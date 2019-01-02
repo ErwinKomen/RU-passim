@@ -1,0 +1,174 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <Name>passim</Name>
+    <RootNamespace>passim</RootNamespace>
+    <InterpreterId>{8c212d24-1430-4982-ade0-2a0e103416f6}</InterpreterId>
+    <InterpreterVersion>3.5</InterpreterVersion>
+    <WebBrowserPort>6405</WebBrowserPort>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>c993c58f-f324-4d95-98fd-0d2022c57566</ProjectGuid>
+    <ProjectHome>
+    </ProjectHome>
+    <ProjectTypeGuids>{5F0BE9CA-D677-4A4D-8806-6076C0FAAD37};{349c5851-65df-11da-9384-00065b846f21};{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <StartupFile>manage.py</StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <LaunchProvider>Web launcher</LaunchProvider>
+    <OutputPath>.</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="manage.py" />
+    <Compile Include="passim\seeker\admin.py" />
+    <Compile Include="passim\seeker\apps.py" />
+    <Compile Include="passim\seeker\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\seeker\migrations\__init__.py" />
+    <Compile Include="passim\seeker\models.py" />
+    <Compile Include="passim\seeker\tests.py" />
+    <Compile Include="passim\seeker\views.py" />
+    <Compile Include="passim\seeker\__init__.py" />
+    <Compile Include="passim\utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\__init__.py" />
+    <Compile Include="passim\settings.py" />
+    <Compile Include="passim\urls.py" />
+    <Compile Include="passim\wsgi.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="passim\" />
+    <Folder Include="passim\seeker\static\" />
+    <Folder Include="passim\seeker\static\seeker\" />
+    <Folder Include="passim\seeker\static\seeker\content\" />
+    <Folder Include="passim\seeker\static\seeker\fonts\" />
+    <Folder Include="passim\seeker\static\seeker\scripts\" />
+    <Folder Include="passim\templates\" />
+    <Folder Include="passim\seeker\" />
+    <Folder Include="passim\seeker\migrations\" />
+    <Folder Include="passim\seeker\templates\" />
+    <Folder Include="passim\templates\admin\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="codemeta.json">
+      <SubType>Code</SubType>
+    </Content>
+    <None Include="passim\seeker\static\seeker\scripts\_references.js" />
+    <Content Include="passim\seeker\static\seeker\content\bootstrap.css" />
+    <Content Include="passim\seeker\static\seeker\content\bootstrap.min.css" />
+    <Content Include="passim\seeker\static\seeker\content\ru-base.css" />
+    <Content Include="passim\seeker\static\seeker\content\ru-form.css" />
+    <Content Include="passim\seeker\static\seeker\content\ru-widgets.css" />
+    <Content Include="passim\seeker\static\seeker\content\site.css" />
+    <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.eot" />
+    <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.svg" />
+    <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.ttf" />
+    <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.woff" />
+    <Content Include="passim\seeker\static\seeker\scripts\bootstrap.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\bootstrap.min.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\passim.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\crpstudio.htable.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\crpstudio.svg.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\html2canvas.js" />
+    <None Include="passim\seeker\static\seeker\scripts\jquery.validate-vsdoc.js" />
+    <None Include="passim\seeker\static\seeker\scripts\jquery-1.10.2.intellisense.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery-1.10.2.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery-1.10.2.min.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery-1.10.2.min.map" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery.validate.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery.validate.min.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery.validate.unobtrusive.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\jquery.validate.unobtrusive.min.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\modernizr-2.6.2.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\respond.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\respond.min.js" />
+    <Content Include="passim\seeker\templates\index.html" />
+    <Content Include="passim\templates\about.html" />
+    <Content Include="passim\templates\admin\base.html" />
+    <Content Include="passim\templates\contact.html" />
+    <Content Include="passim\templates\index.html" />
+    <Content Include="passim\templates\layout.html" />
+    <Content Include="passim\templates\login.html" />
+    <Content Include="passim\templates\loginpartial.html" />
+    <Content Include="passim\templates\more.html" />
+    <Content Include="passim\templates\nlogin.html" />
+    <Content Include="passim\templates\pagination.html" />
+    <Content Include="passim\templates\paginationpost.html" />
+    <Content Include="passim\templates\signup.html" />
+    <Content Include="passim\templates\submit_row.html" />
+    <Content Include="passim\templates\topnav.html" />
+    <Content Include="requirements.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="readme.mht">
+      <SubType>WebBrowser</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="..\..\..\..\..\env\pasim\">
+      <Id>{8c212d24-1430-4982-ade0-2a0e103416f6}</Id>
+      <BaseInterpreter>{2af0f10d-7135-4994-9156-5d01c9c11b7e}</BaseInterpreter>
+      <Version>3.5</Version>
+      <Description>passim (Python 3.5)</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <LibraryPath>Lib\</LibraryPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X86</Architecture>
+    </Interpreter>
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.Django.targets" />
+  <!-- Specify pre- and post-build commands in the BeforeBuild and 
+       AfterBuild targets below. -->
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <AutoAssignPort>True</AutoAssignPort>
+          <UseCustomServer>True</UseCustomServer>
+          <CustomServerUrl>http://localhost</CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}" User="">
+        <WebProjectProperties>
+          <StartPageUrl>
+          </StartPageUrl>
+          <StartAction>CurrentPage</StartAction>
+          <AspNetDebugging>True</AspNetDebugging>
+          <SilverlightDebugging>False</SilverlightDebugging>
+          <NativeDebugging>False</NativeDebugging>
+          <SQLDebugging>False</SQLDebugging>
+          <ExternalProgram>
+          </ExternalProgram>
+          <StartExternalURL>
+          </StartExternalURL>
+          <StartCmdLineArguments>
+          </StartCmdLineArguments>
+          <StartWorkingDirectory>
+          </StartWorkingDirectory>
+          <EnableENC>False</EnableENC>
+          <AlwaysStartWebServerOnDebug>False</AlwaysStartWebServerOnDebug>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+</Project>

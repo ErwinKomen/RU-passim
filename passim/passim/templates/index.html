@@ -1,0 +1,60 @@
+﻿{% extends "layout.html" %}
+{% load staticfiles %}
+
+{% block content %}
+
+<div class="container body-content">
+  <div class="jumbotron" style="max-height: 180px;">
+      <h1>
+        <span>PASSIM</span>
+        <span class="pull-right">
+          {% if not user.is_authenticated %}
+            <a class="btn btn-default" href="{% url 'login' %}"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>Log in</a>
+            <a class="btn btn-default" href="{% url 'signup' %}">Sign up</a>
+          {% endif %}
+          <a href="{% url 'about' %}" class="btn btn-primary btn-large">Learn more &raquo;</a>
+        </span>
+      </h1>
+      <p class="lead">
+        <span>The passim web application provides search facilities for Medieval Latin sermons.</span>
+        
+      </p>
+  </div>
+
+  <div class="row">
+      <div class="col-md-6 bgimg">
+          <h2>Latest news</h2>
+          {% for item in newsitem_list %}
+            <div class="panel panel-default">
+              <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
+                <span>{{item.title}}</span>
+                <span class="pull-right" style="font-size: smaller;">
+                  {% if item.saved %}
+                    <i>{{item.saved|date:"j/b/o"}}</i>
+                  {% else %}
+                    <i>{{item.created|date:"j/b/o"}}</i>
+                  {% endif %}
+                </span>
+              </div>
+              <div class="collapse newsitem" id="news-item-{{item.id}}">
+                {{item.msg|safe}}
+              </div>
+            </div>
+          {% endfor %}
+      </div>
+      <div class="col-md-6">
+        <h2>Getting started</h2>
+        <p>
+            The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
+          Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>) and maintain his or her own research projects.
+          Projects of one researcher are by default <i>not</i> visible to other researchers, but it is possible to specify a different accessibility level.
+        </p>
+        <p>
+          {% if user.is_authenticated %}
+          (See the <b>Extra</b> menu for logout and other options)
+          {% endif %}
+        </p>
+      </div>
+  </div>
+</div>
+{% endblock %}

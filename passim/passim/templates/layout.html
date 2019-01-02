@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    {% load staticfiles %}
+    <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/bootstrap.min.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/ru-base.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/ru-form.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/ru-widgets.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/site.css' %}" />
+    <script src="{% static 'seeker/scripts/modernizr-2.6.2.js' %}"></script>
+    <script src="{% static 'seeker/scripts/jquery-1.10.2.js' %}"></script>
+    <script src="{% static 'seeker/scripts/bootstrap.js' %}"></script>
+    <script src="{% static 'seeker/scripts/respond.js' %}"></script>
+    <script src="{% static 'seeker/scripts/html2canvas.js' %}"></script>
+    <script src="{% static 'seeker/scripts/crpstudio.svg.js' %}"></script>
+    <script src="{% static 'seeker/scripts/crpstudio.htable.js' %}"></script>
+    <script src="{% static 'seeker/scripts/xhr2.js' %}"></script>
+    <script src="{% static 'seeker/scripts/passim.js' %}"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-108165780-4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-108165780-4');
+    </script>
+{% block scripts %}{% endblock %}
+</head>
+
+<body>
+{% load i18n %}
+{% include 'topnav.html' %}
+
+{% block breadcrumbs %}{% endblock %}
+
+    <div class="container-fluid body-content">
+
+{% block content %}{% endblock %}
+
+        <hr/>
+    </div>
+  <div>
+        <footer>
+            <span>PASSIM v1.0.0 &copy; jan/2019 </span>
+            &nbsp;&nbsp;&nbsp;&nbsp;
+            <span>Sponsored by: <a href="https://cordis.europa.eu/project/rcn/218691/factsheet/en">Cordis</a></span>
+            &nbsp;&nbsp;&nbsp;&nbsp;
+            <span>Developed at: <a href="http://cls.ru.nl">Radboud University Nijmegen</a></span>
+        </footer>
+
+  </div>
+
+</body>
+</html>
