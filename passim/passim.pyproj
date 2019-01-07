@@ -57,6 +57,7 @@
     <Folder Include="passim\seeker\static\seeker\content\" />
     <Folder Include="passim\seeker\static\seeker\fonts\" />
     <Folder Include="passim\seeker\static\seeker\scripts\" />
+    <Folder Include="passim\seeker\templates\seeker\" />
     <Folder Include="passim\templates\" />
     <Folder Include="passim\seeker\" />
     <Folder Include="passim\seeker\migrations\" />
@@ -96,7 +97,8 @@
     <Content Include="passim\seeker\static\seeker\scripts\modernizr-2.6.2.js" />
     <Content Include="passim\seeker\static\seeker\scripts\respond.js" />
     <Content Include="passim\seeker\static\seeker\scripts\respond.min.js" />
-    <Content Include="passim\seeker\templates\index.html" />
+    <Content Include="passim\seeker\templates\seeker\collection.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript.html" />
     <Content Include="passim\templates\about.html" />
     <Content Include="passim\templates\admin\base.html" />
     <Content Include="passim\templates\contact.html" />
@@ -108,6 +110,7 @@
     <Content Include="passim\templates\nlogin.html" />
     <Content Include="passim\templates\pagination.html" />
     <Content Include="passim\templates\paginationpost.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon.html" />
     <Content Include="passim\templates\signup.html" />
     <Content Include="passim\templates\submit_row.html" />
     <Content Include="passim\templates\topnav.html" />

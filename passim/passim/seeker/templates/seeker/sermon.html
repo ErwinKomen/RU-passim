@@ -1,0 +1,83 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+      <a href="{% url 'home' %}">Home</a>
+      &rsaquo; Sermon
+  </div>
+{% endblock %}
+
+{% block content %}
+
+  <div class="container body-content">
+
+    {% if authenticated %}
+      <form>
+        <!-- Upper part of the search-a-sermon interface -->
+        <div id="search_sermon_main_TABLE">
+          <div class="row">&nbsp;</div>
+          <table>
+            <tr><td colspan="4" style="width:100%;"></td></tr>
+            <tr>
+              <td align="right" style="width:12%;">AUTHOR</td><td style="width:12%;">{{searchForm.author}}</td>
+              <td align="right" style="width:12%;">INCIPIT</td><td  style="width:12%;">{{searchForm.incipit}}</td>
+              <td align="right" style="width:12%;">EXPLICIT</td><td  style="width:12%;">{{searchForm.explicit}}</td>
+              <td align="right" style="width:12%;">TITLE</td><td  style="width:12%;">{{searchForm.title}}</td>           
+            </tr>
+            <tr style="height: 40px;"><td colspan="4"> </td></tr>
+            <tr>
+              <td align="right">CLAVIS №</td><td >{{searchForm.clavis}}</td>
+              <td align="right">GRYSON №</td><td >{{searchForm.gryson}}</td>
+              <td align="right">FEAST</td><td >{{searchForm.feast}}</td>
+              <td align="right">KEYWORD</td><td >{{searchForm.keyword}}</td>           
+            </tr>
+          </table>
+        </div>
+
+        <div id="search_sermon_main_DIV" class="hidden">
+          <div class="row">&nbsp;</div>
+          <div class="row">
+            <div class="col-md-1">AUTHOR</div><div class="col-md-2">{{searchForm.author}}</div>
+            <div class="col-md-1">INCIPIT</div><div class="col-md-2">{{searchForm.incipit}}</div>
+            <div class="col-md-1">EXPLICIT</div><div class="col-md-2">{{searchForm.explicit}}</div>
+            <div class="col-md-1">TITLE</div><div class="col-md-2">{{searchForm.title}}</div>           
+          </div>
+          <div class="row">&nbsp;</div>
+          <div class="row">
+            <div class="col-md-1">CLAVIS №</div><div class="col-md-2">{{searchForm.clavis}}</div>
+            <div class="col-md-1">GRYSON №</div><div class="col-md-2">{{searchForm.gryson}}</div>
+            <div class="col-md-1">FEAST</div><div class="col-md-2">{{searchForm.feast}}</div>
+            <div class="col-md-1">KEYWORD</div><div class="col-md-2">{{searchForm.keyword}}</div>           
+          </div>
+          <div class="row">&nbsp;</div>
+        </div>
+
+        <!-- Possible matching sermon ID's -->
+        <div id="result_sermon_ids" style="min-height:500px;">
+
+        </div>
+
+        <!-- Lower part: button to add an additional search field -->
+        <div id="search_sermon_add">
+          <span>
+            <a class="btn btn-xs jumbo-2" role="button" href="">Add additional search field</a>
+          </span>
+        </div>
+      </form>
+    {% else %}
+      <div class="explanation">
+        <p>Dear user, you are <b>not</b> logged in.</p>
+        <p>Unfortunately this means that you will not be able to perform any searches.</p>
+        <p>Should you want to work with Passim, here are your options:
+          <ul>
+            <li><a class="btn btn-info btn-xs" href="{% url 'login' %}">Login</a> - if you already have an account</li> 
+            <li><a class="btn btn-warning btn-xs" href="{% url 'signup' %}">Sign up</a> - if you don't have an account yet</li>
+          </ul>
+        </p>
+      </div>
+    {% endif %}
+  </div>
+
+
+{% endblock content %}

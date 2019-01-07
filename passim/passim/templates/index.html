@@ -24,28 +24,35 @@
   <div class="row">
       <div class="col-md-6 bgimg">
           <h2>Latest news</h2>
-          {% for item in newsitem_list %}
-            <div class="panel panel-default">
-              <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
-                <span>{{item.title}}</span>
-                <span class="pull-right" style="font-size: smaller;">
-                  {% if item.saved %}
-                    <i>{{item.saved|date:"j/b/o"}}</i>
-                  {% else %}
-                    <i>{{item.created|date:"j/b/o"}}</i>
-                  {% endif %}
-                </span>
+          {% if newsitem_list %}
+            {% for item in newsitem_list %}
+              <div class="panel panel-default">
+                <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
+                  <span>{{item.title}}</span>
+                  <span class="pull-right" style="font-size: smaller;">
+                    {% if item.saved %}
+                      <i>{{item.saved|date:"j/b/o"}}</i>
+                    {% else %}
+                      <i>{{item.created|date:"j/b/o"}}</i>
+                    {% endif %}
+                  </span>
+                </div>
+                <div class="collapse newsitem" id="news-item-{{item.id}}">
+                  {{item.msg|safe}}
+                </div>
               </div>
-              <div class="collapse newsitem" id="news-item-{{item.id}}">
-                {{item.msg|safe}}
-              </div>
-            </div>
-          {% endfor %}
+            {% endfor %}
+          {% else %}
+            <p><i>(There is no news yet)</i></p>
+          {% endif %}
       </div>
       <div class="col-md-6">
+        <h2>Project</h2>
+        <p>See the PASSIM <a href="to-be-determined">project page</a> for more information.</p>
+
         <h2>Getting started</h2>
         <p>
-            The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
+          The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
           Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>) and maintain his or her own research projects.
           Projects of one researcher are by default <i>not</i> visible to other researchers, but it is possible to specify a different accessibility level.
         </p>

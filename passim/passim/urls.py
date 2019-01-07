@@ -39,6 +39,10 @@ urlpatterns = [
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
 
+    url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
+    url(r'^search/manuscript', passim.seeker.views.search_manuscript, name='search_manuscript'),
+    url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
+
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
 

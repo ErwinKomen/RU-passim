@@ -20,7 +20,9 @@
                       <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                          aria-haspopup="true" aria-expanded="false">Search<span class="caret"></span></a>
                       <ul class="dropdown-menu">
-                          <li><a href="">List of searches</a></li>
+                          <li><a href="{% url 'search_sermon' %}">Sermon</a></li>
+                          <li><a href="{% url 'search_manuscript' %}">Manuscript</a></li>
+                          <li><a href="{% url 'search_collection' %}">Collection</a></li>
                       </ul>
                     </li>
                 </ul>

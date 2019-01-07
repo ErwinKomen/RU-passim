@@ -20,6 +20,8 @@ from datetime import datetime
 from time import sleep
 
 from passim.settings import APP_PREFIX
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm
+
 import fnmatch
 import sys
 import base64
@@ -98,6 +100,75 @@ def nlogin(request):
                     'message':'Radboud University passim utility.',
                     'year':datetime.now().year,}
     return render(request,'nlogin.html', context)
+
+def search_sermon(request):
+    """Search for a sermon"""
+
+    # Set defaults
+    template_name = "seeker/sermon.html"
+
+    # Get a link to a form
+    searchForm = SearchSermonForm()
+
+    # Other initialisations
+    currentuser = request.user
+    authenticated = currentuser.is_authenticated()
+
+    # Create context and add to it
+    context = dict(title="Search sermon",
+                   authenticated=authenticated,
+                   searchForm=searchForm)
+
+
+    # Create and show the result
+    return render(request, template_name, context)
+
+
+def search_manuscript(request):
+    """Search for a manuscript"""
+
+    # Set defaults
+    template_name = "seeker/manuscript.html"
+
+    # Get a link to a form
+    searchForm = SearchManuscriptForm()
+
+    # Other initialisations
+    currentuser = request.user
+    authenticated = currentuser.is_authenticated()
+
+    # Create context and add to it
+    context = dict(title="Search manuscript",
+                   authenticated=authenticated,
+                   searchForm=searchForm)
+
+
+    # Create and show the result
+    return render(request, template_name, context)
+
+
+def search_collection(request):
+    """Search for a collection"""
+
+    # Set defaults
+    template_name = "seeker/collection.html"
+
+    # Get a link to a form
+    searchForm = SearchCollectionForm()
+
+    # Other initialisations
+    currentuser = request.user
+    authenticated = currentuser.is_authenticated()
+
+    # Create context and add to it
+    context = dict(title="Search collection",
+                   authenticated=authenticated,
+                   searchForm=searchForm)
+
+
+    # Create and show the result
+    return render(request, template_name, context)
+
 
 def signup(request):
     """Provide basic sign up and validation of it """

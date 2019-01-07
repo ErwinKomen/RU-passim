@@ -37,3 +37,24 @@ class SignUpForm(UserCreationForm):
         fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2', )
 
 
+class SearchSermonForm(forms.Form):
+    author = forms.CharField(label=_("Author"), required=False)
+    incipit = forms.CharField(label=_("Incipit"), required=False)
+    explicit = forms.CharField(label=_("Explicit"), required=False)
+    title = forms.CharField(label=_("Title"), required=False)
+    clavis = forms.CharField(label=_("Clavis"), required=False)
+    gryson = forms.CharField(label=_("Gryson"), required=False)
+    feast = forms.CharField(label=_("Feast"), required=False)
+    keyword = forms.CharField(label=_("Keyword"), required=False)
+
+class SearchManuscriptForm(forms.Form):
+    country = forms.CharField(label=_("Country"), required=False)
+    city = forms.CharField(label=_("City"), required=False)
+    library = forms.CharField(label=_("Library"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False)
+
+class SearchCollectionForm(forms.Form):
+    country = forms.CharField(label=_("Country"), required=False)
+    city = forms.CharField(label=_("City"), required=False)
+    library = forms.CharField(label=_("Library"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False)
