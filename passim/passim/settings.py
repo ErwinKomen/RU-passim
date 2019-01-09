@@ -32,6 +32,10 @@ elif "131.174" in hst:
     # Configuration within the Radboud University environment
     APP_PREFIX = ""
     admin.site.site_url = '/'
+elif "/var/www" in WRITABLE_DIR:
+    # New configuration of http://corpus-studio-web.cttnww-meertens.surf-hosted.nl/passim
+    APP_PREFIX = "passim/"
+    admin.site.site_url = '/passim'
 else:
     APP_PREFIX = "dd/"
     admin.site.site_url = '/dd'
@@ -51,7 +55,7 @@ SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', 'passim.science.ru.nl']
+ALLOWED_HOSTS = ['localhost', 'passim.science.ru.nl', 'corpus-studio-web.cttnww-meertens.surf-hosted.nl' ]
 
 
 # Application definition
