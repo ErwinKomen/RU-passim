@@ -243,3 +243,4 @@ ModelManifest.xml
 
 # Python stuff
 *.pyc
+/passim/passim/seeker/migrations

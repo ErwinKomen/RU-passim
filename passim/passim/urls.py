@@ -39,6 +39,10 @@ urlpatterns = [
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
 
+    url(r'^sync/entry/$', passim.seeker.views.sync_entry, name='entries_json'),
+    url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
+    url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
+
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', passim.seeker.views.search_manuscript, name='search_manuscript'),
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),

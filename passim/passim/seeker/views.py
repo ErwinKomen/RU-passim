@@ -20,7 +20,9 @@ from datetime import datetime
 from time import sleep
 
 from passim.settings import APP_PREFIX
+from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm
+from passim.seeker.models import process_lib_entries, Status
 
 import fnmatch
 import sys
@@ -100,6 +102,120 @@ def nlogin(request):
                     'message':'Radboud University passim utility.',
                     'year':datetime.now().year,}
     return render(request,'nlogin.html', context)
+
+def sync_entry(request):
+    """-"""
+    assert isinstance(request, HttpRequest)
+
+    # Gather info
+    context = {'title': 'SyncEntry',
+               'message': 'Radboud University PASSIM'
+               }
+    template_name = 'seeker/syncentry.html'
+
+    # Add the information in the 'context' of the web page
+    return render(request, template_name, context)
+
+def sync_start(request):
+    """Synchronize information"""
+
+    oErr = ErrHandle()
+    data = {'status': 'starting'}
+    try:
+        # Get the user
+        username = request.user.username
+        # Get the synchronization type
+        get = request.GET
+        synctype = ""
+        if 'synctype' in get:
+            synctype = get['synctype']
+
+        if synctype == '':
+            # Formulate a response
+            data['status'] = 'no sync type specified'
+
+        else:
+            # Remove previous status objects for this combination of user/type
+            lstQ = []
+            lstQ.append(Q(user=username))
+            lstQ.append(Q(type=synctype))
+            qs = Status.objects.filter(*lstQ)
+            qs.delete()
+
+            # Create a status object for this combination of synctype/user
+            oStatus = Status(user=username, type=synctype, status="preparing")
+            oStatus.save()
+
+            # Formulate a response
+            data['status'] = 'done'
+
+            if synctype == "entries":
+                # Use the synchronisation object that contains all relevant information
+                oStatus.set("loading")
+
+                # Update the models with the new information
+                oResult = process_lib_entries(oStatus)
+                if oResult == None or oResult['result'] == False:
+                    data.status = 'error'
+                elif oResult != None:
+                    data['count'] = oResult
+
+    except:
+        oErr.DoError("sync_start error")
+        data['status'] = "error"
+
+    # Return this response
+    return JsonResponse(data)
+
+def sync_progress(request):
+    """Get the progress on the /crpp synchronisation process"""
+
+    oErr = ErrHandle()
+    data = {'status': 'preparing'}
+
+    try:
+        # Get the user
+        username = request.user.username
+        # Get the synchronization type
+        get = request.GET
+        synctype = ""
+        if 'synctype' in get:
+            synctype = get['synctype']
+
+        if synctype == '':
+            # Formulate a response
+            data['status'] = 'error'
+            data['msg'] = "no sync type specified" 
+
+        else:
+            # Formulate a response
+            data['status'] = 'UNKNOWN'
+
+            # Get the appropriate status object
+            # sleep(1)
+            oStatus = Status.objects.filter(user=username, type=synctype).first()
+
+            # Check what we received
+            if oStatus == None:
+                # There is no status object for this type
+                data['status'] = 'error'
+                data['msg'] = "Cannot find status for {}/{}".format(
+                    username, synctype)
+            else:
+                # Get the last status information
+                data['status'] = oStatus.status
+                data['msg'] = oStatus.msg
+                data['count'] = oStatus.count
+
+        # Return this response
+        return JsonResponse(data)
+    except:
+        oErr.DoError("sync_start error")
+        data = {'status': 'error'}
+
+    # Return this response
+    return JsonResponse(data)
+
 
 def search_sermon(request):
     """Search for a sermon"""

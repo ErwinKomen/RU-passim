@@ -8,10 +8,10 @@ var $ = jQuery;
   $(function () {
     $(document).ready(function () {
       // Initialize event listeners
-      ru.cesar.init_event_listeners();
+      ru.passim.init_event_listeners();
       $('#id_subtype >option').show();
       // Add 'copy' action to inlines
-      ru.cesar.tabinline_add_copy();
+      ru.passim.tabinline_add_copy();
     });
   });
 })(django.jQuery);
@@ -23,7 +23,7 @@ var $ = jQuery;
 var ru = (function ($, ru) {
   "use strict";
 
-  ru.cesar = (function ($, config) {
+  ru.passim = (function ($, config) {
     // Define variables for ru.collbank here
     var loc_example = "",
         loc_divErr = "sentdetails_err",
@@ -53,14 +53,14 @@ var ru = (function ($, ru) {
        */
       init_event_listeners: function () {
         // Bind the keyup and change events
-        // $('#id_DCtype').bind('keyup', ru.cesar.type_change);
-        // $('#id_DCtype').bind('change', ru.cesar.type_change);
+        // $('#id_DCtype').bind('keyup', ru.passim.type_change);
+        // $('#id_DCtype').bind('change', ru.passim.type_change);
         // Bind the change event for text_list.html, 'part-name'
-        $("#part-name").bind('change', ru.cesar.part_change);
-        $("#part-name").change(ru.cesar.part_change);
+        $("#part-name").bind('change', ru.passim.part_change);
+        $("#part-name").change(ru.passim.part_change);
 
         // When a text-line is clicked, a waiting symbol should show up
-        $("#sentence-list .line-text a").bind('click', ru.cesar.sent_click);
+        $("#sentence-list .line-text a").bind('click', ru.passim.sent_click);
       },
     
       type_change: function (el) {
@@ -260,7 +260,7 @@ var ru = (function ($, ru) {
 
         // Start looking only after some time
         oJson = { 'status': 'started' };
-        ru.cesar.oSyncTimer = window.setTimeout(function () { ru.cesar.sync_progress(sSyncType, oJson); }, 3000);
+        ru.passim.oSyncTimer = window.setTimeout(function () { ru.passim.sync_progress(sSyncType, oJson); }, 3000);
 
         // Define the URL
         sUrl = $("#sync_start_" + sSyncType).attr('sync-start');
@@ -273,7 +273,7 @@ var ru = (function ($, ru) {
           cache: false,
           success: function (json) {
             $("#sync_details_" + sSyncType).html("start >> sync_stop");
-            ru.cesar.sync_stop(sSyncType, json);
+            ru.passim.sync_stop(sSyncType, json);
           },
           failure: function () {
             $("#sync_details_" + sSyncType).html("Ajax failure");
@@ -302,7 +302,7 @@ var ru = (function ($, ru) {
           cache: false,
           success: function (json) {
             $("#sync_details_" + sSyncType).html("progress >> sync_handle");
-            ru.cesar.sync_handle(sSyncType, json);
+            ru.passim.sync_handle(sSyncType, json);
           },
           failure: function () {
             $("#sync_details_" + sSyncType).html("Ajax failure");
@@ -330,24 +330,24 @@ var ru = (function ($, ru) {
           case 'error':
             // Show we are ready
             $("#sync_progress_" + sSyncType).html("Error synchronizing: " + sSyncType);
-            $("#sync_details_" + sSyncType).html(ru.cesar.sync_details(json));
+            $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
             // Stop the progress calling
-            window.clearInterval(ru.cesar.oSyncTimer);
+            window.clearInterval(ru.passim.oSyncTimer);
             // Leave the routine, and don't return anymore
             return;
           case "done":
           case "finished":
             // Default action is to show the status
             $("#sync_progress_" + sSyncType).html(json.status);
-            $("#sync_details_" + sSyncType).html(ru.cesar.sync_details(json));
+            $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
             // Finish nicely
-            ru.cesar.sync_stop(sSyncType, json);
+            ru.passim.sync_stop(sSyncType, json);
             return;
           default:
             // Default action is to show the status
             $("#sync_progress_" + sSyncType).html(json.status);
-            $("#sync_details_" + sSyncType).html(ru.cesar.sync_details(json));
-            ru.cesar.oSyncTimer = window.setTimeout(function () { ru.cesar.sync_progress(sSyncType, options); }, 1000);
+            $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
+            ru.passim.oSyncTimer = window.setTimeout(function () { ru.passim.sync_progress(sSyncType, options); }, 1000);
             break;
         }
       },
@@ -361,7 +361,7 @@ var ru = (function ($, ru) {
         var lHtml = [];
 
         // Stop the progress calling
-        window.clearInterval(ru.cesar.oSyncTimer);
+        window.clearInterval(ru.passim.oSyncTimer);
         // Show we are ready
         $("#sync_progress_" + sSyncType).html("Finished synchronizing: " + sSyncType + "<br>" + JSON.stringify(json, null, 2));
 

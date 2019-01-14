@@ -71,10 +71,28 @@ class FieldChoiceAdmin(admin.ModelAdmin):
         obj.save()
 
 
+class CountryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'nameFR', 'idPaysEtab']
+    
+
+class CityAdmin(admin.ModelAdmin):
+    list_display = ['name', 'idVilleEtab', 'country']
+    list_filter = ['country']
+
+
+class LibraryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'idLibrEtab', 'libtype', 'country', 'city']
+    list_filter = ['libtype', 'country']
 
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
+
+# Main program models
+admin.site.register(Country, CountryAdmin)
+admin.site.register(City, CityAdmin)
+admin.site.register(Library, LibraryAdmin)
+
 # Logbook of activities
 admin.site.register(LogEntry, LogEntryAdmin)
 
