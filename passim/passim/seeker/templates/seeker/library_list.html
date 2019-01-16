@@ -1,0 +1,141 @@
+﻿{% extends "layout.html" %}
+
+{% block content %}
+
+      <div class="panel panel-default">
+        <form name='librarysearch' id='librarysearch' method='get' action="{% url 'library_search' %}" >
+            <!-- EK: A sort-order specification is in a hidden form field, which is filled by JS:do_sort_column() -->
+            <div class="hidden">
+                <input name='sortOrder' class='form-control' value='stad' >
+                <input name='search_type' class='form-control' value='stad'>
+                <input id="submit_type" name='submit_type' class='form-control' value='simple'>
+            </div>
+
+            <!-- The top layer of searching -->
+            <div class="row"><table><tr><td>&nbsp;</td></tr></table></div>
+
+
+            <div id="searchdefault" class="row">
+              <div class="col-sm-3">
+                <label>&nbsp;</label>
+                <div class='input-group'>
+                    <label class='input-group-addon' 
+                           data-toggle="popover" data-trigger="hover"
+                           data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
+                           for='id_country'>{{searchform.country.label}}</label>
+                    <input name='country' class='form-control typeahead countries' type="text" 
+                           {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
+                           placeholder="Country..."
+                           onkeyup="ru.passim.form_submit(event);">
+                </div>
+              </div>
+              <div class="col-sm-3">
+                <label>&nbsp;</label>
+                <div class='input-group'>
+                    <label class='input-group-addon' 
+                           data-toggle="popover" data-trigger="hover"
+                           data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
+                           for='id_city'>{{searchform.city.label}}</label>
+                    <input name='city' class='form-control typeahead cities' type="text" 
+                           {% if searchform.city.value %}value='{{searchform.city.value}}'{% endif %}
+                           placeholder="City..."
+                           onkeyup="ru.passim.form_submit(event);">
+                </div>
+              </div>
+              <div class="col-sm-3">
+                <label>&nbsp;</label>
+                <div class='input-group'>
+                    <label class='input-group-addon' 
+                           data-toggle="popover" data-trigger="hover"
+                           data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
+                           for='id_name'>{{searchform.name.label}}</label>
+                    <input name='name' class='form-control typeahead libraries' type="text" 
+                           {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
+                           placeholder="Name of library..."
+                           onkeyup="ru.passim.form_submit(event);">
+                </div>
+              </div>
+              <div class="col-sm-1">
+                <div class='form-group' id='paginate_by'>
+                  <label for='paginate_by'>Per page</label>
+                  <select class='form-control' name="paginate_by">
+                    {% for pag in paginateValues %}
+                    <option {% if pag == paginateSize %} selected {% endif %}>{{pag}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="col-sm-1 pull-right">
+                <div class="input-group">
+                  <div><label>&nbsp;</label></div>
+                  <div class='btn-group'>
+                      <!-- Submit the search form -->
+                      <a role="button" class="btn jumbo-1" onclick="$(this).closest('form').submit();">Search</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        </form>
+      </div>
+
+    {% if object_list %}
+      <div class="panel panel-default">
+
+        <h3>Libraries</h3>
+        <div class="row">
+            <div class="col-sm-4"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-8">
+            <span class="step-links pull-right">
+
+            {% include 'pagination.html' %}
+
+            </span>
+            </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-hover">
+              <thead><tr><th class="hidden">id</th><th>Country</th><th>City</th><th>Library</th><th>type</th><th class="hidden">Toelichting</th></tr></thead>
+              <tbody>
+              {% for library in object_list %}
+                <tr class="dict-entry">
+                  <td class="hidden"> {{ library.id }}</td>
+                  <td>
+                    <span class="library-country"><a href="{% url 'library_search' %}?country={{library.country|urlencode}}">{{library.country}}</a></span>
+                  </td>
+                  <td>
+                    <span class="library-city">{{library.city}}</span>
+                  </td>
+                  <td>
+                    <span class="library-name">{{library.name}}</span>
+                  </td>
+                  <td>
+                    <span class="library-type">{{library.libtype}}</span>
+                  </td>
+                  <td class="hidden">
+                    <span class="toelichting"></span>
+                  </td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <p>No libraries have beenfound.</p>
+      {% endif %}
+
+      <div class="pagination">
+          <span class="step-links">
+
+          {% include 'pagination.html' %}
+
+          </span>
+      </div>
+
+      </div>
+
+{% endblock content %}
+

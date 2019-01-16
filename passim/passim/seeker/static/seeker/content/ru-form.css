@@ -42,7 +42,7 @@ label {
 .required label, label.required {
     font-weight: bold;
     color: #333;
-}
+} 
 
 /* ALIGNED FIELDSETS */
 
@@ -54,6 +54,7 @@ label {
     word-wrap: break-word;
     line-height: 1;
 }
+
 
 .aligned label:not(.vCheckboxLabel):after {
     content: '';

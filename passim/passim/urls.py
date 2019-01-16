@@ -12,8 +12,7 @@ import passim.seeker.forms
 import passim.seeker.views
 from passim.seeker.views import *
 
-
-# Import from CESAR as a whole
+# Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
 
 # Other Django stuff
@@ -46,6 +45,11 @@ urlpatterns = [
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', passim.seeker.views.search_manuscript, name='search_manuscript'),
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
+    url(r'^search/library', LibraryListView.as_view(), name='library_search'),
+
+    url(r'^api/countries/', passim.seeker.views.get_countries, name='api_countries'),
+    url(r'^api/cities/', passim.seeker.views.get_cities, name='api_cities'),
+    url(r'^api/libraries/', passim.seeker.views.get_libraries, name='api_libraries'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),

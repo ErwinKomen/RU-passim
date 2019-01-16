@@ -1,7 +1,7 @@
 ﻿/* FORM DEFAULTS */
 
 input, textarea, select, .form-row p, form .button {
-    margin: 2px 0;
+    /* margin: 2px 0; /* Don't use this!!!  */
     padding: 2px 3px;
     vertical-align: middle;
     font-family: "Roboto", "Lucida Grande", Verdana, Arial, sans-serif;

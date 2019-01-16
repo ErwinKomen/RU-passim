@@ -11,6 +11,7 @@ from passim.settings import APP_PREFIX, WRITABLE_DIR
 import sys, os
 import copy
 import json
+import time
 
 STANDARD_LENGTH=100
 LONG_STRING=255
@@ -32,6 +33,9 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
+
+def get_now_time():
+    return time.clock()
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -276,7 +280,7 @@ class Library(models.Model):
     # [1] LIbrary code according to CNRS
     idLibrEtab = models.IntegerField("CNRS library id", default=-1)
     # [1] Name of the library
-    name = models.CharField("Name", max_length=LONG_STRING)
+    name = models.CharField("Library", max_length=LONG_STRING)
     # [1] Has this library been bracketed?
     libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), 
                             max_length=5)

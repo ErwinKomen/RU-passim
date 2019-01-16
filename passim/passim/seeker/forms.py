@@ -58,3 +58,15 @@ class SearchCollectionForm(forms.Form):
     city = forms.CharField(label=_("City"), required=False)
     library = forms.CharField(label=_("Library"), required=False)
     signature = forms.CharField(label=_("Signature"), required=False)
+
+
+class LibrarySearchForm(forms.ModelForm):
+
+    class Meta:
+
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Library
+        fields = ('country', 'city', 'libtype', 'name')
+
+

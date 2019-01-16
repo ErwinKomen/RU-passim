@@ -12,6 +12,9 @@ var $ = jQuery;
       $('#id_subtype >option').show();
       // Add 'copy' action to inlines
       ru.passim.tabinline_add_copy();
+      // Initialize Bootstrap popover
+      // Note: this is used when hovering over the question mark button
+      $('[data-toggle="popover"]').popover();
     });
   });
 })(django.jQuery);
@@ -27,6 +30,10 @@ var ru = (function ($, ru) {
     // Define variables for ru.collbank here
     var loc_example = "",
         loc_divErr = "sentdetails_err",
+        loc_countries = [],
+        loc_cities = [],
+        loc_libraries = [],
+        base_url = "",
         oSyncTimer = null;
 
 
@@ -52,15 +59,65 @@ var ru = (function ($, ru) {
        *    Initialize eent listeners for this module
        */
       init_event_listeners: function () {
-        // Bind the keyup and change events
-        // $('#id_DCtype').bind('keyup', ru.passim.type_change);
-        // $('#id_DCtype').bind('change', ru.passim.type_change);
         // Bind the change event for text_list.html, 'part-name'
         $("#part-name").bind('change', ru.passim.part_change);
         $("#part-name").change(ru.passim.part_change);
 
         // When a text-line is clicked, a waiting symbol should show up
         $("#sentence-list .line-text a").bind('click', ru.passim.sent_click);
+
+        // Get the base URL
+        base_url = $("__baseurl__").text();
+
+        // Initialise bloodhounds for country, city and library
+        loc_countries = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_countries will be an array of countries
+          local: loc_countries,
+          prefetch: { url: base_url + '/api/countries/', cache: true },
+          remote: {
+            url: base_url + '/api/countries/?country=%QUERY',
+            wildcard: '%QUERY'                  // %QUERY will be replace by users input in the URL option
+          }
+        });
+
+        // Initialize specific typeaheads
+        $(".typeahead.countries").typeahead(
+          { hint: true, highlight: true, minLength: 1 },
+          { name: 'countries',
+            source: loc_countries,
+            display: function (item) { return item.name; },
+            limit: 10,
+            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; }
+            }
+          }
+        );
+      },
+
+      /**
+       *  form_submit
+       *    Refer to this in an [onkeydown] item of an input box
+       *    When the ENTER key is pressed, the nearest form is submitted
+       */
+      form_submit: function(e) {
+        var target,
+            frm = null;
+
+        try {
+          // Get the event
+          e = e || window.event;
+          if (e.keyCode == 13) {
+            // Get the target
+            target = e.target || e.srcElement;
+            // Find the form
+            frm = $(target).closest("form");
+            // Submit that form
+            $(frm).submit();
+          }
+        } catch (ex) {
+          private_methods.errMsg("form_submit", ex);
+        }
       },
     
       type_change: function (el) {
@@ -98,41 +155,6 @@ var ru = (function ($, ru) {
         $.ajax(ajaxoptions);
         // Do something else to provide a break point
         var k = 0;
-      },
-
-      /**
-       * start_tree_draw
-       *   Initiate drawing a syntax tree
-       *
-       */
-      start_tree_draw: function () {
-        var sTree = "", oTree = {},
-            divNodes = "sentdetails_node",
-            divTree = "sentdetails_tree",
-            divHtable = "sentdetails_htable",
-            divSvg = "sentdetails_svg";
-
-        try {
-          // Convert the tree we get
-          sTree = $("#" + divNodes).text();
-          oTree = JSON.parse(sTree);
-          // Draw the tree using the NEW method
-          crpstudio.svg.treeToSvg("#" + divTree, oTree, "#" + loc_divErr);
-          // Draw the Htable
-          crpstudio.htable.treeToHtable("#" + divHtable, oTree, "#" + loc_divErr);
-        } catch (ex) {
-          private_methods.errMsg("start_tree_draw", ex);
-        }
-      },
-
-      /**
-       * part_change: act on a change in selected 'part' in text_list.html
-       */
-      part_change : function() {
-        // Get the name of the part that has been chosen
-        var sPartName = $("#part-name option:selected").html();
-        // Show this name
-        $("#corpus_selected").html("<b>" + sPartName + "</b>");
       },
 
       /**

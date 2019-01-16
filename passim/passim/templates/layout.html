@@ -14,6 +14,7 @@
     <script src="{% static 'seeker/scripts/jquery-1.10.2.js' %}"></script>
     <script src="{% static 'seeker/scripts/bootstrap.js' %}"></script>
     <script src="{% static 'seeker/scripts/respond.js' %}"></script>
+    <script src="{% static 'seeker/scripts/typeahead.bundle.js' %}"></script>
     <script src="{% static 'seeker/scripts/html2canvas.js' %}"></script>
     <script src="{% static 'seeker/scripts/crpstudio.svg.js' %}"></script>
     <script src="{% static 'seeker/scripts/crpstudio.htable.js' %}"></script>
@@ -38,6 +39,7 @@
 {% block breadcrumbs %}{% endblock %}
 
     <div class="container-fluid body-content">
+      <div id="__baseurl__" class="hidden">{% url 'home' %}</div>
 
 {% block content %}{% endblock %}
 

@@ -16,17 +16,29 @@ from django.template.loader import render_to_string
 from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
+from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime
 from time import sleep
 
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm
-from passim.seeker.models import process_lib_entries, Status
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City
 
 import fnmatch
 import sys
 import base64
+import json
+
+# Some constants that can be used
+paginateSize = 20
+paginateValues = (100, 50, 20, 10, 5, 2, 1, )
+
+def adapt_search(val):
+    # First trim
+    val = val.strip()
+    val = '^' + fnmatch.translate(val) + '$'
+    return val
 
 def home(request):
     """Renders the home page."""
@@ -216,7 +228,6 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-
 def search_sermon(request):
     """Search for a sermon"""
 
@@ -238,7 +249,6 @@ def search_sermon(request):
 
     # Create and show the result
     return render(request, template_name, context)
-
 
 def search_manuscript(request):
     """Search for a manuscript"""
@@ -262,7 +272,6 @@ def search_manuscript(request):
     # Create and show the result
     return render(request, template_name, context)
 
-
 def search_collection(request):
     """Search for a collection"""
 
@@ -284,7 +293,6 @@ def search_collection(request):
 
     # Create and show the result
     return render(request, template_name, context)
-
 
 def signup(request):
     """Provide basic sign up and validation of it """
@@ -315,3 +323,143 @@ def signup(request):
     else:
         form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
+
+@csrf_exempt
+def get_countries(request):
+    """Get a list of countries for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        sName = request.GET.get('country', '')
+        lstQ = []
+        lstQ.append(Q(name__icontains=sName))
+        countries = Country.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in countries:
+            # co_json = {'combi': "{}: {}".format(co.id, co.name)}
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_cities(request):
+    """Get a list of cities for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        pass
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+    
+@csrf_exempt
+def get_libraries(request):
+    """Get a list of libraries for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        pass
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+    
+
+class LibraryListView(ListView):
+    """Listview of libraries in countries/cities"""
+
+    model = Library
+    paginate_by = 20
+    template_name = 'seeker/library_list.html'
+    entrycount = 0
+    bDoTime = True
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(LibraryListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        initial = self.request.GET
+        search_form = LibrarySearchForm(initial)
+
+        context['searchform'] = search_form
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim Libraries"
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Measure how long it takes
+        if self.bDoTime: iStart = get_now_time()
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Fix the sort-order
+        get['sortOrder'] = 'country'
+
+        lstQ = []
+
+        # Check for the library [country]
+        if 'country' in get and get['country'] != '':
+            val = adapt_search(get['country'])
+            lstQ.append(Q(country__name__iregex=val) )
+
+        # Check for the library [city]
+        if 'city' in get and get['city'] != '':
+            val = adapt_search(get['city'])
+            lstQ.append(Q(city__name__iregex=val))
+
+        # Check for the library [libtype] ('br' or 'pl')
+        if 'libtype' in get and get['libtype'] != '':
+            val = adapt_search(get['libtype'])
+            lstQ.append(Q(libtype__iregex=val))
+
+        # Check for library [name]
+        if 'name' in get and get['name'] != '':
+            val = adapt_search(get['name'])
+            lstQ.append(Q(name__iregex=val))
+
+        # Calculate the final qs
+        qs = Library.objects.filter(*lstQ).order_by('country', 'city').distinct()
+
+        # Time measurement
+        if self.bDoTime:
+            print("LibraryListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+            print("LibraryListView query: {}".format(qs.query))
+            iStart = get_now_time()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Time measurement
+        if self.bDoTime:
+            print("LibraryListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+    
+            
