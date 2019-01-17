@@ -950,18 +950,17 @@ class LibraryListDownload(BasicPart):
         else:
             # Create CSV string writer
             output = StringIO()
-            csvwriter = csv.writer(output, delimiter=",", quotechar='"')
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
             # Headers
             headers = ['id', 'country', 'city', 'library', 'libtype']
             csvwriter.writerow(headers)
-            # lData.append(",".join(headers))
             # Loop
             for lib in self.get_queryset(prefix):
                 row = [lib.id, lib.country.name, lib.city.name, lib.name, lib.libtype]
                 csvwriter.writerow(row)
-                # lData.append(",".join(row))
+
             # Convert to string
-            #sData = "\n".join(lData)
             sData = output.getvalue()
             output.close()
 
