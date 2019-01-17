@@ -46,6 +46,7 @@ urlpatterns = [
     url(r'^search/manuscript', passim.seeker.views.search_manuscript, name='search_manuscript'),
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
+    url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
 
     url(r'^api/countries/', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/', passim.seeker.views.get_cities, name='api_cities'),

@@ -19,6 +19,8 @@ var $ = jQuery;
   });
 })(django.jQuery);
 
+
+
 // based on the type, action will be loaded
 
 // var $ = django.jQuery.noConflict();
@@ -46,6 +48,9 @@ var ru = (function ($, ru) {
       methodNotVisibleFromOutside: function () {
         return "something";
       },
+      errClear: function() {
+        $("#" + loc_divErr).html("");
+      },
       errMsg: function (sMsg, ex) {
         var sHtml = "Error in [" + sMsg + "]<br>" + ex.message;
         $("#" + loc_divErr).html(sHtml);
@@ -67,7 +72,7 @@ var ru = (function ($, ru) {
         $("#sentence-list .line-text a").bind('click', ru.passim.sent_click);
 
         // Get the base URL
-        base_url = $("__baseurl__").text();
+        base_url = $("#__baseurl__").text();
 
         // Bloodhound: COUNTRY
         loc_countries = new Bloodhound({
@@ -75,8 +80,8 @@ var ru = (function ($, ru) {
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
           local: loc_countries,
-          prefetch: { url: base_url + '/api/countries/', cache: true },
-          remote:   { url: base_url + '/api/countries/?country=%QUERY', wildcard: '%QUERY' }
+          prefetch: { url: base_url + 'api/countries/', cache: true },
+          remote:   { url: base_url + 'api/countries/?country=%QUERY', wildcard: '%QUERY' }
         });
 
         // Bloodhound: CITY
@@ -85,9 +90,9 @@ var ru = (function ($, ru) {
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
           local: loc_cities,
-          prefetch: { url: base_url + '/api/cities/', cache: true },
+          prefetch: { url: base_url + 'api/cities/', cache: true },
           remote: {
-            url: base_url + '/api/cities/?city=',
+            url: base_url + 'api/cities/?city=',
             replace: function (url, uriEncodedQuery) {
               var country = $("input[name=country]").val();
               url += encodeURIComponent(uriEncodedQuery);
@@ -103,9 +108,9 @@ var ru = (function ($, ru) {
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
           local: loc_cities,
-          prefetch: { url: base_url + '/api/libraries/', cache: true },
+          prefetch: { url: base_url + 'api/libraries/', cache: true },
           remote: {
-            url: base_url + '/api/libraries/?library=',
+            url: base_url + 'api/libraries/?library=',
             replace: function (url, uriEncodedQuery) {
               var city = $("input[name=city]").val();
               var country = $("input[name=country]").val();
@@ -147,6 +152,7 @@ var ru = (function ($, ru) {
           var style = $(this).attr("style");
           $(this).attr("style", style + " width: 100%;");
         });
+
       },
 
       /**
@@ -166,11 +172,80 @@ var ru = (function ($, ru) {
             target = e.target || e.srcElement;
             // Find the form
             frm = $(target).closest("form");
+            // Make sure the GET method is used
+            $(frm).attr("method", "GET");
             // Submit that form
             $(frm).submit();
           }
         } catch (ex) {
           private_methods.errMsg("form_submit", ex);
+        }
+      },
+
+      /**
+        * result_download
+        *   Trigger creating and downloading a result CSV / XLSX / JSON
+        *
+        */
+      post_download: function (elStart) {
+        var ajaxurl = "",
+            contentid = null,
+            response = null,
+            frm = null,
+            el = null,
+            sHtml = "",
+            oBack = null,
+            dtype = "",
+            sMsg = "",
+            data = [];
+
+        try {
+          // Clear the errors
+          private_methods.errClear();
+
+          // obligatory parameter: ajaxurl
+          ajaxurl = $(elStart).attr("ajaxurl");
+          contentid = $(elStart).attr("contentid");
+
+          // Gather the information
+          frm = $(elStart).closest(".container-small").find("form");
+          if (frm.length === 0) {
+            frm = $(elStart).closest("td").find("form");
+            if (frm.length === 0) {
+              frm = $(elStart).closest(".body-content").find("form");
+              if (frm.length === 0) {
+                frm = $(elStart).closest(".container-large.body-content").find("form");
+              }
+            }
+          }
+          // Set the 'action; attribute in the form
+          frm.attr("action", ajaxurl);
+          // Make sure we do a POST
+          frm.attr("method", "POST");
+
+          // Get the download type and put it in the <input>
+          dtype = $(elStart).attr("downloadtype");
+          $(frm).find("#downloadtype").val(dtype);
+
+          // Do we have a contentid?
+          if (contentid !== undefined && contentid !== null && contentid !== "") {
+            // Process download data
+            switch (dtype) {
+              default:
+                // TODO: add error message here
+                return;
+            }
+          } else {
+            // Do a plain submit of the form
+            oBack = frm.submit();
+          }
+
+          // Check on what has been returned
+          if (oBack !== null) {
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("post_download", ex);
         }
       },
     

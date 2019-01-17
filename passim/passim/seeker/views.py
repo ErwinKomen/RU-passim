@@ -29,6 +29,10 @@ import fnmatch
 import sys
 import base64
 import json
+import csv
+import openpyxl
+from openpyxl.utils.cell import get_column_letter
+from io import StringIO
 
 # Some constants that can be used
 paginateSize = 20
@@ -39,6 +43,43 @@ def adapt_search(val):
     val = val.strip()
     val = '^' + fnmatch.translate(val) + '$'
     return val
+
+def csv_to_excel(sCsvData, response):
+    """Convert CSV data to an Excel worksheet"""
+
+    # Start workbook
+    wb = openpyxl.Workbook()
+    ws = wb.get_active_sheet()
+    ws.title="Data"
+
+    # Start accessing the string data 
+    f = StringIO(sCsvData)
+    reader = csv.reader(f, delimiter=",")
+
+    # Read the header cells and make a header row in the worksheet
+    headers = next(reader)
+    for col_num in range(len(headers)):
+        c = ws.cell(row=1, column=col_num+1)
+        c.value = headers[col_num]
+        c.font = openpyxl.styles.Font(bold=True)
+        # Set width to a fixed size
+        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+    row_num = 1
+    lCsv = []
+    for row in reader:
+        # Keep track of the EXCEL row we are in
+        row_num += 1
+        # Walk the elements in the data row
+        # oRow = {}
+        for idx, cell in enumerate(row):
+            c = ws.cell(row=row_num, column=idx+1)
+            c.value = row[idx]
+            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
+    # Save the result in the response
+    wb.save(response)
+    return response
+
 
 def home(request):
     """Renders the home page."""
@@ -340,6 +381,8 @@ def get_countries(request):
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
@@ -360,6 +403,8 @@ def get_cities(request):
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
     
@@ -383,6 +428,8 @@ def get_libraries(request):
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
     
@@ -484,5 +531,439 @@ class LibraryListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class BasicPart(View):
+    # Initialisations
+    arErr = []              # errors   
+    template_name = None    # The template to be used
+    template_err_view = None
+    form_validated = True   # Used for POST form validation
+    savedate = None         # When saving information, the savedate is returned in the context
+    add = False             # Are we adding a new record or editing an existing one?
+    obj = None              # The instance of the MainModel
+    action = ""             # The action to be undertaken
+    MainModel = None        # The model that is mainly used for this form
+    form_objects = []       # List of forms to be processed
+    formset_objects = []    # List of formsets to be processed
+    bDebug = False          # Debugging information
+    data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
+    def post(self, request, object_id=None):
+        # A POST request means we are trying to SAVE something
+        self.initializations(request, object_id)
+
+        # Explicitly set the status to OK
+        self.data['status'] = "ok"
+
+        if self.checkAuthentication(request):
+            # Build the context
+            context = dict(object_id = object_id, savedate=None)
+            # Action depends on 'action' value
+            if self.action == "":
+                if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
+                # Walk all the forms for preparation of the formObj contents
+                for formObj in self.form_objects:
+                    # Are we SAVING a NEW item?
+                    if self.add:
+                        # We are saving a NEW item
+                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
+                    else:
+                        # We are saving an EXISTING item
+                        # Determine the instance to be passed on
+                        instance = self.get_instance(formObj['prefix'])
+                        # Make the instance available in the form-object
+                        formObj['instance'] = instance
+                        # Get an instance of the form
+                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
+
+                # Initially we are assuming this just is a review
+                context['savedate']="reviewed at {}".format(datetime.now().strftime("%X"))
+
+                # Iterate again
+                for formObj in self.form_objects:
+                    prefix = formObj['prefix']
+                    # Adapt if it is not readonly
+                    if not formObj['readonly']:
+                        # Check validity of form
+                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
+                            # Save it preliminarily
+                            instance = formObj['forminstance'].save(commit=False)
+                            # The instance must be made available (even though it is only 'preliminary')
+                            formObj['instance'] = instance
+                            # Perform actions to this form BEFORE FINAL saving
+                            bNeedSaving = formObj['forminstance'].has_changed()
+                            if self.before_save(prefix, request, instance=instance): bNeedSaving = True
+                            if formObj['forminstance'].instance.id == None: bNeedSaving = True
+                            if bNeedSaving:
+                                # Perform the saving
+                                instance.save()
+                                # Set the context
+                                context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                # Put the instance in the form object
+                                formObj['instance'] = instance
+                                # Store the instance id in the data
+                                self.data[prefix + '_instanceid'] = instance.id
+                                # Any action after saving this form
+                                self.after_save(prefix, instance)
+                        else:
+                            self.arErr.append(formObj['forminstance'].errors)
+                            self.form_validated = False
+
+                    # Add instance to the context object
+                    context[prefix + "Form"] = formObj['forminstance']
+                # Walk all the formset objects
+                for formsetObj in self.formset_objects:
+                    prefix  = formsetObj['prefix']
+                    if self.can_process_formset(prefix):
+                        formsetClass = formsetObj['formsetClass']
+                        form_kwargs = self.get_form_kwargs(prefix)
+                        if self.add:
+                            # Saving a NEW item
+                            formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                        else:
+                            # Saving an EXISTING item
+                            instance = self.get_instance(prefix)
+                            qs = self.get_queryset(prefix)
+                            if qs == None:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, form_kwargs = form_kwargs)
+                            else:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, queryset=qs, form_kwargs = form_kwargs)
+                        # Process all the forms in the formset
+                        self.process_formset(prefix, request, formset)
+                        # Store the instance
+                        formsetObj['formsetinstance'] = formset
+                        # Adapt the formset contents only, when it is NOT READONLY
+                        if not formsetObj['readonly']:
+                            # Is the formset valid?
+                            if formset.is_valid():
+                                # Make sure all changes are saved in one database-go
+                                with transaction.atomic():
+                                    # Walk all the forms in the formset
+                                    for form in formset:
+                                        # At least check for validity
+                                        if form.is_valid() and self.is_custom_valid(prefix, form):
+                                            # Should we delete?
+                                            if form.cleaned_data['DELETE']:
+                                                # Delete this one
+                                                form.instance.delete()
+                                                # NOTE: the template knows this one is deleted by looking at form.DELETE
+                                                # form.delete()
+                                            else:
+                                                # Check if anything has changed so far
+                                                has_changed = form.has_changed()
+                                                # Save it preliminarily
+                                                instance = form.save(commit=False)
+                                                # Any actions before saving
+                                                if self.before_save(prefix, request, instance, form):
+                                                    has_changed = True
+                                                # Save this construction
+                                                if has_changed: 
+                                                    # Save the instance
+                                                    instance.save()
+                                                    # Adapt the last save time
+                                                    context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                                    # Store the instance id in the data
+                                                    self.data[prefix + '_instanceid'] = instance.id
+                                        else:
+                                            if len(form.errors) > 0:
+                                                self.arErr.append(form.errors)
+                            else:
+                                # Iterate over all errors
+                                for idx, err_this in enumerate(formset.errors):
+                                    if '__all__' in err_this:
+                                        self.arErr.append(err_this['__all__'][0])
+                                    elif err_this != {}:
+                                        # There is an error in item # [idx+1], field 
+                                        problem = err_this 
+                                        for k,v in err_this.items():
+                                            fieldName = k
+                                            errmsg = "Item #{} has an error at field [{}]: {}".format(idx+1, k, v[0])
+                                            self.arErr.append(errmsg)
+
+                            # self.arErr.append(formset.errors)
+                    else:
+                        formset = []
+                    # Add the formset to the context
+                    context[prefix + "_formset"] = formset
+            elif self.action == "download":
+                # We are being asked to download something
+                if self.dtype != "":
+                    # Initialise return status
+                    oBack = {'status': 'ok'}
+                    sType = "csv" if (self.dtype == "xlsx") else self.dtype
+
+                    # Get the data
+                    sData = self.get_data('', self.dtype)
+                    # Decode the data and compress it using gzip
+                    bUtf8 = (self.dtype != "db")
+                    bUsePlain = (self.dtype == "xlsx" or self.dtype == "csv")
+
+                    # Create name for download
+                    # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
+                    sDbName = "passim_libraries.{}".format(self.dtype)
+                    sContentType = ""
+                    if self.dtype == "csv":
+                        sContentType = "text/tab-separated-values"
+                    elif self.dtype == "json":
+                        sContentType = "application/json"
+                    elif self.dtype == "xlsx":
+                        sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+                    # Excel needs additional conversion
+                    if self.dtype == "xlsx":
+                        # Convert 'compressed_content' to an Excel worksheet
+                        response = HttpResponse(content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        response = csv_to_excel(sData, response)
+                    else:
+                        response = HttpResponse(sData, content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+
+                    # Continue for all formats
+                        
+                    # return gzip_middleware.process_response(request, response)
+                    return response
+
+            # Allow user to add to the context
+            context = self.add_to_context(context)
+
+            # Make sure we have a list of any errors
+            error_list = [str(item) for item in self.arErr]
+            context['error_list'] = error_list
+            context['errors'] = self.arErr
+            if len(self.arErr) > 0:
+                # Indicate that we have errors
+                self.data['has_errors'] = True
+                self.data['status'] = "error"
+            else:
+                self.data['has_errors'] = False
+            # Standard: add request user to context
+            context['requestuser'] = request.user
+
+            # Get the HTML response
+            if len(self.arErr) > 0:
+                if self.template_err_view != None:
+                     # Create a list of errors
+                    self.data['err_view'] = render_to_string(self.template_err_view, context, request)
+                else:
+                    self.data['error_list'] = error_list
+                self.data['html'] = ''
+            else:
+                # In this case reset the errors - they should be shown within the template
+                self.data['html'] = render_to_string(self.template_name, context, request)
+            # At any rate: empty the error basket
+            self.arErr = []
+            error_list = []
+
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+        
+    def get(self, request, object_id=None): 
+        self.data['status'] = 'ok'
+        # Perform the initializations that need to be made anyway
+        self.initializations(request, object_id)
+        if self.checkAuthentication(request):
+            context = dict(object_id = object_id, savedate=None)
+            # Walk all the form objects
+            for formObj in self.form_objects:        
+                # Used to populate a NEW research project
+                # - CREATE a NEW research form, populating it with any initial data in the request
+                initial = dict(request.GET.items())
+                if self.add:
+                    # Create a new form
+                    formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
+                else:
+                    # Used to show EXISTING information
+                    instance = self.get_instance(formObj['prefix'])
+                    # We should show the data belonging to the current Research [obj]
+                    formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
+                # Add instance to the context object
+                context[formObj['prefix'] + "Form"] = formObj['forminstance']
+            # Walk all the formset objects
+            for formsetObj in self.formset_objects:
+                formsetClass = formsetObj['formsetClass']
+                prefix  = formsetObj['prefix']
+                form_kwargs = self.get_form_kwargs(prefix)
+                if self.add:
+                    # - CREATE a NEW formset, populating it with any initial data in the request
+                    initial = dict(request.GET.items())
+                    # Saving a NEW item
+                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
+                else:
+                    # show the data belonging to the current [obj]
+                    instance = self.get_instance(prefix)
+                    qs = self.get_queryset(prefix)
+                    if qs == None:
+                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                    else:
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                # Process all the forms in the formset
+                ordered_forms = self.process_formset(prefix, request, formset)
+                if ordered_forms:
+                    context[prefix + "_ordered"] = ordered_forms
+                # Store the instance
+                formsetObj['formsetinstance'] = formset
+                # Add the formset to the context
+                context[prefix + "_formset"] = formset
+            # Allow user to add to the context
+            context = self.add_to_context(context)
+            # Make sure we have a list of any errors
+            error_list = [str(item) for item in self.arErr]
+            context['error_list'] = error_list
+            context['errors'] = self.arErr
+            # Standard: add request user to context
+            context['requestuser'] = request.user
             
+            # Get the HTML response
+            sHtml = render_to_string(self.template_name, context, request)
+            sHtml = treat_bom(sHtml)
+            self.data['html'] = sHtml
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+      
+    def checkAuthentication(self,request):
+        # first check for authentication
+        if not request.user.is_authenticated:
+            # Simply redirect to the home page
+            self.data['html'] = "Please log in to work on this project"
+            return False
+        else:
+            return True
+
+    def initializations(self, request, object_id):
+        # Clear errors
+        self.arErr = []
+        # COpy the request
+        self.request = request
+        # Copy any object id
+        self.object_id = object_id
+        self.add = object_id is None
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+
+        # Check for action
+        if 'action' in self.qd:
+            self.action = self.qd['action']
+
+        # Find out what the Main Model instance is, if any
+        if self.add:
+            self.obj = None
+        else:
+            # Get the instance of the Main Model object
+            self.obj =  self.MainModel.objects.filter(pk=object_id).first()
+            # NOTE: if the object doesn't exist, we will NOT get an error here
+        # ALWAYS: perform some custom initialisations
+        self.custom_init()
+
+    def get_instance(self, prefix):
+        return self.obj
+
+    def is_custom_valid(self, prefix, form):
+        return True
+
+    def get_queryset(self, prefix):
+        return None
+
+    def get_form_kwargs(self, prefix):
+        return None
+
+    def get_data(self, prefix, dtype):
+        return ""
+
+    def before_save(self, prefix, request, instance=None, form=None):
+        return False
+
+    def after_save(self, prefix, instance=None):
+        return True
+
+    def add_to_context(self, context):
+        return context
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def can_process_formset(self, prefix):
+        return True
+
+    def custom_init(self):
+        pass    
+           
+class LibraryListDownload(BasicPart):
+    MainModel = Library
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd['downloadtype']
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
+        #context['search_name'] = self.basket.research.name
+        return context
+
+    def get_queryset(self, prefix):
+
+        # Get parameters
+        country = self.qd.get("country", "")
+        city = self.qd.get("city", "")
+        library = self.qd.get("library", "")
+
+        # Construct the QS
+        lstQ = []
+        if country != "": lstQ.append(Q(country__name__iregex=adapt_search(country)))
+        if city != "": lstQ.append(Q(city__name__iregex=adapt_search(city)))
+        if library != "": lstQ.append(Q(name__iregex=adapt_search(library)))
+        qs = Library.objects.filter(*lstQ).order_by('country__name', 'city__name', 'name')
+
+        return qs
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop
+            for lib in self.get_queryset(prefix):
+                row = {"id": lib.id, "country": lib.country.name, "city": lib.city.name, "library": lib.name, "libtype": lib.libtype}
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            csvwriter = csv.writer(output, delimiter=",", quotechar='"')
+            # Headers
+            headers = ['id', 'country', 'city', 'library', 'libtype']
+            csvwriter.writerow(headers)
+            # lData.append(",".join(headers))
+            # Loop
+            for lib in self.get_queryset(prefix):
+                row = [lib.id, lib.country.name, lib.city.name, lib.name, lib.libtype]
+                csvwriter.writerow(row)
+                # lData.append(",".join(row))
+            # Convert to string
+            #sData = "\n".join(lData)
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
