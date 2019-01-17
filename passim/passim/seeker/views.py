@@ -349,7 +349,17 @@ def get_cities(request):
 
     data = 'fail'
     if request.is_ajax():
-        pass
+        country = request.GET.get('country', "")
+        city = request.GET.get("city", "")
+        lstQ = []
+        lstQ.append(Q(country__name__icontains=country))
+        lstQ.append(Q(name__icontains=city))
+        countries = City.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in countries:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
     
@@ -359,7 +369,20 @@ def get_libraries(request):
 
     data = 'fail'
     if request.is_ajax():
-        pass
+        country = request.GET.get('country', "")
+        city = request.GET.get("city", "")
+        lib = request.GET.get("library", "")
+
+        lstQ = []
+        if country != "": lstQ.append(Q(country__name__icontains=country))
+        if city != "": lstQ.append(Q(city__name__icontains=city))
+        if lib != "": lstQ.append(Q(name__icontains=lib))
+        countries = Library.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in countries:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
     

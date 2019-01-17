@@ -69,30 +69,84 @@ var ru = (function ($, ru) {
         // Get the base URL
         base_url = $("__baseurl__").text();
 
-        // Initialise bloodhounds for country, city and library
+        // Bloodhound: COUNTRY
         loc_countries = new Bloodhound({
           datumTokenizer: Bloodhound.tokenizers.whitespace,
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
           local: loc_countries,
           prefetch: { url: base_url + '/api/countries/', cache: true },
+          remote:   { url: base_url + '/api/countries/?country=%QUERY', wildcard: '%QUERY' }
+        });
+
+        // Bloodhound: CITY
+        loc_cities = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_countries will be an array of countries
+          local: loc_cities,
+          prefetch: { url: base_url + '/api/cities/', cache: true },
           remote: {
-            url: base_url + '/api/countries/?country=%QUERY',
-            wildcard: '%QUERY'                  // %QUERY will be replace by users input in the URL option
+            url: base_url + '/api/cities/?city=',
+            replace: function (url, uriEncodedQuery) {
+              var country = $("input[name=country]").val();
+              url += encodeURIComponent(uriEncodedQuery);
+              if (country) url += "&country=" + country ;
+              return url;
+            }
           }
         });
 
-        // Initialize specific typeaheads
-        $(".typeahead.countries").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'countries',
-            source: loc_countries,
-            display: function (item) { return item.name; },
-            limit: 10,
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; }
+        // Bloodhound: LIBRARY
+        loc_libraries = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_countries will be an array of countries
+          local: loc_cities,
+          prefetch: { url: base_url + '/api/libraries/', cache: true },
+          remote: {
+            url: base_url + '/api/libraries/?library=',
+            replace: function (url, uriEncodedQuery) {
+              var city = $("input[name=city]").val();
+              var country = $("input[name=country]").val();
+              url += encodeURIComponent(uriEncodedQuery);
+              if (country) url += "&country=" + country;
+              if (city) url += "&city=" + city;
+              return url;
             }
           }
+        });
+
+        // Type-ahead: COUNTRY
+        $(".typeahead.countries").typeahead(
+          { hint: true, highlight: true, minLength: 1 },
+          { name: 'countries', source: loc_countries, limit: 10,
+            display: function (item) { return item.name; },
+            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+          }
         );
+        // Type-ahead: CITY
+        $(".typeahead.cities").typeahead(
+          { hint: true, highlight: true, minLength: 1 },
+          { name: 'cities', source: loc_cities, limit: 10,
+            display: function (item) { return item.name; },
+            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+          }
+        );
+        // Type-ahead: LIBRARY
+        $(".typeahead.libraries").typeahead(
+          { hint: true, highlight: true, minLength: 1 },
+          { name: 'libraries', source: loc_libraries, limit: 10,
+            display: function (item) { return item.name; },
+            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+          }
+        );
+
+        // Make sure the twitter typeahead spans are maximized
+        $("span.twitter-typeahead").each(function () {
+          var style = $(this).attr("style");
+          $(this).attr("style", style + " width: 100%;");
+        });
       },
 
       /**
