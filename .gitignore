@@ -244,3 +244,12 @@ ModelManifest.xml
 # Python stuff
 *.pyc
 /passim/passim/seeker/migrations
+/passimproject/css/bootstrap.min.css
+/passimproject/img/erc_funded.png
+/passimproject/img/cerl.jpg
+/passimproject/img/AugustineOfHippo.jpg
+/passimproject/img/ru_lg.jpg
+/passimproject/img/ru.png
+/passimproject/js/jquery-1.10.2.min.js
+/passimproject/js/bootstrap.min.js
+/passimproject/Web.config
