@@ -22,7 +22,7 @@ from time import sleep
 
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City
 
 import fnmatch
