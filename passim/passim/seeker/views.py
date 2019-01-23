@@ -30,6 +30,8 @@ import sys
 import base64
 import json
 import csv
+import requests
+import demjson
 import openpyxl
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
@@ -37,6 +39,8 @@ from io import StringIO
 # Some constants that can be used
 paginateSize = 20
 paginateValues = (100, 50, 20, 10, 5, 2, 1, )
+
+cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
 def adapt_search(val):
     # First trim
@@ -430,6 +434,45 @@ def get_libraries(request):
         data = json.dumps(results)
     else:
         data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+def get_manuscripts(request):
+    """Get a list of manuscripts"""
+
+    data = 'fail'
+    errHandle = ErrHandle()
+    # Only allow AJAX calls with POST
+    if request.is_ajax() and request.method == "POST":
+        get = request.POST
+        # Get parameters city and library
+        city = get.get("city", "")
+        lib = get.get("library", "")
+
+        url = "{}/Manuscrits/manuscritforetablissement".format(cnrs_url)
+        data = "idEtab={}&idVille={}".format(lib, city)
+        data = {"idEtab": lib, "idVille": city}
+        #data = []
+        #data.append({'name': 'idEtab', 'value': lib})
+        #data.append({'name': 'idVille', 'value': city})
+        try:
+            r = requests.post(url, data=data)
+        except:
+            sMsg = errHandle.get_error_message()
+            errHandle.DoError("Request problem")
+            return False
+        if r.status_code == 200:
+            # Return positively
+            reply = demjson.decode(r.text.replace("\t", " "))
+            if reply != None and "items" in reply:
+                results = []
+                for item in reply['items']:
+                    if item['name'] != "":
+                        results.append(item['name'])
+                data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    # Prepare and return data
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
     

@@ -35,6 +35,8 @@ var ru = (function ($, ru) {
         loc_countries = [],
         loc_cities = [],
         loc_libraries = [],
+        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
         base_url = "",
         oSyncTimer = null;
 
@@ -248,44 +250,67 @@ var ru = (function ($, ru) {
           private_methods.errMsg("post_download", ex);
         }
       },
-    
-      type_change: function (el) {
-        // Figure out how we are called
-        if (el.type === "change" || el.type === "keyup") {
-          // Need to get the element proper
-          el = this;
-        }
-        // Get the value of the selected [DCtype]
-        // var dctype_type = $('#id_DCtype').val();
-        var dctype_type = $(el).val();
-        var sIdSub = $(el).attr("id").replace("DCtype", "subtype");
-        // Create the URL that is needed
-        var url_prefix = $(".container[url_home]").attr("url_home");
-        if (url_prefix === undefined) {
-          url_prefix = $("#container").attr("url_home");
-        }
-        var sUrl = url_prefix + "subtype_choices/?dctype_type=" + dctype_type;
-        // Define the options
-        var ajaxoptions = {
-          type: "GET",
-          url: sUrl,
-          dataType: "json",
-          async: false,
-          success: function (json) {
-            $('#' + sIdSub + ' >option').remove();
-            for (var j = 0; j < json.length; j++) {
-              $('#' + sIdSub).append($('<option></option>').val(json[j][0]).html(json[j][1]));
-            }
-            // Set the selected value correctly
-            $("#" + sIdSub).val(parseInt(dctype_type, 10));
-          }
-        };
-        // Execute the ajax request SYNCHRONOUSLY
-        $.ajax(ajaxoptions);
-        // Do something else to provide a break point
-        var k = 0;
-      },
 
+      /**
+       * lib_manuscripts
+       *   Get the manuscripts of the library
+       *
+       */
+      lib_manuscripts: function (el) {
+        var url = "",
+            data = "",
+            items = [],
+            i = 0,
+            html = [],
+            sBack = "",
+            frm = null,
+            item = "",
+            libName = "",
+            idVille = "",
+            target = "";
+
+        try {
+          // Which site to open when ready
+          target = $(el).attr("data-target");
+
+          // Close all other sites
+          $(".lib-manuscripts").addClass("hidden");
+
+          // Open my new site and show we are working
+          $(target).removeClass("hidden");
+          sBack = "Searching in the library..." + loc_sWaiting;
+          $(target).find(".manuscripts-target").first().html(sBack);
+
+          // Get the parameters
+          idVille = $(el).attr("city");
+          libName = $(el).attr("library");
+          // Prepare the request for information
+          url = base_url + 'api/manuscripts/'
+          frm = $(el).closest("form");
+          if (frm !== undefined) { data = $(frm).serializeArray(); }
+          data.push({ "name": "city", "value": idVille });
+          data.push({ "name": "library", "value": libName });
+          // Request the information
+          $.post(url, data, function (response) {
+            if (response !== undefined) {
+              // There is a respons object, but can we read it?
+              html = [];
+              for (i = 0; i < response.length; i++) {
+                item = response[i];
+                html.push("<span class='manuscript'>" + item + "</span>");
+              }
+              sBack = html.join("\n");
+              $(target).find(".manuscripts-target").first().html(sBack);
+              $(target).removeClass("hidden");
+            } else {
+              private_methods.errMsg("lib_manuscripts: undefined response ");
+            }
+          });
+        } catch (ex) {
+          private_methods.errMsg("lib_manuscripts", ex);
+        }
+      },
+    
       /**
        * sent_click
        *   Show waiting symbol when sentence is clicked

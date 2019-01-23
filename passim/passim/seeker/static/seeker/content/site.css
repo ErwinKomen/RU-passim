@@ -977,3 +977,13 @@ table.compact-table td:hover {
     font-family: monospace;
     font-size: smaller;
 }
+
+.manuscript {
+  background-color: lightgray;
+  color: darkblue;
+    font-family: monospace;
+    font-size: smaller;
+    border-radius: 2px;
+    /* padding: 2px; */
+     white-space:nowrap;
+}

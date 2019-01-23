@@ -51,6 +51,7 @@ urlpatterns = [
     url(r'^api/countries/', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/', passim.seeker.views.get_cities, name='api_cities'),
     url(r'^api/libraries/', passim.seeker.views.get_libraries, name='api_libraries'),
+    url(r'^api/manuscripts/', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
