@@ -16,6 +16,7 @@ import socket
 from django.contrib import admin
 
 hst = socket.gethostbyname(socket.gethostname())
+bUseTunnel = False
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,15 +24,17 @@ WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/database/"
 if "RU-passim\\writable" in WRITABLE_DIR:
     # Need another string
     WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../../writable/database/"))
+elif "/applejack" in BASE_DIR:
+    WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/passim/database/"))
 
 APP_PREFIX = ""
-if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR:
+if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or bUseTunnel:
     APP_PREFIX = ""
     admin.site.site_url = '/'
 elif "131.174" in hst:
-    # Configuration within the Radboud University environment
-    APP_PREFIX = ""
-    admin.site.site_url = '/'
+    # Configuration within the Radboud University environment (AppleJack)
+    APP_PREFIX = "passim/"
+    admin.site.site_url = '/passim'
 elif "/var/www" in WRITABLE_DIR:
     # New configuration of http://corpus-studio-web.cttnww-meertens.surf-hosted.nl/passim
     APP_PREFIX = "passim/"
@@ -55,7 +58,7 @@ SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', 'passim.science.ru.nl', 'corpus-studio-web.cttnww-meertens.surf-hosted.nl' ]
+ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.science.ru.nl', 'corpus-studio-web.cttnww-meertens.surf-hosted.nl' ]
 
 
 # Application definition
@@ -152,7 +155,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 
 STATIC_URL = '/static/'
-if ("/var/www" in WRITABLE_DIR):
+if ("/var/www" in WRITABLE_DIR and not bUseTunnel):
     STATIC_URL = "/" + APP_PREFIX + "static/"
 
 STATIC_ROOT = os.path.abspath(os.path.join("/", posixpath.join(*(BASE_DIR.split(os.path.sep) + ['static']))))
