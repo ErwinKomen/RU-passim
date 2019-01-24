@@ -301,8 +301,9 @@ def search_manuscript(request):
     # Set defaults
     template_name = "seeker/manuscript.html"
 
-    # Get a link to a form
-    searchForm = SearchManuscriptForm()
+    # Get parameters for the search
+    initial = request.GET
+    searchForm = SearchManuscriptForm(initial)
 
     # Other initialisations
     currentuser = request.user
@@ -311,7 +312,7 @@ def search_manuscript(request):
     # Create context and add to it
     context = dict(title="Search manuscript",
                    authenticated=authenticated,
-                   searchForm=searchForm)
+                   searchform=searchForm)
 
 
     # Create and show the result

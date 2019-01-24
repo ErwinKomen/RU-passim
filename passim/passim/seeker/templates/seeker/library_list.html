@@ -1,4 +1,12 @@
 ﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+      <a href="{% url 'home' %}">Home</a>
+      &rsaquo; Search Library
+  </div>
+{% endblock %}
 
 {% block content %}
 

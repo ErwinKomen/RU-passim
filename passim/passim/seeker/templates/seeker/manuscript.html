@@ -4,7 +4,7 @@
 {% block breadcrumbs %}
   <div class="breadcrumbs">
       <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Manuscript
+      &rsaquo; Search Manuscript
   </div>
 {% endblock %}
 
@@ -13,17 +13,60 @@
   <div class="container body-content">
 
     {% if authenticated %}
-      <form>
+      <form id="manuscriptsearch" method='get' action="{% url 'library_search' %}" >
+        <!-- Be sure to add csrf -->
+        {% csrf_token %}
         <!-- Upper part of the search-a-manuscript interface -->
         <div id="search_manuscript_main">
           <div class="row">&nbsp;</div>
           <div class="row">
-            <table>
-              <tr><td>COUNTRY</td><td>{{searchForm.country}}</td></tr>
-              <tr><td>CITY</td><td>{{searchForm.city}}</td></tr>
-              <tr><td>LIBRARY</td><td>{{searchForm.library}}</td></tr>
-              <tr><td>SIGNATURE</td><td>{{searchForm.signature}}</td></tr>
-            </table>
+            <div class="col-sm-6">
+              <p>Manuscript to look for:</p>
+              <table>
+                <tr>
+                  <td>COUNTRY</td>
+                  <td style="width: 100%;">
+                    <input name='country' class='form-control typeahead countries input-sm' type="text" 
+                           {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
+                           placeholder="Country..."
+                           onkeyup="ru.passim.form_submit(event);">
+                  </td>
+                </tr>
+                <tr>
+                  <td>CITY</td>
+                  <td style="width: 100%;">
+                    <input name='city' class='form-control typeahead cities input-sm' type="text" 
+                           {% if searchform.city.value %}value='{{searchform.city.value}}'{% endif %}
+                           placeholder="City..."
+                           onkeyup="ru.passim.form_submit(event);">
+                  </td>
+                </tr>
+                <tr>
+                  <td>LIBRARY</td>
+                  <td style="width: 100%;">
+                    <input name='library' class='form-control typeahead libraries input-sm' type="text" 
+                           {% if searchform.library.value %}value='{{searchform.library.value}}'{% endif %}
+                           placeholder="Name of library..."
+                           onkeyup="ru.passim.form_submit(event);">
+                  </td>
+                </tr>
+                <tr>
+                  <td>SIGNATURE</td>
+                  <td style="width: 100%;">{{searchform.signature}}</td>
+                </tr>
+                <tr>
+                  <td colspan="2" align="right">
+                    <span><i>(right now the search only yields libraries)</i></span>
+                      <!-- Submit the search form -->
+                      <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div class="col-sm-6">
+              <p>Results:</p>
+              <p>This is where the search results will come...</p>
+            </div>
           </div>
           <div class="row">&nbsp;</div>
         </div>
