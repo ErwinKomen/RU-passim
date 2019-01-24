@@ -45,9 +45,6 @@
       <Architecture>X86</Architecture>
     </Interpreter>
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="info.xml" />
-  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>

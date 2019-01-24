@@ -950,7 +950,7 @@ class LibraryListDownload(BasicPart):
     def custom_init(self):
         """Calculate stuff"""
         
-        dt = self.qd['downloadtype']
+        dt = self.qd.get('downloadtype', "")
         if dt != None and dt != '':
             self.dtype = dt
 

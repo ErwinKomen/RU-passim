@@ -31,7 +31,7 @@ var ru = (function ($, ru) {
   ru.passim = (function ($, config) {
     // Define variables for ru.collbank here
     var loc_example = "",
-        loc_divErr = "sentdetails_err",
+        loc_divErr = "passim_err",
         loc_countries = [],
         loc_cities = [],
         loc_libraries = [],
@@ -54,7 +54,10 @@ var ru = (function ($, ru) {
         $("#" + loc_divErr).html("");
       },
       errMsg: function (sMsg, ex) {
-        var sHtml = "Error in [" + sMsg + "]<br>" + ex.message;
+        var sHtml = "Error in [" + sMsg + "]<br>";
+        if (ex !== undefined && ex !== null) {
+          sHtml = sHtml + ex.message;
+        }
         $("#" + loc_divErr).html(sHtml);
       }
     }
@@ -219,6 +222,14 @@ var ru = (function ($, ru) {
                 frm = $(elStart).closest(".container-large.body-content").find("form");
               }
             }
+          }
+          // Check what we have
+          if (frm === null || frm.length === 0) {
+            // Didn't find the form
+            private_methods.errMsg("post_download: could not find form");
+          } else {
+            // Make sure we take only the first matching form
+            frm = frm.first();
           }
           // Set the 'action; attribute in the form
           frm.attr("action", ajaxurl);
