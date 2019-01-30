@@ -1,0 +1,196 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+      <a href="{% url 'home' %}">Home</a>
+      &rsaquo; Authors
+  </div>
+{% endblock %}
+
+{% block content %}
+
+      <div class="panel panel-default">
+        <form name='authorsearch' id='authorsearch' method='get' action="{% url 'author_search' %}" >
+            <!-- Be sure to add csrf -->
+            {% csrf_token %}
+            <div id="downloadcenter" class="hidden">
+              <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+            </div>
+
+            <!-- EK: A sort-order specification is in a hidden form field, which is filled by JS:do_sort_column() -->
+            <div class="hidden">
+                <input name='sortOrder' class='form-control' value='stad' >
+                <input name='search_type' class='form-control' value='stad'>
+                <input id="submit_type" name='submit_type' class='form-control' value='simple'>
+            </div>
+
+            <!-- The top layer of searching: upload and download button(s) -->
+            <div class="row">
+              <div class="col-sm-1 col-sm-offset-9" align="right">
+                <span><a title="upload authors" 
+                   class="btn btn-success btn-xs" 
+                   targetid="import_main"
+                   onclick="ru.passim.seeker.toggle_click(this);">
+                  <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
+                </a></span>
+              </div>
+              <div class="col-sm-2" align="right" style="margin-top: 5px;">
+                <a id="downloadmenu" role="button" class="btn jumbo-1 btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" 
+                        onclick="" >
+                  Download<span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="downloadmenu">
+                  <li><a href="#" downloadtype="xlsx" ajaxurl="{% url 'author_results' %}" onclick="ru.passim.post_download(this);">Excel</a></li>
+                  <li class="divider" role="separator"></li>
+                  <li><a href="#" downloadtype="csv" ajaxurl="{% url 'author_results' %}" onclick="ru.passim.post_download(this);">csv (tab-separated)</a></li>
+                  <li><a href="#" downloadtype="json" ajaxurl="{% url 'author_results' %}" onclick="ru.passim.post_download(this);">json</a></li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- The actual search parameters: name -->
+            <div id="searchdefault" class="row">
+              <div class="col-sm-10">
+                <label>&nbsp;</label>
+                <div class='input-group'>
+                    <label class='input-group-addon' 
+                           data-toggle="popover" data-trigger="hover"
+                           data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
+                           for='id_name'>{{searchform.name.label}}</label>
+                    <input name='name' class='form-control typeahead authors input-sm' type="text" 
+                           {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
+                           placeholder="Name of the author..."
+                           onkeyup="ru.passim.form_submit(event);">
+                </div>
+              </div>
+              <div class="col-sm-1">
+                <div class='form-group' id='paginate_by'>
+                  <label for='paginate_by'>Per page</label>
+                  <select class='form-control input-sm' name="paginate_by">
+                    {% for pag in paginateValues %}
+                    <option {% if pag == paginateSize %} selected {% endif %}>{{pag}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="col-sm-1 pull-right" align="right">
+                <div class="input-group">
+                  <div><label>&nbsp;</label></div>
+                  <div class='btn-group'>
+                      <!-- Submit the search form -->
+                      <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        </form>
+
+      <!-- Allow adding a project -->
+      <div id="import_main" class="row hidden container">
+        <form action="{% url 'import_authors' %}" method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+          <!-- Room for the filename to appear -->
+          <div class="col-md-6 form-group" id="main-import_info"
+               targetid="author_data_import"
+               targeturl="{% url 'import_authors' %}">
+            <div class="input-group">
+              <span>Specify the CSV file that contains the PASSIM authors</span>
+              <span class="input-group-btn">
+                <span class="btn btn-default btn-xs btn-file">
+                  Browse...
+                  <input id="id_file_source" name="file_source" required="" type="file" oninput="ru.passim.seeker.import_data('main');" />
+                </span>
+              </span>
+            </div>
+            
+          </div>
+          <!-- Progress of upload indicator -->
+          <div class="col-md-6">
+            <progress class="hidden" style="width:100%;" id="main-import_progress" value="0" min="0" max="100"></progress>
+          </div>
+          <!-- Any error reporting -->
+          <div id="main-import_error"></div>
+        </form>
+
+        <!-- Import information -->
+        <div id="author_data_import" class="project-part hidden"></div>
+      </div>
+
+
+      </div>
+
+    {% if object_list %}
+      <div class="panel panel-default">
+
+        <h3>Authors</h3>
+        <div class="row">
+            <div class="col-sm-4"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-8">
+            <span class="step-links pull-right">
+
+            {% include 'pagination.html' %}
+
+            </span>
+            </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-hover">
+              <thead><tr><th class="hidden">id</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
+              <tbody>
+              {% for author in object_list %}
+                <tr class="dict-entry">
+                  <td class="hidden"> {{ author.id }}</td>
+                  <td style="width: 100%;">
+                    <span class="author-name">{{author.name}}</span>
+                  </td>
+                  <!-- Buttons for this author-->
+                  <td style="min-width: 80px;">
+                    <form>
+                      {% csrf_token %}
+                      <!-- information on this author -->
+                      <a role="button" class="btn btn-xs jumbo-3" title="Information" data-toggle="collapse" data-target="#author-info-{{author.id}}">
+                        <span class="glyphicon glyphicon-info-sign"></span>
+                      </a>
+                    </form>
+                  </td>
+                </tr>
+
+                <!-- Knicknames for this author -->
+                <tr id="author-info-{{author.id}}" class="collapse">
+                  <td colspan="1">
+                    {% if author.author_knicknames.count == 0 %}
+                      <span>This author doesn't have any local names (yet)</span>
+                    {% else %}
+                      {% for knick in author.author_knicknames.all %}
+                      <span class="author-knickname">{{knick.name}}</span>
+                      {% endfor %}
+                    {% endif %}
+                  </td>
+                  <td>&nbsp;</td>
+                </tr>
+
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <p>No authors have been found.</p>
+      {% endif %}
+
+      <div class="pagination">
+          <span class="step-links">
+
+          {% include 'pagination.html' %}
+
+          </span>
+      </div>
+
+      </div>
+
+{% endblock content %}
+

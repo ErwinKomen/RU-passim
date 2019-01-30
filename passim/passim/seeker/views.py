@@ -22,8 +22,9 @@ from time import sleep
 
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
+                                AuthorSearchForm, UploadFileForm
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author
 
 import fnmatch
 import sys
@@ -476,6 +477,176 @@ def get_manuscripts(request):
     # Prepare and return data
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_authors(request):
+    """Get a list of authors for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        author = request.GET.get("name", "")
+        lstQ = []
+        lstQ.append(Q(name__icontains=author))
+        authors = Author.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in authors:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def import_authors(request):
+    """Import a CSV file that contains author names"""
+
+
+    # Initialisations
+    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'seeker/import_status.html'
+    obj = None
+    data_file = ""
+    bClean = False
+    username = request.user.username
+
+    # Check if the user is authenticated and if it is POST
+    if not request.user.is_authenticated  or request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            # NOTE: from here a breakpoint may be inserted!
+            print('valid form')
+            # Get the contents of the imported file
+            data_file = request.FILES['file_source']
+
+            # Get the source file
+            if data_file == None or data_file == "":
+                arErr.append("No source file specified for the selected project")
+            else:
+                # 
+                # Read the list of authors
+                oResult = Author.read_csv(username, data_file, arErr)
+
+                # Determine a status code
+                statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                if oResult == None:
+                    arErr.append("There was an error. No authors have been added")
+
+            # Get a list of errors
+            error_list = [str(item) for item in arErr]
+
+            # Create the context
+            context = dict(
+                statuscode=statuscode,
+                results=oResult,
+                error_list=error_list
+                )
+
+            if len(arErr) == 0:
+                # Get the HTML response
+                data['html'] = render_to_string(template_name, context, request)
+            else:
+                data['html'] = "Please log in before continuing"
+
+
+        else:
+            data['html'] = 'invalid form: {}'.format(form.errors)
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
+
+class AuthorListView(ListView):
+    """Listview of authors"""
+
+    model = Author
+    paginate_by = 20
+    template_name = 'seeker/author_list.html'
+    entrycount = 0
+    bDoTime = True
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(AuthorListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        initial = self.request.GET
+        search_form = AuthorSearchForm(initial)
+
+        context['searchform'] = search_form
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim Authors"
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Measure how long it takes
+        if self.bDoTime: iStart = get_now_time()
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Fix the sort-order
+        get['sortOrder'] = 'name'
+
+        lstQ = []
+
+        # Check for author [name]
+        if 'name' in get and get['name'] != '':
+            val = adapt_search(get['name'])
+            lstQ.append(Q(name__iregex=val))
+
+        # Calculate the final qs
+        qs = Author.objects.filter(*lstQ).order_by('name').distinct()
+
+        # Time measurement
+        if self.bDoTime:
+            print("AuthorListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+            print("AuthorListView query: {}".format(qs.query))
+            iStart = get_now_time()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Time measurement
+        if self.bDoTime:
+            print("AuthorListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+        # Return the resulting filtered and sorted queryset
+        return qs
     
 
 class LibraryListView(ListView):
@@ -942,6 +1113,7 @@ class BasicPart(View):
     def custom_init(self):
         pass    
            
+
 class LibraryListDownload(BasicPart):
     MainModel = Library
     template_name = "seeker/download_status.html"
@@ -1002,6 +1174,71 @@ class LibraryListDownload(BasicPart):
             # Loop
             for lib in self.get_queryset(prefix):
                 row = [lib.id, lib.country.name, lib.city.name, lib.name, lib.libtype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+class AuthorListDownload(BasicPart):
+    MainModel = Author
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
+        #context['search_name'] = self.basket.research.name
+        return context
+
+    def get_queryset(self, prefix):
+
+        # Get parameters
+        name = self.qd.get("name", "")
+
+        # Construct the QS
+        lstQ = []
+        if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+        qs = Author.objects.filter(*lstQ).order_by('name')
+
+        return qs
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = {"id": author.id, "name": author.name}
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['id', 'name']
+            csvwriter.writerow(headers)
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = [author.id, author.name]
                 csvwriter.writerow(row)
 
             # Convert to string

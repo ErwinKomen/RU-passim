@@ -35,6 +35,7 @@ var ru = (function ($, ru) {
         loc_countries = [],
         loc_cities = [],
         loc_libraries = [],
+        loc_authors = [],
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
         base_url = "",
@@ -127,6 +128,22 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: AUTHOR
+        loc_authors = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_countries will be an array of countries
+          local: loc_cities,
+          prefetch: { url: base_url + 'api/authors/', cache: true },
+          remote: {
+            url: base_url + 'api/authors/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Type-ahead: COUNTRY
         $(".typeahead.countries").typeahead(
           { hint: true, highlight: true, minLength: 1 },
@@ -147,6 +164,16 @@ var ru = (function ($, ru) {
         $(".typeahead.libraries").typeahead(
           { hint: true, highlight: true, minLength: 1 },
           { name: 'libraries', source: loc_libraries, limit: 10,
+            display: function (item) { return item.name; },
+            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+          }
+        );
+
+        // Type-ahead: AUTHOR
+        $(".typeahead.authors").typeahead(
+          { hint: true, highlight: true, minLength: 1 },
+          {
+            name: 'authors', source: loc_authors, limit: 10,
             display: function (item) { return item.name; },
             templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
           }

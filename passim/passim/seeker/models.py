@@ -351,3 +351,141 @@ class Library(models.Model):
             oResult['status'] = "error"
             oResult['msg'] = oErr.get_error_message()
             return oResult
+
+
+class Origin(models.Model):
+    """The 'origin' is a location where manuscripts were originally created"""
+
+    # [1] Name of the location
+    name = models.CharField("Original location", max_length=LONG_STRING)
+    # [0-1] Further details are perhaps required too
+    # TODO: city/country??
+
+    def __str__(self):
+        return self.name
+
+
+class Manuscript(models.Model):
+    """A manuscript can contain a number of sermons"""
+
+    # [1] Name of the manuscript
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False)
+    # [1] One manuscript can only belong to one particular library
+    library = models.ForeignKey(Library, related_name="library_manuscripts")
+    # [0-1] If possible we need to know the original location of the manuscript
+    origin = models.ForeignKey(Origin, null=True, blank=True, related_name="origin_manuscripts")
+
+    def __str__(self):
+        return self.name
+
+
+class Author(models.Model):
+    """We have a set of authors that are the 'golden' standard"""
+
+    # [1] Name of the author
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+
+    def read_csv(username, data_file, arErr, sData = None, sName = None):
+        """Import a CSV list of authors and add these authors to the database"""
+
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        try:
+            # Make sure we have the data
+            if sData == None:
+                sData = data_file
+
+            # Go through the data
+            lines = []
+            bFirst = True
+            for line in sData:
+                # Get a good view of the line
+                sLine = line.decode("utf-8").strip()
+                if bFirst:
+                    if "\ufeff" in sLine:
+                        sLine = sLine.replace("\ufeff", "")
+                    bFirst = False
+                lines.append(sLine)
+
+            iCount = 0
+            added = []
+            with transaction.atomic():
+                for name in lines:
+                    # The whole line is the author: add it
+                    obj = Author.objects.filter(name__iexact=name).first()
+                    if obj == None:
+                        # Add this author
+                        obj = Author(name=name)
+                        obj.save()
+                        added.append(name)
+                        # Keep track of the authors that are ADDED
+                        iCount += 1
+            # Make sure the requester knows how many have been added
+            oBack['count'] = iCount
+            oBack['added'] = added
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
+
+
+
+
+class Knickname(models.Model):
+    """Authors can have 0 or more local names, which we call 'knicknames' """
+
+    # [1] Knickname 
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] We should try to link this knickname to an actual author
+    author = models.ForeignKey("Author", null=True, blank=True, related_name="author_knicknames")
+
+    def __str__(self):
+        return self.name
+
+
+class SermonDescr(models.Model):
+    """A sermon is part of a manuscript"""
+
+    # [1] Every sermon must have a title
+    title = models.CharField("Title", max_length=LONG_STRING)
+
+    # ======= OPTIONAL FIELDS describing the sermon ============
+    # [0-1] We would very much like to know the *REAL* author
+    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_sermons")
+    # [0-1] We would like to know the INCIPIT (first line in Latin)
+    incipit = models.CharField("Incipit", max_length=LONG_STRING)
+    # [0-1] We would like to know the EXPLICIT (last line in Latin)
+    explicit = models.CharField("Explicit", max_length=LONG_STRING)
+    # [0-1] We would like to know the Clavis number (if available)
+    clavis = models.CharField("Clavis number", max_length=LONG_STRING)
+    # [0-1] We would like to know the Gryson number (if available)
+    gryson = models.CharField("Gryson number", max_length=LONG_STRING)
+    # [0-1] The FEAST??
+    feast = models.CharField("Feast", max_length=LONG_STRING)
+    # [0-1] One keyword or more??
+    keyword = models.CharField("Keyword", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.title
+
+
+class SermonMan(models.Model):
+    """A particular sermon is located in a particular manuscript"""
+
+    # [1] The sermon we are talking about
+    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts")
+    # [1] The manuscript this sermon is written on 
+    manuscript = models.ForeignKey(Manuscript, related_name = "sermons")
+
+    def __str__(self):
+        combi = "{}: {}".format(self.manuscript.name, self.sermon.title)

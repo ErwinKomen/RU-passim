@@ -70,3 +70,17 @@ class LibrarySearchForm(forms.ModelForm):
         fields = ('country', 'city', 'libtype', 'name')
 
 
+class AuthorSearchForm(forms.ModelForm):
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Author
+        fields = ('name',)
+
+
+class UploadFileForm(forms.Form):
+    file_source = forms.FileField(label="Specify which file should be loaded")
+
+
+
