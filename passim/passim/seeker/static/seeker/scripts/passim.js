@@ -36,6 +36,7 @@ var ru = (function ($, ru) {
         loc_cities = [],
         loc_libraries = [],
         loc_authors = [],
+        loc_authorsL = [],
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
         base_url = "",
@@ -130,13 +131,17 @@ var ru = (function ($, ru) {
 
         // Bloodhound: AUTHOR
         loc_authors = new Bloodhound({
-          datumTokenizer: Bloodhound.tokenizers.whitespace,
-          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
           // loc_countries will be an array of countries
-          local: loc_cities,
-          prefetch: { url: base_url + 'api/authors/', cache: true },
+          local: loc_authorsL,
+          prefetch: { url: base_url + 'api/authors/list/', cache: true },
           remote: {
-            url: base_url + 'api/authors/?name=',
+            url: base_url + 'api/authors/list/?name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;
@@ -175,7 +180,12 @@ var ru = (function ($, ru) {
           {
             name: 'authors', source: loc_authors, limit: 10,
             display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            templates: {
+              empty: '<p>Not found</p>',
+              suggestion: function (item) {
+                return '<div>' + item.name + '</div>';
+              }
+            }
           }
         );
 

@@ -417,7 +417,9 @@ class Author(models.Model):
             added = []
             with transaction.atomic():
                 for name in lines:
-                    # The whole line is the author: add it
+                    # The whole line is the author: but strip quotation marks
+                    name = name.strip('"')
+
                     obj = Author.objects.filter(name__iexact=name).first()
                     if obj == None:
                         # Add this author
