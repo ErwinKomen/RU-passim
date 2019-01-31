@@ -10,11 +10,28 @@
     <script type="text/javascript" src="js/passim.project.js"></script>
   </head>
   <body>
-    <nav class="navbar navbar-custom">
+    <nav class="navbar navbar-custom navbar-fixed-top">
       <div class="container-fluid">
         <!-- mobile display: group brand and toggle -->
         <div class="navbar-header">
-          <a class="navbar-brand navbar-img" href="http://www.ru.nl/" target="_blank"><img src="img/ru.png" class="mini-logo" /></a>
+          <!-- No header filling?> -->
+        </div>
+        <div>
+          <table style="width: 100%;">
+            <tbody>
+              <tr>
+                <td align="center">
+                  <a class="navbar-img" href="http://www.cerl.org/" target="_blank"><img src="img/erc_funded.png" class="mini-logo stamp" /></a>
+                </td>
+                <td align="center">
+                  <a class="navbar-img" href="http://www.ru.nl/" target="_blank"><img src="img/ru_red-black.png" class="mini-logo" /></a>
+                </td>
+                <td align="center">
+                  <a class="navbar-img" href="http://www.nwo.nl/" target="_blank"><img src="img/nwo_logo.png" class="mini-logo" /></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </nav>
@@ -25,10 +42,12 @@
       <div class="row">
         <div class="col-sm-10 col-sm-offset-1">
           <div class="jumbotron">
-            <img src="img/erc_funded.png" class="stamp" />
-            <h1 class="text-center" id="maintitle">PATRISTIC SERMONS IN THE MIDDLE AGES</h1>
+            <!--
+              <img src="img/erc_funded.png" class="stamp" />
+            -->
+            <h2 class="text-center" id="maintitle">PATRISTIC SERMONS IN THE MIDDLE AGES</h2>
             <hr/>
-            <h2 class="text-center" id="subtitle">The Dissemination, Manipulation and Interpretation of Late-antique Sermons in the Medieval Latin West</h2>
+            <h3 class="text-center" id="subtitle">The Dissemination, Manipulation and Interpretation of Late-antique Sermons in the Medieval Latin West</h3>
           </div>
         </div>
       </div>
@@ -58,23 +77,28 @@
               <div class="tab-pane active">
                 <div class="col-sm-12 display-lg">
                   <!-- Image -->
-                  <img src="img/LincolnCathedralLib90.jpg" />
-                  <span class="banner visible-sm visible-md visible-lg">
-                    <h3>Pastoral Sermons</h3>
-                    <h4>Tracking sermon copying routes in Middle-Age Europe</h4>
+                  <img src="img/LincolnCathedralLib90.jpg"  title="Source: Wikimedia Commons" />
+                  <span class="banner visible-sm visible-lg visible-md">
+                    Lincoln, Cathedral Library, 90 (A.III.17), f. 8v
                   </span>
                 </div>
-                <div class="col-sm-8 page-content">
-                  <h4>Explanation</h4>
-                  <p>PASSIM is a project that aims to track patristic sermons in the middle ages. 
-                  FURTHER EXPLANATIONS
+                <div class="col-sm-12 page-content">
+                  <p>The Latin sermons preached by the Fathers of the Early Church, Augustine, Jerome, Leo, Gregory and their contemporaries had an impact 
+                  that went far beyond the Late-Antique context in which they were first preached. Collections of patristic sermons traveled throughout the medieval world. 
+                  These sermons were not just preserved as relics of the authoritative voices of the early days of Christianity. On the contrary, 
+                  patristic sermons served a number of functions in the medieval religious experience and were changed and manipulated to fit their new purpose and context. 
                   </p>
-                  <p>The PASSIM project is funded by the ERC (REFERENCE). 
-                  The principle investigator is Shari Boodts (REF).</p>
-                  <p>A full description of the project can be found at the <a href="http://add.a.site.her.nl/passim" target="_blank">ERC site</a>.</p>
-                </div>
-                <div class="col-sm-4">
-                  <p><strong>Latest news</strong></p>
+                  <p>This dynamic and enduring reception of the sermons of the Church Fathers can be traced in a vast corpus of medieval manuscripts. 
+                    <i>Patristic Sermons in the Middle Ages</i> will use a digital network of the manuscripts transmitting patristic sermon collections 
+                  to analyze for the first time the myriad ways in which patristic sermons were used in the Middle Ages and how the medieval adaptations 
+                  of the corpus of late-antique sermons reflect and steer both medieval and modern interpretations of the authorities of the Early Church.</p>
+
+                  <p>Two complementary research projects will realize these aims. <i>Patristic Sermons in the Middle Ages. 
+                  The dissemination, manipulation and interpretation of late-antique sermons in the medieval Latin West (PASSIM)</i> 
+                  is an ERC-funded project (grant n° 802210) which will run 2019-2023. <i>On the trail of Alanus of Farfa. 
+                  Tracing the formation of Augustine’s authority in medieval sermon collections for the liturgy (Alanus)</i> 
+                  is funded by a VENI-grant (016.Veni.195.12) of the Dutch Research Organization (NWO) which will run 2018-2022. 
+                  Both projects are hosted by Radboud University Nijmegen.</p>
                 </div>
               </div>
             </div>
@@ -87,14 +111,20 @@
     <!-- Information about the PI, project partners etc -->
     <div class="col-sm-12 footinfo ds">
       <div class="col-sm-8 col-sm-offset-2">
-        <p>
-          Principal Investigator:  Dr. Shari Boodts,
-          <a class="emailaddress" href="mailto:s.boodts@let.ru.nl" target="_blank">s.boodts@let.ru.nl</a>
-        </p>
         <p>Project partners:</p>
         <ul class="list-inline">
           <li><a href="http://www.ru.nl/" target="_blank"><img class="partner-logo2" src="img/ru_lg.jpg" /></a></li>
           <li><a href="http://www.cerl.org/" target="_blank"><img class="partner-logo2" src="img/cerl.jpg"></a></li>
+          <li>
+            <div class="mirabile-logo">
+              <a href="http://www.mirabileweb.it/" target="_blank">
+                <img class="partner-logo3"  src="img/mirabile_logo_90.png" alt="" />
+              </a>
+              <h2 style="margin-bottom:0!important; margin-top:15px">MIRABILE</h2>
+              <p >Archivio digitale della cultura medievale<br>Digital Archives for Medieval Culture</p>
+            </div>
+
+          </li>
         </ul>
         <ul class="list-inline"></ul>
       </div>
