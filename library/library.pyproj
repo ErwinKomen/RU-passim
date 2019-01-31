@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>fe44b9d4-3a09-4292-8d93-21bc9e3e4757</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>library.py</StartupFile>
+    <StartupFile>authnames.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -15,7 +15,7 @@
     <InterpreterId>{1e0ede81-9850-4bc8-88b1-ed3d616f5876}</InterpreterId>
     <InterpreterVersion>3.5</InterpreterVersion>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-i "d:/data files/passim/data/passim_countries.json" -c "d:/data files/passim/data/cities" -o "d:/data files/passim/data/entries.json"</CommandLineArguments>
+    <CommandLineArguments>-i "d:/data files/passim/data/LLTA_Names.xml" -o "d:/data files/passim/data/authors.json"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -27,6 +27,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="authnames.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="library.py" />
     <Compile Include="utils.py">
       <SubType>Code</SubType>
