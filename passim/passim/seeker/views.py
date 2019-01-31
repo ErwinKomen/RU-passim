@@ -113,7 +113,7 @@ def contact(request):
         'contact.html',
         {
             'title':'Contact',
-            'message':'Henk van den Heuvel',
+            'message':'Shari Boodts',
             'year':datetime.now().year,
         }
     )
