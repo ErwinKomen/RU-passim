@@ -190,6 +190,28 @@ def process_lib_entries(oStatus):
         errHandle.DoError("process_lib_entries", True)
         return oBack
 
+def import_data_file(sContents, arErr):
+    """Turn the contents of [data_file] into a json object"""
+
+    try:
+        # Validate
+        if sContents == "":
+            return {}
+        # Adapt the contents into an object array
+        lines = []
+        for line in sContents:
+            lines.append(line.decode("utf-8").strip())
+        # Combine again
+        sContents = "\n".join(lines)
+        oData = json.loads(sContents)
+        # This is the data
+        return oData
+    except:
+        sMsg = errHandle.get_error_message()
+        arErr.DoError("import_data_file error:")
+        return {}
+
+
 
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
@@ -440,7 +462,61 @@ class Author(models.Model):
         # Return the object that has been created
         return oBack
 
+    def read_json(username, data_file, arErr, oData=None, sName = None):
+        """Import a JSON list of authors and add them to the database"""
 
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        try:
+            # Make sure we have the data
+            if oData == None:
+                oData =import_data_file( data_file, arErr)
+
+            # Go through the data
+            lines = []
+            bFirst = True
+            for line in oData:
+                sAuthor = ""
+                # Each 'line' is either a string (a name) or an object with a name field
+                if isinstance(line, str):
+                    # This is a string, so this is the author's name
+                    sAuthor = line
+                else:
+                    # =========================================
+                    # TODO: this part has not been debugged yet
+                    # =========================================
+                    # this is an object, so iterate over the fields
+                    for k,v in line.items:
+                        if isinstance(v, str):
+                            sAuthor = v
+                            break
+                lines.append(sAuthor)
+
+            iCount = 0
+            added = []
+            with transaction.atomic():
+                for name in lines:
+                    # The whole line is the author: but strip quotation marks
+                    name = name.strip('"')
+
+                    obj = Author.objects.filter(name__iexact=name).first()
+                    if obj == None:
+                        # Add this author
+                        obj = Author(name=name)
+                        obj.save()
+                        added.append(name)
+                        # Keep track of the authors that are ADDED
+                        iCount += 1
+            # Make sure the requester knows how many have been added
+            oBack['count'] = iCount
+            oBack['added'] = added
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
 
 
 class Knickname(models.Model):

@@ -500,7 +500,7 @@ def get_authors(request):
 
 @csrf_exempt
 def import_authors(request):
-    """Import a CSV file that contains author names"""
+    """Import a CSV file or a JSON file that contains author names"""
 
 
     # Initialisations
@@ -523,14 +523,23 @@ def import_authors(request):
             print('valid form')
             # Get the contents of the imported file
             data_file = request.FILES['file_source']
+            filename = data_file.name
 
             # Get the source file
             if data_file == None or data_file == "":
                 arErr.append("No source file specified for the selected project")
             else:
-                # 
-                # Read the list of authors
-                oResult = Author.read_csv(username, data_file, arErr)
+                # Check the extension
+                arFile = filename.split(".")
+                extension = arFile[len(arFile)-1]
+
+                # Further processing depends on the extension
+                if extension == "json":
+                    # This is a JSON file
+                    oResult = Author.read_json(username, data_file, arErr)
+                else:
+                    # Read the list of authors as CSV
+                    oResult = Author.read_csv(username, data_file, arErr)
 
                 # Determine a status code
                 statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
