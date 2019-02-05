@@ -90,7 +90,9 @@ def main(prgName, argv) :
                         data['latin'] = True
                     elif tag == "date":
                         # Is this an integer?
-                        if check_int(sText):
+                        if sText == None:
+                            data['dateString'] = ""
+                        elif check_int(sText):
                             # Yes, integer
                             iDate = int(sText)
                             data['dateStart'] = iDate
@@ -112,6 +114,8 @@ def main(prgName, argv) :
                             if isinstance(oldData, str):
                                 # This used to be one string, now we get an addition
                                 lText = [ oldData ]
+                            elif oldData == None:
+                                lText = []
                             else:
                                 lText = oldData
                             lText.append(sText)
@@ -121,7 +125,6 @@ def main(prgName, argv) :
                 # Only actually append if the data is LATIN
                 if data['latin']:
                     lExtracted.append(data)
-
 
         # Save output
         with open(flOutput, "w", encoding="utf-8-sig") as fp:
