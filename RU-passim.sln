@@ -29,6 +29,8 @@ Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "passimproject", "passimproj
 		DefaultWebSiteLanguage = "Visual Basic"
 	EndProjectSection
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "gallica", "gallica\gallica.pyproj", "{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,8 @@ Global
 		{BB4FCF56-3EE7-437E-8C0E-EE147ACA6855}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB4FCF56-3EE7-437E-8C0E-EE147ACA6855}.Release|Any CPU.ActiveCfg = Debug|Any CPU
 		{BB4FCF56-3EE7-437E-8C0E-EE147ACA6855}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
