@@ -2,7 +2,7 @@
 
 """
 from django.db import models, transaction
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
 from datetime import datetime
@@ -210,7 +210,6 @@ def import_data_file(sContents, arErr):
         sMsg = errHandle.get_error_message()
         arErr.DoError("import_data_file error:")
         return {}
-
 
 
 class Status(models.Model):
@@ -469,7 +468,9 @@ class Author(models.Model):
         try:
             # Make sure we have the data
             if oData == None:
-                oData =import_data_file( data_file, arErr)
+                # This treats the data as JSON already
+                sData = data_file.read().decode("utf-8-sig")
+                oData = json.loads(sData)
 
             # Go through the data
             lines = []

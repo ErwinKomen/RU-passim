@@ -28,12 +28,14 @@
             <!-- The top layer of searching: upload and download button(s) -->
             <div class="row">
               <div class="col-sm-1 col-sm-offset-9" align="right">
+                {% if is_passim_uploader %}
                 <span><a title="upload authors" 
                    class="btn btn-success btn-xs" 
                    targetid="import_main"
                    onclick="ru.passim.seeker.toggle_click(this);">
                   <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
                 </a></span>
+                {% endif %}
               </div>
               <div class="col-sm-2" align="right" style="margin-top: 5px;">
                 <a id="downloadmenu" role="button" class="btn jumbo-1 btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" 
@@ -89,35 +91,37 @@
         </form>
 
       <!-- Allow adding a project -->
-      <div id="import_main" class="row hidden container">
-        <form action="{% url 'import_authors' %}" method="POST" enctype="multipart/form-data">
-          {% csrf_token %}
-          <!-- Room for the filename to appear -->
-          <div class="col-md-6 form-group" id="main-import_info"
-               targetid="author_data_import"
-               targeturl="{% url 'import_authors' %}">
-            <div class="input-group">
-              <span>Specify the CSV file that contains the PASSIM authors</span>
-              <span class="input-group-btn">
-                <span class="btn btn-default btn-xs btn-file">
-                  Browse...
-                  <input id="id_file_source" name="file_source" required="" type="file" oninput="ru.passim.seeker.import_data('main');" />
+      {% if is_passim_uploader %}
+        <div id="import_main" class="row hidden container">
+          <form action="{% url 'import_authors' %}" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <!-- Room for the filename to appear -->
+            <div class="col-md-6 form-group" id="main-import_info"
+                 targetid="author_data_import"
+                 targeturl="{% url 'import_authors' %}">
+              <div class="input-group">
+                <span>Specify the CSV file (or the JSON file) that contains the PASSIM authors</span>
+                <span class="input-group-btn">
+                  <span class="btn btn-default btn-xs btn-file">
+                    Browse...
+                    <input id="id_file_source" name="file_source" required="" type="file" oninput="ru.passim.seeker.import_data('main');" />
+                  </span>
                 </span>
-              </span>
-            </div>
+              </div>
             
-          </div>
-          <!-- Progress of upload indicator -->
-          <div class="col-md-6">
-            <progress class="hidden" style="width:100%;" id="main-import_progress" value="0" min="0" max="100"></progress>
-          </div>
-          <!-- Any error reporting -->
-          <div id="main-import_error"></div>
-        </form>
+            </div>
+            <!-- Progress of upload indicator -->
+            <div class="col-md-6">
+              <progress class="hidden" style="width:100%;" id="main-import_progress" value="0" min="0" max="100"></progress>
+            </div>
+            <!-- Any error reporting -->
+            <div id="main-import_error"></div>
+          </form>
 
-        <!-- Import information -->
-        <div id="author_data_import" class="project-part hidden"></div>
-      </div>
+          <!-- Import information -->
+          <div id="author_data_import" class="project-part hidden"></div>
+        </div>
+      {% endif %}
 
 
       </div>

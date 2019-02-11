@@ -24,7 +24,7 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, User, Group
 
 import fnmatch
 import sys
@@ -84,6 +84,24 @@ def csv_to_excel(sCsvData, response):
     # Save the result in the response
     wb.save(response)
     return response
+
+def user_is_authenticated(request):
+    # Is this user authenticated?
+    username = request.user.username
+    user = User.objects.filter(username=username).first()
+    return user.is_authenticated()
+
+def user_is_ingroup(request, sGroup):
+    # Is this user part of the indicated group?
+    username = request.user.username
+    user = User.objects.filter(username=username).first()
+    # glist = user.groups.values_list('name', flat=True)
+
+    glist = [x.name for x in user.groups.all()]
+
+    ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+    bIsInGroup = (sGroup in glist)
+    return bIsInGroup
 
 
 def home(request):
@@ -359,8 +377,8 @@ def signup(request):
                                 is_staff=True)
             user.is_staff = True
             user.save()
-            # Add user to the "RegistryUser" group
-            gQs = Group.objects.filter(name="seeker_user")
+            # Add user to the "passim_user" group
+            gQs = Group.objects.filter(name="passim_user")
             if gQs.count() > 0:
                 g = gQs[0]
                 g.user_set.add(user)
@@ -610,6 +628,10 @@ class AuthorListView(ListView):
         # Set the title of the application
         context['title'] = "Passim Authors"
 
+        # Check this user: is he allowed to UPLOAD data?
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+
         # Return the calculated context
         return context
 
@@ -693,6 +715,10 @@ class LibraryListView(ListView):
 
         # Set the title of the application
         context['title'] = "Passim Libraries"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
 
         # Return the calculated context
         return context
