@@ -42,8 +42,9 @@ urlpatterns = [
     url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
     url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
 
+
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
-    url(r'^search/manuscript', passim.seeker.views.search_manuscript, name='search_manuscript'),
+    url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
@@ -55,7 +56,9 @@ urlpatterns = [
     url(r'^api/libraries/$', passim.seeker.views.get_libraries, name='api_libraries'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
+
     url(r'^api/authors/import/$', passim.seeker.views.import_authors, name='import_authors'),
+    url(r'^api/ecodices/import/$', passim.seeker.views.import_ecodices, name='import_ecodices'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),

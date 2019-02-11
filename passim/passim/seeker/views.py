@@ -24,7 +24,7 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, User, Group
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group
 
 import fnmatch
 import sys
@@ -516,6 +516,77 @@ def get_authors(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
+def import_ecodices(request):
+    """Import an XML file that contains a manuscript definition from e-codices, from Switzerland"""
+
+    # Initialisations
+    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'seeker/import_status.html'
+    obj = None
+    data_file = ""
+    bClean = False
+    username = request.user.username
+
+    # Check if the user is authenticated and if it is POST
+    if request.user.is_authenticated and request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            # NOTE: from here a breakpoint may be inserted!
+            print('valid form')
+            # Get the contents of the imported file
+            data_file = request.FILES['file_source']
+            filename = data_file.name
+
+            # Get the source file
+            if data_file == None or data_file == "":
+                arErr.append("No source file specified for the selected project")
+            else:
+                # Check the extension
+                arFile = filename.split(".")
+                extension = arFile[len(arFile)-1]
+
+                # Further processing depends on the extension
+                oResult = None
+                if extension == "xml":
+                    # This is an XML file
+                    oResult = Manuscript.read_ecodices(username, data_file, arErr)
+
+                # Determine a status code
+                statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                if oResult == None:
+                    arErr.append("There was an error. No manuscripts have been added")
+
+            # Get a list of errors
+            error_list = [str(item) for item in arErr]
+
+            # Create the context
+            context = dict(
+                statuscode=statuscode,
+                results=oResult,
+                error_list=error_list
+                )
+
+            if len(arErr) == 0:
+                # Get the HTML response
+                data['html'] = render_to_string(template_name, context, request)
+            else:
+                data['html'] = "Please log in before continuing"
+
+
+        else:
+            data['html'] = 'invalid form: {}'.format(form.errors)
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
 @csrf_exempt
 def import_authors(request):
     """Import a CSV file or a JSON file that contains author names"""
@@ -590,6 +661,95 @@ def import_authors(request):
  
     # Return the information
     return JsonResponse(data)
+
+
+class ManuscriptListView(ListView):
+    """Search and list manuscripts"""
+    
+    model = Manuscript
+    paginate_by = 20
+    template_name = 'seeker/manuscript.html'
+    entrycount = 0
+    bDoTime = True
+
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(ManuscriptListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        initial = self.request.GET
+        search_form = SearchManuscriptForm(initial)
+
+        context['searchform'] = search_form
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim Manuscripts"
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Measure how long it takes
+        if self.bDoTime: iStart = get_now_time()
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Fix the sort-order
+        get['sortOrder'] = 'name'
+
+        lstQ = []
+
+        # Check for Manuscript [name]
+        if 'name' in get and get['name'] != '':
+            val = adapt_search(get['name'])
+            lstQ.append(Q(name__iregex=val))
+
+        # Calculate the final qs
+        qs = Manuscript.objects.filter(*lstQ).order_by('name').distinct()
+
+        # Time measurement
+        if self.bDoTime:
+            print("ManuscriptListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+            print("ManuscriptListView query: {}".format(qs.query))
+            iStart = get_now_time()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Time measurement
+        if self.bDoTime:
+            print("ManuscriptListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+        # Return the resulting filtered and sorted queryset
+        return qs
 
 
 class AuthorListView(ListView):

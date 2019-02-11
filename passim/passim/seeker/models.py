@@ -12,6 +12,9 @@ import sys, os
 import copy
 import json
 import time
+# import xml.etree.ElementTree as ET
+from lxml import etree as ET
+import xmltodict
 
 STANDARD_LENGTH=100
 LONG_STRING=255
@@ -36,6 +39,32 @@ class FieldChoice(models.Model):
 
 def get_now_time():
     return time.clock()
+
+def obj_text(d):
+    stack = list(d.items())
+    lBack = []
+    while stack:
+        k, v = stack.pop()
+        if isinstance(v, dict):
+            stack.extend(v.iteritems())
+        else:
+            # Note: the key is [k]
+            lBack.append(v)
+    return ", ".join(lBack)
+
+def obj_value(d):
+    def NestedDictValues(d):
+        for k, v in d.items():
+            # Treat attributes differently
+            if k[:1] == "@":
+                yield "{}={}".format(k,v)
+            elif isinstance(v, dict):
+                yield from NestedDictValues(v)
+            else:
+                yield v
+    a = list(NestedDictValues(d))
+    return ", ".join(a)
+
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -402,6 +431,133 @@ class Manuscript(models.Model):
 
     def __str__(self):
         return self.name
+
+    def read_ecodices(username, data_file, arErr, root=None, sName = None):
+        """Import an XML from e-codices with manuscript data and add it to the DB"""
+
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
+        mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'manuscript'}
+        mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
+        mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
+        ns = {'k': 'http://www.tei-c.org/ns/1.0'}
+        errHandle = ErrHandle()
+        try:
+            # Make sure we have the data
+            if root == None:
+                # Read the data as BYTE string
+                sData = data_file.read()
+                # Convert into a complex dictionary object
+                alt = xmltodict.parse(sData)
+
+            # Get relevant information From the xml
+            # /TEI/teiHeader/fileDesc/teiHeader
+            if 'TEI' in alt and 'teiHeader' in alt['TEI'] and 'fileDesc' in alt['TEI']['teiHeader']:
+                fd = alt['TEI']['teiHeader']['fileDesc']
+                # ./sourceDesc/msDesc
+                if 'sourceDesc' in fd and 'msDesc' in fd['sourceDesc']:
+                    msDesc = fd['sourceDesc']['msDesc']
+                    # ./msIdentifier
+                    if 'msIdentifier' in msDesc:
+                        for sTag, item in msDesc['msIdentifier'].items():
+                            # Action depends on the tag
+                            if sTag in mapIdentifier:
+                                sInfo = mapIdentifier[sTag]
+                                oInfo[sInfo] = item
+                    # ./head
+                    if 'head' in msDesc:
+                        for sTag, item in msDesc['head'].items():
+                            # Action depends on the tag
+                            if sTag in mapHead:
+                                oValue = mapHead[sTag]
+                                if isinstance(oValue, str):
+                                    oInfo[oValue] = item
+                                else:
+                                    # Get the attributes named in here
+                                    for k, attr in oValue.items():
+                                        oInfo[attr] = item['@'+k]
+                    # Walk all the ./msContents/msItem, which are the content items
+                    lItems = []
+                    if 'msContents' in msDesc and 'msItem' in msDesc['msContents']:
+                        for msItem in msDesc['msContents']['msItem']:
+                            # Create a new item
+                            oMsItem = {}
+                            bAdded = False
+                            # Get the details of this [msItem]
+                            for sTag, item in msItem.items():
+                                # Action depends on the tag
+                                if sTag in mapItem:
+                                    oValue = mapItem[sTag]
+                                    if isinstance(item, str):
+                                        # Too simplistic: oMsItem[oValue] = item['#text']
+                                        if isinstance(item, str):
+                                            oMsItem[oValue] = item      # ['#text']
+                                        else:
+                                            oMsItem[oValue] = json.dumps(item)
+                                    elif isinstance(item, dict):
+                                        oMsItem[oValue] = obj_value(item)
+                                    else:
+                                        # Get the attributes named in here
+                                        for k, attr in oValue.items():
+                                            oMsItem[attr] = item['@'+k]
+                                elif sTag == "msItem":
+                                    # This is a sub-item. That means:
+                                    # (1) take the 'author' + 'title' from current oInfo
+                                    # (2) add items for different 'locus, note, incipit, explicit' stuff
+                                    for subItem in item:
+                                        oSubItem = copy.copy(oMsItem)
+                                        for sTag_s, item_s in subItem.items():
+                                            # Action depends on the tag
+                                            if sTag_s in mapItem:
+                                                oValue = mapItem[sTag_s]
+                                                if isinstance(item_s, str):
+                                                    oSubItem[oValue] = item_s
+                                                elif isinstance(item_s, dict):
+                                                    oSubItem[oValue] = obj_value(item_)
+                                                else:
+                                                    # Get the attributes named in here
+                                                    for k, attr in oValue.items():
+                                                        oSubItem[attr] = item_s['@'+k]
+                                        # Add this sub-item to the list
+                                        lItems.append(oSubItem)
+                                        bAdded = True
+                            # Check if this item has already been added
+                            if not bAdded:
+                                lItems.append(oMsItem)
+                    # Now dd this list to the main one
+                    oInfo['list'] = lItems
+
+            # Now we should have a full description of the contents to be added to the database
+
+
+            iCount = 0
+            added = []
+            with transaction.atomic():
+                for name in lines:
+                    # The whole line is the author: but strip quotation marks
+                    name = name.strip('"')
+
+                    obj = Author.objects.filter(name__iexact=name).first()
+                    if obj == None:
+                        # Add this author
+                        obj = Author(name=name)
+                        obj.save()
+                        added.append(name)
+                        # Keep track of the authors that are ADDED
+                        iCount += 1
+            # Make sure the requester knows how many have been added
+            oBack['count'] = iCount
+            oBack['added'] = added
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
+
+
 
 
 class Author(models.Model):
