@@ -397,6 +397,55 @@ var ru = (function ($, ru) {
     return {
 
       /**
+       * check_progress
+       */
+      check_progress: function (progrurl, sTargetDiv) {
+        var elTarget = "#" + sTargetDiv,
+            lHtml = [];
+
+        try {
+          $(elTarget).removeClass("hidden");
+          // Call the URL
+          $.get(progrurl, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "finished":
+                  // NO NEED for further action
+                  //// Indicate we are ready
+                  //$(elTarget).html("READY");
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(elTarget).html(response.msg);
+                  } else {
+                    $(elTarget).html("An error has occurred");
+                  }                  
+                  break;
+                default:
+                  // Show the status
+                  lHtml.push("status: " + response.status);
+                  if ("msg" in response) {
+                    lHtml.push("<br />" + response.msg);
+                  }
+                  $(elTarget).html(lHtml.join("\n"));
+                  // Make sure we check again
+                  window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 1000);
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("check_progress", ex);
+        }
+      },
+
+      /**
        * import_data
        *   Allow user to upload a file
        *
@@ -404,15 +453,18 @@ var ru = (function ($, ru) {
        * - the [el] contains parameter  @targeturl
        * - there is a div 'import_progress'
        * - there is a div 'id_{{ftype}}-{{forloop.counter0}}-file_source'
+       *   or one for multiple files: 'id_files_field'
        *
        */
       import_data: function (sKey) {
         var frm = null,
             targeturl = "",
+            options = {},
             fdata = null,
             el = null,
             elProg = null,    // Progress div
             elErr = null,     // Error div
+            progrurl = null,  // Any progress function to be called
             data = null,
             xhr = null,
             files = null,
@@ -436,6 +488,7 @@ var ru = (function ($, ru) {
 
           // Get the URL
           targeturl = $(el).attr("targeturl");
+          progrurl = $(el).attr("sync-progress");
           sTargetDiv = $(el).attr("targetid");
           sSaveDiv = $(el).attr("saveid");
 
@@ -469,6 +522,11 @@ var ru = (function ($, ru) {
           }
           // Showe the user needs to wait...
           private_methods.waitStart(elWait);
+
+          // Now initiate any possible progress calling
+          if (progrurl !== null) {
+            window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 2000);
+          }
 
           // Upload XHR
           $(elInput).upload(targeturl,

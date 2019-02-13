@@ -23,7 +23,7 @@ from time import sleep
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm
+                                AuthorSearchForm, UploadFileForm, UploadFilesForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group
 
 import fnmatch
@@ -516,8 +516,8 @@ def get_authors(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
-def import_ecodices(request):
-    """Import an XML file that contains a manuscript definition from e-codices, from Switzerland"""
+def import_ecodex(request):
+    """Import one or more XML files that each contain one manuscript definition from e-codices, from Switzerland"""
 
     # Initialisations
     # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
@@ -525,7 +525,7 @@ def import_ecodices(request):
     error_list = []
     transactions = []
     data = {'status': 'ok', 'html': ''}
-    template_name = 'seeker/import_status.html'
+    template_name = 'seeker/import_manuscripts.html'
     obj = None
     data_file = ""
     bClean = False
@@ -533,40 +533,56 @@ def import_ecodices(request):
 
     # Check if the user is authenticated and if it is POST
     if request.user.is_authenticated and request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
+
+        # Remove previous status object for this user
+        Status.objects.filter(user=username).delete()
+        # Create a status object
+        oStatus = Status(user=username, type="ecodex", status="preparing")
+        oStatus.save()
+
+
+        form = UploadFilesForm(request.POST, request.FILES)
+        lResults = []
         if form.is_valid():
             # NOTE: from here a breakpoint may be inserted!
-            print('valid form')
+            print('import_ecodex: valid form')
             # Get the contents of the imported file
-            data_file = request.FILES['file_source']
-            filename = data_file.name
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
 
-            # Get the source file
-            if data_file == None or data_file == "":
-                arErr.append("No source file specified for the selected project")
-            else:
-                # Check the extension
-                arFile = filename.split(".")
-                extension = arFile[len(arFile)-1]
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
 
-                # Further processing depends on the extension
-                oResult = None
-                if extension == "xml":
-                    # This is an XML file
-                    oResult = Manuscript.read_ecodices(username, data_file, arErr)
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
 
-                # Determine a status code
-                statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
-                if oResult == None:
-                    arErr.append("There was an error. No manuscripts have been added")
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = Manuscript.read_ecodex(username, data_file, filename, arErr)
 
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+            oStatus.set("ready")
             # Get a list of errors
             error_list = [str(item) for item in arErr]
 
             # Create the context
             context = dict(
                 statuscode=statuscode,
-                results=oResult,
+                results=lResults,
                 error_list=error_list
                 )
 
@@ -598,7 +614,7 @@ def import_authors(request):
     error_list = []
     transactions = []
     data = {'status': 'ok', 'html': ''}
-    template_name = 'seeker/import_status.html'
+    template_name = 'seeker/import_authors.html'
     obj = None
     data_file = ""
     bClean = False
@@ -682,6 +698,9 @@ class ManuscriptListView(ListView):
         search_form = SearchManuscriptForm(initial)
 
         context['searchform'] = search_form
+
+        # Add a files upload form
+        context['uploadform'] = UploadFilesForm()
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()

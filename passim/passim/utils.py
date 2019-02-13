@@ -27,13 +27,10 @@ class ErrHandle:
     def DoError(self, msg, bExit = False):
         # Append the error message to the stack we have
         self.loc_errStack.append(msg)
+        # get the message
+        sErr = self.get_error_message()
         # Print the error message for the user
-        print("Error: "+msg+"\nSystem:", file=sys.stderr)
-        # Note: exc_info gives a tuple (type, value, traceback)
-        for nErr in sys.exc_info():
-            if (nErr != None):
-                print(nErr, file=sys.stderr)
-                self.loc_errStack.append(str(nErr))
+        print("Error: {}\nSystem:{}".format(msg, sErr), file=sys.stderr)
         # Is this a fatal error that requires exiting?
         if (bExit):
             sys.exit(2)

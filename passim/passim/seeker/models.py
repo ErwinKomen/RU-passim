@@ -15,6 +15,7 @@ import time
 # import xml.etree.ElementTree as ET
 from lxml import etree as ET
 import xmltodict
+from xml.dom import minidom
 
 STANDARD_LENGTH=100
 LONG_STRING=255
@@ -64,6 +65,19 @@ def obj_value(d):
                 yield v
     a = list(NestedDictValues(d))
     return ", ".join(a)
+
+def getText(nodeStart):
+    # Iterate all Nodes aggregate TEXT_NODE
+    rc = []
+    for node in nodeStart.childNodes:
+        if node.nodeType == node.TEXT_NODE:
+            sText = node.data.strip(' \t\n')
+            if sText != "":
+                rc.append(sText)
+        else:
+            # Recursive
+            rc.append(getText(node))
+    return ' '.join(rc)
 
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
@@ -304,8 +318,8 @@ class City(models.Model):
     idVilleEtab = models.IntegerField("CNRS city id", default=-1)
     # [1] Name of the city
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
-    # [1] Name of the country this is in
-    country = models.ForeignKey(Country, related_name="country_cities")
+    # [0-1] Name of the country this is in
+    country = models.ForeignKey(Country, null=True, blank=True, related_name="country_cities")
 
     def __str__(self):
         return self.name
@@ -323,6 +337,28 @@ class City(models.Model):
 
         return hit
 
+    def find_or_create(sName, country):
+        """Find a city or create it."""
+
+        errHandle = ErrHandle()
+        try:
+            qs = City.objects.filter(Q(name__iexact=sName))
+            if qs.count() == 0:
+                # Create one
+                hit = City(name=sName)
+                if country != None:
+                    hit.country = country
+                hit.save()
+            else:
+                hit = qs[0]
+            # Return what we found or created
+            return hit
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+            return None
+
 
 class Library(models.Model):
     """Library in a particular city"""
@@ -337,7 +373,7 @@ class Library(models.Model):
     # [1] Name of the city this is in
     city = models.ForeignKey(City, related_name="city_libraries")
     # [1] Name of the country this is in
-    country = models.ForeignKey(Country, related_name="country_libraries")
+    country = models.ForeignKey(Country, null=True, related_name="country_libraries")
 
     def __str__(self):
         return self.name
@@ -356,6 +392,42 @@ class Library(models.Model):
             hit.save()
 
         return hit
+
+    def find_or_create(sCity, sLibrary, sCountry = None):
+        """Find a library on the basis of the city and the library name.
+        If there is no library with that combination yet, create it
+        """
+
+        errHandle = ErrHandle()
+        try:
+            hit = None
+            country = None
+            # Check if a country is mentioned
+            if sCountry != None:
+                country = Country.objects.filter(Q(name__iexact=sCountry)).first()
+            # Try to create the city 
+            if sCity != "":
+                city = City.find_or_create(sCity, country)
+                lstQ = []
+                lstQ.append(Q(name__iexact=sLibrary))
+                lstQ.append(Q(city=city))
+                qs = Library.objects.filter(*lstQ)
+                if qs.count() == 0:
+                    # Create one
+                    libtype = "-"
+                    hit = Library(name=sLibrary, city=city, libtype=libtype)
+                    if country != None:
+                        hit.country = country
+                    hit.save()
+                else:
+                    hit = qs[0]
+            # Return what we found or created
+            return hit
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
 
     def read_json(oStatus, fname):
         """Read libraries from a JSON file"""
@@ -414,6 +486,19 @@ class Origin(models.Model):
     def __str__(self):
         return self.name
 
+    def find_or_create(sName):
+        """Find a location or create it."""
+
+        qs = Origin.objects.filter(Q(name__iexact=sName))
+        if qs.count() == 0:
+            # Create one
+            hit = Origin(name=sName)
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
 
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
@@ -428,11 +513,228 @@ class Manuscript(models.Model):
     library = models.ForeignKey(Library, related_name="library_manuscripts")
     # [0-1] If possible we need to know the original location of the manuscript
     origin = models.ForeignKey(Origin, null=True, blank=True, related_name="origin_manuscripts")
+    # [0-1] Optional filename to indicate where we got this from
+    filename = models.CharField("Filename", max_length=LONG_STRING, null=True, blank=True)
 
     def __str__(self):
         return self.name
 
-    def read_ecodices(username, data_file, arErr, root=None, sName = None):
+    def find_sermon(self, oDescr):
+        """Find a sermon within a manuscript"""
+
+        oErr = ErrHandle()
+        sermon = None
+        try:
+            lstQ = []
+            lstQ.append(Q(sermon__title=oDescr['title']))
+            if 'location' in oDescr: lstQ.append(Q(sermon__locus__iexact=oDescr['location']))
+            if 'author' in oDescr: lstQ.append(Q(sermon__author__name__iexact=oDescr['author']))
+            if 'incipit' in oDescr: lstQ.append(Q(sermon__incipit__iexact=oDescr['incipit']))
+            if 'explicit' in oDescr: lstQ.append(Q(sermon__explicit__iexact=oDescr['explicit']))
+            # Find all the SermanMan objects that point to a sermon with the same characteristics I have
+            sermonman = self.sermons.filter(*lstQ).first()
+            if sermonman != None:
+                # Alternative: prescribe manuscript
+                lstQ.append(Q(manuscript=self))
+                sermonman = self.sermons.filter(*lstQ).first()
+                if sermonman != None:
+                    sermon = sermonman.sermon
+            return sermon
+        except:
+            sMsg = oErr.get_error_message()
+            oErr.DoError("Manuscript/find_or_create")
+            return None
+
+    def find_or_create(name,yearstart, yearfinish, library, origin, filename=None):
+        """Find an existing manuscript, or create a new one"""
+
+        oErr = ErrHandle()
+        try:
+            lstQ = []
+            lstQ.append(Q(name=name))
+            lstQ.append(Q(yearstart=yearstart))
+            lstQ.append(Q(yearfinish=yearfinish))
+            lstQ.append(Q(library=library))
+            qs = Manuscript.objects.filter(*lstQ)
+            if qs.count() == 0:
+                # Note: do *NOT* let the place of origin play a role in locating the manuscript
+                manuscript = Manuscript(name=name, yearstart=yearstart, yearfinish=yearfinish, library=library )
+                if origin != None:
+                    manuscript.origin = origin
+                if filename != None:
+                    manuscript.filename = filename
+                manuscript.save()
+            else:
+                manuscript = qs[0]
+            return manuscript
+        except:
+            sMsg = oErr.get_error_message()
+            oErr.DoError("Manuscript/find_or_create")
+            return None
+
+    def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None):
+        """Import an XML from e-codices with manuscript data and add it to the DB
+        
+        This approach makes use of MINIDOM (which is part of the standard xml.dom)
+        """
+
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
+        mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'manuscript'}
+        mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
+        # mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
+        mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'incipit': 'incipit', 'explicit': 'explicit'}
+        ns = {'k': 'http://www.tei-c.org/ns/1.0'}
+        errHandle = ErrHandle()
+        try:
+            # Make sure we have the data
+            if xmldoc == None:
+                # Read and parse the data into a DOM element
+                xmldoc = minidom.parse(data_file)
+
+            # Try to get a main author
+            # Try to find the author within msItem
+            authors = xmldoc.getElementsByTagName("persName")
+            mainAuthor = ""
+            for person in authors:
+                # Check if this is linked as author
+                if 'role' in person.attributes and person.attributes['role'].value == "author":
+                    mainAuthor = getText(person)
+                    # Don't look further: the first author is the *main* author of it
+                    break
+
+            # Get relevant information From the xml: the [fileDesc] element
+            # /TEI/teiHeader/fileDesc/teiHeader/fileDesc/sourceDesc/msDesc
+            # Alternative, but not needed: fdList = xmldoc.getElementsByTagNameNS(ns['k'], "fileDesc")
+            fdList = xmldoc.getElementsByTagName("msDesc")
+            if fdList.length > 0:
+                msDesc = fdList[0]
+                # (1) Find the 'msIdentifier' in here
+                msIdents = msDesc.getElementsByTagName("msIdentifier")
+                if msIdents.length > 0:
+                    for item in msIdents[0].childNodes:
+                        if item.nodeType == minidom.Node.ELEMENT_NODE:
+                            # Get the tag name of this item
+                            sTag = item.tagName
+                            # Action depends on the tag
+                            if sTag in mapIdentifier:
+                                sInfo = mapIdentifier[sTag]
+                                oInfo[sInfo] = getText(item) #  " ".join(t.nodeValue for t in item.childNodes if t.nodeType == t.TEXT_NODE) # item.data
+                # (2) Find the 'head' in msDesc
+                msHeads = msDesc.getElementsByTagName("head")
+                if msHeads.length > 0:
+                    for item in msHeads[0].childNodes:
+                        if item.nodeType == minidom.Node.ELEMENT_NODE:
+                            # Get the tag name of this item
+                            sTag = item.tagName
+                            if sTag in mapHead:
+                                # Action depends on the tag
+                                oValue = mapHead[sTag]
+                                if isinstance(oValue, str):
+                                    oInfo[oValue] = getText(item)
+                                else:
+                                    # Get the attributes named in here
+                                    for k, attr in oValue.items():
+                                        # Get the named attribute
+                                        oInfo[attr] = item.attributes[k].value
+                # (3) Walk all the ./msContents/msItem, which are the content items
+                msItems = msDesc.getElementsByTagName("msItem")
+                lItems = []
+                for msItem in msItems:
+                    # Create a new item
+                    oMsItem = {}
+                    # Process all child nodes
+                    for item in msItem.childNodes:
+                        if item.nodeType == minidom.Node.ELEMENT_NODE:
+                            # Get the tag name of this item
+                            sTag = item.tagName
+                            # Action depends on the tag
+                            if sTag in mapItem:
+                                oMsItem[mapItem[sTag]] = getText(item)
+                            elif sTag == "note":
+                                oMsItem['note'] = getText(item)
+                    # Check if we have a title
+                    if not 'title' in oMsItem:
+                        # Perhaps we have a parent <msItem> that contains a title
+                        parent = msItem.parentNode
+                        if parent.nodeName == "msItem":
+                            # Check if this one has a title
+                            if 'title' in parent.childNodes:
+                                oMsItem['title'] = getText(parent.childNodes['title'])
+                    # Try to find the author within msItem
+                    authors = msItem.getElementsByTagName("persName")
+                    for person in authors:
+                        # Check if this is linked as author
+                        if 'role' in person.attributes and person.attributes['role'].value == "author":
+                            oMsItem['author'] = getText(person)
+                            # Don't look further: the first author is the *best*
+                            break
+                    # If there is no author, then supply the default author (if that exists)
+                    if not 'author' in oMsItem and mainAuthor != "":
+                        oMsItem['author'] = mainAuthor
+                    # Add to the list of items
+                    lItems.append(oMsItem)
+                # Add to the info object
+                oInfo['list'] = lItems
+
+            # Now [oInfo] has a full description of the contents to be added to the database
+            # (1) Get the library from the info object
+            library = Library.find_or_create(oInfo['city'], oInfo['library'], "Switzerland")
+
+            # (2) Get or create place of origin
+            origin = Origin.find_or_create(oInfo['origPlace'])
+
+            # (3) Get or create the Manuscript
+            yearstart = oInfo['origDateFrom'] if oInfo['origDateFrom'] != "" else 0
+            yearfinish = oInfo['origDateTo'] if oInfo['origDateTo'] != "" else 2020
+            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, filename)
+
+            # (3) Create all the manuscript content items
+            iCount = 0
+            for msItem in oInfo['list']:
+                # Obligatory: each sermon must have a title
+                if 'title' in msItem:
+                    # Check if we already have this kind of sermon
+                    sermon = manuscript.find_sermon(msItem)
+                    # sermon = manuscript.sermons.filter(title=msItem['title']).first()
+                    if sermon == None:
+                        # Create a SermonDescr
+                        sermon = SermonDescr(title=msItem['title'])
+                        if 'location' in msItem: sermon.locus = msItem['location']
+                        if 'incipit' in msItem: sermon.incipit = msItem['incipit']
+                        if 'explicit' in msItem: sermon.explicit = msItem['explicit']
+                        if 'note' in msItem: sermon.note = msItem['note']
+                        if 'author' in msItem:
+                            author = Author.find(msItem['author'])
+                            if author == None:
+                                # Create a nickname
+                                nickname = Nickname.find_or_create(msItem['author'])
+                                sermon.nickname = nickname
+                            else:
+                                sermon.author = author
+                        sermon.save()
+                        # Make a link using the SermonMan
+                        sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
+                        sermonman.save()
+                        # Keep track of the number of sermons added
+                        iCount += 1
+
+
+            # Make sure the requester knows how many have been added
+            oBack['count'] = 1          # Only one manuscript is added here
+            oBack['sermons'] = iCount   # The number of sermans added
+            oBack['name'] = oInfo['name']
+            oBack['filename'] = filename
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
+
+    def read_ecodex_xmltodict(username, data_file, arErr, root=None, sName = None):
         """Import an XML from e-codices with manuscript data and add it to the DB"""
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
@@ -556,9 +858,7 @@ class Manuscript(models.Model):
 
         # Return the object that has been created
         return oBack
-
-
-
+    
 
 class Author(models.Model):
     """We have a set of authors that are the 'golden' standard"""
@@ -568,6 +868,29 @@ class Author(models.Model):
 
     def __str__(self):
         return self.name
+
+    def find_or_create(sName):
+        """Find an author or create it."""
+
+        qs = Author.objects.filter(Q(name__iexact=sName))
+        if qs.count() == 0:
+            # Create one
+            hit = Author(name=sName)
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
+    def find(sName):
+        """Find an author."""
+
+        qs = Author.objects.filter(Q(name__iexact=sName))
+        hit = None
+        if qs.count() != 0:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
 
     def read_csv(username, data_file, arErr, sData = None, sName = None):
         """Import a CSV list of authors and add these authors to the database"""
@@ -676,39 +999,58 @@ class Author(models.Model):
         return oBack
 
 
-class Knickname(models.Model):
-    """Authors can have 0 or more local names, which we call 'knicknames' """
+class Nickname(models.Model):
+    """Authors can have 0 or more local names, which we call 'nicknames' """
 
-    # [1] Knickname 
+    # [1] Nickname 
     name = models.CharField("Name", max_length=LONG_STRING)
-    # [0-1] We should try to link this knickname to an actual author
-    author = models.ForeignKey("Author", null=True, blank=True, related_name="author_knicknames")
+    # [0-1] We should try to link this nickname to an actual author
+    author = models.ForeignKey("Author", null=True, blank=True, related_name="author_nicknames")
 
     def __str__(self):
         return self.name
+
+    def find_or_create(sName):
+        """Find an author or create it."""
+
+        qs = Nickname.objects.filter(Q(name__iexact=sName))
+        if qs.count() == 0:
+            # Create one
+            hit = Nickname(name=sName)
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
 
 
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
-    # [1] Every sermon must have a title
-    title = models.CharField("Title", max_length=LONG_STRING)
+    # [0-1] Not every sermon might have a title ...
+    title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, related_name="author_sermons")
+    # [0-1] But most often we only start out with having just a nickname of the author
+    nickname = models.ForeignKey(Nickname, null=True, blank=True, related_name="nickname_sermons")
+    # [0-1] Optional location of this sermon on the manuscript
+    locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the INCIPIT (first line in Latin)
-    incipit = models.CharField("Incipit", max_length=LONG_STRING)
+    incipit = models.CharField("Incipit", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
-    explicit = models.CharField("Explicit", max_length=LONG_STRING)
+    explicit = models.CharField("Explicit", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the Clavis number (if available)
-    clavis = models.CharField("Clavis number", max_length=LONG_STRING)
+    clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the Gryson number (if available)
-    gryson = models.CharField("Gryson number", max_length=LONG_STRING)
+    gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] The FEAST??
-    feast = models.CharField("Feast", max_length=LONG_STRING)
+    feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Any notes for this sermon
+    note = models.TextField("Note", null=True, blank=True)
     # [0-1] One keyword or more??
-    keyword = models.CharField("Keyword", max_length=LONG_STRING)
+    keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
     def __str__(self):
         return self.title

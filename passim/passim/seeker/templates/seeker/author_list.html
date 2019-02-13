@@ -163,14 +163,14 @@
                   </td>
                 </tr>
 
-                <!-- Knicknames for this author -->
+                <!-- Nicknames for this author -->
                 <tr id="author-info-{{author.id}}" class="collapse">
                   <td colspan="1">
-                    {% if author.author_knicknames.count == 0 %}
+                    {% if author.author_nicknames.count == 0 %}
                       <span>This author doesn't have any local names (yet)</span>
                     {% else %}
-                      {% for knick in author.author_knicknames.all %}
-                      <span class="author-knickname">{{knick.name}}</span>
+                      {% for knick in author.author_nicknames.all %}
+                      <span class="author-nickname">{{knick.name}}</span>
                       {% endfor %}
                     {% endif %}
                   </td>
@@ -182,17 +182,17 @@
             </table>
           </div>
         </div>
+        <div class="pagination">
+            <span class="step-links">
+
+            {% include 'pagination.html' %}
+
+            </span>
+        </div>
+
       {% else %}
         <p>No authors have been found.</p>
       {% endif %}
-
-      <div class="pagination">
-          <span class="step-links">
-
-          {% include 'pagination.html' %}
-
-          </span>
-      </div>
 
       </div>
 
