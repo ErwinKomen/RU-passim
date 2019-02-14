@@ -515,6 +515,16 @@ class Manuscript(models.Model):
     origin = models.ForeignKey(Origin, null=True, blank=True, related_name="origin_manuscripts")
     # [0-1] Optional filename to indicate where we got this from
     filename = models.CharField("Filename", max_length=LONG_STRING, null=True, blank=True)
+    # [0-1] Optional link to a website with (more) information on this manuscript
+    url = models.URLField("Web info", null=True, blank=True)
+
+    # PHYSICAL features of the manuscript (OPTIONAL)
+    # [0-1] Support: the general type of manuscript
+    support = models.CharField("Support", max_length=LONG_STRING, null=True, blank=True)
+    # [0-1] Extent: the total number of pages
+    extent = models.CharField("Extent", max_length=LONG_STRING, null=True, blank=True)
+    # [0-1] Format: the size
+    format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -545,7 +555,7 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
-    def find_or_create(name,yearstart, yearfinish, library, origin, filename=None):
+    def find_or_create(name,yearstart, yearfinish, library, origin, filename=None, support = "", extent = "", format = ""):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -559,10 +569,11 @@ class Manuscript(models.Model):
             if qs.count() == 0:
                 # Note: do *NOT* let the place of origin play a role in locating the manuscript
                 manuscript = Manuscript(name=name, yearstart=yearstart, yearfinish=yearfinish, library=library )
-                if origin != None:
-                    manuscript.origin = origin
-                if filename != None:
-                    manuscript.filename = filename
+                if origin != None: manuscript.origin = origin
+                if filename != None: manuscript.filename = filename
+                if support != "": manuscript.support = support
+                if extent != "": manuscript.extent = extent
+                if format != "": manuscript.format = support
                 manuscript.save()
             else:
                 manuscript = qs[0]
@@ -582,6 +593,7 @@ class Manuscript(models.Model):
         oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
         mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'manuscript'}
         mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
+        mapPhys = {'support': 'support', 'extent': {'leavesCount': 'extent', 'pageDimensions': 'format'}}
         # mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
         mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'incipit': 'incipit', 'explicit': 'explicit'}
         ns = {'k': 'http://www.tei-c.org/ns/1.0'}
@@ -619,7 +631,7 @@ class Manuscript(models.Model):
                             # Action depends on the tag
                             if sTag in mapIdentifier:
                                 sInfo = mapIdentifier[sTag]
-                                oInfo[sInfo] = getText(item) #  " ".join(t.nodeValue for t in item.childNodes if t.nodeType == t.TEXT_NODE) # item.data
+                                oInfo[sInfo] = getText(item)
                 # (2) Find the 'head' in msDesc
                 msHeads = msDesc.getElementsByTagName("head")
                 if msHeads.length > 0:
@@ -637,7 +649,27 @@ class Manuscript(models.Model):
                                     for k, attr in oValue.items():
                                         # Get the named attribute
                                         oInfo[attr] = item.attributes[k].value
-                # (3) Walk all the ./msContents/msItem, which are the content items
+                # (3) Find the 'supportDesc' in msDesc
+                msSupport = msDesc.getElementsByTagName("supportDesc")
+                if msSupport.length > 0:
+                    for item in msSupport[0].childNodes:
+                        if item.nodeType == minidom.Node.ELEMENT_NODE:
+                            # Get the tag name of this item
+                            sTag = item.tagName
+                            # Action depends on the tag
+                            if sTag == "support":
+                                oInfo['support'] = getText(item)
+                            elif sTag == "extent":
+                                # Look further into the <measure> children
+                                for measure in item.childNodes:
+                                    if measure.nodeType == minidom.Node.ELEMENT_NODE and measure.tagName == "measure":
+                                        # Find out which type
+                                        mType = measure.attributes['type'].value
+                                        if mType == "leavesCount":
+                                            oInfo['extent'] = getText(measure)
+                                        elif mType == "pageDimensions":
+                                            oInfo['format'] = getText(measure)
+                # (4) Walk all the ./msContents/msItem, which are the content items
                 msItems = msDesc.getElementsByTagName("msItem")
                 lItems = []
                 for msItem in msItems:
@@ -687,7 +719,10 @@ class Manuscript(models.Model):
             # (3) Get or create the Manuscript
             yearstart = oInfo['origDateFrom'] if oInfo['origDateFrom'] != "" else 0
             yearfinish = oInfo['origDateTo'] if oInfo['origDateTo'] != "" else 2020
-            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, filename)
+            support = "" if 'support' not in oInfo else oInfo['support']
+            extent = "" if 'extent' not in oInfo else oInfo['extent']
+            format = "" if 'format' not in oInfo else oInfo['format']
+            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, filename, support, extent, format)
 
             # (3) Create all the manuscript content items
             iCount = 0

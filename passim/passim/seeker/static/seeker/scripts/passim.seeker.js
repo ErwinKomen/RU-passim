@@ -10,6 +10,7 @@ var ru = (function ($, ru) {
   ru.passim.seeker = (function ($, config) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
+        loc_progr = [],       // Progress tracking
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>";
 
@@ -398,9 +399,12 @@ var ru = (function ($, ru) {
 
       /**
        * check_progress
+       *    Check the progress of reading e.g. codices
+       *
        */
       check_progress: function (progrurl, sTargetDiv) {
         var elTarget = "#" + sTargetDiv,
+            sMsg = "",
             lHtml = [];
 
         try {
@@ -427,12 +431,16 @@ var ru = (function ($, ru) {
                   }                  
                   break;
                 default:
-                  // Show the status
-                  lHtml.push("status: " + response.status);
-                  if ("msg" in response) {
-                    lHtml.push("<br />" + response.msg);
+                  if ("msg" in response) { sMsg = response.msg; }
+                  // Combine the status
+                  sMsg = "<tr><td>" + response.status + "</td><td>" + sMsg + "</td></tr>";
+                  // Check if it is on the stack already
+                  if ($.inArray(sMsg, loc_progr) < 0) {
+                    loc_progr.push(sMsg);
                   }
-                  $(elTarget).html(lHtml.join("\n"));
+                  // Combine the status HTML
+                  sMsg = "<table>" + loc_progr.join("\n") + "</table>";
+                  $(elTarget).html(sMsg);
                   // Make sure we check again
                   window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 1000);
                   break;
@@ -442,6 +450,19 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("check_progress", ex);
+        }
+      },
+
+      /**
+       * hide
+       *   Hide element [sHide] and 
+       *
+       */
+      hide: function (sHide) {
+        try {
+          $("#" + sHide).addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("hide", ex);
         }
       },
 
@@ -525,6 +546,7 @@ var ru = (function ($, ru) {
 
           // Now initiate any possible progress calling
           if (progrurl !== null) {
+            loc_progr = [];
             window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 2000);
           }
 

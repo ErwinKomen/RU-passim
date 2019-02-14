@@ -978,6 +978,8 @@ table.compact-table td:hover {
     font-size: smaller;
 }
 
+/* PASSIM particular stuff */
+
 .manuscript {
   background-color: lightgray;
   color: darkblue;
@@ -986,4 +988,12 @@ table.compact-table td:hover {
     border-radius: 2px;
     /* padding: 2px; */
      white-space:nowrap;
+}
+
+.sermon-author {
+  color: darkblue;
+}
+
+.sermon-nickname {
+  color: darkred;
 }

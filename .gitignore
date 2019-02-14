@@ -267,3 +267,4 @@ ModelManifest.xml
 /dept_des_manuscripts.tar.gz
 /deptDMsources.txt
 /passim/passim/seeker/templates/seeker/import_manuscripts_ORG.html
+/passim/passim/seeker/templates/seeker/manuscript_PREV.html

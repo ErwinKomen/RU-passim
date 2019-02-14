@@ -679,6 +679,38 @@ def import_authors(request):
     return JsonResponse(data)
 
 
+class ManuscriptDetailsView(DetailView):
+    """The details of one manuscript"""
+
+    model = Manuscript
+    template_name = 'seeker/manuscript_details.html'
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # Do not allow to get a good response
+            response = nlogin(request)
+        else:
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            response = self.render_to_response(context)
+            #response.content = treat_bom(response.rendered_content)
+        return response
+
+    def get_context_data(self, **kwargs):
+        # Get the current context
+        context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
+
+        # Set the title of the application
+        context['title'] = "Manuscript"
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+
+        # Return the calculated context
+        return context
+
+
 class ManuscriptListView(ListView):
     """Search and list manuscripts"""
     
@@ -717,7 +749,7 @@ class ManuscriptListView(ListView):
             context['paginateSize'] = paginateSize
 
         # Set the title of the application
-        context['title'] = "Passim Manuscripts"
+        context['title'] = "Manuscripts"
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
