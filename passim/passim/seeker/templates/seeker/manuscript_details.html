@@ -16,21 +16,33 @@
       <div id="manuscript_top" class="panel panel-default">
 
         <!-- Manuscript information -->
-        <h3>Manuscript</h3>
+        <h3>Manuscript <span class="pull-right" style="font-size: xx-small;">{{object.library.city.name}}, {{object.library.name}}, {{object.idno}}</span></h3>
         <table>
           <tbody>
-            <tr><td><b>Country</b></td><td class="manuscript-city" align="left">{% if object.library.city.country.name %}{{object.library.city.country.name}}{% endif %}</td></tr>
-            <tr><td><b>City</b></td><td class="manuscript-city" align="left">{{object.library.city.name}}</td></tr>
-            <tr><td><b>Library</b></td> <td class="manuscript-library" align="left">{{object.library.name}}</td></tr>
-            <tr><td><b>Name</b></td><td class="manuscript-name" align="left">{{object.name}}</td></tr>
+            <tr><td valign="top"><b>Country</b></td><td class="manuscript-city" align="left">{% if object.library.city.country.name %}{{object.library.city.country.name}}{% endif %}</td></tr>
+            <tr><td valign="top"><b>City</b></td><td class="manuscript-city" align="left">{{object.library.city.name}}</td></tr>
+            <tr><td valign="top"><b>Library</b></td> <td class="manuscript-library" align="left">{{object.library.name}}</td></tr>
+            <tr><td valign="top"><b>Identifier</b></td><td class="manuscript-name" align="left">{{object.idno}}</td></tr>
+            <tr><td valign="top"><b>Title</b></td><td class="manuscript-name" align="left">{{object.name}}</td></tr>
 
             <!-- Dates for this manuscript -->
-            <tr><td><b>Date</b></td><td class="manuscript-date" align="left">{{object.yearstart}} - {{object.yearfinish}}</td></tr>
+            <tr><td valign="top"><b>Date</b></td><td class="manuscript-date" align="left">{{object.yearstart}} - {{object.yearfinish}}</td></tr>
 
             <!-- Physical appearance -->
-            <tr><td><b>Support</b></td><td class="manuscript-support" align="left">{% if object.support %}{{object.support}}{% else %}-{% endif %}</td></tr>
-            <tr><td><b>Extent</b></td><td class="manuscript-extent" align="left">{% if object.extent %}{{object.extent}}{% else %}-{% endif %}</td></tr>
-            <tr><td><b>Format</b></td><td class="manuscript-format" align="left">{% if object.format %}{{object.format}}{% else %}-{% endif %}</td></tr>
+            <tr><td valign="top"><b>Support</b></td><td class="manuscript-support" align="left">{% if object.support %}{{object.support}}{% else %}-{% endif %}</td></tr>
+            <tr><td valign="top"><b>Extent</b></td><td class="manuscript-extent" align="left">{% if object.extent %}{{object.extent}}{% else %}-{% endif %}</td></tr>
+            <tr><td valign="top"><b>Format</b></td><td class="manuscript-format" align="left">{% if object.format %}{{object.format}}{% else %}-{% endif %}</td></tr>
+
+            <!-- External link -->
+            <tr>
+              <td><b>External</b></td><td class="manuscript-support" align="left">
+                {% if object.url %}
+                  <a title="External link" href="{{object.url}}" target="_blank" >{{object.url}}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

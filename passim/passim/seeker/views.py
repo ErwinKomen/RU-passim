@@ -783,6 +783,26 @@ class ManuscriptListView(ListView):
             val = adapt_search(get['name'])
             lstQ.append(Q(name__iregex=val))
 
+        # Check for Manuscript [idno]
+        if 'signature' in get and get['signature'] != '':
+            val = adapt_search(get['signature'])
+            lstQ.append(Q(idno__iregex=val))
+
+        # Check for country name
+        if 'country' in get and get['country'] != '':
+            val = adapt_search(get['country'])
+            lstQ.append(Q(library__country__name__iregex=val))
+
+        # Check for city name
+        if 'city' in get and get['city'] != '':
+            val = adapt_search(get['city'])
+            lstQ.append(Q(library__city__name__iregex=val))
+
+        # Check for library name
+        if 'library' in get and get['library'] != '':
+            val = adapt_search(get['library'])
+            lstQ.append(Q(library__name__iregex=val))
+
         # Calculate the final qs
         qs = Manuscript.objects.filter(*lstQ).order_by('name').distinct()
 

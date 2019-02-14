@@ -52,6 +52,7 @@ class SearchManuscriptForm(forms.Form):
     city = forms.CharField(label=_("City"), required=False)
     library = forms.CharField(label=_("Library"), required=False)
     signature = forms.CharField(label=_("Signature"), required=False)
+    name = forms.CharField(label=_("Title"), required=False)
 
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)

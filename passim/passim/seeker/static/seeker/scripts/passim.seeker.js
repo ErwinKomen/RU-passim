@@ -442,7 +442,7 @@ var ru = (function ($, ru) {
                   sMsg = "<table>" + loc_progr.join("\n") + "</table>";
                   $(elTarget).html(sMsg);
                   // Make sure we check again
-                  window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 1000);
+                  window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 200);
                   break;
               }
             }

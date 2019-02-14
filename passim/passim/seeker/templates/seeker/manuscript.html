@@ -76,7 +76,7 @@
         <!-- Search tab -->
         <div class="inert collapse" id="tab_search">
           <div class="panel panel-default">
-            <form id="manuscriptsearch" method='get' action="{% url 'library_search' %}" >
+            <form id="manuscriptsearch" method='get' action="{% url 'search_manuscript' %}" >
               <div>
                 <!-- Be sure to add csrf -->
                 {% csrf_token %}
@@ -118,8 +118,12 @@
                         <td style="width: 100%;">{{searchform.signature}}</td>
                       </tr>
                       <tr>
+                        <td>TITLE</td>
+                        <td style="width: 100%;">{{searchform.name}}</td>
+                      </tr>
+                      <tr>
                         <td colspan="2" align="right">
-                          <span><i>(right now the search only yields libraries)</i></span>
+                          <span><i>(The search engine is not yet implemented...)</i></span>
                             <!-- Submit the search form -->
                             <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
                         </td>
@@ -179,18 +183,23 @@
                       <tr class="dict-entry">
                         <td class="hidden"> {{ man.id }}</td>
                         <!-- City / Library / Manuscript name -->
-                        <td class="manuscript-city" align="left">{{man.library.city.name}}</td>
+                        <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:15}}</td>
                         <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:15}}</td>
                         <td style="width: 100%;">
-                          <span class="manuscript-name">{{man.name}}</span>
+                          <span class="manuscript-idno">{{man.idno}}</span>
+                          {% if man.name %}
+                          <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
+                          {% endif %}
                         </td>
                         <!-- Number of sermons -->
                         <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
                         <!-- Dates for this manuscript -->
                         <td class="manuscript-date" align="right">{{man.yearstart}}</td>
                         <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
-                        <!-- Buttons for this author-->
+
+                        <!-- Buttons for more information on this manuscript -->
                         <td style="min-width: 80px;">
+                          <!-- Information button -->
                           <form>
                             {% csrf_token %}
                             <!-- information on this manuscript -->
@@ -198,6 +207,13 @@
                                 href="{% url 'manuscript_view' man.id %}">
                               <span class="glyphicon glyphicon-info-sign"></span>
                             </a>
+                            <!-- external link button -->
+                            {% if man.url %}
+                              <a role="button" class="btn btn-xs jumbo-1" title="External link"
+                                 href="{{man.url}}" target="_blank" >
+                                <span class="glyphicon glyphicon-link"></span>
+                              </a>
+                            {% endif %}
                           </form>
                         </td>
                       </tr>

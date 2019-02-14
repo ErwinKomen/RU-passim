@@ -503,7 +503,7 @@ class Origin(models.Model):
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
-    # [1] Name of the manuscript
+    # [1] Name of the manuscript (that is the TITLE)
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Date estimate: starting from this year
     yearstart = models.IntegerField("Year from", null=False)
@@ -511,6 +511,8 @@ class Manuscript(models.Model):
     yearfinish = models.IntegerField("Year until", null=False)
     # [1] One manuscript can only belong to one particular library
     library = models.ForeignKey(Library, related_name="library_manuscripts")
+    # [1] Each manuscript has an identification number
+    idno = models.CharField("Identifier", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] If possible we need to know the original location of the manuscript
     origin = models.ForeignKey(Origin, null=True, blank=True, related_name="origin_manuscripts")
     # [0-1] Optional filename to indicate where we got this from
@@ -555,7 +557,7 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
-    def find_or_create(name,yearstart, yearfinish, library, origin, filename=None, support = "", extent = "", format = ""):
+    def find_or_create(name,yearstart, yearfinish, library, origin, idno="", filename=None, url="", support = "", extent = "", format = ""):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -569,14 +571,26 @@ class Manuscript(models.Model):
             if qs.count() == 0:
                 # Note: do *NOT* let the place of origin play a role in locating the manuscript
                 manuscript = Manuscript(name=name, yearstart=yearstart, yearfinish=yearfinish, library=library )
+                if idno != "": manuscript.idno = idno
                 if origin != None: manuscript.origin = origin
                 if filename != None: manuscript.filename = filename
                 if support != "": manuscript.support = support
                 if extent != "": manuscript.extent = extent
-                if format != "": manuscript.format = support
+                if format != "": manuscript.format = format
+                if url != "": manuscript.url = url
                 manuscript.save()
             else:
                 manuscript = qs[0]
+                # Check if any fields need to be adapted
+                bNeedSave = False
+                if name != manuscript.name: manuscript.name = name ; bNeedSave = True
+                if filename != manuscript.filename: manuscript.filename = filename ; bNeedSave = True
+                if support != manuscript.support: manuscript.support = support ; bNeedSave = True
+                if extent != manuscript.extent: manuscript.extent = extent ; bNeedSave = True
+                if format != manuscript.format: manuscript.format = format ; bNeedSave = True
+                if url != manuscript.url: manuscript.url = url ; bNeedSave = True
+                if bNeedSave:
+                    manuscript.save()
             return manuscript
         except:
             sMsg = oErr.get_error_message()
@@ -591,7 +605,7 @@ class Manuscript(models.Model):
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
         oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
-        mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'manuscript'}
+        mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'idno'}
         mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
         mapPhys = {'support': 'support', 'extent': {'leavesCount': 'extent', 'pageDimensions': 'format'}}
         # mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
@@ -604,8 +618,15 @@ class Manuscript(models.Model):
                 # Read and parse the data into a DOM element
                 xmldoc = minidom.parse(data_file)
 
+            # Try to get an URL to this description
+            url = ""
+            ndTEI_list = xmldoc.getElementsByTagName("TEI")
+            if ndTEI_list.length > 0:
+                ndTEI = ndTEI_list[0]
+                if "xml:base" in ndTEI.attributes:
+                    url = ndTEI.attributes["xml:base"].value
+            oInfo['url'] = url
             # Try to get a main author
-            # Try to find the author within msItem
             authors = xmldoc.getElementsByTagName("persName")
             mainAuthor = ""
             for person in authors:
@@ -614,6 +635,13 @@ class Manuscript(models.Model):
                     mainAuthor = getText(person)
                     # Don't look further: the first author is the *main* author of it
                     break
+
+            # Get the main title, to prevent it from remaining empty
+            title_list = xmldoc.getElementsByTagName("titleStmt")
+            if title_list.length > 0:
+                # Get the first title
+                title = title_list[0]
+                oInfo['name'] = getText(title)
 
             # Get relevant information From the xml: the [fileDesc] element
             # /TEI/teiHeader/fileDesc/teiHeader/fileDesc/sourceDesc/msDesc
@@ -722,7 +750,9 @@ class Manuscript(models.Model):
             support = "" if 'support' not in oInfo else oInfo['support']
             extent = "" if 'extent' not in oInfo else oInfo['extent']
             format = "" if 'format' not in oInfo else oInfo['format']
-            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, filename, support, extent, format)
+            idno = "" if 'idno' not in oInfo else oInfo['idno']
+            url = oInfo['url']
+            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, idno, filename, url, support, extent, format)
 
             # (3) Create all the manuscript content items
             iCount = 0
@@ -760,131 +790,6 @@ class Manuscript(models.Model):
             oBack['sermons'] = iCount   # The number of sermans added
             oBack['name'] = oInfo['name']
             oBack['filename'] = filename
-
-        except:
-            sError = errHandle.get_error_message()
-            oBack['status'] = 'error'
-            oBack['msg'] = sError
-
-        # Return the object that has been created
-        return oBack
-
-    def read_ecodex_xmltodict(username, data_file, arErr, root=None, sName = None):
-        """Import an XML from e-codices with manuscript data and add it to the DB"""
-
-        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
-        oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
-        mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'manuscript'}
-        mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
-        mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
-        ns = {'k': 'http://www.tei-c.org/ns/1.0'}
-        errHandle = ErrHandle()
-        try:
-            # Make sure we have the data
-            if root == None:
-                # Read the data as BYTE string
-                sData = data_file.read()
-                # Convert into a complex dictionary object
-                alt = xmltodict.parse(sData)
-
-            # Get relevant information From the xml
-            # /TEI/teiHeader/fileDesc/teiHeader
-            if 'TEI' in alt and 'teiHeader' in alt['TEI'] and 'fileDesc' in alt['TEI']['teiHeader']:
-                fd = alt['TEI']['teiHeader']['fileDesc']
-                # ./sourceDesc/msDesc
-                if 'sourceDesc' in fd and 'msDesc' in fd['sourceDesc']:
-                    msDesc = fd['sourceDesc']['msDesc']
-                    # ./msIdentifier
-                    if 'msIdentifier' in msDesc:
-                        for sTag, item in msDesc['msIdentifier'].items():
-                            # Action depends on the tag
-                            if sTag in mapIdentifier:
-                                sInfo = mapIdentifier[sTag]
-                                oInfo[sInfo] = item
-                    # ./head
-                    if 'head' in msDesc:
-                        for sTag, item in msDesc['head'].items():
-                            # Action depends on the tag
-                            if sTag in mapHead:
-                                oValue = mapHead[sTag]
-                                if isinstance(oValue, str):
-                                    oInfo[oValue] = item
-                                else:
-                                    # Get the attributes named in here
-                                    for k, attr in oValue.items():
-                                        oInfo[attr] = item['@'+k]
-                    # Walk all the ./msContents/msItem, which are the content items
-                    lItems = []
-                    if 'msContents' in msDesc and 'msItem' in msDesc['msContents']:
-                        for msItem in msDesc['msContents']['msItem']:
-                            # Create a new item
-                            oMsItem = {}
-                            bAdded = False
-                            # Get the details of this [msItem]
-                            for sTag, item in msItem.items():
-                                # Action depends on the tag
-                                if sTag in mapItem:
-                                    oValue = mapItem[sTag]
-                                    if isinstance(item, str):
-                                        # Too simplistic: oMsItem[oValue] = item['#text']
-                                        if isinstance(item, str):
-                                            oMsItem[oValue] = item      # ['#text']
-                                        else:
-                                            oMsItem[oValue] = json.dumps(item)
-                                    elif isinstance(item, dict):
-                                        oMsItem[oValue] = obj_value(item)
-                                    else:
-                                        # Get the attributes named in here
-                                        for k, attr in oValue.items():
-                                            oMsItem[attr] = item['@'+k]
-                                elif sTag == "msItem":
-                                    # This is a sub-item. That means:
-                                    # (1) take the 'author' + 'title' from current oInfo
-                                    # (2) add items for different 'locus, note, incipit, explicit' stuff
-                                    for subItem in item:
-                                        oSubItem = copy.copy(oMsItem)
-                                        for sTag_s, item_s in subItem.items():
-                                            # Action depends on the tag
-                                            if sTag_s in mapItem:
-                                                oValue = mapItem[sTag_s]
-                                                if isinstance(item_s, str):
-                                                    oSubItem[oValue] = item_s
-                                                elif isinstance(item_s, dict):
-                                                    oSubItem[oValue] = obj_value(item_)
-                                                else:
-                                                    # Get the attributes named in here
-                                                    for k, attr in oValue.items():
-                                                        oSubItem[attr] = item_s['@'+k]
-                                        # Add this sub-item to the list
-                                        lItems.append(oSubItem)
-                                        bAdded = True
-                            # Check if this item has already been added
-                            if not bAdded:
-                                lItems.append(oMsItem)
-                    # Now dd this list to the main one
-                    oInfo['list'] = lItems
-
-            # Now we should have a full description of the contents to be added to the database
-
-
-            iCount = 0
-            added = []
-            with transaction.atomic():
-                for name in lines:
-                    # The whole line is the author: but strip quotation marks
-                    name = name.strip('"')
-
-                    obj = Author.objects.filter(name__iexact=name).first()
-                    if obj == None:
-                        # Add this author
-                        obj = Author(name=name)
-                        obj.save()
-                        added.append(name)
-                        # Keep track of the authors that are ADDED
-                        iCount += 1
-            # Make sure the requester knows how many have been added
-            oBack['count'] = iCount
-            oBack['added'] = added
 
         except:
             sError = errHandle.get_error_message()
