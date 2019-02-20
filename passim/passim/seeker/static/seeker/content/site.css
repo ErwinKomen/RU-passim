@@ -990,6 +990,10 @@ table.compact-table td:hover {
      white-space:nowrap;
 }
 
+.manuscript-city, .manuscript-library {
+  min-width: 92px;
+}
+
 .sermon-author {
   color: darkblue;
 }
