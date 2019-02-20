@@ -51,8 +51,8 @@ class SearchManuscriptForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
     city = forms.CharField(label=_("City"), required=False)
     library = forms.CharField(label=_("Library"), required=False)
-    signature = forms.CharField(label=_("Signature"), required=False)
-    name = forms.CharField(label=_("Title"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False, widget=forms.TextInput(attrs={'style': 'width: 100%;'}))
+    name = forms.CharField(label=_("Title"), required=False, widget=forms.TextInput(attrs={'style': 'width: 100%;'}))
 
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
