@@ -130,64 +130,60 @@
 
                 <!-- Search interface: what manuscript to look for and what are the results -->
                 <div class="row">
-                  <div class="col-sm-6">
+                  <div id="manu_search" class="col-sm-12">
                     <p>Manuscript to look for:</p>
-                    <table>
-                      <tr>
-                        <td>COUNTRY</td>
-                        <td style="width: 100%;">
-                          <input name='country' class='form-control typeahead countries input-sm' type="text" 
-                                  {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
-                                  placeholder="Country..."
-                                  onkeyup="ru.passim.form_submit(event);">
+                    <table style="width: 100%;">
+                      {% for sform in manu_formset %}
+                        <!-- One row for this form -->
+                        <tr class="form-row">
+                          <td>
+                            <table>
+                              <tr>
+                                <td>COUNTRY</td><td style="width: 50%;">{{sform.country}}</td>
+                                <td>SIGNATURE</td><td style="width: 50%;">{{sform.signature}}</td>
+                              </tr>
+                              <tr>
+                                <td>CITY</td><td style="width: 50%;">{{sform.city}}</td>
+                                <td>TITLE</td><td style="width: 50%;">{{sform.name}}</td>
+                              </tr>
+                              <tr>
+                                <td>LIBRARY</td><td style="width: 50%;">{{sform.library}}</td>
+                              </tr>
+                              <tr><td colspan="2">&nbsp;</td></tr>
+                            </table>
+                          </td>
+                        </tr>
+                      {% endfor %}
+
+                      <!-- Empty row with related constituent specification-->
+                      <tr class="form-row empty-form">
+                        <td>
+                          <table>
+                            <tr>
+                              <td>COUNTRY</td><td style="width: 50%;">{{manu_formset.empty_form.country}}</td>
+                              <td>SIGNATURE</td><td style="width: 50%;">{{manu_formset.empty_form.signature}}</td>
+                            </tr>
+                            <tr>
+                              <td>CITY</td><td style="width: 50%;">{{manu_formset.empty_form.city}}</td>
+                              <td>TITLE</td><td style="width: 50%;">{{manu_formset.empty_form.name}}</td>
+                            </tr>
+                            <tr>
+                              <td>LIBRARY</td><td style="width: 50%;">{{manu_formset.empty_form.library}}</td>
+                            </tr>
+                              <tr><td colspan="2">&nbsp;</td></tr>
+                          </table>
                         </td>
                       </tr>
-                      <tr>
-                        <td>CITY</td>
-                        <td style="width: 100%;">
-                          <input name='city' class='form-control typeahead cities input-sm' type="text" 
-                                  {% if searchform.city.value %}value='{{searchform.city.value}}'{% endif %}
-                                  placeholder="City..."
-                                  onkeyup="ru.passim.form_submit(event);">
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>LIBRARY</td>
-                        <td style="width: 100%;">
-                          <input name='library' class='form-control typeahead libraries input-sm' type="text" 
-                                  {% if searchform.library.value %}value='{{searchform.library.value}}'{% endif %}
-                                  placeholder="Name of library..."
-                                  onkeyup="ru.passim.form_submit(event);">
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>SIGNATURE</td>
-                        <td style="width: 100%;">{{searchform.signature}}</td>
-                      </tr>
-                      <tr>
-                        <td>TITLE</td>
-                        <td style="width: 100%;">{{searchform.name}}</td>
-                      </tr>
-                      <tr>
-                        <td colspan="2" align="right">
-                          <span><i>(The search engine is now in phase #1...)</i></span>
-                            <!-- Submit the search form -->
-                            <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+
+                      <!-- Row that contains the command to add one -->
+                      <tr class="add-row">
+                        <td>
+                          <span id="add_search_criteria">
+                            <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
+                          </span>
                         </td>
                       </tr>
                     </table>
-                  </div>
-                  <div class="col-sm-6">
-                    <p>Results:</p>
-                    <!-- The results -->
-                    {% if object_list %}
-                      <!-- Possible matching sermon ID's -->
-                      <div id="result_manuscript_ids">
-
-                      </div>
-                    {% else %}
-                    <p><i>No results</i></p>
-                    {% endif %}
                   </div>
                 </div>
 
@@ -195,14 +191,16 @@
                 <div class="row">&nbsp;</div>
               </div>
 
-              <!-- Lower part: button to add an additional search field -->
-              <div id="search_manuscript_add">
-                <span>
-                  <a class="btn btn-xs jumbo-3" 
-                     role="button" 
-                     onclick="ru.passim.seeker.add_form(this);"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
-                </span>
+              <div class="row">
+                <div class="col-md-4 col-md-offset-8">
+                  <span align="right" class="pull-right">
+                    <span><i>(The search engine is now in phase #1...)</i></span>
+                      <!-- Submit the search form -->
+                      <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+                  </span>
+                </div>
               </div>
+
             </form>
           </div>
         </div>
@@ -307,5 +305,8 @@
     
   </div>
 
+<script>
+  ru.passim.seeker.init_events();
+</script>
 
 {% endblock content %}

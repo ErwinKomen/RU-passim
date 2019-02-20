@@ -12,7 +12,11 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_progr = [],       // Progress tracking
         loc_divErr = "passim_err",
-        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>";
+        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        lAddTableRow = [
+          { "table": "manu_search", "prefix": "manu", "counter": false, "events": null }
+        ];
+
 
     // Private methods specification
     var private_methods = {
@@ -398,6 +402,26 @@ var ru = (function ($, ru) {
     return {
 
       /**
+       *  init_events
+       *      Bind main necessary events
+       *
+       */
+      init_events: function () {
+        try {
+          // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
+          //$('tr.add-row a').first().click(ru.cesar.seeker.tabular_addrow);
+          $("tr.add-row").each(function () {
+            $(this).find("a").first().click(ru.passim.seeker.tabular_addrow);
+          });
+
+          // Bind the click event to all class="ajaxform" elements
+          $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
+        } catch (ex) {
+          private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *
@@ -638,16 +662,16 @@ var ru = (function ($, ru) {
                               break;
                           }
                           // Make sure events are in place again
-                          ru.cesar.seeker.init_events();
+                          ru.passim.seeker.init_events();
                           switch (sFtype) {
                             case "cvar":
-                              ru.cesar.seeker.init_cvar_events();
+                              ru.passim.seeker.init_cvar_events();
                               break;
                             case "cond":
-                              ru.cesar.seeker.init_cond_events();
+                              ru.passim.seeker.init_cond_events();
                               break;
                             case "feat":
-                              ru.cesar.seeker.init_feat_events();
+                              ru.passim.seeker.init_feat_events();
                               break;
                           }
                           // Indicate we are through with waiting
@@ -676,16 +700,16 @@ var ru = (function ($, ru) {
                     // Show the message at the appropriate location
                     $(elErr).html("<div class='error'>" + sMsg + "</div>");
                     // Make sure events are in place again
-                    ru.cesar.seeker.init_events();
+                    ru.passim.seeker.init_events();
                     switch (sFtype) {
                       case "cvar":
-                        ru.cesar.seeker.init_cvar_events();
+                        ru.passim.seeker.init_cvar_events();
                         break;
                       case "cond":
-                        ru.cesar.seeker.init_cond_events();
+                        ru.passim.seeker.init_cond_events();
                         break;
                       case "feat":
-                        ru.cesar.seeker.init_feat_events();
+                        ru.passim.seeker.init_feat_events();
                         break;
                     }
                     // Indicate we are through with waiting
@@ -709,6 +733,162 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("import_data", ex);
           private_methods.waitStop(elWait);
+        }
+      },
+
+      /**
+       * tabular_addrow
+       *   Add one row into a tabular inline
+       *
+       */
+      tabular_addrow: function () {
+        // NOTE: see the definition of lAddTableRow above
+        var arTdef = lAddTableRow,
+            oTdef = {},
+            rowNew = null,
+            elTable = null,
+            iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
+            sId = "",
+            i;
+
+        try {
+          // Find out just where we are
+          sId = $(this).closest("div").attr("id");
+          // Walk all tables
+          for (i = 0; i < arTdef.length; i++) {
+            // Get the definition
+            oTdef = arTdef[i];
+            if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
+              // Go to the <tbody> and find the last form-row
+              elTable = $(this).closest("tbody").children("tr.form-row.empty-form")
+
+              // Perform the cloneMore function to this <tr>
+              rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
+              // Call the event initialisation again
+              if (oTdef.events !== null) {
+                oTdef.events();
+              }
+              // Any follow-up activity
+              if ('follow' in oTdef && oTdef['follow'] !== null) {
+                oTdef.follow(rowNew);
+              }
+              // We are done...
+              break;
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("tabular_addrow", ex);
+        }
+      },
+
+      /**
+       *  cloneMore
+       *      Add a form to the formset
+       *      selector = the element that should be duplicated
+       *      type     = the formset type
+       *      number   = boolean indicating that re-numbering on the first <td> must be done
+       *
+       */
+      cloneMore: function (selector, type, number) {
+        var elTotalForms = null,
+            total = 0;
+
+        try {
+          // Clone the element in [selector]
+          var newElement = $(selector).clone(true);
+          // Find the total number of [type] elements
+          elTotalForms = $('#id_' + type + '-TOTAL_FORMS').first();
+          // Determine the total of already available forms
+          if (elTotalForms === null || elTotalForms.length ===0) {
+            // There is no TOTAL_FORMS for this type, so calculate myself
+          } else {
+            // Just copy the TOTAL_FORMS value
+            total = $(elTotalForms).val();
+          }
+
+          // Find each <input> element
+          newElement.find(':input').each(function (idx, el) {
+            if ($(el).attr("name") !== undefined) {
+              // Get the name of this element, adapting it on the fly
+              var name = $(el).attr("name").replace("__prefix__", total.toString());
+              // Produce a new id for this element
+              var id = $(el).attr("id").replace("__prefix__", total.toString());
+              // Adapt this element's name and id, unchecking it
+              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+            }
+          });
+          newElement.find('select').each(function (idx, el) {
+            if ($(el).attr("name") !== undefined) {
+              // Get the name of this element, adapting it on the fly
+              var name = $(el).attr("name").replace("__prefix__", total.toString());
+              // Produce a new id for this element
+              var id = $(el).attr("id").replace("__prefix__", total.toString());
+              // Adapt this element's name and id, unchecking it
+              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+            }
+          });
+
+          // Find each <label> under newElement
+          newElement.find('label').each(function (idx, el) {
+            if ($(el).attr("for") !== undefined) {
+              // Adapt the 'for' attribute
+              var newFor = $(el).attr("for").replace("__prefix__", total.toString());
+              $(el).attr('for', newFor);
+            }
+          });
+
+          // Look at the inner text of <td>
+          newElement.find('td').each(function (idx, el) {
+            var elText = $(el).children().first();
+            if (elText !== undefined) {
+              var sHtml = $(elText).html();
+              if (sHtml !== undefined && sHtml !== "") {
+                sHtml = sHtml.replace("__counter__", total.toString());
+                $(elText).html(sHtml);
+              }
+              // $(elText).html($(elText).html().replace("__counter__", total.toString()));
+            }
+          });
+          // Look at the attributes of <a>
+          newElement.find('a').each(function (idx, el) {
+            // Iterate over all attributes
+            var elA = el;
+            $.each(elA.attributes, function (i, attrib) {
+              var attrText = $(elA).attr(attrib.name).replace("__counter__", total.toString());
+              // EK (20/feb): $(this).attr(attrib.name, attrText);
+              $(elA).attr(attrib.name, attrText);
+            });
+          });
+
+
+          // Adapt the total number of forms in this formset
+          total++;
+          $('#id_' + type + '-TOTAL_FORMS').val(total);
+
+          // Adaptations on the new <tr> itself
+          newElement.attr("id", "arguments-" + (total - 1).toString());
+          newElement.attr("class", "form-row row" + total.toString());
+
+          // Insert the new element before the selector = empty-form
+          $(selector).before(newElement);
+
+          // Should we re-number?
+          if (number !== undefined && number) {
+            // Walk all <tr> elements of the table
+            var iRow = 1;
+            $(selector).closest("tbody").children("tr.form-row").not(".empty-form").each(function (idx, el) {
+              var elFirstCell = $(el).find("td").not(".hidden").first();
+              $(elFirstCell).html(iRow);
+              iRow += 1;
+            });
+          }
+
+          // Return the new <tr> 
+          return newElement;
+
+        } catch (ex) {
+          private_methods.errMsg("cloneMore", ex);
+          return null;
         }
       },
 
