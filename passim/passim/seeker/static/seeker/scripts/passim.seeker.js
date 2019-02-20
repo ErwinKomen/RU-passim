@@ -398,6 +398,48 @@ var ru = (function ($, ru) {
     return {
 
       /**
+       * search_reset
+       *    Clear the information in the form's fields and then do a submit
+       *
+       */
+      search_reset: function (elStart) {
+        var frm = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Clear the information in the form's INPUT fields
+          $(frm).find("input:not([readonly]).searching").val("");
+          // Show we are waiting
+          $("#waitingsign").removeClass("hidden");
+          // Now submit the form
+          frm.submit();
+        } catch (ex) {
+          private_methods.errMsg("search_reset", ex);
+        }
+      },
+
+      /**
+       * search_start
+       *    Clear the information in the form's fields and then do a submit
+       *
+       */
+      search_start: function (elStart) {
+        var frm = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Show we are waiting
+          $("#waitingsign").removeClass("hidden");
+          // Now submit the form
+          frm.submit();
+        } catch (ex) {
+          private_methods.errMsg("search_start", ex);
+        }
+      },
+
+      /**
        * check_progress
        *    Check the progress of reading e.g. codices
        *

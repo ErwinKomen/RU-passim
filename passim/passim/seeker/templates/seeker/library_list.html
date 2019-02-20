@@ -50,7 +50,7 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_country'>{{searchform.country.label}}</label>
-                    <input name='country' class='form-control typeahead countries input-sm' type="text" 
+                    <input name='country' class='form-control typeahead searching countries input-sm' type="text" 
                            {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
                            placeholder="Country..."
                            onkeyup="ru.passim.form_submit(event);">
@@ -63,7 +63,7 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_city'>{{searchform.city.label}}</label>
-                    <input name='city' class='form-control typeahead cities input-sm' type="text" 
+                    <input name='city' class='form-control typeahead searching cities input-sm' type="text" 
                            {% if searchform.city.value %}value='{{searchform.city.value}}'{% endif %}
                            placeholder="City..."
                            onkeyup="ru.passim.form_submit(event);">
@@ -76,7 +76,7 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_name'>{{searchform.name.label}}</label>
-                    <input name='name' class='form-control typeahead libraries input-sm' type="text" 
+                    <input name='name' class='form-control typeahead searching libraries input-sm' type="text" 
                            {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
                            placeholder="Name of library..."
                            onkeyup="ru.passim.form_submit(event);">
@@ -97,8 +97,10 @@
                 <div class="input-group">
                   <div><label>&nbsp;</label></div>
                   <div class='btn-group'>
+                      <!-- Reset the search buttons -->
+                      <a role="button" class="btn btn-sm jumbo-1" title="reset" onclick="ru.passim.seeker.search_reset(this);"><span class="glyphicon glyphicon-remove"></span></a>
                       <!-- Submit the search form -->
-                      <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+                      <a role="button" class="btn btn-sm jumbo-3" title="search" onclick="ru.passim.seeker.search_start(this);"><span class="glyphicon glyphicon-search"></span></a>
                   </div>
                 </div>
               </div>
@@ -112,7 +114,8 @@
 
         <h3>Libraries</h3>
         <div class="row">
-            <div class="col-sm-4"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-3"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
             <div class="col-sm-8">
             <span class="step-links pull-right">
 

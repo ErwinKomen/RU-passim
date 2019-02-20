@@ -216,6 +216,8 @@ var ru = (function ($, ru) {
             frm = $(target).closest("form");
             // Make sure the GET method is used
             $(frm).attr("method", "GET");
+            // Show we are waiting
+            $("#waitingsign").removeClass("hidden");
             // Submit that form
             $(frm).submit();
           }
