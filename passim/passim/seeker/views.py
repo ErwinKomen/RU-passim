@@ -111,8 +111,11 @@ def home(request):
     # Specify the template
     template_name = 'index.html'
     # Define the initial context
-    context =  {'title':'RU-passim','year':datetime.now().year,
-            'pfx': APP_PREFIX,'site_url': admin.site.site_url}
+    context =  {'title':'RU-passim',
+                'year':datetime.now().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     ## Create the list of news-items
     #lstQ = []
@@ -515,6 +518,13 @@ def get_authors(request):
         data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
+
+def import_ead(request):
+    """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
+
+    # HIER DUS CODE TOEVOEGEN
+    pass
+
 
 def import_ecodex(request):
     """Import one or more XML files that each contain one manuscript definition from e-codices, from Switzerland"""

@@ -24,9 +24,18 @@
               <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
                 <span class="glyphicon glyphicon-search"></span>
               </a>
+              <!-- Allow uploading e-codex XML files -->
               {% if is_passim_uploader %}
-                <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload" 
-                   role="button" title="Upload e-codices XML"
+                <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_ecodex" 
+                   role="button" title="Upload e-codices XML files"
+                   onclick="ru.passim.seeker.hide('tab_list');">
+                  <span class="glyphicon glyphicon-upload"></span>
+                </a>
+              {% endif %}
+              <!-- Allow uploading EAD XML files -->
+              {% if is_passim_uploader %}
+                <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload_ead" 
+                   role="button" title="Upload 'archive et manuscript' XML files"
                    onclick="ru.passim.seeker.hide('tab_list');">
                   <span class="glyphicon glyphicon-upload"></span>
                 </a>
@@ -36,8 +45,8 @@
         </div>
 
         {% if is_passim_uploader %}
-        <!-- Upload tab -->
-        <div class="inert collapse" id="tab_upload">
+        <!-- Upload tab for e-codices -->
+        <div class="inert collapse" id="tab_upload_ecodex">
           <div id="import_main" class="row container">
             <form action="{% url 'import_ecodex' %}" method="POST" enctype="multipart/form-data">
               {% csrf_token %}
@@ -67,6 +76,44 @@
 
             <!-- Import information -->
             <div id="manuscript_data_import" class="project-part hidden"></div>
+
+          </div>
+
+        </div>
+        {% endif %}
+
+        {% if is_passim_uploader %}
+        <!-- Upload tab for EAD -->
+        <div class="inert collapse" id="tab_upload_ead">
+          <div id="import_ead" class="row container">
+            <form action="{% url 'import_ead' %}" method="POST" enctype="multipart/form-data">
+              {% csrf_token %}
+              <!-- Room for the filename to appear -->
+              <div class="col-md-6 form-group" id="ead-import_info"
+                    sync-progress="{% url 'sync_progress' %}?synctype=ead"
+                    targetid="ead_data_import"
+                    targeturl="{% url 'import_ead' %}">
+                <div class="input-group">
+                  <span>Specify the EAD (archive a manuscript) XML file(s) with the manuscript data</span>
+                  <span class="input-group-btn">
+                    <span class="btn btn-default btn-xs btn-file">
+                      Browse...
+                      <input id="id_files_field" name="files_field" required="" multiple="" type="file" oninput="ru.passim.seeker.import_data('ead');" />
+                    </span>
+                  </span>
+                </div>
+            
+              </div>
+              <!-- Progress of upload indicator -->
+              <div class="col-md-6">
+                <progress class="hidden" style="width:100%;" id="ead-import_progress" value="0" min="0" max="100"></progress>
+              </div>
+              <!-- Any error reporting -->
+              <div id="ead-import_error"></div>
+            </form>
+
+            <!-- Import information -->
+            <div id="ead_data_import" class="project-part hidden"></div>
 
           </div>
 

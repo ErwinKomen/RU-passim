@@ -60,8 +60,9 @@ urlpatterns = [
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
 
-    url(r'^api/authors/import/$', passim.seeker.views.import_authors, name='import_authors'),
-    url(r'^api/ecodex/import/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
+    url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
+    url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
+    url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
