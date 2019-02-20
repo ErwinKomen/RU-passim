@@ -9,6 +9,7 @@ from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.forms import formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -97,9 +98,13 @@ def user_is_ingroup(request, sGroup):
     user = User.objects.filter(username=username).first()
     # glist = user.groups.values_list('name', flat=True)
 
-    glist = [x.name for x in user.groups.all()]
-
-    ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+    # Only look at group if the user is known
+    if user == None:
+        glist = []
+    else:
+        glist = [x.name for x in user.groups.all()]
+        ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+    # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
 
@@ -312,29 +317,6 @@ def search_sermon(request):
     context = dict(title="Search sermon",
                    authenticated=authenticated,
                    searchForm=searchForm)
-
-
-    # Create and show the result
-    return render(request, template_name, context)
-
-def search_manuscript(request):
-    """Search for a manuscript"""
-
-    # Set defaults
-    template_name = "seeker/manuscript.html"
-
-    # Get parameters for the search
-    initial = request.GET
-    searchForm = SearchManuscriptForm(initial)
-
-    # Other initialisations
-    currentuser = request.user
-    authenticated = currentuser.is_authenticated()
-
-    # Create context and add to it
-    context = dict(title="Search manuscript",
-                   authenticated=authenticated,
-                   searchform=searchForm)
 
 
     # Create and show the result
@@ -729,7 +711,8 @@ class ManuscriptListView(ListView):
     template_name = 'seeker/manuscript.html'
     entrycount = 0
     bDoTime = True
-
+    # Define a formset for searching
+    ManuFormset = formset_factory(SearchManuscriptForm, extra=0, min_num=1)
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -737,9 +720,14 @@ class ManuscriptListView(ListView):
 
         # Get parameters for the search
         initial = self.request.GET
-        search_form = SearchManuscriptForm(initial)
 
-        context['searchform'] = search_form
+        ## OLD: just one form
+        #search_form = SearchManuscriptForm(initial)
+        #context['searchform'] = search_form
+
+        # NEW: a whole formset
+        manu_formset = self.ManuFormset(prefix='manu', initial=initial)
+        context['manu_formset'] = manu_formset
 
         # Add a files upload form
         context['uploadform'] = UploadFilesForm()
