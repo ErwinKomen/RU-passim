@@ -119,8 +119,8 @@ var ru = (function ($, ru) {
           remote: {
             url: base_url + 'api/libraries/?library=',
             replace: function (url, uriEncodedQuery) {
-              var city = $("input[name=city]").val();
-              var country = $("input[name=country]").val();
+              var city = $("input[manu-0-name=city]").val();
+              var country = $("input[manu-0-name=country]").val();
               url += encodeURIComponent(uriEncodedQuery);
               if (country) url += "&country=" + country;
               if (city) url += "&city=" + city;
@@ -149,52 +149,68 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Type-ahead: COUNTRY
-        $(".typeahead.countries").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'countries', source: loc_countries, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
-        // Type-ahead: CITY
-        $(".typeahead.cities").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'cities', source: loc_cities, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
-        // Type-ahead: LIBRARY
-        $(".typeahead.libraries").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'libraries', source: loc_libraries, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
+        // Initialize typeahead
+        ru.passim.init_typeahead();
 
-        // Type-ahead: AUTHOR
-        $(".typeahead.authors").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          {
-            name: 'authors', source: loc_authors, limit: 10,
-            display: function (item) { return item.name; },
-            templates: {
-              empty: '<p>Not found</p>',
-              suggestion: function (item) {
-                return '<div>' + item.name + '</div>';
+      },
+
+      init_typeahead: function() {
+        try {
+          // First destroy them
+          $(".typeahead.countries").typeahead('destroy');
+          $(".typeahead.cities").typeahead('destroy');
+          $(".typeahead.libraries").typeahead('destroy');
+          $(".typeahead.authors").typeahead('destroy');
+
+          // Type-ahead: COUNTRY
+          $(".form-row:not(.empty-form) .typeahead.countries").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'countries', source: loc_countries, limit: 10,
+              display: function (item) { return item.name; },
+              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            }
+          );
+          // Type-ahead: CITY
+          $(".form-row:not(.empty-form) .typeahead.cities").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'cities', source: loc_cities, limit: 10,
+              display: function (item) { return item.name; },
+              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            }
+          );
+          // Type-ahead: LIBRARY
+          $(".form-row:not(.empty-form) .typeahead.libraries").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'libraries', source: loc_libraries, limit: 10,
+              display: function (item) { return item.name; },
+              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            }
+          );
+
+          // Type-ahead: AUTHOR
+          $(".form-row:not(.empty-form) .typeahead.authors").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'authors', source: loc_authors, limit: 10,
+              display: function (item) { return item.name; },
+              templates: {
+                empty: '<p>Not found</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
               }
             }
-          }
-        );
+          );
 
-        // Make sure the twitter typeahead spans are maximized
-        $("span.twitter-typeahead").each(function () {
-          var style = $(this).attr("style");
-          $(this).attr("style", style + " width: 100%;");
-        });
+          // Make sure the twitter typeahead spans are maximized
+          $("span.twitter-typeahead").each(function () {
+            var style = $(this).attr("style");
+            $(this).attr("style", style + " width: 100%;");
+          });
 
+        } catch (ex) {
+          private_methods.errMsg("init_typeahead", ex);
+        }
       },
 
       /**

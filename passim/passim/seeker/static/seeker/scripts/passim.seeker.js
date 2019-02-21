@@ -14,7 +14,7 @@ var ru = (function ($, ru) {
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
-          { "table": "manu_search", "prefix": "manu", "counter": false, "events": null }
+          { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
 
