@@ -90,6 +90,11 @@ div.inline-group a.add-related {
     display: inline-block;
 }
 
+.panel-none {
+  border: 0 !important;
+  box-shadow: none;
+}
+
 /* navbar */
 .navbar-custom {
     background-color: goldenrod;
@@ -372,6 +377,13 @@ svg g.lithium-node:hover > text {
 .glyphicon-plus {
     color: mediumseagreen;
 }
+.glyphicon-remove {
+  color: red;
+}
+.glyphicon-ok {
+  color: green;
+}
+
 
 .result-part .row {
     margin-right: 20px;

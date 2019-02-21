@@ -49,15 +49,15 @@ class SearchSermonForm(forms.Form):
 
 class SearchManuscriptForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     library = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Title"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
 
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)

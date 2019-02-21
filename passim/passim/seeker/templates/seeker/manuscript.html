@@ -15,32 +15,35 @@
     {% if authenticated %}
       <!-- Upper part of the search-a-manuscript interface -->
 
-      <div id="manuscript_top">
+      <div id="manuscript_top" >
 
         <!-- Allow access to interface parts that are normally hidden -->
-        <div class="row">
-          <div class="col-md-1 col-md-offset-10 ">
-            <span class="pull-right">
-              <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
-                <span class="glyphicon glyphicon-search"></span>
-              </a>
-              <!-- Allow uploading e-codex XML files -->
-              {% if is_passim_uploader %}
-                <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_ecodex" 
-                   role="button" title="Upload e-codices XML files"
-                   onclick="ru.passim.seeker.hide('tab_list');">
-                  <span class="glyphicon glyphicon-upload"></span>
+        <div  class="panel panel-none">
+
+          <div class="row">
+            <div class="col-md-2 col-md-offset-10 text-right">
+              <span class="">
+                <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
+                  <span class="glyphicon glyphicon-search"></span>
                 </a>
-              {% endif %}
-              <!-- Allow uploading EAD XML files -->
-              {% if is_passim_uploader %}
-                <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload_ead" 
-                   role="button" title="Upload 'archive et manuscript' XML files"
-                   onclick="ru.passim.seeker.hide('tab_list');">
-                  <span class="glyphicon glyphicon-upload"></span>
-                </a>
-              {% endif %}
-            </span>
+                <!-- Allow uploading e-codex XML files -->
+                {% if is_passim_uploader %}
+                  <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_ecodex" 
+                     role="button" title="Upload e-codices XML files"
+                     onclick="ru.passim.seeker.hide('tab_list');">
+                    <span class="glyphicon glyphicon-upload"></span>
+                  </a>
+                {% endif %}
+                <!-- Allow uploading EAD XML files -->
+                {% if is_passim_uploader %}
+                  <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload_ead" 
+                     role="button" title="Upload 'archive et manuscript' XML files"
+                     onclick="ru.passim.seeker.hide('tab_list');">
+                    <span class="glyphicon glyphicon-upload"></span>
+                  </a>
+                {% endif %}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -128,6 +131,9 @@
                 <!-- Be sure to add csrf -->
                 {% csrf_token %}
 
+                <!-- Include the formset's management -->
+                {{manu_formset.management_form}}
+
                 <!-- Search interface: what manuscript to look for and what are the results -->
                 <div class="row">
                   <div id="manu_search" class="col-sm-12">
@@ -136,6 +142,13 @@
                       {% for sform in manu_formset %}
                         <!-- One row for this form -->
                         <tr class="form-row">
+                          <!-- Cell to signal what this is -->
+                          {% if forloop.first %}
+                            <td style="width: 50px;">&nbsp;</td>
+                          {% else %}
+                            <td valign="top" style="width: 50px;"><b>OR</b></td>
+                          {% endif %}
+                          <!-- Cell for choices -->
                           <td>
                             <table>
                               <tr>
@@ -152,11 +165,22 @@
                               <tr><td colspan="2">&nbsp;</td></tr>
                             </table>
                           </td>
+                          <!-- Cell for deletion -->
+                          {% if forloop.first %}
+                            <td style="width: 50px;"></td>
+                          {% else %}
+                            <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
+                              <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                            </td>
+                          {% endif %}
                         </tr>
                       {% endfor %}
 
                       <!-- Empty row with related constituent specification-->
                       <tr class="form-row empty-form">
+                        <!-- Cell to signal the relation -->
+                        <td valign="top" style="width: 50px;"><b>OR</b></td>
+                        <!-- Cell for choices -->
                         <td>
                           <table>
                             <tr>
@@ -173,11 +197,15 @@
                               <tr><td colspan="2">&nbsp;</td></tr>
                           </table>
                         </td>
+                        <!-- Cell for deletion -->
+                        <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
+                          <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                        </td>
                       </tr>
 
                       <!-- Row that contains the command to add one -->
                       <tr class="add-row">
-                        <td>
+                        <td colspan="3">
                           <span id="add_search_criteria">
                             <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
                           </span>
@@ -187,16 +215,17 @@
                   </div>
                 </div>
 
-                <!-- A bit more space at the bottom-->
-                <div class="row">&nbsp;</div>
               </div>
 
               <div class="row">
-                <div class="col-md-4 col-md-offset-8">
-                  <span align="right" class="pull-right">
-                    <span><i>(The search engine is now in phase #1...)</i></span>
-                      <!-- Submit the search form -->
-                      <a role="button" class="btn btn-sm jumbo-3" onclick="$(this).closest('form').submit();">Search</a>
+                <div class="col-md-2 col-md-offset-10 text-right">
+                  <!-- Room to reset the search criteria -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
+                  </span>
+                  <!-- Submit the search form -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="$(this).closest('form').submit();">Search</a>
                   </span>
                 </div>
               </div>

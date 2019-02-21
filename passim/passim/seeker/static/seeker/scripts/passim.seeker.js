@@ -409,10 +409,12 @@ var ru = (function ($, ru) {
       init_events: function () {
         try {
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
-          //$('tr.add-row a').first().click(ru.cesar.seeker.tabular_addrow);
           $("tr.add-row").each(function () {
             $(this).find("a").first().click(ru.passim.seeker.tabular_addrow);
           });
+          // Bind one 'tabular_deletrow' event handler to clicking that button
+          $(".delete-row").unbind("click");
+          $('tr td a.delete-row').click(ru.passim.seeker.tabular_deleterow);
 
           // Bind the click event to all class="ajaxform" elements
           $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
@@ -440,6 +442,34 @@ var ru = (function ($, ru) {
           frm.submit();
         } catch (ex) {
           private_methods.errMsg("search_reset", ex);
+        }
+      },
+
+      /**
+       * search_clear
+       *    No real searching, just reset the criteria
+       *
+       */
+      search_clear: function (elStart) {
+        var frm = null,
+            idx = 0,
+            lFormRow = [];
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Remove additional rows
+          lFormRow = $(frm).find("tr.form-row").not(".empty-form");
+          for (idx = lFormRow.length - 1; idx > 0; idx--) {
+            // Remove this row
+            lFormRow[idx].remove();
+          }
+
+          // Clear the fields in the first row
+          $(frm).find("input:not([readonly]).searching").val("");
+
+        } catch (ex) {
+          private_methods.errMsg("search_clear", ex);
         }
       },
 
@@ -733,6 +763,94 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("import_data", ex);
           private_methods.waitStop(elWait);
+        }
+      },
+
+      /**
+       * tabular_deleterow
+       *   Delete one row from a tabular inline
+       *
+       */
+      tabular_deleterow: function () {
+        var sId = "",
+            elRow = null,
+            sPrefix = "",
+            elForms = "",
+            counter = $(this).attr("counter"),
+            bCounter = false,
+            iForms = 0,
+            prefix = "simplerel",
+            bValidated = false;
+
+        try {
+          // Get the prefix, if possible
+          sPrefix = $(this).attr("extra");
+          bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
+          elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
+          // Find out just where we are
+          sId = $(this).closest("div").attr("id");
+          // Find out how many forms there are right now
+          iForms = $(elForms).val();
+          // The validation action depends on this id
+          switch (sId) {
+            case "manu_search":
+              // Indicate that deep evaluation is needed
+              bValidated = true;
+              break;
+          }
+          // Continue with deletion only if validated
+          if (bValidated) {
+            // Get to the row
+            elRow = $(this).closest("tr");
+            $(elRow).remove();
+            // Decrease the amount of forms
+            iForms -= 1;
+            $(elForms).val(iForms);
+
+            // Re-do the numbering of the forms that are shown
+            $(".form-row").not(".empty-form").each(function (idx, elThisRow) {
+              var iCounter = 0, sRowId = "", arRowId = [];
+
+              iCounter = idx + 1;
+              // Adapt the ID attribute -- if it EXISTS
+              sRowId = $(elThisRow).attr("id");
+              if (sRowId !== undefined) {
+                arRowId = sRowId.split("-");
+                arRowId[1] = idx;
+                sRowId = arRowId.join("-");
+                $(elThisRow).attr("id", sRowId);
+              }
+
+              if (bCounter) {
+                // Adjust the number in the FIRST <td>
+                $(elThisRow).find("td").first().html(iCounter.toString());
+              }
+
+              // Adjust the numbering of the INPUT and SELECT in this row
+              $(elThisRow).find("input, select").each(function (j, elInput) {
+                // Adapt the name of this input
+                var sName = $(elInput).attr("name");
+                if (sName !== undefined) {
+                  var arName = sName.split("-");
+                  arName[1] = idx;
+                  sName = arName.join("-");
+                  $(elInput).attr("name", sName);
+                  $(elInput).attr("id", "id_" + sName);
+                }
+              });
+            });
+
+            // The validation action depends on this id (or on the prefix)
+            switch (sId) {
+              case "search_mode_simple":
+                // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
+                ru.passim.seeker.simple_update();
+                break;
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("tabular_deleterow", ex);
         }
       },
 
