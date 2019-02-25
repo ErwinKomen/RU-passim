@@ -59,6 +59,49 @@ class SearchManuscriptForm(forms.Form):
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
 
+class ManuscriptForm(forms.ModelForm):
+    country = forms.CharField(label=_("Country"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city = forms.CharField(label=_("City"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Manuscript
+        fields = ('name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format')
+        widgets={'library': forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}),
+                 'name': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearstart': forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'yearfinish': forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'support': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'format': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptForm, self).__init__(*args, **kwargs)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check if a library is specified
+            library = instance.library
+            if library != None:
+                # In this case: get the city and the country
+                city = library.city.name
+                country = library.country.name
+                if country == None and city != None and city != "":
+                    country = library.city.country.name
+                # Put them in the fields
+                self.fields['city'].initial = city
+                self.fields['country'].initial = country
+
+
+
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
     city = forms.CharField(label=_("City"), required=False)

@@ -27,7 +27,7 @@ from time import sleep
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm, UploadFilesForm
+                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group
 
 import fnmatch
@@ -695,12 +695,24 @@ class ManuscriptDetailsView(DetailView):
         # Get the current context
         context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
 
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasFormset = (len(self.qd) > 0)
+
         # Set the title of the application
         context['title'] = "Manuscript"
+
+        # Get a form for this manuscript
+        frm = ManuscriptForm(instance=self.object)
+        context['manuForm'] = frm
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context

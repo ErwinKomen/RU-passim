@@ -380,7 +380,11 @@ svg g.lithium-node:hover > text {
 .glyphicon-remove {
   color: red;
 }
-.glyphicon-ok {
+/*
+.glyphicon-arrow-left {
+  color: darkred;
+}*/
+.glyphicon-ok, .glyphicon-edit, .glyphicon-pencil {
   color: green;
 }
 
@@ -528,6 +532,14 @@ form .panel-heading.row {
     background-color: darkgray;
     fill: darkgray;
     cursor: wait;
+}
+
+td.editable, span.editable {
+  cursor: pointer;
+}
+td.editable:hover, span.editable:hover {
+  background-color: lightyellow;
+  color: darkgreen;
 }
 
 .main-arrow {

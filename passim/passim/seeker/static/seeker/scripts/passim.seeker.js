@@ -407,6 +407,9 @@ var ru = (function ($, ru) {
        *
        */
       init_events: function () {
+        var lHtml = [],
+            sHtml = "";
+
         try {
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
           $("tr.add-row").each(function () {
@@ -418,6 +421,18 @@ var ru = (function ($, ru) {
 
           // Bind the click event to all class="ajaxform" elements
           $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
+
+          // Bind manuscript editing stuff
+          lHtml.push("<a mode=\"edit\" class=\"view-mode btn btn-xs jumbo-1\"><span class=\"glyphicon glyphicon-pencil\" title=\"Edit these data\"></span></a>");
+          lHtml.push("<a mode=\"cancel\" class=\"edit-mode btn btn-xs jumbo-2 hidden\"><span class=\"glyphicon glyphicon-arrow-left\" title=\"Cancel (do *NOT* save)\"></span></a>");
+          lHtml.push("<a mode=\"save\" class=\"edit-mode btn btn-xs jumbo-1 hidden\"><span class=\"glyphicon glyphicon-ok\" title=\"Save these data\"></span></a>");
+          lHtml.push("<span class=\"waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden\"></span>");
+          sHtml = lHtml.join("\n");
+          $(".ms.editable").each(function (idx, el) {
+            $(el).html(sHtml);
+          });
+          $(".ms.editable a").unbind("click").click(ru.passim.seeker.manu_edit);
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
@@ -763,6 +778,65 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("import_data", ex);
           private_methods.waitStop(elWait);
+        }
+      },
+
+      /**
+       * manu_edit
+       *   Switch between edit modes on this <tr>
+       *
+       */
+      manu_edit: function () {
+        var el = this,
+            sMode = "",
+            colspan = "",
+            elTr = null,
+            elView = null,
+            elEdit = null;
+
+        try {
+          // Get the mode
+          sMode = $(el).attr("mode");
+          // Get the <tr>
+          elTr = $(el).closest("td");
+          // Check if this has colspan
+          colspan = $(elTr).attr("colspan");
+          if (colspan !== undefined && colspan !== "" && parseInt(colspan, 10) > 1) {
+            elTr = $(el).closest("table");
+          }
+          // Get the view and edit values
+          elView = $(el).find(".view-mode").first();
+          elEdit = $(el).find(".edit-mode").first();
+
+          // Action depends on the mode
+          switch (sMode) {
+            case "edit":
+              // Go to edit mode
+              $(elTr).find(".view-mode").addClass("hidden");
+              $(elTr).find(".edit-mode").removeClass("hidden");
+              // Make sure typeahead works here
+              ru.passim.init_typeahead();
+              break;
+            case "save":
+              // Show waiting symbol
+              $(elTr).find(".waiting").removeClass("hidden");
+
+              // Try to save the form data
+
+              // Return to view mode
+              $(elTr).find(".view-mode").removeClass("hidden");
+              $(elTr).find(".edit-mode").addClass("hidden");
+              // Hide waiting symbol
+              $(elTr).find(".waiting").addClass("hidden");
+              break;
+            case "cancel":
+              // Go to view mode without saving
+              $(elTr).find(".view-mode").removeClass("hidden");
+              $(elTr).find(".edit-mode").addClass("hidden");
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("manu_edit", ex);
         }
       },
 

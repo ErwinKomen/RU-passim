@@ -75,13 +75,6 @@ var ru = (function ($, ru) {
        *    Initialize eent listeners for this module
        */
       init_event_listeners: function () {
-        // Bind the change event for text_list.html, 'part-name'
-        $("#part-name").bind('change', ru.passim.part_change);
-        $("#part-name").change(ru.passim.part_change);
-
-        // When a text-line is clicked, a waiting symbol should show up
-        $("#sentence-list .line-text a").bind('click', ru.passim.sent_click);
-
         // Get the base URL
         base_url = $("#__baseurl__").text();
 
@@ -159,7 +152,7 @@ var ru = (function ($, ru) {
           $(".typeahead.authors").typeahead('destroy');
 
           // Type-ahead: COUNTRY
-          $(".form-row:not(.empty-form) .typeahead.countries").typeahead(
+          $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             { name: 'countries', source: loc_countries, limit: 20,
               display: function (item) { return item.name; },
@@ -167,7 +160,7 @@ var ru = (function ($, ru) {
             }
           );
           // Type-ahead: CITY
-          $(".form-row:not(.empty-form) .typeahead.cities").typeahead(
+          $(".form-row:not(.empty-form) .typeahead.cities, .manuscript-details .typeahead.cities").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             { name: 'cities', source: loc_cities, limit: 25,
               display: function (item) { return item.name; },
@@ -175,7 +168,7 @@ var ru = (function ($, ru) {
             }
           );
           // Type-ahead: LIBRARY
-          $(".form-row:not(.empty-form) .typeahead.libraries").typeahead(
+          $(".form-row:not(.empty-form) .typeahead.libraries, .manuscript-details .typeahead.libraries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             { name: 'libraries', source: loc_libraries, limit: 25,
               display: function (item) { return item.name; },
@@ -233,18 +226,22 @@ var ru = (function ($, ru) {
       tt_city: function (url, uriEncodedQuery) {
         var elThis = loc_elInput,
             elRow = null,
-            sPrefix = "",
+            sPrefix = "id_",
             country = "";
 
         try {
           // Get to this row
           elRow = $(elThis).closest("tr").first();
-          // Get the PREFIX from the first <input> that has an ID
-          sPrefix = $(elRow).find("input[id]").first().attr("id");
-          sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-"));
+          if (elRow.length > 0) {
+            // Get the PREFIX from the first <input> that has an ID
+            sPrefix = $(elRow).find("input[id]").first().attr("id");
+            if (sPrefix.indexOf("-") > 0) {
+              sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-")) + "-";
+            } 
+          }
 
           // Fetch value for country in this line
-          country = $("input[id=" + sPrefix + "-country]").val();
+          country = $("input[id=" + sPrefix + "country]").val();
           // Build the URL with the components we have
           url += encodeURIComponent(uriEncodedQuery);
           // Possibly add country
@@ -263,20 +260,22 @@ var ru = (function ($, ru) {
       tt_library: function (url, uriEncodedQuery) {
         var elThis = loc_elInput,
             elRow = null,
-            sPrefix = "",
+            sPrefix = "id_",
             city = "",
             country = "";
 
         try {
           // Get to this row
           elRow = $(elThis).closest("tr").first();
-          // Get the PREFIX from the first <input> that has an ID
-          sPrefix = $(elRow).find("input[id]").first().attr("id");
-          sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-"));
+          if (elRow.length > 0) {
+            // Get the PREFIX from the first <input> that has an ID
+            sPrefix = $(elRow).find("input[id]").first().attr("id");
+            sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-")) + "-";
+          }
 
           // Fetch values for city and country in this line
-          city = $("input[id="+sPrefix+"-city]").val();
-          country = $("input[id=" + sPrefix + "-country]").val();
+          city = $("input[id="+sPrefix+"city]").val();
+          country = $("input[id=" + sPrefix + "country]").val();
           // Build the URL with the components we have
           url += encodeURIComponent(uriEncodedQuery);
           // Possibly add country
