@@ -52,7 +52,10 @@
         <td valign="top"><b>Library</b></td>
         <td class="manuscript-library" align="left">
           <div class="view-mode">{{manuForm.instance.library.name}}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.library}}</div>{% endif %}
+          {% if is_passim_editor %}
+          <div class="library-key hidden">{{manuForm.library}}</div>
+          <div class="edit-mode hidden">{{manuForm.libname}}</div>
+          {% endif %}
         </td>
       </tr>
       <tr>

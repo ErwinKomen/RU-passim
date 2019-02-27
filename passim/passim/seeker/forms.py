@@ -64,6 +64,8 @@ class ManuscriptForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city = forms.CharField(label=_("City"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    libname = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -99,6 +101,8 @@ class ManuscriptForm(forms.ModelForm):
                 # Put them in the fields
                 self.fields['city'].initial = city
                 self.fields['country'].initial = country
+                # Also: make sure we put the library NAME in the initial
+                self.fields['libname'].initial = library.name
 
 
 

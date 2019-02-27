@@ -171,8 +171,14 @@ var ru = (function ($, ru) {
           $(".form-row:not(.empty-form) .typeahead.libraries, .manuscript-details .typeahead.libraries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             { name: 'libraries', source: loc_libraries, limit: 25,
-              display: function (item) { return item.name; },
-              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            display: function (item) {
+              return item.name;
+            },
+            templates: {
+              suggestion: function (item) {
+                return '<div>' + item.name + '</div>';
+              }
+            }
             }
           );
 
