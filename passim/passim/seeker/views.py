@@ -678,7 +678,8 @@ class ManuscriptDetailsView(DetailView):
     """The details of one manuscript"""
 
     model = Manuscript
-    template_name = 'seeker/manuscript_details.html'
+    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
+    template_post = 'seeker/manuscript_info.html'       # Use this for POST requests
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -690,6 +691,20 @@ class ManuscriptDetailsView(DetailView):
             response = self.render_to_response(context)
             #response.content = treat_bom(response.rendered_content)
         return response
+
+    def post(self, requests, *args, **kwargs):
+        # Make sure only POSTS get through that are authorized
+        if request.user.is_authenticated:
+            # Determine the object and the context
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            response = self.render_to_response(self.template_post, context)
+        else:
+            response = "(No authorization)"
+
+        # Return the response
+        return response
+
 
     def get_context_data(self, **kwargs):
         # Get the current context
@@ -706,7 +721,11 @@ class ManuscriptDetailsView(DetailView):
         context['title'] = "Manuscript"
 
         # Get a form for this manuscript
-        frm = ManuscriptForm(instance=self.object)
+        if self.request.method == "POST":
+            pass
+        else:
+            frm = ManuscriptForm(instance=self.object)
+        # Put the form in the context
         context['manuForm'] = frm
 
         # Check this user: is he allowed to UPLOAD data?

@@ -123,202 +123,200 @@
         </div>
         {% endif %}
 
-        <!-- Search tab -->
-        <div class="inert collapse" id="tab_search">
-          <div class="panel panel-default">
-            <form id="manuscriptsearch" method='get' action="{% url 'search_manuscript' %}" >
-              <div>
-                <!-- Be sure to add csrf -->
-                {% csrf_token %}
+        <!-- The form spans the list + pagination information -->
+        <form id="manuscriptsearch" method='get' action="{% url 'search_manuscript' %}" >
+          <!-- Search tab -->
+          <div class="inert collapse" id="tab_search">
+            <div class="panel panel-default">
+                <div>
+                  <!-- Be sure to add csrf -->
+                  {% csrf_token %}
 
-                <!-- Include the formset's management -->
-                {{manu_formset.management_form}}
+                  <!-- Include the formset's management -->
+                  {{manu_formset.management_form}}
 
-                <!-- Search interface: what manuscript to look for and what are the results -->
-                <div class="row">
-                  <div id="manu_search" class="col-sm-12">
-                    <p>Manuscript to look for:</p>
-                    <table style="width: 100%;">
-                      {% for sform in manu_formset %}
-                        <!-- One row for this form -->
-                        <tr class="form-row">
-                          <!-- Cell to signal what this is -->
-                          {% if forloop.first %}
-                            <td style="width: 50px;">&nbsp;</td>
-                          {% else %}
-                            <td valign="top" style="width: 50px;"><b>OR</b></td>
-                          {% endif %}
+                  <!-- Search interface: what manuscript to look for and what are the results -->
+                  <div class="row">
+                    <div id="manu_search" class="col-sm-12">
+                      <p>Manuscript to look for:</p>
+                      <table style="width: 100%;">
+                        {% for sform in manu_formset %}
+                          <!-- One row for this form -->
+                          <tr class="form-row">
+                            <!-- Cell to signal what this is -->
+                            {% if forloop.first %}
+                              <td style="width: 50px;">&nbsp;</td>
+                            {% else %}
+                              <td valign="top" style="width: 50px;"><b>OR</b></td>
+                            {% endif %}
+                            <!-- Cell for choices -->
+                            <td>
+                              <table>
+                                <tr>
+                                  <td>COUNTRY</td><td style="width: 50%;">{{sform.country}}</td>
+                                  <td>SIGNATURE</td><td style="width: 50%;">{{sform.signature}}</td>
+                                </tr>
+                                <tr>
+                                  <td>CITY</td><td style="width: 50%;">{{sform.city}}</td>
+                                  <td>TITLE</td><td style="width: 50%;">{{sform.name}}</td>
+                                </tr>
+                                <tr>
+                                  <td>LIBRARY</td><td style="width: 50%;">{{sform.library}}</td>
+                                </tr>
+                                <tr><td colspan="2">&nbsp;</td></tr>
+                              </table>
+                            </td>
+                            <!-- Cell for deletion -->
+                            {% if forloop.first %}
+                              <td style="width: 50px;"></td>
+                            {% else %}
+                              <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
+                                <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                              </td>
+                            {% endif %}
+                          </tr>
+                        {% endfor %}
+
+                        <!-- Empty row with related constituent specification-->
+                        <tr class="form-row empty-form">
+                          <!-- Cell to signal the relation -->
+                          <td valign="top" style="width: 50px;"><b>OR</b></td>
                           <!-- Cell for choices -->
                           <td>
                             <table>
                               <tr>
-                                <td>COUNTRY</td><td style="width: 50%;">{{sform.country}}</td>
-                                <td>SIGNATURE</td><td style="width: 50%;">{{sform.signature}}</td>
+                                <td>COUNTRY</td><td style="width: 50%;">{{manu_formset.empty_form.country}}</td>
+                                <td>SIGNATURE</td><td style="width: 50%;">{{manu_formset.empty_form.signature}}</td>
                               </tr>
                               <tr>
-                                <td>CITY</td><td style="width: 50%;">{{sform.city}}</td>
-                                <td>TITLE</td><td style="width: 50%;">{{sform.name}}</td>
+                                <td>CITY</td><td style="width: 50%;">{{manu_formset.empty_form.city}}</td>
+                                <td>TITLE</td><td style="width: 50%;">{{manu_formset.empty_form.name}}</td>
                               </tr>
                               <tr>
-                                <td>LIBRARY</td><td style="width: 50%;">{{sform.library}}</td>
+                                <td>LIBRARY</td><td style="width: 50%;">{{manu_formset.empty_form.library}}</td>
                               </tr>
-                              <tr><td colspan="2">&nbsp;</td></tr>
+                                <tr><td colspan="2">&nbsp;</td></tr>
                             </table>
                           </td>
                           <!-- Cell for deletion -->
-                          {% if forloop.first %}
-                            <td style="width: 50px;"></td>
-                          {% else %}
-                            <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
-                              <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-                            </td>
-                          {% endif %}
+                          <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
+                            <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                          </td>
                         </tr>
+
+                        <!-- Row that contains the command to add one -->
+                        <tr class="add-row">
+                          <td colspan="3">
+                            <span id="add_search_criteria">
+                              <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
+                            </span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+
+                <div class="row">
+                  <div class="col-md-2 col-md-offset-10 text-right">
+                    <!-- Room to reset the search criteria -->
+                    <span>
+                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
+                    </span>
+                    <!-- Submit the search form -->
+                    <span>
+                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="$(this).closest('form').submit();">Search</a>
+                    </span>
+                  </div>
+                </div>
+
+            </div>
+          </div>
+
+          <!-- List tab -->
+          <div class="" id="tab_list">
+            <div class="panel panel-default">
+              {% if object_list %}
+
+                <h3>Manuscripts</h3>
+                <div class="row">
+                    <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
+                    <div class="col-sm-8">
+                    <span class="step-links pull-right">
+
+                    {% include 'pagination.html' %}
+
+                    </span>
+                    </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-12">
+                    <table class="table table-hover">
+                      <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th><!-- Buttons --></th></tr></thead>
+                      <tbody>
+                      {% for man in object_list %}
+                        <tr class="dict-entry">
+                          <td class="hidden"> {{ man.id }}</td>
+                          <!-- City / Library / Manuscript name -->
+                          <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
+                          <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
+                          <td style="width: 100%;">
+                            <span class="manuscript-idno">{{man.idno}}</span>
+                            {% if man.name %}
+                            <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
+                            {% endif %}
+                          </td>
+                          <!-- Number of sermons -->
+                          <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
+                          <!-- Dates for this manuscript -->
+                          <td class="manuscript-date" align="right">{{man.yearstart}}</td>
+                          <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
+
+                          <!-- Buttons for more information on this manuscript -->
+                          <td style="min-width: 80px;">
+                            <!-- Information button -->
+                              {% csrf_token %}
+                              <!-- information on this manuscript -->
+                              <a role="button" class="btn btn-xs jumbo-3" title="Information" 
+                                  href="{% url 'manuscript_view' man.id %}">
+                                <span class="glyphicon glyphicon-info-sign"></span>
+                              </a>
+                              <!-- external link button -->
+                              {% if man.url %}
+                                <a role="button" class="btn btn-xs jumbo-1" title="External link"
+                                   href="{{man.url}}" target="_blank" >
+                                  <span class="glyphicon glyphicon-link"></span>
+                                </a>
+                              {% endif %}
+                          </td>
+                        </tr>
+
                       {% endfor %}
-
-                      <!-- Empty row with related constituent specification-->
-                      <tr class="form-row empty-form">
-                        <!-- Cell to signal the relation -->
-                        <td valign="top" style="width: 50px;"><b>OR</b></td>
-                        <!-- Cell for choices -->
-                        <td>
-                          <table>
-                            <tr>
-                              <td>COUNTRY</td><td style="width: 50%;">{{manu_formset.empty_form.country}}</td>
-                              <td>SIGNATURE</td><td style="width: 50%;">{{manu_formset.empty_form.signature}}</td>
-                            </tr>
-                            <tr>
-                              <td>CITY</td><td style="width: 50%;">{{manu_formset.empty_form.city}}</td>
-                              <td>TITLE</td><td style="width: 50%;">{{manu_formset.empty_form.name}}</td>
-                            </tr>
-                            <tr>
-                              <td>LIBRARY</td><td style="width: 50%;">{{manu_formset.empty_form.library}}</td>
-                            </tr>
-                              <tr><td colspan="2">&nbsp;</td></tr>
-                          </table>
-                        </td>
-                        <!-- Cell for deletion -->
-                        <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
-                          <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-                        </td>
-                      </tr>
-
-                      <!-- Row that contains the command to add one -->
-                      <tr class="add-row">
-                        <td colspan="3">
-                          <span id="add_search_criteria">
-                            <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
-                          </span>
-                        </td>
-                      </tr>
+                      </tbody>
                     </table>
                   </div>
                 </div>
+                <div class="pagination">
+                    <span class="step-links">
 
-              </div>
+                    {% include 'pagination.html' %}
 
-              <div class="row">
-                <div class="col-md-2 col-md-offset-10 text-right">
-                  <!-- Room to reset the search criteria -->
-                  <span>
-                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
-                  </span>
-                  <!-- Submit the search form -->
-                  <span>
-                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="$(this).closest('form').submit();">Search</a>
-                  </span>
+                    </span>
                 </div>
+
+              {% else %}
+                <p>No manuscripts have been found.</p>
+              {% endif %}
+
               </div>
 
-            </form>
           </div>
-        </div>
 
-        <!-- List tab -->
-        <div class="" id="tab_list">
-          <div class="panel panel-default">
-            {% if object_list %}
-
-              <h3>Manuscripts</h3>
-              <div class="row">
-                  <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
-                  <div class="col-sm-8">
-                  <span class="step-links pull-right">
-
-                  {% include 'pagination.html' %}
-
-                  </span>
-                  </div>
-              </div>
-              <div class="row">
-                <div class="col-md-12">
-                  <table class="table table-hover">
-                    <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th><!-- Buttons --></th></tr></thead>
-                    <tbody>
-                    {% for man in object_list %}
-                      <tr class="dict-entry">
-                        <td class="hidden"> {{ man.id }}</td>
-                        <!-- City / Library / Manuscript name -->
-                        <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
-                        <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
-                        <td style="width: 100%;">
-                          <span class="manuscript-idno">{{man.idno}}</span>
-                          {% if man.name %}
-                          <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
-                          {% endif %}
-                        </td>
-                        <!-- Number of sermons -->
-                        <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
-                        <!-- Dates for this manuscript -->
-                        <td class="manuscript-date" align="right">{{man.yearstart}}</td>
-                        <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
-
-                        <!-- Buttons for more information on this manuscript -->
-                        <td style="min-width: 80px;">
-                          <!-- Information button -->
-                          <form>
-                            {% csrf_token %}
-                            <!-- information on this manuscript -->
-                            <a role="button" class="btn btn-xs jumbo-3" title="Information" 
-                                href="{% url 'manuscript_view' man.id %}">
-                              <span class="glyphicon glyphicon-info-sign"></span>
-                            </a>
-                            <!-- external link button -->
-                            {% if man.url %}
-                              <a role="button" class="btn btn-xs jumbo-1" title="External link"
-                                 href="{{man.url}}" target="_blank" >
-                                <span class="glyphicon glyphicon-link"></span>
-                              </a>
-                            {% endif %}
-                          </form>
-                        </td>
-                      </tr>
-
-                    {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="pagination">
-                  <span class="step-links">
-
-                  {% include 'pagination.html' %}
-
-                  </span>
-              </div>
-
-            {% else %}
-              <p>No manuscripts have been found.</p>
-            {% endif %}
-
-            </div>
-
-        </div>
-
+        </form>
       </div>
 
-
-
+    
     {% else %}
       <div class="explanation">
         <p>Dear user, you are <b>not</b> logged in.</p>
