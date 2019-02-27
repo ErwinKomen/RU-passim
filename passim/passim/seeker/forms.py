@@ -75,7 +75,7 @@ class ManuscriptForm(forms.ModelForm):
                  'yearstart': forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'yearfinish': forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'origin': forms.Select(attrs={'style': 'width: 100%;'}),
                  'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'support': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),

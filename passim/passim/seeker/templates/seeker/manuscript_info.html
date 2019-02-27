@@ -1,10 +1,37 @@
 ﻿{% load i18n %}
 
+<!-- Manuscript information -->
+<form>
+  {% csrf_token %}
+  <h3>
+    <span>Manuscript</span>
+    <span class="pull-right" style="font-size: xx-small;">{{manuForm.city.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}</span>
+  </h3>
+
   <table style="width: 90%;" class="manuscript-details">
     <tbody>
       <!-- Row to indicate editing, if possible -->
       {% if is_passim_editor %}
-      <tr><td colspan="2" class="ms editable"></td></tr>
+      <tr>
+        <td>&nbsp;</td>
+        <td class="ms editable table">
+          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+            <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+          </a>
+          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+          </a>
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targeturl="{% url 'manuscript_view' manuForm.instance.id %}" targetid="manuscript_info">
+            <span class="glyphicon glyphicon-ok" title="Save these data"></span>
+          </a>
+
+          <!-- Waiting symbol-->
+          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+          <!-- Little error message room -->
+          <span id="little_err_msg" class="err-msg"></span>
+        </td>
+      </tr>
       {% endif %}
 
       <tr>
@@ -40,6 +67,13 @@
         <td class="manuscript-name" align="left">
           <div class="view-mode">{{manuForm.name.value}}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.name}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Origin</b></td>
+        <td class="manuscript-support" align="left">
+          <div class="view-mode">{% if object.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.origin}}</div>{% endif %}
         </td>
       </tr>
 
@@ -91,3 +125,4 @@
       </tr>
     </tbody>
   </table>
+</form>

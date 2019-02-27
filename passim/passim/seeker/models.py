@@ -13,8 +13,8 @@ import copy
 import json
 import time
 # import xml.etree.ElementTree as ET
-from lxml import etree as ET
-import xmltodict
+# from lxml import etree as ET
+# import xmltodict
 from xml.dom import minidom
 
 STANDARD_LENGTH=100

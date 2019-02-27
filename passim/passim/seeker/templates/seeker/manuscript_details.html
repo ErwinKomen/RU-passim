@@ -13,19 +13,9 @@
   <div>
 
     {% if authenticated %}
-      <div id="manuscript_top" class="panel panel-default">
-
-        <!-- Manuscript information -->
-        <form>
-          <h3>
-            <span>Manuscript</span>
-            <span class="pull-right" style="font-size: xx-small;">{{object.library.city.name}}, {{object.library.name}}, {{object.idno}}</span>
-          </h3>
-          <!-- Incorporate the manuscript details-->
-          <div id="manuscript_info">
-            {% include 'seeker/manuscript_info.html' %}
-          </div>
-        </form>
+      <!-- Incorporate the manuscript details-->
+      <div id="manuscript_info" class="panel panel-default">
+        {% include 'seeker/manuscript_info.html' %}
       </div>
 
       <div class="container">

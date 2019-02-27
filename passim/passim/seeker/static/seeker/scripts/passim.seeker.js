@@ -11,6 +11,7 @@ var ru = (function ($, ru) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
         loc_progr = [],       // Progress tracking
+        loc_urlStore = "",    // Keep track of URL to be shown
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
@@ -406,7 +407,7 @@ var ru = (function ($, ru) {
        *      Bind main necessary events
        *
        */
-      init_events: function () {
+      init_events: function (sUrlShow) {
         var lHtml = [],
             sHtml = "";
 
@@ -422,16 +423,16 @@ var ru = (function ($, ru) {
           // Bind the click event to all class="ajaxform" elements
           $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
 
-          // Bind manuscript editing stuff
-          lHtml.push("<a mode=\"edit\" class=\"view-mode btn btn-xs jumbo-1\"><span class=\"glyphicon glyphicon-pencil\" title=\"Edit these data\"></span></a>");
-          lHtml.push("<a mode=\"cancel\" class=\"edit-mode btn btn-xs jumbo-2 hidden\"><span class=\"glyphicon glyphicon-arrow-left\" title=\"Cancel (do *NOT* save)\"></span></a>");
-          lHtml.push("<a mode=\"save\" class=\"edit-mode btn btn-xs jumbo-1 hidden\"><span class=\"glyphicon glyphicon-ok\" title=\"Save these data\"></span></a>");
-          lHtml.push("<span class=\"waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden\"></span>");
-          sHtml = lHtml.join("\n");
-          $(".ms.editable").each(function (idx, el) {
-            $(el).html(sHtml);
-          });
           $(".ms.editable a").unbind("click").click(ru.passim.seeker.manu_edit);
+
+          // Show URL if needed
+          if (loc_urlStore !== undefined && loc_urlStore !== "") {
+            // show it
+            window.location.href = loc_urlStore;
+          } else if (sUrlShow !== undefined && sUrlShow !== "") {
+            // window.location.href = sUrlShow;
+            history.pushState(null, null, sUrlShow);
+          }
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
@@ -494,15 +495,40 @@ var ru = (function ($, ru) {
        *
        */
       search_start: function (elStart) {
-        var frm = null;
+        var frm = null,
+            url = "",
+            bTry = false,
+            data = null;
 
         try {
           // Get to the form
           frm = $(elStart).closest('form');
-          // Show we are waiting
-          $("#waitingsign").removeClass("hidden");
-          // Now submit the form
-          frm.submit();
+          // Get the data from the form
+          data = frm.serializeArray();
+
+          // Get the URL from the form
+          url = $(frm).attr("action");
+
+          // Check if all is there
+          if (bTry && data !== null && data.length > 0 && url !== undefined && url !== "") {
+            // Show we are waiting
+            $("#waitingsign").removeClass("hidden");
+            // Yes, use GET
+            $.get(url, data, function (response) {
+              // Replace the contents of the current page with what we receive
+              $("html").html(response);
+              // Show the state
+              history.pushState(url);
+            });
+          } else {
+            // Show we are waiting
+            $("#waitingsign").removeClass("hidden");
+            // Store the current URL
+            loc_urlStore = url;
+            // Now submit the form
+            frm.submit();
+          }
+
         } catch (ex) {
           private_methods.errMsg("search_start", ex);
         }
@@ -784,12 +810,19 @@ var ru = (function ($, ru) {
       /**
        * manu_edit
        *   Switch between edit modes on this <tr>
+       *   And if saving is required, then call the [targeturl] to send a POST of the form data
        *
        */
       manu_edit: function () {
         var el = this,
             sMode = "",
             colspan = "",
+            targeturl = "",
+            targetid = "",
+            data = null,
+            frm = null,
+            bOkay = true,
+            err = "#little_err_msg",
             elTr = null,
             elView = null,
             elEdit = null;
@@ -799,9 +832,9 @@ var ru = (function ($, ru) {
           sMode = $(el).attr("mode");
           // Get the <tr>
           elTr = $(el).closest("td");
-          // Check if this has colspan
-          colspan = $(elTr).attr("colspan");
-          if (colspan !== undefined && colspan !== "" && parseInt(colspan, 10) > 1) {
+
+          // Check if we need to take the table
+          if ($(elTr).hasClass("table")) {
             elTr = $(el).closest("table");
           }
           // Get the view and edit values
@@ -821,13 +854,64 @@ var ru = (function ($, ru) {
               // Show waiting symbol
               $(elTr).find(".waiting").removeClass("hidden");
 
-              // Try to save the form data
+              // Get any possible targeturl
+              targeturl = $(el).attr("targeturl");
+              targetid = $(el).attr("targetid");
 
-              // Return to view mode
-              $(elTr).find(".view-mode").removeClass("hidden");
-              $(elTr).find(".edit-mode").addClass("hidden");
-              // Hide waiting symbol
-              $(elTr).find(".waiting").addClass("hidden");
+              // Check
+              if (targeturl === undefined) { $(err).html("Save: not <code>targeturl</code> specified");  bOkay = false}
+              if (bOkay && targetid === undefined) { $(err).html("Save: not <code>targetid</code> specified"); }
+
+              // Get the form data
+              frm = $(el).closest("form");
+              if (bOkay && frm === undefined) { $(err).html("<i>There is no <code>form</code> in this page</i>"); }
+
+              // Either POST the request
+              if (bOkay) {
+                data = $(frm).serializeArray();
+                // Try to save the form data: send a POST
+                $.post(targeturl, data, function (response) {
+                  // Action depends on the response
+                  if (response === undefined || response === null || !("status" in response)) {
+                    private_methods.errMsg("No status returned");
+                  } else {
+                    switch (response.status) {
+                      case "ready":
+                      case "ok":
+                      case "error":
+                        if ("html" in response) {
+                          // Show the HTML in the targetid
+                          $("#" + targetid).html(response['html']);
+                          // If there is an error, indicate this
+                          if (response.status === "error") {
+                            if ("msg" in response) {
+                              $(err).html("Error: "+response['msg']);
+                            } else {
+                              $(err).html("<code>There is an error</code>");
+                            }
+                          }
+                        } else {
+                          // Send a message
+                          $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                        }
+                        break;
+                      default:
+                        // Something went wrong -- show the page or not?
+                        $(err).html("The status returned is unknown: " + response.status);
+                        break;
+                    }
+                  }
+                  // Return to view mode
+                  $(elTr).find(".view-mode").removeClass("hidden");
+                  $(elTr).find(".edit-mode").addClass("hidden");
+                  // Hide waiting symbol
+                  $(elTr).find(".waiting").addClass("hidden");
+                });
+              } else {
+                // Or else stop waiting - with error message above
+                $(elTr).find(".waiting").addClass("hidden");
+              }
+
               break;
             case "cancel":
               // Go to view mode without saving

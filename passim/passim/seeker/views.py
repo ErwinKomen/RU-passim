@@ -692,18 +692,26 @@ class ManuscriptDetailsView(DetailView):
             #response.content = treat_bom(response.rendered_content)
         return response
 
-    def post(self, requests, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
+        # Initialisation
+        data = {'status': 'ok', 'html': '', 'statuscode': ''}
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
             # Determine the object and the context
             self.object = self.get_object()
             context = self.get_context_data(object=self.object)
-            response = self.render_to_response(self.template_post, context)
+            # Possibly indicate form errors
+            if 'errors' in context:
+                data['status'] = "error"
+                data['msg'] = context['errors']
+            # response = self.render_to_response(self.template_post, context)
+            data['html'] = render_to_string(self.template_post, context, request)
         else:
-            response = "(No authorization)"
+            data['html'] = "(No authorization)"
+            data['status'] = "error"
 
         # Return the response
-        return response
+        return JsonResponse(data)
 
 
     def get_context_data(self, **kwargs):
@@ -722,9 +730,26 @@ class ManuscriptDetailsView(DetailView):
 
         # Get a form for this manuscript
         if self.request.method == "POST":
-            pass
+            instance = self.object
+            # Do we have an existing object or are we creating?
+            if instance == None:
+                # Saving a new item
+                frm = ManuscriptForm(get, prefix="manu")
+            else:
+                # Editing an existing one
+                frm = ManuscriptForm(get, prefix="manu", instance=instance)
+            # Both cases: validation and saving
+            if frm.is_valid():
+                # The form is valid - do a preliminary saving
+                instance = frm.save(commit=False)
+                # Now save it for real
+                instance.save()
+            else:
+                # We need to pass on to the user that there are errors
+                context['errors'] = frm.errors
+                
         else:
-            frm = ManuscriptForm(instance=self.object)
+            frm = ManuscriptForm(instance=self.object, prefix="manu")
         # Put the form in the context
         context['manuForm'] = frm
 
