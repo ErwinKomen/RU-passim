@@ -33,10 +33,14 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_divErr = "passim_err",
         loc_countries = [],
+        loc_countriesL = [],
         loc_cities = [],
+        loc_citiesL = [],
         loc_libraries = [],
+        loc_librariesL = [],
         loc_authors = [],
         loc_authorsL = [],
+        loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
         base_url = "",
@@ -71,13 +75,6 @@ var ru = (function ($, ru) {
        *    Initialize eent listeners for this module
        */
       init_event_listeners: function () {
-        // Bind the change event for text_list.html, 'part-name'
-        $("#part-name").bind('change', ru.passim.part_change);
-        $("#part-name").change(ru.passim.part_change);
-
-        // When a text-line is clicked, a waiting symbol should show up
-        $("#sentence-list .line-text a").bind('click', ru.passim.sent_click);
-
         // Get the base URL
         base_url = $("#__baseurl__").text();
 
@@ -86,7 +83,7 @@ var ru = (function ($, ru) {
           datumTokenizer: Bloodhound.tokenizers.whitespace,
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
-          local: loc_countries,
+          // local: loc_countries,
           prefetch: { url: base_url + 'api/countries/', cache: true },
           remote:   { url: base_url + 'api/countries/?country=%QUERY', wildcard: '%QUERY' }
         });
@@ -96,16 +93,11 @@ var ru = (function ($, ru) {
           datumTokenizer: Bloodhound.tokenizers.whitespace,
           queryTokenizer: Bloodhound.tokenizers.whitespace,
           // loc_countries will be an array of countries
-          local: loc_cities,
+          // local: loc_cities,
           prefetch: { url: base_url + 'api/cities/', cache: true },
           remote: {
             url: base_url + 'api/cities/?city=',
-            replace: function (url, uriEncodedQuery) {
-              var country = $("input[name=country]").val();
-              url += encodeURIComponent(uriEncodedQuery);
-              if (country) url += "&country=" + country ;
-              return url;
-            }
+            replace: ru.passim.tt_city
           }
         });
 
@@ -113,19 +105,12 @@ var ru = (function ($, ru) {
         loc_libraries = new Bloodhound({
           datumTokenizer: Bloodhound.tokenizers.whitespace,
           queryTokenizer: Bloodhound.tokenizers.whitespace,
-          // loc_countries will be an array of countries
-          local: loc_cities,
+          // loc_libraries will be an array of libraries
+          local: loc_librariesL,
           prefetch: { url: base_url + 'api/libraries/', cache: true },
           remote: {
             url: base_url + 'api/libraries/?library=',
-            replace: function (url, uriEncodedQuery) {
-              var city = $("input[name=city]").val();
-              var country = $("input[name=country]").val();
-              url += encodeURIComponent(uriEncodedQuery);
-              if (country) url += "&country=" + country;
-              if (city) url += "&city=" + city;
-              return url;
-            }
+            replace: ru.passim.tt_library
           }
         });
 
@@ -149,52 +134,165 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Type-ahead: COUNTRY
-        $(".typeahead.countries").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'countries', source: loc_countries, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
-        // Type-ahead: CITY
-        $(".typeahead.cities").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'cities', source: loc_cities, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
-        // Type-ahead: LIBRARY
-        $(".typeahead.libraries").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          { name: 'libraries', source: loc_libraries, limit: 10,
-            display: function (item) { return item.name; },
-            templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
-          }
-        );
+        // Initialize typeahead
+        ru.passim.init_typeahead();
 
-        // Type-ahead: AUTHOR
-        $(".typeahead.authors").typeahead(
-          { hint: true, highlight: true, minLength: 1 },
-          {
-            name: 'authors', source: loc_authors, limit: 10,
-            display: function (item) { return item.name; },
+      },
+
+      /**
+       * init_typeahead
+       *    Initialize the typeahead features, based on the existing bloodhound stuff
+       */
+      init_typeahead: function () {
+        try {
+          // First destroy them
+          $(".typeahead.countries").typeahead('destroy');
+          $(".typeahead.cities").typeahead('destroy');
+          $(".typeahead.libraries").typeahead('destroy');
+          $(".typeahead.authors").typeahead('destroy');
+
+          // Type-ahead: COUNTRY
+          $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'countries', source: loc_countries, limit: 20,
+              display: function (item) { return item.name; },
+              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            }
+          );
+          // Type-ahead: CITY
+          $(".form-row:not(.empty-form) .typeahead.cities, .manuscript-details .typeahead.cities").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'cities', source: loc_cities, limit: 25,
+              display: function (item) { return item.name; },
+              templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
+            }
+          );
+          // Type-ahead: LIBRARY
+          $(".form-row:not(.empty-form) .typeahead.libraries, .manuscript-details .typeahead.libraries").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            { name: 'libraries', source: loc_libraries, limit: 25,
+            display: function (item) {
+              return item.name;
+            },
             templates: {
-              empty: '<p>Not found</p>',
               suggestion: function (item) {
                 return '<div>' + item.name + '</div>';
               }
             }
+            }
+          );
+
+          // Type-ahead: AUTHOR -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.authors").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'authors', source: loc_authors, limit: 10,
+              display: function (item) { return item.name; },
+              templates: {
+                empty: '<p>Not found</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          );
+
+          // Make sure we know which element is pressed in typeahead
+          $(".form-row:not(.empty-form) .typeahead").on("keyup", function () { loc_elInput = $(this); });
+
+          // Make sure the twitter typeahead spans are maximized
+          $("span.twitter-typeahead").each(function () {
+            var style = $(this).attr("style");
+            $(this).attr("style", style + " width: 100%;");
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("init_typeahead", ex);
+        }
+      },
+
+      /**
+       *  tt_country
+       *    Bloodhound / remote / replace function for: COUNTRY
+       */
+      tt_country: function (url, uriEncodedQuery) {
+        var elThis = this;
+
+        try {
+
+        } catch (ex) {
+          private_methods.errMsg("tt_country", ex);
+        }
+      },
+
+      /**
+       *  tt_city
+       *    Bloodhound / remote / replace function for: CITY
+       */
+      tt_city: function (url, uriEncodedQuery) {
+        var elThis = loc_elInput,
+            elRow = null,
+            sPrefix = "id_",
+            country = "";
+
+        try {
+          // Get to this row
+          elRow = $(elThis).closest("tr").first();
+          if (elRow.length > 0) {
+            // Get the PREFIX from the first <input> that has an ID
+            sPrefix = $(elRow).find("input[id]").first().attr("id");
+            if (sPrefix.indexOf("-") > 0) {
+              sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-")) + "-";
+            } 
           }
-        );
 
-        // Make sure the twitter typeahead spans are maximized
-        $("span.twitter-typeahead").each(function () {
-          var style = $(this).attr("style");
-          $(this).attr("style", style + " width: 100%;");
-        });
+          // Fetch value for country in this line
+          country = $("input[id=" + sPrefix + "country]").val();
+          // Build the URL with the components we have
+          url += encodeURIComponent(uriEncodedQuery);
+          // Possibly add country
+          if (country) url += "&country=" + country;
+          // Return the resulting URL
+          return url;
+        } catch (ex) {
+          private_methods.errMsg("tt_city", ex);
+        }
+      },
 
+      /**
+       *  tt_library
+       *    Bloodhound / remote / replace function for: LIBRARY
+       */
+      tt_library: function (url, uriEncodedQuery) {
+        var elThis = loc_elInput,
+            elRow = null,
+            sPrefix = "id_",
+            city = "",
+            country = "";
+
+        try {
+          // Get to this row
+          elRow = $(elThis).closest("tr").first();
+          if (elRow.length > 0) {
+            // Get the PREFIX from the first <input> that has an ID
+            sPrefix = $(elRow).find("input[id]").first().attr("id");
+            sPrefix = sPrefix.substr(0, sPrefix.lastIndexOf("-")) + "-";
+          }
+
+          // Fetch values for city and country in this line
+          city = $("input[id="+sPrefix+"city]").val();
+          country = $("input[id=" + sPrefix + "country]").val();
+          // Build the URL with the components we have
+          url += encodeURIComponent(uriEncodedQuery);
+          // Possibly add country
+          if (country) url += "&country=" + country;
+          // Possibly add city
+          if (city) url += "&city=" + city;
+          // Return the resulting URL
+          return url;
+        } catch (ex) {
+          private_methods.errMsg("tt_library", ex);
+        }
       },
 
       /**

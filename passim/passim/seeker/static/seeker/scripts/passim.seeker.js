@@ -11,8 +11,13 @@ var ru = (function ($, ru) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
         loc_progr = [],       // Progress tracking
+        loc_urlStore = "",    // Keep track of URL to be shown
         loc_divErr = "passim_err",
-        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>";
+        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        lAddTableRow = [
+          { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead }
+        ];
+
 
     // Private methods specification
     var private_methods = {
@@ -398,6 +403,43 @@ var ru = (function ($, ru) {
     return {
 
       /**
+       *  init_events
+       *      Bind main necessary events
+       *
+       */
+      init_events: function (sUrlShow) {
+        var lHtml = [],
+            sHtml = "";
+
+        try {
+          // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
+          $("tr.add-row").each(function () {
+            $(this).find("a").first().click(ru.passim.seeker.tabular_addrow);
+          });
+          // Bind one 'tabular_deletrow' event handler to clicking that button
+          $(".delete-row").unbind("click");
+          $('tr td a.delete-row').click(ru.passim.seeker.tabular_deleterow);
+
+          // Bind the click event to all class="ajaxform" elements
+          $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
+
+          $(".ms.editable a").unbind("click").click(ru.passim.seeker.manu_edit);
+
+          // Show URL if needed
+          if (loc_urlStore !== undefined && loc_urlStore !== "") {
+            // show it
+            window.location.href = loc_urlStore;
+          } else if (sUrlShow !== undefined && sUrlShow !== "") {
+            // window.location.href = sUrlShow;
+            history.pushState(null, null, sUrlShow);
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *
@@ -420,20 +462,73 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * search_clear
+       *    No real searching, just reset the criteria
+       *
+       */
+      search_clear: function (elStart) {
+        var frm = null,
+            idx = 0,
+            lFormRow = [];
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Remove additional rows
+          lFormRow = $(frm).find("tr.form-row").not(".empty-form");
+          for (idx = lFormRow.length - 1; idx > 0; idx--) {
+            // Remove this row
+            lFormRow[idx].remove();
+          }
+
+          // Clear the fields in the first row
+          $(frm).find("input:not([readonly]).searching").val("");
+
+        } catch (ex) {
+          private_methods.errMsg("search_clear", ex);
+        }
+      },
+
+      /**
        * search_start
        *    Clear the information in the form's fields and then do a submit
        *
        */
       search_start: function (elStart) {
-        var frm = null;
+        var frm = null,
+            url = "",
+            bTry = false,
+            data = null;
 
         try {
           // Get to the form
           frm = $(elStart).closest('form');
-          // Show we are waiting
-          $("#waitingsign").removeClass("hidden");
-          // Now submit the form
-          frm.submit();
+          // Get the data from the form
+          data = frm.serializeArray();
+
+          // Get the URL from the form
+          url = $(frm).attr("action");
+
+          // Check if all is there
+          if (bTry && data !== null && data.length > 0 && url !== undefined && url !== "") {
+            // Show we are waiting
+            $("#waitingsign").removeClass("hidden");
+            // Yes, use GET
+            $.get(url, data, function (response) {
+              // Replace the contents of the current page with what we receive
+              $("html").html(response);
+              // Show the state
+              history.pushState(url);
+            });
+          } else {
+            // Show we are waiting
+            $("#waitingsign").removeClass("hidden");
+            // Store the current URL
+            loc_urlStore = url;
+            // Now submit the form
+            frm.submit();
+          }
+
         } catch (ex) {
           private_methods.errMsg("search_start", ex);
         }
@@ -638,16 +733,16 @@ var ru = (function ($, ru) {
                               break;
                           }
                           // Make sure events are in place again
-                          ru.cesar.seeker.init_events();
+                          ru.passim.seeker.init_events();
                           switch (sFtype) {
                             case "cvar":
-                              ru.cesar.seeker.init_cvar_events();
+                              ru.passim.seeker.init_cvar_events();
                               break;
                             case "cond":
-                              ru.cesar.seeker.init_cond_events();
+                              ru.passim.seeker.init_cond_events();
                               break;
                             case "feat":
-                              ru.cesar.seeker.init_feat_events();
+                              ru.passim.seeker.init_feat_events();
                               break;
                           }
                           // Indicate we are through with waiting
@@ -676,16 +771,16 @@ var ru = (function ($, ru) {
                     // Show the message at the appropriate location
                     $(elErr).html("<div class='error'>" + sMsg + "</div>");
                     // Make sure events are in place again
-                    ru.cesar.seeker.init_events();
+                    ru.passim.seeker.init_events();
                     switch (sFtype) {
                       case "cvar":
-                        ru.cesar.seeker.init_cvar_events();
+                        ru.passim.seeker.init_cvar_events();
                         break;
                       case "cond":
-                        ru.cesar.seeker.init_cond_events();
+                        ru.passim.seeker.init_cond_events();
                         break;
                       case "feat":
-                        ru.cesar.seeker.init_feat_events();
+                        ru.passim.seeker.init_feat_events();
                         break;
                     }
                     // Indicate we are through with waiting
@@ -709,6 +804,367 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("import_data", ex);
           private_methods.waitStop(elWait);
+        }
+      },
+
+      /**
+       * manu_edit
+       *   Switch between edit modes on this <tr>
+       *   And if saving is required, then call the [targeturl] to send a POST of the form data
+       *
+       */
+      manu_edit: function () {
+        var el = this,
+            sMode = "",
+            colspan = "",
+            targeturl = "",
+            targetid = "",
+            data = null,
+            frm = null,
+            bOkay = true,
+            err = "#little_err_msg",
+            elTr = null,
+            elView = null,
+            elEdit = null;
+
+        try {
+          // Get the mode
+          sMode = $(el).attr("mode");
+          // Get the <tr>
+          elTr = $(el).closest("td");
+
+          // Check if we need to take the table
+          if ($(elTr).hasClass("table")) {
+            elTr = $(el).closest("table");
+          }
+          // Get the view and edit values
+          elView = $(el).find(".view-mode").first();
+          elEdit = $(el).find(".edit-mode").first();
+
+          // Action depends on the mode
+          switch (sMode) {
+            case "edit":
+              // Go to edit mode
+              $(elTr).find(".view-mode").addClass("hidden");
+              $(elTr).find(".edit-mode").removeClass("hidden");
+              // Make sure typeahead works here
+              ru.passim.init_typeahead();
+              break;
+            case "save":
+              // Show waiting symbol
+              $(elTr).find(".waiting").removeClass("hidden");
+
+              // Get any possible targeturl
+              targeturl = $(el).attr("targeturl");
+              targetid = $(el).attr("targetid");
+
+              // Check
+              if (targeturl === undefined) { $(err).html("Save: not <code>targeturl</code> specified");  bOkay = false}
+              if (bOkay && targetid === undefined) { $(err).html("Save: not <code>targetid</code> specified"); }
+
+              // Get the form data
+              frm = $(el).closest("form");
+              if (bOkay && frm === undefined) { $(err).html("<i>There is no <code>form</code> in this page</i>"); }
+
+              // Either POST the request
+              if (bOkay) {
+                data = $(frm).serializeArray();
+                // Try to save the form data: send a POST
+                $.post(targeturl, data, function (response) {
+                  // Action depends on the response
+                  if (response === undefined || response === null || !("status" in response)) {
+                    private_methods.errMsg("No status returned");
+                  } else {
+                    switch (response.status) {
+                      case "ready":
+                      case "ok":
+                      case "error":
+                        if ("html" in response) {
+                          // Show the HTML in the targetid
+                          $("#" + targetid).html(response['html']);
+                          // If there is an error, indicate this
+                          if (response.status === "error") {
+                            if ("msg" in response) {
+                              $(err).html("Error: "+response['msg']);
+                            } else {
+                              $(err).html("<code>There is an error</code>");
+                            }
+                          }
+                        } else {
+                          // Send a message
+                          $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                        }
+                        break;
+                      default:
+                        // Something went wrong -- show the page or not?
+                        $(err).html("The status returned is unknown: " + response.status);
+                        break;
+                    }
+                  }
+                  // Return to view mode
+                  $(elTr).find(".view-mode").removeClass("hidden");
+                  $(elTr).find(".edit-mode").addClass("hidden");
+                  // Hide waiting symbol
+                  $(elTr).find(".waiting").addClass("hidden");
+                });
+              } else {
+                // Or else stop waiting - with error message above
+                $(elTr).find(".waiting").addClass("hidden");
+              }
+
+              break;
+            case "cancel":
+              // Go to view mode without saving
+              $(elTr).find(".view-mode").removeClass("hidden");
+              $(elTr).find(".edit-mode").addClass("hidden");
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("manu_edit", ex);
+        }
+      },
+
+      /**
+       * tabular_deleterow
+       *   Delete one row from a tabular inline
+       *
+       */
+      tabular_deleterow: function () {
+        var sId = "",
+            elRow = null,
+            sPrefix = "",
+            elForms = "",
+            counter = $(this).attr("counter"),
+            bCounter = false,
+            iForms = 0,
+            prefix = "simplerel",
+            bValidated = false;
+
+        try {
+          // Get the prefix, if possible
+          sPrefix = $(this).attr("extra");
+          bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
+          elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
+          // Find out just where we are
+          sId = $(this).closest("div").attr("id");
+          // Find out how many forms there are right now
+          iForms = $(elForms).val();
+          // The validation action depends on this id
+          switch (sId) {
+            case "manu_search":
+              // Indicate that deep evaluation is needed
+              bValidated = true;
+              break;
+          }
+          // Continue with deletion only if validated
+          if (bValidated) {
+            // Get to the row
+            elRow = $(this).closest("tr");
+            $(elRow).remove();
+            // Decrease the amount of forms
+            iForms -= 1;
+            $(elForms).val(iForms);
+
+            // Re-do the numbering of the forms that are shown
+            $(".form-row").not(".empty-form").each(function (idx, elThisRow) {
+              var iCounter = 0, sRowId = "", arRowId = [];
+
+              iCounter = idx + 1;
+              // Adapt the ID attribute -- if it EXISTS
+              sRowId = $(elThisRow).attr("id");
+              if (sRowId !== undefined) {
+                arRowId = sRowId.split("-");
+                arRowId[1] = idx;
+                sRowId = arRowId.join("-");
+                $(elThisRow).attr("id", sRowId);
+              }
+
+              if (bCounter) {
+                // Adjust the number in the FIRST <td>
+                $(elThisRow).find("td").first().html(iCounter.toString());
+              }
+
+              // Adjust the numbering of the INPUT and SELECT in this row
+              $(elThisRow).find("input, select").each(function (j, elInput) {
+                // Adapt the name of this input
+                var sName = $(elInput).attr("name");
+                if (sName !== undefined) {
+                  var arName = sName.split("-");
+                  arName[1] = idx;
+                  sName = arName.join("-");
+                  $(elInput).attr("name", sName);
+                  $(elInput).attr("id", "id_" + sName);
+                }
+              });
+            });
+
+            // The validation action depends on this id (or on the prefix)
+            switch (sId) {
+              case "search_mode_simple":
+                // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
+                ru.passim.seeker.simple_update();
+                break;
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("tabular_deleterow", ex);
+        }
+      },
+
+      /**
+       * tabular_addrow
+       *   Add one row into a tabular inline
+       *
+       */
+      tabular_addrow: function () {
+        // NOTE: see the definition of lAddTableRow above
+        var arTdef = lAddTableRow,
+            oTdef = {},
+            rowNew = null,
+            elTable = null,
+            iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
+            sId = "",
+            i;
+
+        try {
+          // Find out just where we are
+          sId = $(this).closest("div").attr("id");
+          // Walk all tables
+          for (i = 0; i < arTdef.length; i++) {
+            // Get the definition
+            oTdef = arTdef[i];
+            if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
+              // Go to the <tbody> and find the last form-row
+              elTable = $(this).closest("tbody").children("tr.form-row.empty-form")
+
+              // Perform the cloneMore function to this <tr>
+              rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
+              // Call the event initialisation again
+              if (oTdef.events !== null) {
+                oTdef.events();
+              }
+              // Any follow-up activity
+              if ('follow' in oTdef && oTdef['follow'] !== null) {
+                oTdef.follow(rowNew);
+              }
+              // We are done...
+              break;
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("tabular_addrow", ex);
+        }
+      },
+
+      /**
+       *  cloneMore
+       *      Add a form to the formset
+       *      selector = the element that should be duplicated
+       *      type     = the formset type
+       *      number   = boolean indicating that re-numbering on the first <td> must be done
+       *
+       */
+      cloneMore: function (selector, type, number) {
+        var elTotalForms = null,
+            total = 0;
+
+        try {
+          // Clone the element in [selector]
+          var newElement = $(selector).clone(true);
+          // Find the total number of [type] elements
+          elTotalForms = $('#id_' + type + '-TOTAL_FORMS').first();
+          // Determine the total of already available forms
+          if (elTotalForms === null || elTotalForms.length ===0) {
+            // There is no TOTAL_FORMS for this type, so calculate myself
+          } else {
+            // Just copy the TOTAL_FORMS value
+            total = $(elTotalForms).val();
+          }
+
+          // Find each <input> element
+          newElement.find(':input').each(function (idx, el) {
+            if ($(el).attr("name") !== undefined) {
+              // Get the name of this element, adapting it on the fly
+              var name = $(el).attr("name").replace("__prefix__", total.toString());
+              // Produce a new id for this element
+              var id = $(el).attr("id").replace("__prefix__", total.toString());
+              // Adapt this element's name and id, unchecking it
+              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+            }
+          });
+          newElement.find('select').each(function (idx, el) {
+            if ($(el).attr("name") !== undefined) {
+              // Get the name of this element, adapting it on the fly
+              var name = $(el).attr("name").replace("__prefix__", total.toString());
+              // Produce a new id for this element
+              var id = $(el).attr("id").replace("__prefix__", total.toString());
+              // Adapt this element's name and id, unchecking it
+              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+            }
+          });
+
+          // Find each <label> under newElement
+          newElement.find('label').each(function (idx, el) {
+            if ($(el).attr("for") !== undefined) {
+              // Adapt the 'for' attribute
+              var newFor = $(el).attr("for").replace("__prefix__", total.toString());
+              $(el).attr('for', newFor);
+            }
+          });
+
+          // Look at the inner text of <td>
+          newElement.find('td').each(function (idx, el) {
+            var elText = $(el).children().first();
+            if (elText !== undefined) {
+              var sHtml = $(elText).html();
+              if (sHtml !== undefined && sHtml !== "") {
+                sHtml = sHtml.replace("__counter__", total.toString());
+                $(elText).html(sHtml);
+              }
+              // $(elText).html($(elText).html().replace("__counter__", total.toString()));
+            }
+          });
+          // Look at the attributes of <a>
+          newElement.find('a').each(function (idx, el) {
+            // Iterate over all attributes
+            var elA = el;
+            $.each(elA.attributes, function (i, attrib) {
+              var attrText = $(elA).attr(attrib.name).replace("__counter__", total.toString());
+              // EK (20/feb): $(this).attr(attrib.name, attrText);
+              $(elA).attr(attrib.name, attrText);
+            });
+          });
+
+
+          // Adapt the total number of forms in this formset
+          total++;
+          $('#id_' + type + '-TOTAL_FORMS').val(total);
+
+          // Adaptations on the new <tr> itself
+          newElement.attr("id", "arguments-" + (total - 1).toString());
+          newElement.attr("class", "form-row row" + total.toString());
+
+          // Insert the new element before the selector = empty-form
+          $(selector).before(newElement);
+
+          // Should we re-number?
+          if (number !== undefined && number) {
+            // Walk all <tr> elements of the table
+            var iRow = 1;
+            $(selector).closest("tbody").children("tr.form-row").not(".empty-form").each(function (idx, el) {
+              var elFirstCell = $(el).find("td").not(".hidden").first();
+              $(elFirstCell).html(iRow);
+              iRow += 1;
+            });
+          }
+
+          // Return the new <tr> 
+          return newElement;
+
+        } catch (ex) {
+          private_methods.errMsg("cloneMore", ex);
+          return null;
         }
       },
 

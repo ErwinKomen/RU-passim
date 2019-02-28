@@ -8,6 +8,9 @@ from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
+import operator
+from functools import reduce
+
 from django.db.models.functions import Lower
 from django.forms import formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -24,7 +27,7 @@ from time import sleep
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm, UploadFilesForm
+                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group
 
 import fnmatch
@@ -680,7 +683,8 @@ class ManuscriptDetailsView(DetailView):
     """The details of one manuscript"""
 
     model = Manuscript
-    template_name = 'seeker/manuscript_details.html'
+    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
+    template_post = 'seeker/manuscript_info.html'       # Use this for POST requests
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -693,16 +697,71 @@ class ManuscriptDetailsView(DetailView):
             #response.content = treat_bom(response.rendered_content)
         return response
 
+    def post(self, request, *args, **kwargs):
+        # Initialisation
+        data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # Make sure only POSTS get through that are authorized
+        if request.user.is_authenticated:
+            # Determine the object and the context
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            # Possibly indicate form errors
+            if 'errors' in context:
+                data['status'] = "error"
+                data['msg'] = context['errors']
+            # response = self.render_to_response(self.template_post, context)
+            data['html'] = render_to_string(self.template_post, context, request)
+        else:
+            data['html'] = "(No authorization)"
+            data['status'] = "error"
+
+        # Return the response
+        return JsonResponse(data)
+
+
     def get_context_data(self, **kwargs):
         # Get the current context
         context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
 
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasFormset = (len(self.qd) > 0)
+
         # Set the title of the application
         context['title'] = "Manuscript"
+
+        # Get a form for this manuscript
+        if self.request.method == "POST":
+            instance = self.object
+            # Do we have an existing object or are we creating?
+            if instance == None:
+                # Saving a new item
+                frm = ManuscriptForm(get, prefix="manu")
+            else:
+                # Editing an existing one
+                frm = ManuscriptForm(get, prefix="manu", instance=instance)
+            # Both cases: validation and saving
+            if frm.is_valid():
+                # The form is valid - do a preliminary saving
+                instance = frm.save(commit=False)
+                # Now save it for real
+                instance.save()
+            else:
+                # We need to pass on to the user that there are errors
+                context['errors'] = frm.errors
+                
+        else:
+            frm = ManuscriptForm(instance=self.object, prefix="manu")
+        # Put the form in the context
+        context['manuForm'] = frm
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
@@ -726,12 +785,11 @@ class ManuscriptListView(ListView):
         # Get parameters for the search
         initial = self.request.GET
 
-        ## OLD: just one form
-        #search_form = SearchManuscriptForm(initial)
-        #context['searchform'] = search_form
-
-        # NEW: a whole formset
-        manu_formset = self.ManuFormset(prefix='manu', initial=initial)
+        # Determine the formset to be passed on
+        if self.bHasFormset:
+            manu_formset = self.ManuFormset(initial, prefix='manu')
+        else:
+            manu_formset = self.ManuFormset(prefix='manu')
         context['manu_formset'] = manu_formset
 
         # Add a files upload form
@@ -774,40 +832,74 @@ class ManuscriptListView(ListView):
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         get = get.copy()
-        self.get = get
+        self.qd = get
+
+        self.bHasFormset = (len(self.qd) > 0)
 
         # Fix the sort-order
         get['sortOrder'] = 'name'
 
-        lstQ = []
+        if self.bHasFormset:
+            # Get the formset from the input
+            lstQ = []
 
-        # Check for Manuscript [name]
-        if 'name' in get and get['name'] != '':
-            val = adapt_search(get['name'])
-            lstQ.append(Q(name__iregex=val))
+            manu_formset = self.ManuFormset(self.qd, prefix='manu')
 
-        # Check for Manuscript [idno]
-        if 'signature' in get and get['signature'] != '':
-            val = adapt_search(get['signature'])
-            lstQ.append(Q(idno__iregex=val))
+            # Process the formset
+            if manu_formset != None:
+                # Validate it
+                if manu_formset.is_valid():
+                    #  Everything okay, continue
+                    for sform in manu_formset:
+                        # Process the criteria from this form 
+                        oFields = sform.cleaned_data
+                        lstThisQ = []
 
-        # Check for country name
-        if 'country' in get and get['country'] != '':
-            val = adapt_search(get['country'])
-            lstQ.append(Q(library__country__name__iregex=val))
+                        # Check for Manuscript [name]
+                        if 'name' in oFields and oFields['name'] != "": 
+                            val = adapt_search(oFields['name'])
+                            lstThisQ.append(Q(name__iregex=val))
 
-        # Check for city name
-        if 'city' in get and get['city'] != '':
-            val = adapt_search(get['city'])
-            lstQ.append(Q(library__city__name__iregex=val))
+                        # Check for Manuscript [idno]
+                        if 'signature' in oFields and oFields['signature'] != "": 
+                            val = adapt_search(oFields['signature'])
+                            lstThisQ.append(Q(idno__iregex=val))
 
-        # Check for library name
-        if 'library' in get and get['library'] != '':
-            val = adapt_search(get['library'])
-            lstQ.append(Q(library__name__iregex=val))
+                        # Check for country name
+                        if 'country' in oFields and oFields['country'] != "": 
+                            val = adapt_search(oFields['country'])
+                            lstThisQ.append(Q(library__country__name__iregex=val))
 
-        # Calculate the final qs
-        qs = Manuscript.objects.filter(*lstQ).order_by('name').distinct()
+                        # Check for city name
+                        if 'city' in oFields and oFields['city'] != "": 
+                            val = adapt_search(oFields['city'])
+                            lstThisQ.append(Q(library__city__name__iregex=val))
+
+                        # Check for library name
+                        if 'library' in oFields and oFields['library'] != "": 
+                            val = adapt_search(oFields['library'])
+                            lstThisQ.append(Q(library__name__iregex=val))
+
+                        # Now add these criterya to the overall lstQ
+                        if len(lstThisQ) > 0:
+                            lstQ.append(reduce(operator.and_, lstThisQ))
+                else:
+                    # What to do when it is not valid?
+                    pass
+
+            # Calculate the final qs
+            if len(lstQ) == 0:
+                # Just show everything
+                qs = Manuscript.objects.all().order_by('name')
+            elif len(lstQ) == 1:
+                # criteria = reduce(operator.or_, lstQ)
+                qs = Manuscript.objects.filter(*lstQ).order_by('name').distinct()
+            else:
+                criteria = reduce(operator.or_, lstQ)
+                qs = Manuscript.objects.filter(criteria).order_by('name').distinct()
+        else:
+            # Just show everything
+            qs = Manuscript.objects.all().order_by('name')
 
         # Time measurement
         if self.bDoTime:

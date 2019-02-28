@@ -1,0 +1,131 @@
+﻿{% load i18n %}
+
+<!-- Manuscript information -->
+<form>
+  {% csrf_token %}
+  <h3>
+    <span>Manuscript</span>
+    <span class="pull-right" style="font-size: xx-small;">{{manuForm.city.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}</span>
+  </h3>
+
+  <table style="width: 90%;" class="manuscript-details">
+    <tbody>
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+      <tr>
+        <td>&nbsp;</td>
+        <td class="ms editable table">
+          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+            <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+          </a>
+          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+          </a>
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targeturl="{% url 'manuscript_view' manuForm.instance.id %}" targetid="manuscript_info">
+            <span class="glyphicon glyphicon-ok" title="Save these data"></span>
+          </a>
+
+          <!-- Waiting symbol-->
+          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+          <!-- Little error message room -->
+          <span id="little_err_msg" class="err-msg"></span>
+        </td>
+      </tr>
+      {% endif %}
+
+      <tr>
+        <td valign="top" style="width: 100px;"><b>Country</b></td>
+        <td class="manuscript-country" align="left">
+          <div class="view-mode">{% if manuForm.country %}{{manuForm.country.value}}{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.country}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>City</b></td>
+        <td class="manuscript-city" align="left">
+          <div class="view-mode">{% if manuForm.city %}{{manuForm.city.value}}{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.city}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Library</b></td>
+        <td class="manuscript-library" align="left">
+          <div class="view-mode">{{manuForm.instance.library.name}}</div>
+          {% if is_passim_editor %}
+          <div class="library-key hidden">{{manuForm.library}}</div>
+          <div class="edit-mode hidden">{{manuForm.libname}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Identifier</b></td>
+        <td class="manuscript-name" align="left">
+          <div class="view-mode">{{manuForm.idno.value}}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.idno}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Title</b></td>
+        <td class="manuscript-name" align="left">
+          <div class="view-mode">{{manuForm.name.value}}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.name}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Origin</b></td>
+        <td class="manuscript-support" align="left">
+          <div class="view-mode">{% if object.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.origin}}</div>{% endif %}
+        </td>
+      </tr>
+
+      <!-- Dates for this manuscript -->
+      <tr>
+        <td valign="top"><b>Date</b></td>
+        <td class="manuscript-date" align="left">
+          <div class="view-mode">{{manuForm.yearstart.value}} - {{manuForm.yearfinish.value}}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.yearstart}} - {{manuForm.yearfinish}}</div>{% endif %}
+        </td>
+      </tr>
+
+      <!-- Physical appearance -->
+      <tr>
+        <td valign="top"><b>Support</b></td>
+        <td class="manuscript-support" align="left">
+          <div class="view-mode">{% if object.support %}{{manuForm.support.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.support}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Extent</b></td>
+        <td class="manuscript-extent" align="left">
+          <div class="view-mode">{% if object.extent %}{{manuForm.extent.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.extent}}</div>{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td valign="top"><b>Format</b></td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">{% if object.format %}{{manuForm.format.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.format}}</div>{% endif %}
+        </td>
+      </tr>
+
+      <!-- External link -->
+      <tr>
+        <td><b>External</b></td>
+        <td class="manuscript-support" align="left">
+          <div class="view-mode">
+          {% if object.url %}
+            <a title="External link" href="{{object.url}}" target="_blank" >{{object.url}}</a>
+          {% else %}
+            -
+          {% endif %}
+          </div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.url}}</div>{% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</form>
