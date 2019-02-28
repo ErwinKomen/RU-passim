@@ -505,6 +505,11 @@ def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
 
     # HIER DUS CODE TOEVOEGEN
+    # TH: dit werkt dus van uit de browser denk ik
+    # is wel anders want geen losse bestanden zoals bij de zwitserse site
+    # Moet ik dit niet apart testen? Wat hieronder staat is nogal...weinig
+    # ook bij Manuscript.codex kijken en andee delen genoemd in mail van Erwin read_ecodex in models.py
+    # hoe zit dit samen?
     pass
 
 
