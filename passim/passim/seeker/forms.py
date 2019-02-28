@@ -66,18 +66,20 @@ class ManuscriptForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     libname = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    origname = forms.CharField(label=_("Origin"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
         fields = ('name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format')
-        widgets={'library': forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}),
+        widgets={'library': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'name': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart': forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'yearfinish': forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'origin': forms.Select(attrs={'style': 'width: 100%;'}),
+                 'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'support': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -103,6 +105,9 @@ class ManuscriptForm(forms.ModelForm):
                 self.fields['country'].initial = country
                 # Also: make sure we put the library NAME in the initial
                 self.fields['libname'].initial = library.name
+            # Look after origin
+            origin = instance.origin
+            self.fields['origname'].initial = "" if origin == None else origin.name
 
 
 

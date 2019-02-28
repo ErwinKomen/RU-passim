@@ -868,7 +868,9 @@ var ru = (function ($, ru) {
 
               // Either POST the request
               if (bOkay) {
+                // Get the data into a list of k-v pairs
                 data = $(frm).serializeArray();
+                // Adapt the value for the [library] based on the [id] 
                 // Try to save the form data: send a POST
                 $.post(targeturl, data, function (response) {
                   // Action depends on the response
@@ -906,6 +908,8 @@ var ru = (function ($, ru) {
                   $(elTr).find(".edit-mode").addClass("hidden");
                   // Hide waiting symbol
                   $(elTr).find(".waiting").addClass("hidden");
+                  // Perform init again
+                  ru.passim.seeker.init_events();
                 });
               } else {
                 // Or else stop waiting - with error message above

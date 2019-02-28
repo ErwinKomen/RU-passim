@@ -40,6 +40,8 @@ var ru = (function ($, ru) {
         loc_librariesL = [],
         loc_authors = [],
         loc_authorsL = [],
+        loc_origins = [],
+        loc_originsL = [],
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
@@ -114,6 +116,19 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: ORIGIN
+        loc_origins = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_libraries will be an array of libraries
+          local: loc_originsL,
+          prefetch: { url: base_url + 'api/origins/', cache: true },
+          remote: {
+            url: base_url + 'api/origins/?name=',
+            replace: ru.passim.tt_library
+          }
+        });
+
         // Bloodhound: AUTHOR
         loc_authors = new Bloodhound({
           datumTokenizer: function (myObj) {
@@ -149,38 +164,51 @@ var ru = (function ($, ru) {
           $(".typeahead.countries").typeahead('destroy');
           $(".typeahead.cities").typeahead('destroy');
           $(".typeahead.libraries").typeahead('destroy');
+          $(".typeahead.origins").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
 
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
-            { name: 'countries', source: loc_countries, limit: 20,
-              display: function (item) { return item.name; },
+            { name: 'countries', source: loc_countries, limit: 20, displayKey: "name",
               templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
             }
           );
           // Type-ahead: CITY
           $(".form-row:not(.empty-form) .typeahead.cities, .manuscript-details .typeahead.cities").typeahead(
             { hint: true, highlight: true, minLength: 1 },
-            { name: 'cities', source: loc_cities, limit: 25,
-              display: function (item) { return item.name; },
+            { name: 'cities', source: loc_cities, limit: 25, displayKey: "name",
               templates: { suggestion: function (item) { return '<div>' + item.name + '</div>'; } }
             }
           );
           // Type-ahead: LIBRARY
           $(".form-row:not(.empty-form) .typeahead.libraries, .manuscript-details .typeahead.libraries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
-            { name: 'libraries', source: loc_libraries, limit: 25,
-            display: function (item) {
-              return item.name;
-            },
-            templates: {
-              suggestion: function (item) {
-                return '<div>' + item.name + '</div>';
+            { name: 'libraries', source: loc_libraries, limit: 25, displayKey: "name",
+              templates: {
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
               }
             }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".library-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: ORIGIN
+          $(".form-row:not(.empty-form) .typeahead.origins, .manuscript-details .typeahead.origins").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'origins', source: loc_origins, limit: 25, displayKey: "name",
+              templates: {
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
             }
-          );
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".origin-key input").last().val(suggestion.id);
+          });
 
           // Type-ahead: AUTHOR -- NOTE: not in a form-row, but in a normal 'row'
           $(".row .typeahead.authors").typeahead(

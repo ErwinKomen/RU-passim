@@ -28,7 +28,7 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group, Origin
 
 import fnmatch
 import sys
@@ -444,6 +444,27 @@ def get_libraries(request):
         data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_origins(request):
+    """Get a list of origin names for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        sName = request.GET.get('name', '')
+        lstQ = []
+        lstQ.append(Q(name__icontains=sName))
+        origins = Origin.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in origins:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
 
 def get_manuscripts(request):
     """Get a list of manuscripts"""

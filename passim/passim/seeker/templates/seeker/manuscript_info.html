@@ -53,8 +53,8 @@
         <td class="manuscript-library" align="left">
           <div class="view-mode">{{manuForm.instance.library.name}}</div>
           {% if is_passim_editor %}
-          <div class="library-key hidden">{{manuForm.library}}</div>
-          <div class="edit-mode hidden">{{manuForm.libname}}</div>
+            <div class="library-key hidden">{{manuForm.library}}</div>
+            <div class="edit-mode hidden">{{manuForm.libname}}</div>
           {% endif %}
         </td>
       </tr>
@@ -76,7 +76,10 @@
         <td valign="top"><b>Origin</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">{% if object.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.origin}}</div>{% endif %}
+          {% if is_passim_editor %}
+            <div class="origin-key hidden">{{manuForm.origin}}</div>
+            <div class="edit-mode hidden">{{manuForm.origname}}</div>
+          {% endif %}
         </td>
       </tr>
 
