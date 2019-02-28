@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/1.9/ref/settings/
 import os
 import posixpath
 import socket
+import sys
 from django.contrib import admin
 
 hst = socket.gethostbyname(socket.gethostname())
@@ -21,6 +22,9 @@ bUseTunnel = False
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/database/"))
+
+# print("Writable dir = [{}]".format(WRITABLE_DIR))
+
 if "RU-passim\\writable" in WRITABLE_DIR:
     # Need another string
     WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../../writable/database/"))
