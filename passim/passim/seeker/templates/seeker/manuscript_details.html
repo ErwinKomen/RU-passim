@@ -33,16 +33,26 @@
                   <td>{{forloop.counter}}</td>
                   <td class="tdnowrap">{% if msitem.sermon.locus %}{{msitem.sermon.locus}}{% else %}?{% endif %}</td>
                   <td style="width: 100%;">
-                    {% if msitem.sermon.title %}<b>{{msitem.sermon.title}}</b>{% endif %}
-                    {% if msitem.sermon.author %}
-                      (by <span class="sermon-author">{{msitem.sermon.author}}</span>)
-                    {% elif msitem.sermon.nickname %}
-                      (by <span class="sermon-nickname">{{msitem.sermon.nickname}}</span>)
+                    <!-- View mode is visible by default-->
+                    <div class="view-mode">
+                      {% if msitem.sermon.title %}<b>{{msitem.sermon.title}}</b>{% endif %}
+                      {% if msitem.sermon.author %}
+                        (by <span class="sermon-author">{{msitem.sermon.author}}</span>)
+                      {% elif msitem.sermon.nickname %}
+                        (by <span class="sermon-nickname">{{msitem.sermon.nickname}}</span>)
+                      {% endif %}
+                      {% if msitem.sermon.incipit %}<i>{{msitem.sermon.incipit}}</i>{% endif %}
+                      {% if msitem.sermon.incipit or msitem.sermon.explicit %}...-...{% endif %}
+                      {% if msitem.sermon.explicit %}<i>{{msitem.sermon.explicit}}</i>{% endif %}
+                      {% if msitem.sermon.note %}(Note: {{msitem.sermon.note}}){% endif %}
+                    </div>
+
+                    {% if is_passim_editor %}
+                    <!-- Edit mode is only visible for passim editors -->
+                    <div class="edit-mode hidden">
+
+                    </div>
                     {% endif %}
-                    {% if msitem.sermon.incipit %}<i>{{msitem.sermon.incipit}}</i>{% endif %}
-                    {% if msitem.sermon.incipit or msitem.sermon.explicit %}...-...{% endif %}
-                    {% if msitem.sermon.explicit %}<i>{{msitem.sermon.explicit}}</i>{% endif %}
-                    {% if msitem.sermon.note %}(Note: {{msitem.sermon.note}}){% endif %}
                   </td>
                 </tr>
               {% endfor %}
