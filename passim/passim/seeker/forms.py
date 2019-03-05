@@ -47,6 +47,7 @@ class SearchSermonForm(forms.Form):
     feast = forms.CharField(label=_("Feast"), required=False)
     keyword = forms.CharField(label=_("Keyword"), required=False)
 
+
 class SearchManuscriptForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -58,6 +59,50 @@ class SearchManuscriptForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
+
+
+class SermonForm(forms.ModelForm):
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescr
+        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'clavis', 'gryson', 'feast', 'note', 'keyword']
+        widgets={'title': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'author': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'nickname': forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'locus': forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'incipit': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'explicit': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'clavis': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'gryson': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'feast': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'note': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'keyword': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonForm, self).__init__(*args, **kwargs)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            if instance.author:
+                sAuthor = instance.author.name
+            elif instance.nickname:
+                sAuthor = instance.nickname.name
+            else:
+                sAuthor = ""
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+
+    
+
+
+
 
 class ManuscriptForm(forms.ModelForm):
     country = forms.CharField(label=_("Country"), required=False, 

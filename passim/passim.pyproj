@@ -105,6 +105,7 @@
     <Content Include="passim\seeker\templates\seeker\import_manuscripts.html" />
     <Content Include="passim\seeker\templates\seeker\import_authors.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_info.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_details.html" />

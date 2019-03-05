@@ -424,6 +424,7 @@ var ru = (function ($, ru) {
           $(".ajaxform").unbind('click').click(ru.passim.seeker.ajaxform_click);
 
           $(".ms.editable a").unbind("click").click(ru.passim.seeker.manu_edit);
+          $(".srm.editable a").unbind("click").click(ru.passim.seeker.sermo_edit);
 
           // Show URL if needed
           if (loc_urlStore !== undefined && loc_urlStore !== "") {
@@ -804,6 +805,97 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("import_data", ex);
           private_methods.waitStop(elWait);
+        }
+      },
+
+      stop_bubbling: function(event) {
+        event.handled = true;
+        return false;
+      },
+
+      /**
+       * sermo_edit
+       *   Switch between edit modes for this sermon
+       *   And if saving is required, then call the [targeturl] to send a POST of the form data
+       *
+       */
+      sermo_edit: function (el) {
+        var sMode = "",
+            targetid = "",
+            targeturl = "",
+            data = null,
+            frm = null,
+            bOkay = true,
+            err = "#little_err_msg",
+            elTd = null,
+            elView = null,
+            elEdit = null;
+
+        try {
+          // Get to the <td> we are in
+          elTd = $(el).closest("td");
+          if (elTd === undefined || elTd.length === 0) {
+            el = this;
+            elTd = $(el).closest("td");
+          }
+          // Check if we need to take the table
+          if ($(elTd).hasClass("table")) {
+            elTd = $(el).closest("table");
+          } else if ($(elTd).hasClass("tabletd")) {
+            elTd = $(el).closest("table").closest("td");
+          }
+          // Get the targeturl
+          targeturl = $(elTd).attr("targeturl");
+          // Get the view and edit values
+          elView = $(el).find(".view-mode").first();
+          elEdit = $(el).find(".edit-mode").first();
+          // Determine the mode we are in
+          if ($(el).attr("mode") !== undefined && $(el).attr("mode") !== "") {
+            sMode = $(el).attr("mode");
+          } else {
+            // Check what is opened
+            if ($(elView).hasClass("hidden")) {
+              // Apparently we are editing, and need to go to VIEW mode (this is the equivalent to Cancel)
+              sMode = "view";
+            } else {
+              // Apparently VIEW is visible, so we are in VIEW mode and need to go to Edit
+              sMode = "edit";
+            }
+          }
+
+          // Act on the mode that we need to SWITCH TO
+          switch (sMode) {
+            case "view":
+            case "cancel":
+              // Show the data in view mode
+              $(elTd).find(".view-mode").removeClass("hidden");
+              $(elTd).find(".edit-mode").addClass("hidden");
+              break;
+            case "edit":
+              // Go over to edit mode
+              // (1) Make sure everything is in view-mode
+              $(elTd).closest("table").find(".edit-mode").addClass("hidden");
+              $(elTd).closest("table").find(".view-mode").removeClass("hidden");
+              // (1) Get the target id
+              targetid = $(elTd).find(".edit-mode").first();
+              // (2) Show we are loading
+              $(elTd).find(".view-mode").addClass("hidden");
+              $(elTd).find(".edit-mode").removeClass("hidden");
+              $(targetid).html(loc_sWaiting);
+              // (2) Request information from the server
+              $.get(targeturl, data, function (response) {
+                //$(targetid).html(response);
+                $("#sermon_edit").html(response);
+                $(targetid).html("<i>Please edit the sermon above and then either Save or Cancel</i>");
+                ru.passim.seeker.init_events();
+              });
+              break;
+            case "save":
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermo_edit", ex);
         }
       },
 

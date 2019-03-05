@@ -63,6 +63,15 @@ a.list-group-item-info:hover {
   background-color: lightgoldenrodyellow !important;
 }
 table tbody tr:hover {
+  /* 
+  background-color: lightblue !important;
+  cursor: pointer;*/
+  /*  */
+}
+table tbody tr td.clickable:hover, div.clickable:hover {
+  cursor: pointer;
+}
+table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }
 

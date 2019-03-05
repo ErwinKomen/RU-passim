@@ -5,6 +5,7 @@ from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.urls import reverse
 from datetime import datetime
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
@@ -528,6 +529,10 @@ class Manuscript(models.Model):
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
+    # [m] Many-to-many: all the sermons of this manuscr
+    sermons = models.ManyToManyField("SermonDescr", through="SermonMan")
+
+
     def __str__(self):
         return self.name
 
@@ -544,13 +549,14 @@ class Manuscript(models.Model):
             if 'incipit' in oDescr: lstQ.append(Q(sermon__incipit__iexact=oDescr['incipit']))
             if 'explicit' in oDescr: lstQ.append(Q(sermon__explicit__iexact=oDescr['explicit']))
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
-            sermonman = self.sermons.filter(*lstQ).first()
-            if sermonman != None:
-                # Alternative: prescribe manuscript
-                lstQ.append(Q(manuscript=self))
-                sermonman = self.sermons.filter(*lstQ).first()
-                if sermonman != None:
-                    sermon = sermonman.sermon
+            sermon = self.sermons.filter(*lstQ).first()
+            #sermonman = self.sermons.filter(*lstQ).first()
+            #if sermonman != None:
+            #    # Alternative: prescribe manuscript
+            #    lstQ.append(Q(manuscript=self))
+            #    sermonman = self.sermons.filter(*lstQ).first()
+            #    if sermonman != None:
+            #        sermon = sermonman.sermon
             return sermon
         except:
             sMsg = oErr.get_error_message()
@@ -993,16 +999,28 @@ class SermonDescr(models.Model):
     keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
     def __str__(self):
-        return self.title
+        if self.author:
+            sAuthor = self.author.name
+        elif self.nickname:
+            sAuthor = self.nickname.name
+        else:
+            sAuthor = "-"
+        sSignature = "".formate(sAuthor,self.title)
+        return sSignature
+
+    def target(self):
+        # Get the URL to edit/view this sermon
+        sUrl = "" if self.id == None else reverse("sermon_view", kwargs={'pk': self.id})
+        return sUrl
 
 
 class SermonMan(models.Model):
     """A particular sermon is located in a particular manuscript"""
 
     # [1] The sermon we are talking about
-    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts")
+    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts_sermons")
     # [1] The manuscript this sermon is written on 
-    manuscript = models.ForeignKey(Manuscript, related_name = "sermons")
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_sermons")
 
     def __str__(self):
         combi = "{}: {}".format(self.manuscript.name, self.sermon.title)

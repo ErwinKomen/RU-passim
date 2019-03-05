@@ -12,7 +12,7 @@ import operator
 from functools import reduce
 
 from django.db.models.functions import Lower
-from django.forms import formset_factory
+from django.forms import formset_factory, modelformset_factory, inlineformset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -27,8 +27,8 @@ from time import sleep
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group, Origin
+                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group, Origin, SermonMan, SermonDescr
 
 import fnmatch
 import sys
@@ -706,6 +706,8 @@ class ManuscriptDetailsView(DetailView):
     model = Manuscript
     template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
     template_post = 'seeker/manuscript_info.html'       # Use this for POST requests
+    # Define a formset for the sermons that are part of a manuscript
+    # SermoFormset = modelformset_factory(SermonDescr, form=SermonForm, extra=0)
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -739,45 +741,75 @@ class ManuscriptDetailsView(DetailView):
         # Return the response
         return JsonResponse(data)
 
-
     def get_context_data(self, **kwargs):
         # Get the current context
         context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
+        initial = get.copy()
+        self.qd = initial
 
         self.bHasFormset = (len(self.qd) > 0)
 
         # Set the title of the application
         context['title'] = "Manuscript"
 
+        # Get the instance
+        instance = self.object
+
         # Get a form for this manuscript
         if self.request.method == "POST":
-            instance = self.object
             # Do we have an existing object or are we creating?
             if instance == None:
                 # Saving a new item
-                frm = ManuscriptForm(get, prefix="manu")
+                frm = ManuscriptForm(initial, prefix="manu")
+                # self_formset = self.SermoFormset(initial, prefix="sermo")
             else:
                 # Editing an existing one
-                frm = ManuscriptForm(get, prefix="manu", instance=instance)
+                frm = ManuscriptForm(initial, prefix="manu", instance=instance)
+                # self_formset = self.SermoFormset(initial, prefix="sermo", instance=instance)
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
                 instance = frm.save(commit=False)
                 # Now save it for real
                 instance.save()
+                ## Only now continue with the formset
+                #if self_formset.is_valid():
+                #    # The formset is valid: walk all the forms
+                #    for fSermo in self_formset:
+                #        # Check if the sermon form is valid
+                #        if fSermo.is_valid():
+                #            # Save it and get the instance
+                #            sermon = fSermo.save()
+                #            # Check link between the sermon and the manuscript
+                #            link = SermonMan.objects.filter(sermon=sermon, manuscript=instance).first()
+                #            if link == None:
+                #                # Add this link
+                #                link = SermonMan(sermon=sermon, manuscript=instance)
+                #                link.save()
             else:
                 # We need to pass on to the user that there are errors
                 context['errors'] = frm.errors
                 
         else:
-            frm = ManuscriptForm(instance=self.object, prefix="manu")
-        # Put the form in the context
+            # Get the form for the manuscript
+            frm = ManuscriptForm(instance=instance, prefix="manu")
+            ## Get all the sermondescr object belonging to this Manuscript
+            #qs = instance.sermons.all()
+            ##qs_link = instance.sermons.all().values_list('sermon', flat=True)
+            ##qs = SermonDescr.objects.filter(id__in=qs_link)
+            ## Get the formset for the sermons of this manuscript
+            #if qs == None:
+            #    # Need to provide an EMPTY formset. Is this the way??
+            #    sermo_formset = self.SermoFormset(prefix='sermo')
+            #else:
+            #    sermo_formset = self.SermoFormset(prefix='sermo', queryset=qs)
+
+        # Put the form and the formset in the context
         context['manuForm'] = frm
+        # context['sermo_formset'] = sermo_formset
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
@@ -937,6 +969,96 @@ class ManuscriptListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class SermonDetailsView(DetailView):
+    """The details of one sermon"""
+
+    model = SermonDescr
+    template_name = 'seeker/sermon_info.html'    # Use this for GET and for POST requests
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            # Do not allow to get a good response
+            response = nlogin(request)
+        else:
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            response = self.render_to_response(context)
+            #response.content = treat_bom(response.rendered_content)
+        return response
+
+    def post(self, request, *args, **kwargs):
+        # Initialisation
+        data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # Make sure only POSTS get through that are authorized
+        if request.user.is_authenticated:
+            # Determine the object and the context
+            self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            # Possibly indicate form errors
+            if 'errors' in context:
+                data['status'] = "error"
+                data['msg'] = context['errors']
+            # response = self.render_to_response(self.template_post, context)
+            data['html'] = render_to_string(self.template_post, context, request)
+        else:
+            data['html'] = "(No authorization)"
+            data['status'] = "error"
+
+        # Return the response
+        return JsonResponse(data)
+
+    def get_context_data(self, **kwargs):
+        # Get the current context
+        context = super(SermonDetailsView, self).get_context_data(**kwargs)
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        initial = get.copy()
+        self.qd = initial
+
+        self.bHasFormInfo = (len(self.qd) > 0)
+
+        # Set the title of the application
+        context['title'] = "Sermon"
+
+        # Get the instance
+        instance = self.object
+
+        # Get a form for this manuscript
+        if self.request.method == "POST":
+            # Do we have an existing object or are we creating?
+            if instance == None:
+                # Saving a new item
+                frm = SermonForm(initial, prefix="sermo")
+            else:
+                # Editing an existing one
+                frm = SermonForm(instance=instance, prefix="sermo")
+            # Both cases: validation and saving
+            if frm.is_valid():
+                # The form is valid - do a preliminary saving
+                instance = frm.save(commit=False)
+                # Now save it for real
+                instance.save()
+            else:
+                # We need to pass on to the user that there are errors
+                context['errors'] = frm.errors
+                
+        else:
+            # Get the form for the manuscript
+            frm = SermonForm(instance=instance, prefix="sermo")
+
+        # Put the form and the formset in the context
+        context['sermoForm'] = frm
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Return the calculated context
+        return context
 
 
 class AuthorListView(ListView):

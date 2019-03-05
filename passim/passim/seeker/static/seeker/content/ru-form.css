@@ -21,7 +21,7 @@ form .form-row p {
 }
 
 .form-row.selected {
-    background-color: yellow;
+   background-color: yellow;
 }
 .form-row:hover {
     background-color: palegoldenrod !important;
