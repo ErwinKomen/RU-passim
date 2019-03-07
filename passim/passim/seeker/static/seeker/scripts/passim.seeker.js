@@ -819,38 +819,57 @@ var ru = (function ($, ru) {
        *   And if saving is required, then call the [targeturl] to send a POST of the form data
        *
        */
-      sermo_edit: function (el) {
+      sermo_edit: function (el, sType) {
         var sMode = "",
             targetid = "",
             targeturl = "",
+            manusurl = "",
+            number = "",
+            bNew = false,
             data = null,
             frm = null,
             bOkay = true,
             err = "#little_err_msg",
             elTd = null,
+            parent = "",
+            elSermon = "",
             elView = null,
             elEdit = null;
 
         try {
-          // Get to the <td> we are in
-          elTd = $(el).closest("td");
-          if (elTd === undefined || elTd.length === 0) {
-            el = this;
+          // Check if type is specified
+          if (sType === undefined) {
+            // Get to the <td> we are in
             elTd = $(el).closest("td");
+            if (elTd === undefined || elTd.length === 0) {
+              el = this;
+              elTd = $(el).closest("td");
+            }
+            // Check if we need to take the table
+            if ($(elTd).hasClass("table")) {
+              elTd = $(el).closest("table");
+            } else if ($(elTd).hasClass("tabletd")) {
+              elTd = $(el).closest("table").closest("td");
+            }
+          } else {
+            // We ourselves are the td
+            elTd = el;
           }
-          // Check if we need to take the table
-          if ($(elTd).hasClass("table")) {
-            elTd = $(el).closest("table");
-          } else if ($(elTd).hasClass("tabletd")) {
-            elTd = $(el).closest("table").closest("td");
-          }
-          // Get the targeturl
+          // Get the targeturl and the number
           targeturl = $(elTd).attr("targeturl");
+          if (targeturl === undefined) { targeturl = $(el).attr("targeturl"); }
+          number = $(elTd).attr("number");
+          if (number === undefined) {
+            number = $("#sermon_number").attr("number");
+          }
           // Get the view and edit values
           elView = $(el).find(".view-mode").first();
           elEdit = $(el).find(".edit-mode").first();
           // Determine the mode we are in
-          if ($(el).attr("mode") !== undefined && $(el).attr("mode") !== "") {
+          if (sType !== undefined && sType === "new") {
+            // Creating a new one
+            sMode = "new";
+          } else if ($(el).attr("mode") !== undefined && $(el).attr("mode") !== "") {
             sMode = $(el).attr("mode");
           } else {
             // Check what is opened
@@ -867,9 +886,44 @@ var ru = (function ($, ru) {
           switch (sMode) {
             case "view":
             case "cancel":
-              // Show the data in view mode
-              $(elTd).find(".view-mode").removeClass("hidden");
-              $(elTd).find(".edit-mode").addClass("hidden");
+              // Is this by pressing the 'cancel' button?
+              if (el.localName === "a" && $(el).hasClass("btn")) {
+                // This is pressing the cancel button
+                $(".edit-sermon").addClass("hidden");
+                $("#sermon_edit").html("");
+                // Show the table data in view mode
+                elSermon = "#sermon-number-" + number;
+                $(elSermon).find(".view-mode").removeClass("hidden");
+                $(elSermon).find(".edit-mode").addClass("hidden");
+                //$("#sermon_list").find(".view-mode").removeClass("hidden");
+                //$("#sermon_list").find(".edit-mode").addClass("hidden");
+              } else {
+                // Show the data in view mode
+                $(elTd).find(".view-mode").removeClass("hidden");
+                $(elTd).find(".edit-mode").addClass("hidden");
+              }
+              break;
+            case "new":
+              // (1) Make sure everything in the table is in view-mode
+              $("#sermon_list").find(".edit-mode").addClass("hidden");
+              $("#sermon_list").find(".view-mode").removeClass("hidden");
+              // (2) Request information from the server
+              $.get(targeturl, data, function (response) {
+                $(".edit-sermon").removeClass("hidden");
+                $("#sermon_edit").html(response);
+                // Determine the number of rows we have
+                number = $("#sermon_list").find("tr").length;
+                $("#sermon_number").html(" new item (will be #"+number+")");
+                $("#sermon_number").attr("number", number);
+                $("#sermon_number").attr("new", true);
+                // Pass on a message to the user
+                // NOTE: this cannot happen, because we are above...
+                // $(targetid).html("<i>Please edit sermon " + number + " above and then either Save or Cancel</i>");
+
+
+
+                ru.passim.seeker.init_events();
+              });
               break;
             case "edit":
               // Go over to edit mode
@@ -884,13 +938,79 @@ var ru = (function ($, ru) {
               $(targetid).html(loc_sWaiting);
               // (2) Request information from the server
               $.get(targeturl, data, function (response) {
-                //$(targetid).html(response);
+                $(".edit-sermon").removeClass("hidden");
                 $("#sermon_edit").html(response);
-                $(targetid).html("<i>Please edit the sermon above and then either Save or Cancel</i>");
+                $("#sermon_number").html(" manuscript item #" + number);
+                $("#sermon_number").attr("number", number);
+                // Pass on a message to the user
+                $(targetid).html("<i>Please edit sermon "+number+" above and then either Save or Cancel</i>");
                 ru.passim.seeker.init_events();
               });
               break;
             case "save":
+              // Enter into save mode
+              // (1) get the target id where the summary should later come
+              bNew = ($("#sermon_number").attr("new") !== undefined);
+              if (bNew) {
+                manusurl = $("#sermon_edit").attr("manusurl");
+              } else {
+                elSermon = "#sermon-number-" + number;
+              }
+              // (2) Get the form data
+              data = $(el).closest("form").serializeArray();
+              // (2) Get the manuscript id
+              parent = $("#sermon_edit").attr("parent");
+              // Add this to the data
+              if (parent !== undefined) {
+                data.push({ 'name': 'manuscript_id', 'value': parent });
+              }
+              // (3) Send to the server
+              $.post(targeturl, data, function (response) {
+                // Action depends on the (JSON!) response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ready":
+                    case "ok":
+                    case "error":
+                      if ("html" in response) {
+                        // If there is an error, indicate this
+                        if (response.status === "error") {
+                          if ("msg" in response) {
+                            $(err).html("Error: " + response['msg']);
+                          } else {
+                            $(err).html("<code>There is an error</code>");
+                          }
+                        } else {
+                          // There is NO ERROR, all is well...
+                          // Check if this is a NEW sermon
+                          if (bNew) {
+                            // Load and show the whole manuscript
+                            window.location.href = manusurl;
+                          } else {
+                            // Show the HTML in the VIEW-MODE part of elSermon
+                            $(elSermon).find(".view-mode").first().html(response['html']);
+                            // Make sure the correct part is visible
+                            $(elSermon).find(".view-mode").removeClass("hidden");
+                            $(elSermon).find(".edit-mode").addClass("hidden");
+                            // And now shut down the editable part
+                            $(".edit-sermon").addClass("hidden");
+                            $("#sermon_edit").html("");
+                          }
+                        }
+                      } else {
+                        // Send a message
+                        $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                      }
+                      break;
+                    default:
+                      // Something went wrong -- show the page or not?
+                      $(err).html("The status returned is unknown: " + response.status);
+                      break;
+                  }
+                }
+              });
               break;
           }
 

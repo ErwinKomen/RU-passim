@@ -1035,6 +1035,10 @@ table.compact-table td:hover {
   color: darkred;
 }
 
+div.selected {
+  background-color: lightcyan;
+}
+
 /* Type ahead stuff 
    NOTE: this is now [.tt-menu]
 .tt-dropdown-menu {

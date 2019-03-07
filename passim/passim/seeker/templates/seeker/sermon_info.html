@@ -6,16 +6,20 @@
     <table>
       <tr>
         <td colspan="2"  class="srm editable table">
-          <!-- Provide the necessary buttons -->
-          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+          <!-- Provide the necessary buttons: edit, cancel and save -->
+          <a mode="edit" class="view-mode btn btn-xs jumbo-1 hidden">
             <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
           </a>
-          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2">
             <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
           </a>
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targeturl="{% url 'sermon_view' sermoForm.instance.id %}" targetid="manuscript_info">
-            <span class="glyphicon glyphicon-ok" title="Save these data"></span>
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1" targetid="sermon_edit"
+             targeturl="{% if sermoForm.instance.id %}{% url 'sermon_view' sermoForm.instance.id %}{% else %}{% url 'sermon_view' %}{% endif %}" >
+            <span class="glyphicon glyphicon-save" title="Save these data"></span>
           </a>
+
+          <!-- The sermon's number (if known) -->
+          <span id="sermon_number"></span>
 
           <!-- Waiting symbol-->
           <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
@@ -24,16 +28,49 @@
           <span id="little_err_msg" class="err-msg"></span>
         </td>
       </tr>
-      <tr><td class="hoverable" style="min-width: 150px;">Locus</td><td style="width: 100%;">{{sermoForm.locus}}</td></tr>
-      <tr><td class="hoverable">Author (gold standard)</td><td>{{sermoForm.author}}</td></tr>
-      <tr><td class="hoverable">Author (if not above)</td><td>{{sermoForm.nickname}}</td></tr>
-      <tr><td class="hoverable">Title</td><td>{{sermoForm.title}}</td></tr>
-      <tr><td class="hoverable">Incipit</td><td>{{sermoForm.incipit}}</td></tr>
-      <tr><td class="hoverable">Explicit</td><td>{{sermoForm.explicit}}</td></tr>
-      <tr><td class="hoverable">Clavis</td><td>{{sermoForm.clavis}}</td></tr>
-      <tr><td class="hoverable">Gryson</td><td>{{sermoForm.gryson}}</td></tr>
-      <tr><td class="hoverable">Feast</td><td>{{sermoForm.feast}}</td></tr>
-      <tr><td class="hoverable">Keyword</td><td>{{sermoForm.keyword}}</td></tr>
-      <tr><td class="hoverable">Note</td><td>{{sermoForm.note}}</td></tr>
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">Locus</td>
+        <td  style="width: 100%;">{{sermoForm.locus}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Author (gold standard)</td>
+        <td >{{sermoForm.author}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Author (if not above)</td>
+        <td >{{sermoForm.nickname}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Title</td>
+        <td >{{sermoForm.title}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Incipit</td>
+        <td >{{sermoForm.incipit}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Explicit</td>
+        <td >{{sermoForm.explicit}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Clavis</td>
+        <td >{{sermoForm.clavis}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Gryson</td>
+        <td >{{sermoForm.gryson}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Feast</td>
+        <td >{{sermoForm.feast}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Keyword</td>
+        <td >{{sermoForm.keyword}}</td>
+      </tr>
+      <tr>
+        <td class="hoverable">Note</td>
+        <td >{{sermoForm.note}}</td>
+      </tr>
     </table>
 </form>

@@ -24,15 +24,29 @@
         <h3>
           <span>Contents</span>
           <span id="add_search_criteria" class="pull-right">
-            <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript</a>
+            <a class="btn btn-xs jumbo-3" role="button" 
+               targeturl="{% url 'sermon_view' %}"
+               onclick="ru.passim.seeker.sermo_edit(this, 'new');">
+              <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
+            </a>
           </span>
         </h3>
         {% if object.sermons.count == 0 %}
           <p><i>This manuscript does not contain a definition of its contents</i></p>
         {% else %}
-          <div id="sermon_edit"></div>
+          <!-- This is where the sermon that is currently being edited shows up -->
+          <div class="row edit-sermon hidden">
+            <div class="col-md-10 col-md-offset-1">
+              <div class="panel panel-default" 
+                   parent="{{manuForm.instance.id}}"
+                   manusurl="{% url 'manuscript_view' manuForm.instance.id %}"
+                   id="sermon_edit">
+              </div>
+            </div>
+          </div>
 
-          <table class="func-view">
+          <!-- A table to show all the sermons of this manuscript -->
+          <table id="sermon_list" class="func-view">
             <thead><tr><th>#</th><th>Location</th><th>Details</th></tr></thead>
             <tbody>
               <!-- Use the formset to show the sermons related to this manuscript -->
@@ -41,24 +55,15 @@
                 <tr class="form-row">
                   <td class="hoverable">{{forloop.counter}}</td>
                   <td class="tdnowrap hoverable">{% if msitem.locus %}{{msitem.locus}}{% else %}?{% endif %}</td>
-                  <td style="width: 100%;" targeturl="{{msitem.target}}">
+                  <td id="sermon-number-{{forloop.counter}}" style="width: 100%;" targeturl="{{msitem.target}}" number="{{forloop.counter}}">
                     <!-- View mode is visible by default-->
                     <div class="view-mode clickable" onclick="ru.passim.seeker.sermo_edit(this);">
-                      {% if msitem.title %}<b>{{msitem.title}}</b>{% endif %}
-                      {% if msitem.author %}
-                        (by <span class="sermon-author">{{msitem.author.name}}</span>)
-                      {% elif msitem.nickname %}
-                        (by <span class="sermon-nickname">{{msitem.nickname.name}}</span>)
-                      {% endif %}
-                      {% if msitem.incipit %}<i>{{msitem.incipit}}</i>{% endif %}
-                      {% if msitem.incipit or msitem.explicit %}...-...{% endif %}
-                      {% if msitem.explicit %}<i>{{msitem.explicit}}</i>{% endif %}
-                      {% if msitem.note %}(Note: {{msitem.note}}){% endif %}
+                      {% include 'seeker/sermon_view.html' %}
                     </div>
 
                     {% if is_passim_editor %}
                     <!-- Edit mode is only visible for passim editors -->
-                    <div class="edit-mode hidden" >
+                    <div class="edit-mode hidden selected">
                     </div>
 
                     {% endif %}

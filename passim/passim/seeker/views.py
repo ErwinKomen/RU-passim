@@ -45,6 +45,9 @@ from io import StringIO
 paginateSize = 20
 paginateValues = (100, 50, 20, 10, 5, 2, 1, )
 
+# Global debugging 
+bDebug = False
+
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
 def adapt_search(val):
@@ -106,7 +109,10 @@ def user_is_ingroup(request, sGroup):
         glist = []
     else:
         glist = [x.name for x in user.groups.all()]
-        ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+
+        # Only needed for debugging
+        if bDebug:
+            ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
@@ -976,13 +982,17 @@ class SermonDetailsView(DetailView):
 
     model = SermonDescr
     template_name = 'seeker/sermon_info.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermon_view.html'
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             # Do not allow to get a good response
             response = nlogin(request)
         else:
-            self.object = self.get_object()
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                self.object = None
+            else:
+                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             response = self.render_to_response(context)
             #response.content = treat_bom(response.rendered_content)
@@ -994,10 +1004,15 @@ class SermonDetailsView(DetailView):
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
             # Determine the object and the context
-            self.object = self.get_object()
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                # This is a NEW sermon
+                self.object = None
+            else:
+                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             # Possibly indicate form errors
-            if 'errors' in context:
+            # NOTE: errors is a dictionary itself...
+            if 'errors' in context and len(context['errors']) > 0:
                 data['status'] = "error"
                 data['msg'] = context['errors']
             # response = self.render_to_response(self.template_post, context)
@@ -1025,6 +1040,7 @@ class SermonDetailsView(DetailView):
 
         # Get the instance
         instance = self.object
+        bNew = False
 
         # Get a form for this manuscript
         if self.request.method == "POST":
@@ -1032,9 +1048,10 @@ class SermonDetailsView(DetailView):
             if instance == None:
                 # Saving a new item
                 frm = SermonForm(initial, prefix="sermo")
+                bNew = True
             else:
                 # Editing an existing one
-                frm = SermonForm(instance=instance, prefix="sermo")
+                frm = SermonForm(initial, prefix="sermo", instance=instance)
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
@@ -1044,13 +1061,29 @@ class SermonDetailsView(DetailView):
             else:
                 # We need to pass on to the user that there are errors
                 context['errors'] = frm.errors
+            # Check if this is a new one
+            if bNew:
+                # This is a new one, so it should be coupled to the correct manuscript
+                if 'manuscript_id' in initial:
+                    # It is there, so we can add it
+                    manuscript = Manuscript.objects.filter(id=initial['manuscript_id']).first()
+                    if manuscript != None:
+                        # Add to the SermonMan
+                        obj = SermonMan(sermon=instance, manuscript=manuscript)
+                        obj.save()
                 
         else:
-            # Get the form for the manuscript
-            frm = SermonForm(instance=instance, prefix="sermo")
+            # Check if this is asking for a new form
+            if instance == None:
+                # Get the form for the manuscript
+                frm = SermonForm(prefix="sermo")
+            else:
+                # Get the form for the manuscript
+                frm = SermonForm(instance=instance, prefix="sermo")
 
         # Put the form and the formset in the context
         context['sermoForm'] = frm
+        context['msitem'] = instance
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)

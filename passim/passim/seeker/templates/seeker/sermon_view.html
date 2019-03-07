@@ -1,0 +1,12 @@
+﻿{% load i18n %}
+
+    {% if msitem.title %}<b>{{msitem.title}}</b>{% endif %}
+    {% if msitem.author %}
+      (by <span class="sermon-author">{{msitem.author.name}}</span>)
+    {% elif msitem.nickname %}
+      (by <span class="sermon-nickname">{{msitem.nickname.name}}</span>)
+    {% endif %}
+    {% if msitem.incipit %}<i>{{msitem.incipit}}</i>{% endif %}
+    {% if msitem.incipit or msitem.explicit %}...-...{% endif %}
+    {% if msitem.explicit %}<i>{{msitem.explicit}}</i>{% endif %}
+    {% if msitem.note %}(Note: {{msitem.note}}){% endif %}

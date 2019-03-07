@@ -62,6 +62,7 @@ class SearchManuscriptForm(forms.Form):
 
 
 class SermonForm(forms.ModelForm):
+    # parent_id = forms.CharField(required=False)
     authorname = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
 
