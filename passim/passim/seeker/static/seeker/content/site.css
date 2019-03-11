@@ -299,6 +299,21 @@ p {
     text-decoration-line: none;
 }
 
+/* Patch for Google Chrome */
+/* */
+.glyphicon {
+  position: relative;
+  top: 1px;
+  display: inline-block;
+  font-family: 'Glyphicons Halflings';
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.5;     /* This is the correct measure for btn-xs */
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}/
+
 .glyphicon-refresh-animate {
     animation: spin .7s infinite linear;
     -webkit-animation: spin2 .7s infinite linear;

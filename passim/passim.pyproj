@@ -70,7 +70,6 @@
     </Content>
     <None Include="passim\seeker\static\seeker\scripts\_references.js" />
     <Content Include="passim\seeker\static\seeker\content\bootstrap.css" />
-    <Content Include="passim\seeker\static\seeker\content\bootstrap.min.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-base.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-form.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-widgets.css" />
@@ -79,6 +78,7 @@
     <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.svg" />
     <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.ttf" />
     <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.woff" />
+    <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.woff2" />
     <Content Include="passim\seeker\static\seeker\scripts\bootstrap.js" />
     <Content Include="passim\seeker\static\seeker\scripts\bootstrap.min.js" />
     <Content Include="passim\seeker\static\seeker\scripts\passim.js" />
