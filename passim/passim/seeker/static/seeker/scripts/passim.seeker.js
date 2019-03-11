@@ -949,6 +949,68 @@ var ru = (function ($, ru) {
                 ru.passim.init_typeahead();
               });
               break;
+            case "delete":
+              // Ask for confirmation
+              if (!confirm("Do you really want to remove this sermon from the current manuscript?")) {
+                // Return from here
+                return;
+              }
+              // (1) Get the form data
+              data = $(el).closest("form").serializeArray();
+              // (2) Get the manuscript id
+              parent = $("#sermon_edit").attr("parent");
+              // Add this to the data
+              if (parent !== undefined) {
+                data.push({ 'name': 'manuscript_id', 'value': parent });
+              }
+              // (3) Add the action: delete
+              data.push({ 'name': 'action', 'value': "delete" });
+              // (4) Find out what we need to open later on
+              manusurl = $("#sermon_edit").attr("manusurl");
+              // (5) Send to the server
+              $.post(targeturl, data, function (response) {
+                // Action depends on the (JSON!) response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ready":
+                    case "ok":
+                    case "error":
+                      // If there is an error, indicate this
+                      if (response.status === "error") {
+                        // Process the error message
+                        if ("msg" in response) {
+                          r = response['msg'];
+                          if (typeof r === "string") {
+                            $(err).html("Error: " + response['msg']);
+                          } else {
+                            lHtml.push("Errors:");
+                            for (k in r) {
+                              lHtml.push("<br /><b>" + k + "</b>: <code>" + r[k][0] + "</code>");
+                            }
+                            $(err).html(lHtml.join("\n"));
+                          }
+                        } else {
+                          $(err).html("<code>There is an error</code>");
+                        }
+                      } else {
+                        // There is NO ERROR, all is well...
+                        // Deletion has gone well, so renew showing the manuscript
+                        window.location.href = manusurl;
+                      }
+                      break;
+                    default:
+                      // Something went wrong -- show the page or not?
+                      $(err).html("The status returned is unknown: " + response.status);
+                      break;
+                  }
+                }
+              });
+
+              ru.passim.seeker.init_events();
+              ru.passim.init_typeahead();
+              break;
             case "save":
               // Enter into save mode
               // (1) get the target id where the summary should later come
@@ -966,6 +1028,8 @@ var ru = (function ($, ru) {
               if (parent !== undefined) {
                 data.push({ 'name': 'manuscript_id', 'value': parent });
               }
+              // Add the action: edit
+              data.push({ 'name': 'action', 'value': "edit" });
               // (3) Send to the server
               $.post(targeturl, data, function (response) {
                 var lHtml = [], i, r, k;

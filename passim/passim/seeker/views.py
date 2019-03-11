@@ -1064,8 +1064,31 @@ class SermonDetailsView(DetailView):
         instance = self.object
         bNew = False
 
-        # Get a form for this manuscript
+        # Check if this is a POST or a GET request
         if self.request.method == "POST":
+            # Determine what the action is (if specified)
+            action = ""
+            if 'action' in initial: action = initial['action']
+            if action == "delete":
+                # The user wants to delete this item
+                if 'manuscript_id' in initial:
+                    # It is there, so we can add it
+                    manuscript = Manuscript.objects.filter(id=initial['manuscript_id']).first()
+                    if manuscript != None:
+                        # Remove from the SermonMan
+                        obj = SermonMan.objects.filter(sermon=instance, manuscript=manuscript).first()
+                        if obj != None:
+                            obj.delete()
+                    # Now remove the sermon itself
+                    instance.delete()
+                else:
+                    # Create an errors object
+                    context['errors'] = [ "Trying to remove a sermon that is not tied to a manuscript" ]
+                # And return the complied context
+                return context
+            
+            # All other actions just mean: edit or new and send back
+
             # Do we have an existing object or are we creating?
             if instance == None:
                 # Saving a new item
