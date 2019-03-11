@@ -85,8 +85,21 @@ class LibraryAdmin(admin.ModelAdmin):
     list_filter = ['libtype', 'country']
 
 
+class NewsItemAdmin(admin.ModelAdmin):
+    """Display and edit of [NewsItem] definitions"""
+
+    list_display = ['title', 'until', 'status', 'created', 'saved' ]
+    search_fields = ['title', 'status']
+    fields = ['title', 'created', 'until', 'status', 'msg']
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
+
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
+admin.site.register(NewsItem, NewsItemAdmin)
 
 # Main program models
 admin.site.register(Country, CountryAdmin)

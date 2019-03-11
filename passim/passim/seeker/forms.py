@@ -65,6 +65,8 @@ class SermonForm(forms.ModelForm):
     # parent_id = forms.CharField(required=False)
     authorname = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -73,7 +75,7 @@ class SermonForm(forms.ModelForm):
         fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'clavis', 'gryson', 'feast', 'note', 'keyword']
         widgets={'title': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'nickname': forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'nickname': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus': forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'incipit': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'explicit': forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -91,14 +93,13 @@ class SermonForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
             # If there is an instance, then check the author specification
-            if instance.author:
-                sAuthor = instance.author.name
-            elif instance.nickname:
-                sAuthor = instance.nickname.name
-            else:
-                sAuthor = ""
+            sAuthor = "" if not instance.author else instance.author.name
+            # If there is an instance, then check the nickname specification
+            sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+            self.fields['nickname_ta'].initial = sNickName
+            self.fields['nickname_ta'].required = False
 
     
 

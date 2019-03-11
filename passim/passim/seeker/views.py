@@ -28,7 +28,8 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, User, Group, Origin, SermonMan, SermonDescr
+from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
+    User, Group, Origin, SermonMan, SermonDescr, Nickname, NewsItem
 
 import fnmatch
 import sys
@@ -131,11 +132,11 @@ def home(request):
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
-    ## Create the list of news-items
-    #lstQ = []
-    #lstQ.append(Q(status='val'))
-    #newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-saved', '-created')
-    #context['newsitem_list'] = newsitem_list
+    # Create the list of news-items
+    lstQ = []
+    lstQ.append(Q(status='val'))
+    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-saved', '-created')
+    context['newsitem_list'] = newsitem_list
 
     # Render and return the page
     return render(request, template_name, context)
@@ -530,6 +531,27 @@ def get_authors(request):
         data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_nicknames(request):
+    """Get a list of nicknames for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        author = request.GET.get("name", "")
+        lstQ = []
+        lstQ.append(Q(name__icontains=author))
+        authors = Nickname.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in authors:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
 
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
@@ -1056,6 +1078,15 @@ class SermonDetailsView(DetailView):
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
                 instance = frm.save(commit=False)
+                # Check what has been added
+                if 'nickname_ta' in frm.changed_data:
+                    # Get its value
+                    sNickname = frm.cleaned_data['nickname_ta']
+                    # Check if it is already in the Nicknames
+                    nickname = Nickname.find_or_create(sNickname)
+                    if instance.nickname != nickname:
+                        # Add it
+                        instance.nickname = nickname
                 # Now save it for real
                 instance.save()
             else:

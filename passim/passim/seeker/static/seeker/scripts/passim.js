@@ -40,6 +40,8 @@ var ru = (function ($, ru) {
         loc_librariesL = [],
         loc_authors = [],
         loc_authorsL = [],
+        loc_nicknames = [],
+        loc_nicknamesL = [],
         loc_origins = [],
         loc_originsL = [],
         loc_elInput = null,
@@ -149,6 +151,26 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: NICKNAME
+        loc_nicknames = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_nicknamesL,
+          prefetch: { url: base_url + 'api/nicknames/', cache: true },
+          remote: {
+            url: base_url + 'api/nicknames/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Initialize typeahead
         ru.passim.init_typeahead();
 
@@ -166,6 +188,7 @@ var ru = (function ($, ru) {
           $(".typeahead.libraries").typeahead('destroy');
           $(".typeahead.origins").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
+          $(".typeahead.nicknames").typeahead('destroy');
 
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
@@ -211,11 +234,10 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: AUTHOR -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.authors").typeahead(
+          $(".row .typeahead.authors, tr .typeahead.authors").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
-              name: 'authors', source: loc_authors, limit: 10,
-              display: function (item) { return item.name; },
+              name: 'authors', source: loc_authors, limit: 25, displayKey: "name",
               templates: {
                 empty: '<p>Not found</p>',
                 suggestion: function (item) {
@@ -223,7 +245,25 @@ var ru = (function ($, ru) {
                 }
               }
             }
-          );
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".author-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: NICKNAME -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.nicknames, tr .typeahead.nicknames").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'nicknames', source: loc_nicknames, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>This person will be added... <i>(on saving)</i></p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".nickname-key input").last().val(suggestion.id);
+          });
 
           // Make sure we know which element is pressed in typeahead
           $(".form-row:not(.empty-form) .typeahead").on("keyup", function () { loc_elInput = $(this); });

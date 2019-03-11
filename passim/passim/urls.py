@@ -61,6 +61,7 @@ urlpatterns = [
     url(r'^api/origins/$', passim.seeker.views.get_origins, name='api_origins'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
+    url(r'^api/nicknames/$', passim.seeker.views.get_nicknames, name='api_nicknames'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),

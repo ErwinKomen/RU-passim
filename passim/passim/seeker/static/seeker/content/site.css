@@ -93,6 +93,17 @@ div.inline-group a.add-related {
     padding-right: 15px;
 }
 
+.panel-news {
+  margin-top: 5px;
+	/* margin-bottom:20px;
+	background-color:#fff;
+	-webkit-box-shadow:0 1px 1px rgba(0,0,0,0.05);
+	box-shadow:0 1px 1px rgba(0,0,0,0.05);
+    */
+	border-radius:4px;
+	border:1px solid #ddd;
+}
+
 .panel-function {
     margin-right: 10px;
     background-color: lightyellow;

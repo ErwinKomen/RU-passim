@@ -20,7 +20,9 @@ from xml.dom import minidom
 
 STANDARD_LENGTH=100
 LONG_STRING=255
+MAX_TEXT_LEN = 200
 
+VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
 
 
@@ -38,6 +40,55 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
+
+
+class HelpChoice(models.Model):
+    """Define the URL to link to for the help-text"""
+    
+    field = models.CharField(max_length=200)        # The 'path' to and including the actual field
+    searchable = models.BooleanField(default=False) # Whether this field is searchable or not
+    display_name = models.CharField(max_length=50)  # Name between the <a></a> tags
+    help_url = models.URLField(default='')          # THe actual help url (if any)
+
+    def __str__(self):
+        return "[{}]: {}".format(
+            self.field, self.display_name)
+
+    def Text(self):
+        help_text = ''
+        # is anything available??
+        if (self.help_url != ''):
+            if self.help_url[:4] == 'http':
+                help_text = "See: <a href='{}'>{}</a>".format(
+                    self.help_url, self.display_name)
+            else:
+                help_text = "{} ({})".format(
+                    self.display_name, self.help_url)
+        return help_text
+
+
+def get_help(field):
+    """Create the 'help_text' for this element"""
+
+    # find the correct instance in the database
+    help_text = ""
+    try:
+        entry_list = HelpChoice.objects.filter(field__iexact=field)
+        entry = entry_list[0]
+        # Note: only take the first actual instance!!
+        help_text = entry.Text()
+    except:
+        help_text = "Sorry, no help available for " + field
+
+    return help_text
+
+
+def get_crpp_date(dtThis):
+    """Convert datetime to string"""
+
+    # Model: yyyy-MM-dd'T'HH:mm:ss
+    sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
+    return sDate
 
 def get_now_time():
     return time.clock()
@@ -1024,3 +1075,32 @@ class SermonMan(models.Model):
 
     def __str__(self):
         combi = "{}: {}".format(self.manuscript.name, self.sermon.title)
+
+
+class NewsItem(models.Model):
+    """A news-item that can be displayed for a limited time"""
+
+    # [1] title of this news-item
+    title = models.CharField("Title",  max_length=MAX_TEXT_LEN)
+    # [1] the date when this item was created
+    created = models.DateTimeField(default=datetime.now)
+    saved = models.DateTimeField(null=True, blank=True)
+    # [0-1] optional time after which this should not be shown anymore
+    until = models.DateTimeField("Remove at", null=True, blank=True)
+    # [1] the message that needs to be shown (in html)
+    msg = models.TextField("Message")
+    # [1] the status of this message (can e.g. be 'archived')
+    status = models.CharField("Status", choices=build_abbr_list(VIEW_STATUS), 
+                              max_length=5, help_text=get_help(VIEW_STATUS))
+
+    def __str__(self):
+        # A news item is the tile and the created
+        sDate = get_crpp_date(self.created)
+        sItem = "{}-{}".format(self.title, sDate)
+        return sItem
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+      # Adapt the save date
+      self.saved = datetime.now()
+      response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
+      return response

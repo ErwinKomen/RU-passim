@@ -25,7 +25,7 @@
           <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
 
           <!-- Little error message room -->
-          <span id="little_err_msg" class="err-msg"></span>
+          <span id="sermon_err_msg" class="err-msg"></span>
         </td>
       </tr>
       <tr>
@@ -34,11 +34,17 @@
       </tr>
       <tr>
         <td class="hoverable">Author (gold standard)</td>
-        <td >{{sermoForm.author}}</td>
+        <td>
+          <div class="author-key hidden">{{sermoForm.author}}</div>
+          <div>{{sermoForm.authorname}}</div>
+        </td>
       </tr>
       <tr>
         <td class="hoverable">Author (if not above)</td>
-        <td >{{sermoForm.nickname}}</td>
+        <td>
+          <div class="nickname-key hidden">{{sermoForm.nickname}}</div>
+          <div>{{sermoForm.nickname_ta}}</div>
+        </td>
       </tr>
       <tr>
         <td class="hoverable">Title</td>

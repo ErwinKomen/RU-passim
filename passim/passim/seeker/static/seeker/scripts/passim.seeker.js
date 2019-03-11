@@ -829,7 +829,7 @@ var ru = (function ($, ru) {
             data = null,
             frm = null,
             bOkay = true,
-            err = "#little_err_msg",
+            err = "#sermon_err_msg",
             elTd = null,
             parent = "",
             elSermon = "",
@@ -923,6 +923,7 @@ var ru = (function ($, ru) {
 
 
                 ru.passim.seeker.init_events();
+                ru.passim.init_typeahead();
               });
               break;
             case "edit":
@@ -945,6 +946,7 @@ var ru = (function ($, ru) {
                 // Pass on a message to the user
                 $(targetid).html("<i>Please edit sermon "+number+" above and then either Save or Cancel</i>");
                 ru.passim.seeker.init_events();
+                ru.passim.init_typeahead();
               });
               break;
             case "save":
@@ -966,6 +968,8 @@ var ru = (function ($, ru) {
               }
               // (3) Send to the server
               $.post(targeturl, data, function (response) {
+                var lHtml = [], i, r, k;
+
                 // Action depends on the (JSON!) response
                 if (response === undefined || response === null || !("status" in response)) {
                   private_methods.errMsg("No status returned");
@@ -978,7 +982,16 @@ var ru = (function ($, ru) {
                         // If there is an error, indicate this
                         if (response.status === "error") {
                           if ("msg" in response) {
-                            $(err).html("Error: " + response['msg']);
+                            r = response['msg'];
+                            if (typeof r === "string") {
+                              $(err).html("Error: " + response['msg']);
+                            } else {
+                              lHtml.push("Errors:");
+                              for (k in r) {
+                                lHtml.push("<br /><b>" + k + "</b>: <code>" + r[k][0] + "</code>");
+                              }
+                              $(err).html(lHtml.join("\n"));
+                            }
                           } else {
                             $(err).html("<code>There is an error</code>");
                           }
