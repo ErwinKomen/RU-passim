@@ -144,40 +144,34 @@ def home(request):
 def contact(request):
     """Renders the contact page."""
     assert isinstance(request, HttpRequest)
-    return render(
-        request,
-        'contact.html',
-        {
-            'title':'Contact',
-            'message':'Shari Boodts',
-            'year':datetime.now().year,
-        }
-    )
+    context =  {'title':'Contact',
+                'message':'Shari Boodts',
+                'year':datetime.now().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    return render(request,'contact.html', context)
 
 def more(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)
-    return render(
-        request,
-        'more.html',
-        {
-            'title':'More',
-            'year':datetime.now().year,
-        }
-    )
+    context =  {'title':'More',
+                'year':datetime.now().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    return render(request,'more.html', context)
 
 def about(request):
     """Renders the about page."""
     assert isinstance(request, HttpRequest)
-    return render(
-        request,
-        'about.html',
-        {
-            'title':'About',
-            'message':'Radboud University passim utility.',
-            'year':datetime.now().year,
-        }
-    )
+    context =  {'title':'About',
+                'message':'Radboud University passim utility.',
+                'year':datetime.now().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    return render(request,'about.html', context)
 
 def short(request):
     """Renders the page with the short instructions."""
@@ -187,6 +181,7 @@ def short(request):
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
                'year': datetime.now().year}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     return render(request, template, context)
 
 def nlogin(request):
@@ -195,6 +190,7 @@ def nlogin(request):
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
                     'year':datetime.now().year,}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     return render(request,'nlogin.html', context)
 
 def sync_entry(request):
@@ -327,7 +323,7 @@ def search_sermon(request):
     context = dict(title="Search sermon",
                    authenticated=authenticated,
                    searchForm=searchForm)
-
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Create and show the result
     return render(request, template_name, context)
@@ -349,7 +345,7 @@ def search_collection(request):
     context = dict(title="Search collection",
                    authenticated=authenticated,
                    searchForm=searchForm)
-
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Create and show the result
     return render(request, template_name, context)
@@ -471,7 +467,6 @@ def get_origins(request):
         data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
-
 
 def get_manuscripts(request):
     """Get a list of manuscripts"""

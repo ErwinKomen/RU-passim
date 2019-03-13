@@ -594,13 +594,19 @@ class Manuscript(models.Model):
         sermon = None
         try:
             lstQ = []
-            lstQ.append(Q(sermon__title=oDescr['title']))
-            if 'location' in oDescr: lstQ.append(Q(sermon__locus__iexact=oDescr['location']))
-            if 'author' in oDescr: lstQ.append(Q(sermon__author__name__iexact=oDescr['author']))
-            if 'incipit' in oDescr: lstQ.append(Q(sermon__incipit__iexact=oDescr['incipit']))
-            if 'explicit' in oDescr: lstQ.append(Q(sermon__explicit__iexact=oDescr['explicit']))
+            if 'title' in oDescr: lstQ.append(Q(title__iexact=oDescr['title']))
+            if 'location' in oDescr: lstQ.append(Q(locus__iexact=oDescr['location']))
+            if 'author' in oDescr: lstQ.append(Q(author__name__iexact=oDescr['author']))
+            if 'incipit' in oDescr: lstQ.append(Q(incipit__iexact=oDescr['incipit']))
+            if 'explicit' in oDescr: lstQ.append(Q(explicit__iexact=oDescr['explicit']))
+            #if 'title' in oDescr: lstQ.append(Q(sermon__title__iexact=oDescr['title']))
+            #if 'location' in oDescr: lstQ.append(Q(sermon__locus__iexact=oDescr['location']))
+            #if 'author' in oDescr: lstQ.append(Q(sermon__author__name__iexact=oDescr['author']))
+            #if 'incipit' in oDescr: lstQ.append(Q(sermon__incipit__iexact=oDescr['incipit']))
+            #if 'explicit' in oDescr: lstQ.append(Q(sermon__explicit__iexact=oDescr['explicit']))
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
             sermon = self.sermons.filter(*lstQ).first()
+
             #sermonman = self.sermons.filter(*lstQ).first()
             #if sermonman != None:
             #    # Alternative: prescribe manuscript
@@ -669,6 +675,10 @@ class Manuscript(models.Model):
         mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'incipit': 'incipit', 'explicit': 'explicit'}
         ns = {'k': 'http://www.tei-c.org/ns/1.0'}
         errHandle = ErrHandle()
+
+        # Define the methods that need to be used - each method gets different versions of Sermons
+        trial_methods = ['original', 'all', 'locus']
+
         try:
             # Make sure we have the data
             if xmldoc == None:
@@ -720,6 +730,7 @@ class Manuscript(models.Model):
                 # (2) Find the 'head' in msDesc
                 msHeads = msDesc.getElementsByTagName("head")
                 if msHeads.length > 0:
+                    # Only (!) look at the *FIRST* head if <msDesc> contains more than one
                     for item in msHeads[0].childNodes:
                         if item.nodeType == minidom.Node.ELEMENT_NODE:
                             # Get the tag name of this item
@@ -757,6 +768,7 @@ class Manuscript(models.Model):
                 # (4) Walk all the ./msContents/msItem, which are the content items
                 msItems = msDesc.getElementsByTagName("msItem")
                 lItems = []
+
                 for msItem in msItems:
                     # Create a new item
                     oMsItem = {}
@@ -789,8 +801,10 @@ class Manuscript(models.Model):
                     # If there is no author, then supply the default author (if that exists)
                     if not 'author' in oMsItem and mainAuthor != "":
                         oMsItem['author'] = mainAuthor
+
                     # Add to the list of items
                     lItems.append(oMsItem)
+
                 # Add to the info object
                 oInfo['list'] = lItems
 
@@ -814,32 +828,54 @@ class Manuscript(models.Model):
             # (3) Create all the manuscript content items
             iCount = 0
             for msItem in oInfo['list']:
-                # Obligatory: each sermon must have a title
+                ## Obligatory: each sermon must have a title
+                #if 'title' in msItem:
+
+                # Determine the method
+                method = ""
                 if 'title' in msItem:
-                    # Check if we already have this kind of sermon
-                    sermon = manuscript.find_sermon(msItem)
-                    # sermon = manuscript.sermons.filter(title=msItem['title']).first()
-                    if sermon == None:
-                        # Create a SermonDescr
-                        sermon = SermonDescr(title=msItem['title'])
-                        if 'location' in msItem: sermon.locus = msItem['location']
-                        if 'incipit' in msItem: sermon.incipit = msItem['incipit']
-                        if 'explicit' in msItem: sermon.explicit = msItem['explicit']
-                        if 'note' in msItem: sermon.note = msItem['note']
-                        if 'author' in msItem:
-                            author = Author.find(msItem['author'])
-                            if author == None:
-                                # Create a nickname
-                                nickname = Nickname.find_or_create(msItem['author'])
-                                sermon.nickname = nickname
-                            else:
-                                sermon.author = author
-                        sermon.save()
-                        # Make a link using the SermonMan
-                        sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
-                        sermonman.save()
-                        # Keep track of the number of sermons added
-                        iCount += 1
+                    method = "title"
+                elif 'location' in msItem:
+                    method = "location"
+                else:
+                    method = "all"
+
+                # Check if we already have this kind of sermon
+                sermon = manuscript.find_sermon(msItem)
+                # sermon = manuscript.sermons.filter(title=msItem['title']).first()
+                if sermon == None:
+                    # Create a SermonDescr
+                    sermon = SermonDescr()
+                    # sermon = SermonDescr(title=msItem['title'])
+                    if 'title' in msItem: sermon.title = msItem['title']
+                    if 'location' in msItem: sermon.locus = msItem['location']
+                    if 'incipit' in msItem: sermon.incipit = msItem['incipit']
+                    if 'explicit' in msItem: sermon.explicit = msItem['explicit']
+                    if 'note' in msItem: sermon.note = msItem['note']
+                    if 'author' in msItem:
+                        author = Author.find(msItem['author'])
+                        if author == None:
+                            # Create a nickname
+                            nickname = Nickname.find_or_create(msItem['author'])
+                            sermon.nickname = nickname
+                        else:
+                            sermon.author = author
+
+                    # DEBUG:
+                    sermon.method = method
+
+                    # Now save it
+                    sermon.save()
+                    # Make a link using the SermonMan
+                    sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
+                    sermonman.save()
+                    # Keep track of the number of sermons added
+                    iCount += 1
+                else:
+                    # DEBUG: There already exists a sermon
+                    # Just assign it a method
+                    sermon.method = method
+                    sermon.save()
 
 
             # Make sure the requester knows how many have been added
@@ -1021,6 +1057,26 @@ class Nickname(models.Model):
         return hit
 
 
+class SermonGold(models.Model):
+    """The signature of a standard sermon"""
+
+    # [1]
+    signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
+
+
+class SermonGoldSame(models.Model):
+    """Link to identical sermons that have a different signature"""
+
+    # [1] Starting from sermon [src]
+    src = models.ForeignKey(SermonGold, related_name="sermongold_src")
+    # [1] It equals sermon [dst]
+    dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
+
+    def __str__(self):
+        combi = "{}: {}".format(self.src.signature, self.dst.signature)
+        return combi
+
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -1049,6 +1105,12 @@ class SermonDescr(models.Model):
     # [0-1] One keyword or more??
     keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
+    # [0-n] Link to one or more golden standard sermons
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [0-1] Method
+    method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
+
     def __str__(self):
         if self.author:
             sAuthor = self.author.name
@@ -1056,13 +1118,29 @@ class SermonDescr(models.Model):
             sAuthor = self.nickname.name
         else:
             sAuthor = "-"
-        sSignature = "".formate(sAuthor,self.title)
+        sSignature = "{}/{}".formate(sAuthor,self.locus)
         return sSignature
 
     def target(self):
         # Get the URL to edit/view this sermon
         sUrl = "" if self.id == None else reverse("sermon_view", kwargs={'pk': self.id})
         return sUrl
+
+
+class SermonDescrGold(models.Model):
+    """Link from sermon description to gold standard"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
+    # [1] The gold sermon
+    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
+
+    def __str__(self):
+        # Temporary fix: sermon.id
+        # Should be changed to something more significant in the future
+        # E.G: manuscript+locus?? (assuming each sermon has a locus)
+        combi = "{}: {}".format(self.sermon.id, self.gold.signature)
+        return combi
 
 
 class SermonMan(models.Model):
