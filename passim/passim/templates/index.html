@@ -23,6 +23,9 @@
 
   <div class="row">
       <div class="col-md-6 bgimg">
+        <h2>Summary</h2>
+        <p>Currently the web application hosts {{count_sermon}} sermons, that are part of {{count_manu}} manuscripts. 
+        More details can be found on the <a href="{% url 'bibliography' %}">bibliography page</a>.</p>
           <h2>Latest news</h2>
           {% if newsitem_list %}
             {% for item in newsitem_list %}

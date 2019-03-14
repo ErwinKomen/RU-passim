@@ -118,6 +118,7 @@
     <Content Include="passim\templates\layout.html" />
     <Content Include="passim\templates\login.html" />
     <Content Include="passim\templates\loginpartial.html" />
+    <Content Include="passim\templates\bibliography.html" />
     <Content Include="passim\templates\more.html" />
     <Content Include="passim\templates\nlogin.html" />
     <Content Include="passim\templates\pagination.html" />

@@ -138,6 +138,10 @@ def home(request):
     newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-saved', '-created')
     context['newsitem_list'] = newsitem_list
 
+    # Gather the statistics
+    context['count_sermon'] = SermonDescr.objects.all().count()
+    context['count_manu'] = Manuscript.objects.all().count()
+
     # Render and return the page
     return render(request, template_name, context)
 
@@ -161,6 +165,16 @@ def more(request):
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     return render(request,'more.html', context)
+
+def bibliography(request):
+    """Renders the more page."""
+    assert isinstance(request, HttpRequest)
+    context =  {'title':'Bibliography',
+                'year':datetime.now().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    return render(request,'bibliography.html', context)
 
 def about(request):
     """Renders the about page."""
@@ -910,7 +924,7 @@ class ManuscriptListView(ListView):
         get = get.copy()
         self.qd = get
 
-        self.bHasFormset = (len(self.qd) > 0)
+        self.bHasFormset = ('manu-TOTAL_FORMS' in get)
 
         # Fix the sort-order
         get['sortOrder'] = 'name'

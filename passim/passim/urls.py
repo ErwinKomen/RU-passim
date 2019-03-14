@@ -36,6 +36,7 @@ urlpatterns = [
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
+    url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
 
     url(r'^sync/entry/$', passim.seeker.views.sync_entry, name='entries_json'),
