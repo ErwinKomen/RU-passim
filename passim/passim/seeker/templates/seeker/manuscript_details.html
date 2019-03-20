@@ -47,14 +47,14 @@
 
           <!-- A table to show all the sermons of this manuscript -->
           <table id="sermon_list" class="func-view">
-            <thead><tr><th>#</th><th>Method</th><th>Location</th><th>Details</th></tr></thead>
+            <thead><tr><th>#</th><th>Order</th><th>Location</th><th>Details</th><th>id</th></tr></thead>
             <tbody>
               <!-- Use the formset to show the sermons related to this manuscript -->
               {% for msitem in object.sermons.all %}
                 <!-- Show the details of this item -->
                 <tr class="form-row">
                   <td class="hoverable">{{forloop.counter}}</td>
-                  <td class="tdnowrap">{{msitem.method}}</td>
+                  <td class="tdnowrap">{{msitem.order}} - {% if msitem.parent %}{{msitem.parent.order}}{% endif %}</td>
                   <td class="tdnowrap hoverable">{% if msitem.locus %}{{msitem.locus}}{% else %}?{% endif %}</td>
                   <td id="sermon-number-{{forloop.counter}}" style="width: 100%;" targeturl="{{msitem.target}}" number="{{forloop.counter}}">
                     <!-- View mode is visible by default-->
@@ -69,6 +69,7 @@
 
                     {% endif %}
                   </td>
+                  <td class="tdnowrap">msitem.id</td>
                 </tr>
               {% endfor %}
 

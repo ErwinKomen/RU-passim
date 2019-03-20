@@ -38,6 +38,8 @@ class SignUpForm(UserCreationForm):
 
 
 class SearchSermonForm(forms.Form):
+    """Note: only for SEARCHING"""
+
     author = forms.CharField(label=_("Author"), required=False)
     incipit = forms.CharField(label=_("Incipit"), required=False)
     explicit = forms.CharField(label=_("Explicit"), required=False)
@@ -49,6 +51,8 @@ class SearchSermonForm(forms.Form):
 
 
 class SearchManuscriptForm(forms.Form):
+    """Note: only for SEARCHING"""
+
     country = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city = forms.CharField(label=_("City"), required=False, 
@@ -72,7 +76,8 @@ class SermonForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'clavis', 'gryson', 'feast', 'note', 'keyword']
+        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
+                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword']
         widgets={'title': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname': forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -81,9 +86,13 @@ class SermonForm(forms.ModelForm):
                  'explicit': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'clavis': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'gryson': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'edition': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'feast': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'note': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'keyword': forms.TextInput(attrs={'style': 'width: 100%;'}),
+
+                 'bibleref': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
+                 'additional': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
+                 'note': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -100,9 +109,6 @@ class SermonForm(forms.ModelForm):
             self.fields['authorname'].required = False
             self.fields['nickname_ta'].initial = sNickName
             self.fields['nickname_ta'].required = False
-
-    
-
 
 
 
