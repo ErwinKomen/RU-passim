@@ -592,7 +592,7 @@ a.jumbotron:hover {
 }
 
 /* Specify how a keyword should be shown */
-kw {
+.kw {
   font-family: monospace;
   color: darkblue;
   background-color: whitesmoke;

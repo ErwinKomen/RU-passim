@@ -29,7 +29,7 @@ from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, Nickname, NewsItem
+    User, Group, Origin, SermonMan, SermonDescr, Nickname, NewsItem, SourceInfo
 
 import fnmatch
 import sys
@@ -604,11 +604,18 @@ def import_ecodex(request):
         if form.is_valid():
             # NOTE: from here a breakpoint may be inserted!
             print('import_ecodex: valid form')
+
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo(url="http://e-codices.unifr.ch", collector=username)
+            source.save()
+            file_list = []
+
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
             if files != None:
                 for data_file in files:
                     filename = data_file.name
+                    file_list.append(filename)
 
                     # Set the status
                     oStatus.set("reading", msg="file={}".format(filename))
@@ -625,7 +632,7 @@ def import_ecodex(request):
                         oResult = None
                         if extension == "xml":
                             # This is an XML file
-                            oResult = Manuscript.read_ecodex(username, data_file, filename, arErr)
+                            oResult = Manuscript.read_ecodex(username, data_file, filename, arErr, source=source)
 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
@@ -633,6 +640,11 @@ def import_ecodex(request):
                             arErr.append("There was an error. No manuscripts have been added")
                         else:
                             lResults.append(oResult)
+
+            # Adapt the 'source' to tell what we did
+            source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
+            source.save()
+            # Indicate we are ready
             oStatus.set("ready")
             # Get a list of errors
             error_list = [str(item) for item in arErr]
@@ -833,20 +845,37 @@ class ManuscriptDetailsView(DetailView):
         else:
             # Get the form for the manuscript
             frm = ManuscriptForm(instance=instance, prefix="manu")
-            ## Get all the sermondescr object belonging to this Manuscript
-            #qs = instance.sermons.all()
-            ##qs_link = instance.sermons.all().values_list('sermon', flat=True)
-            ##qs = SermonDescr.objects.filter(id__in=qs_link)
-            ## Get the formset for the sermons of this manuscript
-            #if qs == None:
-            #    # Need to provide an EMPTY formset. Is this the way??
-            #    sermo_formset = self.SermoFormset(prefix='sermo')
-            #else:
-            #    sermo_formset = self.SermoFormset(prefix='sermo', queryset=qs)
 
         # Put the form and the formset in the context
         context['manuForm'] = frm
-        # context['sermo_formset'] = sermo_formset
+
+        # Create a well sorted list of sermons
+        qs = instance.sermons.filter(order__gte=0).order_by('order')
+        sermon_list = []
+        maxdepth = 0
+        prev_level = 0
+        for sermon in qs:
+            oSermon = {}
+            oSermon['obj'] = sermon
+            oSermon['nodeid'] = sermon.order + 1
+            oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+            level = sermon.getdepth()
+            oSermon['level'] = level
+            oSermon['pre'] = (level-1) * 20
+            # If this is a new level, indicate it
+            oSermon['group'] = (sermon.firstchild != None)
+            sermon_list.append(oSermon)
+            # Bookkeeping
+            if level > maxdepth: maxdepth = level
+            prev_level = level
+        # Review them all and fill in the colspan
+        for oSermon in sermon_list:
+            oSermon['cols'] = maxdepth - oSermon['level'] + 1
+            if oSermon['group']: oSermon['cols'] -= 1
+        # Add instances to the list, noting their childof and order
+        context['sermon_list'] = sermon_list
+        context['sermon_count'] = len(sermon_list)
+        context['maxdepth'] = maxdepth
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
@@ -980,16 +1009,22 @@ class ManuscriptListView(ListView):
             # Calculate the final qs
             if len(lstQ) == 0:
                 # Just show everything
-                qs = Manuscript.objects.all().order_by('name')
+                qs = Manuscript.objects.all()
             elif len(lstQ) == 1:
                 # criteria = reduce(operator.or_, lstQ)
-                qs = Manuscript.objects.filter(*lstQ).order_by('name').distinct()
+                qs = Manuscript.objects.filter(*lstQ).distinct()
             else:
                 criteria = reduce(operator.or_, lstQ)
-                qs = Manuscript.objects.filter(criteria).order_by('name').distinct()
+                qs = Manuscript.objects.filter(criteria).distinct()
         else:
             # Just show everything
-            qs = Manuscript.objects.all().order_by('name')
+            qs = Manuscript.objects.all()
+
+        # Set the sort order
+        qs = qs.order_by('library__country__name', 
+                         'library__city__name', 
+                         'library__name', 
+                         'idno')
 
         # Time measurement
         if self.bDoTime:

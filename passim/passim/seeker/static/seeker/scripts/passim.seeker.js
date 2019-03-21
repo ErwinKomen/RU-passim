@@ -944,7 +944,7 @@ var ru = (function ($, ru) {
                 $("#sermon_number").html(" manuscript item #" + number);
                 $("#sermon_number").attr("number", number);
                 // Pass on a message to the user
-                $(targetid).html("<i>Please edit sermon "+number+" above and then either Save or Cancel</i>");
+                $(targetid).html("<i>Please edit manuscript item "+number+" above and then either Save or Cancel</i>");
                 ru.passim.seeker.init_events();
                 ru.passim.init_typeahead();
               });

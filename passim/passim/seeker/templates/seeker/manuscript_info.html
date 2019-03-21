@@ -120,7 +120,7 @@
 
       <!-- External link -->
       <tr>
-        <td><b>External</b></td>
+        <td valign="top"><b>External</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">
           {% if object.url %}
@@ -132,6 +132,24 @@
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.url}}</div>{% endif %}
         </td>
       </tr>
+
+      <!-- The remainder is only visible by passim editors, and only in EDIT mode, and only as visualisation... -->
+      {% if is_passim_editor %}
+      <tr class="edit-mode hidden">
+        <td valign="top"><b>Information:</b></td>
+        <td>
+          <div>
+            <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#source_info" role="button" title="Show source information...">
+              <span class="glyphicon glyphicon-search">&nbsp;Source collection</span>
+            </a>
+          </div>
+          <div id="source_info" class="collapse inert">
+            Collected by {{ manuForm.instance.source.collector}} on {{manuForm.instance.source.created}} (<a href="{{manuForm.instance.source.url}}">url</a>).
+            Code: <span class="kw">{{manuForm.instance.source.code}}</span>
+          </div>
+        </td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
 </form>

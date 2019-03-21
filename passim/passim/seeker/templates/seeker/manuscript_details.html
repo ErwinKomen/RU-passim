@@ -47,29 +47,37 @@
 
           <!-- A table to show all the sermons of this manuscript -->
           <table id="sermon_list" class="func-view">
-            <thead><tr><th>#</th><th>Order</th><th>Location</th><th>Details</th><th>id</th></tr></thead>
+            <thead><tr><th colspan="{{maxdepth|add:2}}">Details of this manuscript's {{sermon_count}} items</th><th>id</th></tr></thead>
             <tbody>
               <!-- Use the formset to show the sermons related to this manuscript -->
-              {% for msitem in object.sermons.all %}
+              {% for sermon in sermon_list %}
                 <!-- Show the details of this item -->
-                <tr class="form-row">
+                <tr class="form-row {% if sermon.level > 1 %}hidden{% endif %}" nodeid="{{sermon.nodeid}}" childof="{{sermon.childof}}">
+                  {% if sermon.level > 1 %}
+                    <!-- Indicate level depth -->
+                    <td class="arg-pre" colspan="{{sermon.level|add:-1}}" style="min-width: {{sermon.pre}}px;"></td>
+                  {% endif %}
+                  {% if sermon.group %}
+                    <!-- This starts a new level -->
+                    <td class="arg-plus" style="min-width: 20px;" onclick="crpstudio.htable.plus_click(this, 'func-inline');">+</td>
+                  {% endif %}
                   <td class="hoverable">{{forloop.counter}}</td>
-                  <td class="tdnowrap">{{msitem.order}} - {% if msitem.parent %}{{msitem.parent.order}}{% endif %}</td>
-                  <td class="tdnowrap hoverable">{% if msitem.locus %}{{msitem.locus}}{% else %}?{% endif %}</td>
-                  <td id="sermon-number-{{forloop.counter}}" style="width: 100%;" targeturl="{{msitem.target}}" number="{{forloop.counter}}">
+                  <td class="tdnowrap hoverable">{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</td>
+                  <td id="sermon-number-{{forloop.counter}}" colspan="{{sermon.cols}}" 
+                      style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
                     <!-- View mode is visible by default-->
                     <div class="view-mode clickable" onclick="ru.passim.seeker.sermo_edit(this);">
-                      {% include 'seeker/sermon_view.html' %}
+                      {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
                     </div>
 
                     {% if is_passim_editor %}
                     <!-- Edit mode is only visible for passim editors -->
                     <div class="edit-mode hidden selected">
+                      <!-- One possibility for editable to appear -->
                     </div>
-
                     {% endif %}
                   </td>
-                  <td class="tdnowrap">msitem.id</td>
+                  <td class="tdnowrap">{{sermon.obj.id}}</td>
                 </tr>
               {% endfor %}
 

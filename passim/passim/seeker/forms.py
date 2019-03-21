@@ -78,21 +78,21 @@ class SermonForm(forms.ModelForm):
         model = SermonDescr
         fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
                   'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword']
-        widgets={'title': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'author': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'nickname': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'locus': forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'incipit': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'explicit': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'clavis': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'gryson': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'edition': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'feast': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'keyword': forms.TextInput(attrs={'style': 'width: 100%;'}),
+        widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'locus':       forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'clavis':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'gryson':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'edition':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
-                 'bibleref': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
-                 'additional': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
-                 'note': forms.Textarea(attrs={'style': 'width: 100%;', 'rows': 1, 'cols': 40, 'style': 'height: 30px;'}),
+                 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
