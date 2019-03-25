@@ -19,73 +19,75 @@
         {% include 'seeker/manuscript_info.html' %}
       </div>
 
-      <div class="container">
-        <!-- Sermons in this manuscript -->
-        <h3>
-          <span>Contents</span>
-          <span id="add_search_criteria" class="pull-right">
-            <a class="btn btn-xs jumbo-3" role="button" 
-               targeturl="{% url 'sermon_view' %}"
-               onclick="ru.passim.seeker.sermo_edit(this, 'new');">
-              <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
-            </a>
-          </span>
-        </h3>
-        {% if object.sermons.count == 0 %}
-          <p><i>This manuscript does not contain a definition of its contents</i></p>
-        {% else %}
-          <!-- This is where the sermon that is currently being edited shows up -->
-          <div class="row edit-sermon hidden">
-            <div class="col-md-10 col-md-offset-1">
-              <div class="panel panel-default" 
-                   parent="{{manuForm.instance.id}}"
-                   manusurl="{% url 'manuscript_view' manuForm.instance.id %}"
-                   id="sermon_edit">
+      {% if manuForm.instance.id  %}
+        <div class="container">
+          <!-- Sermons in this manuscript -->
+          <h3>
+            <span>Contents</span>
+            <span id="add_search_criteria" class="pull-right">
+              <a class="btn btn-xs jumbo-3" role="button" 
+                 targeturl="{% url 'sermon_view' %}"
+                 onclick="ru.passim.seeker.sermo_edit(this, 'new');">
+                <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
+              </a>
+            </span>
+          </h3>
+          {% if object.sermons.count == 0 %}
+            <p><i>This manuscript does not contain a definition of its contents</i></p>
+          {% else %}
+            <!-- This is where the sermon that is currently being edited shows up -->
+            <div class="row edit-sermon hidden">
+              <div class="col-md-10 col-md-offset-1">
+                <div class="panel panel-default" 
+                     parent="{{manuForm.instance.id}}"
+                     manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
+                     id="sermon_edit">
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- A table to show all the sermons of this manuscript -->
-          <table id="sermon_list" class="func-view">
-            <thead><tr><th colspan="{{maxdepth|add:2}}">Details of this manuscript's {{sermon_count}} items</th><th>id</th></tr></thead>
-            <tbody>
-              <!-- Use the formset to show the sermons related to this manuscript -->
-              {% for sermon in sermon_list %}
-                <!-- Show the details of this item -->
-                <tr class="form-row {% if sermon.level > 1 %}hidden{% endif %}" nodeid="{{sermon.nodeid}}" childof="{{sermon.childof}}">
-                  {% if sermon.level > 1 %}
-                    <!-- Indicate level depth -->
-                    <td class="arg-pre" colspan="{{sermon.level|add:-1}}" style="min-width: {{sermon.pre}}px;"></td>
-                  {% endif %}
-                  {% if sermon.group %}
-                    <!-- This starts a new level -->
-                    <td class="arg-plus" style="min-width: 20px;" onclick="crpstudio.htable.plus_click(this, 'func-inline');">+</td>
-                  {% endif %}
-                  <td class="hoverable">{{forloop.counter}}</td>
-                  <td class="tdnowrap hoverable">{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</td>
-                  <td id="sermon-number-{{forloop.counter}}" colspan="{{sermon.cols}}" 
-                      style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
-                    <!-- View mode is visible by default-->
-                    <div class="view-mode clickable" onclick="ru.passim.seeker.sermo_edit(this);">
-                      {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
-                    </div>
-
-                    {% if is_passim_editor %}
-                    <!-- Edit mode is only visible for passim editors -->
-                    <div class="edit-mode hidden selected">
-                      <!-- One possibility for editable to appear -->
-                    </div>
+            <!-- A table to show all the sermons of this manuscript -->
+            <table id="sermon_list" class="func-view">
+              <thead><tr><th colspan="{{maxdepth|add:2}}">Details of this manuscript's {{sermon_count}} items</th><th>id</th></tr></thead>
+              <tbody>
+                <!-- Use the formset to show the sermons related to this manuscript -->
+                {% for sermon in sermon_list %}
+                  <!-- Show the details of this item -->
+                  <tr class="form-row {% if sermon.level > 1 %}hidden{% endif %}" nodeid="{{sermon.nodeid}}" childof="{{sermon.childof}}">
+                    {% if sermon.level > 1 %}
+                      <!-- Indicate level depth -->
+                      <td class="arg-pre" colspan="{{sermon.level|add:-1}}" style="min-width: {{sermon.pre}}px;"></td>
                     {% endif %}
-                  </td>
-                  <td class="tdnowrap">{{sermon.obj.id}}</td>
-                </tr>
-              {% endfor %}
+                    {% if sermon.group %}
+                      <!-- This starts a new level -->
+                      <td class="arg-plus" style="min-width: 20px;" onclick="crpstudio.htable.plus_click(this, 'func-inline');">+</td>
+                    {% endif %}
+                    <td class="hoverable">{{forloop.counter}}</td>
+                    <td class="tdnowrap hoverable">{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</td>
+                    <td id="sermon-number-{{forloop.counter}}" colspan="{{sermon.cols}}" 
+                        style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
+                      <!-- View mode is visible by default-->
+                      <div class="view-mode clickable" onclick="ru.passim.seeker.sermo_edit(this);">
+                        {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
+                      </div>
 
-            </tbody>
-          </table>
+                      {% if is_passim_editor %}
+                      <!-- Edit mode is only visible for passim editors -->
+                      <div class="edit-mode hidden selected">
+                        <!-- One possibility for editable to appear -->
+                      </div>
+                      {% endif %}
+                    </td>
+                    <td class="tdnowrap">{{sermon.obj.id}}</td>
+                  </tr>
+                {% endfor %}
 
-        {% endif %}
-      </div>
+              </tbody>
+            </table>
+
+          {% endif %}
+        </div>
+      {% endif %}
     {% else %}
       <div class="explanation">
         <p>Dear user, you are <b>not</b> logged in.</p>

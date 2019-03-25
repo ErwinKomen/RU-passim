@@ -1102,8 +1102,8 @@ var ru = (function ($, ru) {
        *   And if saving is required, then call the [targeturl] to send a POST of the form data
        *
        */
-      manu_edit: function () {
-        var el = this,
+      manu_edit: function (el, sType) {
+        var //el = this,
             sMode = "",
             colspan = "",
             targeturl = "",
@@ -1118,7 +1118,11 @@ var ru = (function ($, ru) {
 
         try {
           // Get the mode
-          sMode = $(el).attr("mode");
+          if (sType !== undefined && sType !== "") {
+            sMode = sType;
+          } else {
+            sMode = $(el).attr("mode");
+          }
           // Get the <tr>
           elTr = $(el).closest("td");
 
@@ -1138,6 +1142,12 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").removeClass("hidden");
               // Make sure typeahead works here
               ru.passim.init_typeahead();
+              break;
+            case "new":
+              // Get any possible targeturl
+              targeturl = $(el).attr("targeturl");
+              // Open the target url
+              window.location.href = targeturl;
               break;
             case "save":
               // Show waiting symbol
@@ -1210,6 +1220,8 @@ var ru = (function ($, ru) {
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
+              break;
+            case "delete":
               break;
           }
         } catch (ex) {

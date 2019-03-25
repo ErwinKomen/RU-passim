@@ -236,7 +236,16 @@
             <div class="panel panel-default">
               {% if object_list %}
 
-                <h3>Manuscripts</h3>
+                <h3>
+                  <span>Manuscripts</span>
+                  <span id="add_manuscript" class="pull-right">
+                    <a class="btn btn-xs jumbo-3" role="button" 
+                       targeturl="{% url 'manuscript_view' %}"
+                       onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                      <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
+                    </a>
+                  </span>
+                </h3>
                 <div class="row">
                     <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
                     <div class="col-sm-8">

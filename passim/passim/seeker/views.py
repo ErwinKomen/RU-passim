@@ -769,7 +769,12 @@ class ManuscriptDetailsView(DetailView):
             # Do not allow to get a good response
             response = nlogin(request)
         else:
-            self.object = self.get_object()
+            # Determine the object and the context
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                # This is a NEW sermon
+                self.object = None
+            else:
+                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             response = self.render_to_response(context)
             #response.content = treat_bom(response.rendered_content)
@@ -781,10 +786,15 @@ class ManuscriptDetailsView(DetailView):
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
             # Determine the object and the context
-            self.object = self.get_object()
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                # This is a NEW sermon
+                self.object = None
+            else:
+                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             # Possibly indicate form errors
-            if 'errors' in context:
+            # NOTE: errors is a dictionary itself...
+            if 'errors' in context and len(context['errors']) > 0:
                 data['status'] = "error"
                 data['msg'] = context['errors']
             # response = self.render_to_response(self.template_post, context)
@@ -812,6 +822,7 @@ class ManuscriptDetailsView(DetailView):
 
         # Get the instance
         instance = self.object
+        bNew = False
 
         # Get a form for this manuscript
         if self.request.method == "POST":
@@ -819,69 +830,79 @@ class ManuscriptDetailsView(DetailView):
             if instance == None:
                 # Saving a new item
                 frm = ManuscriptForm(initial, prefix="manu")
-                # self_formset = self.SermoFormset(initial, prefix="sermo")
+                bNew = True
             else:
                 # Editing an existing one
                 frm = ManuscriptForm(initial, prefix="manu", instance=instance)
-                # self_formset = self.SermoFormset(initial, prefix="sermo", instance=instance)
+
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
                 instance = frm.save(commit=False)
+                # Check if a new 'Origin' has been added
+                if 'origname_ta' in frm.changed_data:
+
+                    # TODO: check if this is not already taken care of...
+
+                    # Get its value
+                    sOrigin = frm.cleaned_data['origname_ta']
+                    # Check if it is already in the Nicknames
+                    origin = Origin.find_or_create(sOrigin)
+                    if instance.origin != origin:
+                        # Add it
+                        instance.origin = origin
                 # Now save it for real
                 instance.save()
-                ## Only now continue with the formset
-                #if self_formset.is_valid():
-                #    # The formset is valid: walk all the forms
-                #    for fSermo in self_formset:
-                #        # Check if the sermon form is valid
-                #        if fSermo.is_valid():
-                #            # Save it and get the instance
-                #            sermon = fSermo.save()
-                #            # Check link between the sermon and the manuscript
-                #            link = SermonMan.objects.filter(sermon=sermon, manuscript=instance).first()
-                #            if link == None:
-                #                # Add this link
-                #                link = SermonMan(sermon=sermon, manuscript=instance)
-                #                link.save()
             else:
                 # We need to pass on to the user that there are errors
                 context['errors'] = frm.errors
+
+            # Check if this is a new one
+            if bNew:
+                # Put anything here that needs handling if it is a new manuscript instance
+                pass
                 
         else:
-            # Get the form for the manuscript
-            frm = ManuscriptForm(instance=instance, prefix="manu")
+            # Check if this is asking for a new form
+            if instance == None:
+                # Get the form for the manuscript
+                frm = ManuscriptForm(prefix="manu")
+            else:
+                # Get the form for the manuscript
+                frm = ManuscriptForm(instance=instance, prefix="manu")
 
         # Put the form and the formset in the context
         context['manuForm'] = frm
 
-        # Create a well sorted list of sermons
-        qs = instance.sermons.filter(order__gte=0).order_by('order')
         sermon_list = []
         maxdepth = 0
-        prev_level = 0
-        for sermon in qs:
-            oSermon = {}
-            oSermon['obj'] = sermon
-            oSermon['nodeid'] = sermon.order + 1
-            oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-            level = sermon.getdepth()
-            oSermon['level'] = level
-            oSermon['pre'] = (level-1) * 20
-            # If this is a new level, indicate it
-            oSermon['group'] = (sermon.firstchild != None)
-            sermon_list.append(oSermon)
-            # Bookkeeping
-            if level > maxdepth: maxdepth = level
-            prev_level = level
-        # Review them all and fill in the colspan
-        for oSermon in sermon_list:
-            oSermon['cols'] = maxdepth - oSermon['level'] + 1
-            if oSermon['group']: oSermon['cols'] -= 1
+        if instance != None:
+            # Create a well sorted list of sermons
+            qs = instance.sermons.filter(order__gte=0).order_by('order')
+            prev_level = 0
+            for sermon in qs:
+                oSermon = {}
+                oSermon['obj'] = sermon
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                level = sermon.getdepth()
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = (sermon.firstchild != None)
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list
         context['sermon_count'] = len(sermon_list)
         context['maxdepth'] = maxdepth
+        context['isnew'] = bNew
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
@@ -1179,10 +1200,10 @@ class SermonDetailsView(DetailView):
         else:
             # Check if this is asking for a new form
             if instance == None:
-                # Get the form for the manuscript
+                # Get the form for the sermon
                 frm = SermonForm(prefix="sermo")
             else:
-                # Get the form for the manuscript
+                # Get the form for the sermon
                 frm = SermonForm(instance=instance, prefix="sermo")
 
         # Put the form and the formset in the context

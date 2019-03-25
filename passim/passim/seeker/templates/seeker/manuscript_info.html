@@ -5,7 +5,13 @@
   {% csrf_token %}
   <h3>
     <span>Manuscript</span>
-    <span class="pull-right" style="font-size: xx-small;">{{manuForm.city_ta.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}</span>
+    <span class="pull-right" style="font-size: xx-small;">
+      {% if manuForm.instance.id  %}
+        {{manuForm.city_ta.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}
+      {% else %}
+        <i>(New Manuscript)</i>
+      {% endif %}
+    </span>
   </h3>
 
   <table style="width: 90%;" class="manuscript-details">
@@ -21,11 +27,10 @@
           <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
             <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
           </a>
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targeturl="{% url 'manuscript_view' manuForm.instance.id %}" targetid="manuscript_info">
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
+             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}" >
+             targetid="manuscript_info">
             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
-          </a>
-          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" targeturl="" targetid="manuscript_info">
-            <span class="glyphicon glyphicon-remove" title="Delete this manuscript"></span>
           </a>
 
           <!-- Waiting symbol-->
@@ -33,6 +38,12 @@
 
           <!-- Little error message room -->
           <span id="little_err_msg" class="err-msg"></span>
+
+          <!-- Delete button completely to the right -->
+          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" targetid="manuscript_info"
+             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% endif %}" >
+            <span class="glyphicon glyphicon-remove" title="Delete this manuscript"></span>
+          </a>
         </td>
       </tr>
       {% endif %}
