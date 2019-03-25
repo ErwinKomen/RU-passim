@@ -5,7 +5,7 @@
   {% csrf_token %}
   <h3>
     <span>Manuscript</span>
-    <span class="pull-right" style="font-size: xx-small;">{{manuForm.city.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}</span>
+    <span class="pull-right" style="font-size: xx-small;">{{manuForm.city_ta.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}</span>
   </h3>
 
   <table style="width: 90%;" class="manuscript-details">
@@ -37,27 +37,33 @@
       </tr>
       {% endif %}
 
-      <tr>
+      <tr class="form-row">
         <td valign="top" style="width: 100px;"><b>Country</b></td>
         <td class="manuscript-country" align="left">
-          <div class="view-mode">{% if manuForm.country %}{{manuForm.country.value}}{% endif %}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.country}}</div>{% endif %}
+          <div class="view-mode">{% if manuForm.country_ta %}{{manuForm.country_ta.value}}{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="country-key hidden">{{manuForm.country}}</div>
+            <div class="edit-mode hidden">{{manuForm.country_ta}}</div>
+          {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>City</b></td>
         <td class="manuscript-city" align="left">
-          <div class="view-mode">{% if manuForm.city %}{{manuForm.city.value}}{% endif %}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.city}}</div>{% endif %}
+          <div class="view-mode">{% if manuForm.city_ta %}{{manuForm.city_ta.value}}{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="city-key hidden">{{manuForm.city}}</div>
+            <div class="edit-mode hidden">{{manuForm.city_ta}}</div>
+          {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Library</b></td>
         <td class="manuscript-library" align="left">
-          <div class="view-mode">{{manuForm.instance.library.name}}</div>
+          <div class="view-mode">{{manuForm.libname_ta.value}}</div>
           {% if is_passim_editor %}
             <div class="library-key hidden">{{manuForm.library}}</div>
-            <div class="edit-mode hidden">{{manuForm.libname}}</div>
+            <div class="edit-mode hidden">{{manuForm.libname_ta}}</div>
           {% endif %}
         </td>
       </tr>
@@ -75,13 +81,13 @@
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.name}}</div>{% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Origin</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">{% if object.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="origin-key hidden">{{manuForm.origin}}</div>
-            <div class="edit-mode hidden">{{manuForm.origname}}</div>
+            <div class="edit-mode hidden">{{manuForm.origname_ta}}</div>
           {% endif %}
         </td>
       </tr>

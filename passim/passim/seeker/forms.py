@@ -14,7 +14,6 @@ def init_choices(obj, sFieldName, sSet, maybe_empty=False):
         obj.fields[sFieldName].help_text = get_help(sSet)
 
 
-
 class BootstrapAuthenticationForm(AuthenticationForm):
     """Authentication form which uses boostrap CSS."""
     username = forms.CharField(max_length=254,
@@ -71,6 +70,8 @@ class SermonForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
+    libname_ta = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -113,13 +114,13 @@ class SermonForm(forms.ModelForm):
 
 
 class ManuscriptForm(forms.ModelForm):
-    country = forms.CharField(label=_("Country"), required=False, 
+    country_ta = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
+    city_ta = forms.CharField(label=_("City"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    libname = forms.CharField(label=_("Library"), required=False, 
+    libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    origname = forms.CharField(label=_("Origin"), required=False, 
+    origname_ta = forms.CharField(label=_("Origin"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
 
     class Meta:
@@ -134,9 +135,10 @@ class ManuscriptForm(forms.ModelForm):
                  'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'support': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format': forms.TextInput(attrs={'style': 'width: 100%;'}),
+
+                 'support': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -154,13 +156,13 @@ class ManuscriptForm(forms.ModelForm):
                 if country == None and city != None and city != "":
                     country = library.city.country.name
                 # Put them in the fields
-                self.fields['city'].initial = city
-                self.fields['country'].initial = country
+                self.fields['city_ta'].initial = city
+                self.fields['country_ta'].initial = country
                 # Also: make sure we put the library NAME in the initial
-                self.fields['libname'].initial = library.name
+                self.fields['libname_ta'].initial = library.name
             # Look after origin
             origin = instance.origin
-            self.fields['origname'].initial = "" if origin == None else origin.name
+            self.fields['origname_ta'].initial = "" if origin == None else origin.name
 
 
 

@@ -401,6 +401,7 @@ def get_countries(request):
     data = 'fail'
     if request.is_ajax():
         sName = request.GET.get('country', '')
+        if country == "": country = request.GET.get('country_ta', "")
         lstQ = []
         lstQ.append(Q(name__icontains=sName))
         countries = Country.objects.filter(*lstQ).order_by('name')
@@ -422,7 +423,9 @@ def get_cities(request):
     data = 'fail'
     if request.is_ajax():
         country = request.GET.get('country', "")
+        if country == "": country = request.GET.get('country_ta', "")
         city = request.GET.get("city", "")
+        if city == "": city = request.GET.get('city_ta', "")
         lstQ = []
         lstQ.append(Q(country__name__icontains=country))
         lstQ.append(Q(name__icontains=city))
@@ -444,8 +447,11 @@ def get_libraries(request):
     data = 'fail'
     if request.is_ajax():
         country = request.GET.get('country', "")
+        if country == "": country = request.GET.get('country_ta', "")
         city = request.GET.get("city", "")
+        if city == "": city = request.GET.get('city_ta', "")
         lib = request.GET.get("library", "")
+        if lib == "": lib = request.GET.get('libname_ta', "")
 
         lstQ = []
         if country != "": lstQ.append(Q(country__name__icontains=country))
