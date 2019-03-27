@@ -813,6 +813,7 @@ var ru = (function ($, ru) {
         return false;
       },
 
+
       /**
        * sermo_edit
        *   Switch between edit modes for this sermon
@@ -837,6 +838,10 @@ var ru = (function ($, ru) {
             elEdit = null;
 
         try {
+          // Possibly correct [el]
+          if (el !== undefined && "currentTarget" in el) {
+            el = el.currentTarget;
+          }
           // Check if type is specified
           if (sType === undefined) {
             // Get to the <td> we are in
@@ -1108,6 +1113,7 @@ var ru = (function ($, ru) {
             colspan = "",
             targeturl = "",
             targetid = "",
+            targethead = null,
             lHtml = [],
             data = null,
             frm = null,
@@ -1149,10 +1155,93 @@ var ru = (function ($, ru) {
               ru.passim.init_typeahead();
               break;
             case "new":
+            case "view":
               // Get any possible targeturl
               targeturl = $(el).attr("targeturl");
-              // Open the target url
-              window.location.href = targeturl;
+              targetid = $(el).attr("targetid");
+              // If the targetid is specified, we need to get it from there
+              if (targetid === undefined || targetid === "") {
+                // No targetid specified: just open the target url
+                window.location.href = targeturl;
+              } else {
+                targethead = $("#" + targetid).closest(".edit-mode");
+                if (targethead !== undefined && targethead.length > 0) {
+                  // Targetid is specified: check if we need to close
+                  if (!$(targethead).hasClass("hidden")) {
+                    // Close it
+                    $(targethead).addClass("hidden");
+                    return;
+                  }
+                }
+
+                // There is a targetid specified, so make a GET request for the information and get it here
+                data = [];
+                $.get(targeturl, data, function (response) {
+                  // Action depends on the response
+                  if (response === undefined || response === null || !("status" in response)) {
+                    private_methods.errMsg("No status returned");
+                  } else {
+                    switch (response.status) {
+                      case "ready":
+                      case "ok":
+                      case "error":
+                        if ("html" in response) {
+                          // Show the HTML in the targetid
+                          $("#" + targetid).html(response['html']);
+
+                          // Close any other edit-mode items
+                          $(".edit-mode").addClass("hidden");
+                          // Open this particular edit-mode item
+                          $(targethead).removeClass("hidden");
+
+                          // Check on specific modes
+                          if (sMode === "new") {
+                            // This is 'new', so don't show buttons cancel and delete
+                            $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
+                            $("#" + targetid).find(".edit-mode").removeClass("hidden");
+                          } else {
+                            // Just viewing means we can also delete...
+                            // What about CANCEL??
+                            // $("#" + targetid).find("a[mode='delete']").addClass("hidden");
+                          }
+
+                          // If there is an error, indicate this
+                          if (response.status === "error") {
+                            if ("msg" in response) {
+                              if (typeof response['msg'] === "object") {
+                                lHtml = []
+                                lHtml.push("Errors:");
+                                $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                                $(err).html(lHtml.join("<br />"));
+                              } else {
+                                $(err).html("Error: " + response['msg']);
+                              }
+                            } else {
+                              $(err).html("<code>There is an error</code>");
+                            }
+                          }
+                        } else {
+                          // Send a message
+                          $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                        }
+                        break;
+                      default:
+                        // Something went wrong -- show the page or not?
+                        $(err).html("The status returned is unknown: " + response.status);
+                        break;
+                    }
+                  }
+                  // Return to view mode
+                  $(elTr).find(".view-mode").removeClass("hidden");
+                  $(elTr).find(".edit-mode").addClass("hidden");
+                  // Hide waiting symbol
+                  $(elTr).find(".waiting").addClass("hidden");
+                  // Perform init again
+                  ru.passim.init_typeahead();
+                  ru.passim.seeker.init_events();
+                });
+
+              }
               break;
             case "save":
               // Show waiting symbol
@@ -1234,6 +1323,86 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").addClass("hidden");
               break;
             case "delete":
+              // Show waiting symbol
+              $(elTr).find(".waiting").removeClass("hidden");
+
+              // Get any possible targeturl
+              targeturl = $(el).attr("targeturl");
+
+              // Determine targetid from own
+              targetid = $(el).closest(".gold-head");
+              targethead = $(targetid).prev();
+
+              // Check
+              if (targeturl === undefined) { $(err).html("Save: no <code>targeturl</code> specified"); bOkay = false }
+
+              // Get the form data
+              frm = $(el).closest("form");
+              if (bOkay && frm === undefined) { $(err).html("<i>There is no <code>form</code> in this page</i>"); }
+              // Either POST the request
+              if (bOkay) {
+                // Get the data into a list of k-v pairs
+                data = $(frm).serializeArray();
+                // Add the delete mode
+                data.push({ name: "action", value: "delete" });
+
+                // Try to delete: send a POST
+                $.post(targeturl, data, function (response) {
+                  // Action depends on the response
+                  if (response === undefined || response === null || !("status" in response)) {
+                    private_methods.errMsg("No status returned");
+                  } else {
+                    switch (response.status) {
+                      case "ready":
+                      case "ok":
+                        // Delete visually
+                        $(targetid).remove();
+                        $(targethead).remove();
+                        break;
+                      case "error":
+                        if ("html" in response) {
+                          // Show the HTML in the targetid
+                          $(err).html(response['html']);
+                          // If there is an error, indicate this
+                          if (response.status === "error") {
+                            if ("msg" in response) {
+                              if (typeof response['msg'] === "object") {
+                                lHtml = []
+                                lHtml.push("Errors:");
+                                $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                                $(err).html(lHtml.join("<br />"));
+                              } else {
+                                $(err).html("Error: " + response['msg']);
+                              }
+                            } else {
+                              $(err).html("<code>There is an error</code>");
+                            }
+                          }
+                        } else {
+                          // Send a message
+                          $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                        }
+                        break;
+                      default:
+                        // Something went wrong -- show the page or not?
+                        $(err).html("The status returned is unknown: " + response.status);
+                        break;
+                    }
+                  }
+                  // Return to view mode
+                  $(elTr).find(".view-mode").removeClass("hidden");
+                  $(elTr).find(".edit-mode").addClass("hidden");
+                  // Hide waiting symbol
+                  $(elTr).find(".waiting").addClass("hidden");
+                  // Perform init again
+                  ru.passim.seeker.init_events();
+                });
+              } else {
+                // Or else stop waiting - with error message above
+                $(elTr).find(".waiting").addClass("hidden");
+              }
+
+
               break;
           }
         } catch (ex) {

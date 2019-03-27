@@ -1323,8 +1323,24 @@ class Nickname(models.Model):
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
 
-    # [1]
+    # [0-1] Every sermongold should at some point end up with a signature (a name)
     signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
+
+    # ======= OPTIONAL FIELDS describing the sermon ============
+    # [0-1] We would very much like to know the *REAL* author
+    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
+    # [0-1] We would like to know the INCIPIT (first line in Latin)
+    incipit = models.CharField("Incipit", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] We would like to know the EXPLICIT (last line in Latin)
+    explicit = models.CharField("Explicit", null=True, blank=True, max_length=LONG_STRING)
+
+    def __str__(self):
+        name = ""
+        if self.signature:
+            name = self.signature
+        else:
+            name = "RU_sg_{}".format(self.id)
+        return name
 
 
 class SermonGoldSame(models.Model):

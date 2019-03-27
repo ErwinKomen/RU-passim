@@ -49,6 +49,15 @@ class SearchSermonForm(forms.Form):
     keyword = forms.CharField(label=_("Keyword"), required=False)
 
 
+class SearchGoldForm(forms.Form):
+    """Note: only for SEARCHING"""
+
+    author = forms.CharField(label=_("Author"), required=False)
+    incipit = forms.CharField(label=_("Incipit"), required=False)
+    explicit = forms.CharField(label=_("Explicit"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False)
+
+
 class SearchManuscriptForm(forms.Form):
     """Note: only for SEARCHING"""
 
@@ -112,6 +121,33 @@ class SermonForm(forms.ModelForm):
             self.fields['nickname_ta'].required = False
 
 
+class SermonGoldForm(forms.ModelForm):
+    # parent_id = forms.CharField(required=False)
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonGold
+        fields = ['signature', 'author', 'incipit', 'explicit' ]
+        widgets={'signature':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldForm, self).__init__(*args, **kwargs)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            sAuthor = "" if not instance.author else instance.author.name
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+
 
 class ManuscriptForm(forms.ModelForm):
     country_ta = forms.CharField(label=_("Country"), required=False, 
@@ -163,7 +199,6 @@ class ManuscriptForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
 
 
 class SearchCollectionForm(forms.Form):

@@ -27,9 +27,10 @@ from time import sleep
 from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm
+                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
+                                SearchGoldForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, Nickname, NewsItem, SourceInfo
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo
 
 import fnmatch
 import sys
@@ -755,6 +756,183 @@ def import_authors(request):
     return JsonResponse(data)
 
 
+class PassimDetails(DetailView):
+    """Extension of the normal DetailView class for PASSIM"""
+
+    template_name = ""
+    template_post = ""
+    prefix = ""             # The prefix for the one (!) form we use
+    title = ""              # The title to be passedon with the context
+    mForm = None            # Model form
+
+    def get(self, request, *args, **kwargs):
+        # Initialisation
+        data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        if not request.user.is_authenticated:
+            # Do not allow to get a good response
+            data['html'] = "(No authorization)"
+            data['status'] = "error"
+        else:
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                self.object = None
+            else:
+                self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+
+            # Possibly indicate form errors
+            # NOTE: errors is a dictionary itself...
+            if 'errors' in context and len(context['errors']) > 0:
+                data['status'] = "error"
+                data['msg'] = context['errors']
+
+            # We render to the _name 
+            response = render_to_string(self.template_name, context, request)
+            response = response.replace("\ufeff", "")
+            data['html'] = response
+
+            # response = self.render_to_response(self.template_name, context)
+            #response.content = treat_bom(response.rendered_content)
+        # return response
+        # Return the response
+        return JsonResponse(data)
+
+    def post(self, request, *args, **kwargs):
+        # Initialisation
+        data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # Make sure only POSTS get through that are authorized
+        if request.user.is_authenticated:
+            # Determine the object and the context
+            if not 'pk' in kwargs or kwargs['pk'] == None:
+                # This is a NEW instance for this model
+                self.object = None
+            else:
+                self.object = self.get_object()
+            context = self.get_context_data(object=self.object)
+            # Possibly indicate form errors
+            # NOTE: errors is a dictionary itself...
+            if 'errors' in context and len(context['errors']) > 0:
+                data['status'] = "error"
+                data['msg'] = context['errors']
+            # response = self.render_to_response(self.template_post, context)
+            response = render_to_string(self.template_post, context, request)
+            response = response.replace("\ufeff", "")
+            data['html'] = response
+        else:
+            data['html'] = "(No authorization)"
+            data['status'] = "error"
+
+        # Return the response
+        return JsonResponse(data)
+
+    def before_delete(self, instance):
+        """Anything that needs doing before deleting [instance] """
+        return True, "" 
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+        return True, "" 
+
+    def before_save(self, instance):
+        """Action to be performed after saving an item preliminarily, and before saving completely"""
+        return True, "" 
+
+    def get_context_data(self, **kwargs):
+        # Get the current context
+        context = super(PassimDetails, self).get_context_data(**kwargs)
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        initial = get.copy()
+        self.qd = initial
+
+        self.bHasFormInfo = (len(self.qd) > 0)
+
+        # Set the title of the application
+        context['title'] = self.title
+
+        # Get the instance
+        instance = self.object
+        bNew = False
+        prefix = self.prefix
+        mForm = self.mForm
+        oErr = ErrHandle()
+
+        # Check if this is a POST or a GET request
+        if self.request.method == "POST":
+            # Determine what the action is (if specified)
+            action = ""
+            if 'action' in initial: action = initial['action']
+            if action == "delete":
+                # The user wants to delete this item
+                try:
+                    bResult, msg = self.before_delete(instance)
+                    if bResult:
+                        # Remove this sermongold instance
+                        instance.delete()
+                    else:
+                        # Removing is not possible
+                        context['errors'] = {'delete': msg }
+                except:
+                    msg = oErr.get_error_message()
+                    # Create an errors object
+                    context['errors'] = {'delete':  msg }
+                # And return the complied context
+                return context
+            
+            # All other actions just mean: edit or new and send back
+
+            # Do we have an existing object or are we creating?
+            if instance == None:
+                # Saving a new item
+                frm = mForm(initial, prefix=prefix)
+                bNew = True
+            else:
+                # Editing an existing one
+                frm = mForm(initial, prefix=prefix, instance=instance)
+            # Both cases: validation and saving
+            if frm.is_valid():
+                # The form is valid - do a preliminary saving
+                instance = frm.save(commit=False)
+                # Any checks go here...
+                bResult, msg = self.before_save(instance)
+                if bResult:
+                    # Now save it for real
+                    instance.save()
+                else:
+                    context['errors'] = {'save': msg }
+            else:
+                # We need to pass on to the user that there are errors
+                context['errors'] = frm.errors
+            # Check if this is a new one
+            if bNew:
+                # Any code that should be added when creating a new [SermonGold] instance
+                bResult, msg = self.after_new(instance)
+                if not bResult:
+                    # Removing is not possible
+                    context['errors'] = {'new': msg }
+                
+        else:
+            # Check if this is asking for a new form
+            if instance == None:
+                # Get the form for the sermon
+                frm = mForm(prefix=prefix)
+            else:
+                # Get the form for the sermon
+                frm = mForm(instance=instance, prefix=prefix)
+
+        # Put the form and the formset in the context
+        context['{}Form'.format(self.prefix)] = frm
+        context['instance'] = instance
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Return the calculated context
+        return context
+
+
 class ManuscriptDetailsView(DetailView):
     """The details of one manuscript"""
 
@@ -1070,6 +1248,138 @@ class ManuscriptListView(ListView):
         return qs
 
 
+class SermonGoldListView(ListView):
+    """Search and list manuscripts"""
+    
+    model = SermonGold
+    paginate_by = 20
+    template_name = 'seeker/sermongold.html'
+    entrycount = 0
+    bDoTime = True
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(SermonGoldListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        initial = self.request.GET
+
+        # Add a files upload form
+        # context['goldForm'] = SearchGoldForm(prefix='gold')
+        context['goldForm'] = SermonGoldForm(prefix='gold')
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Gold-Sermons"
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Measure how long it takes
+        if self.bDoTime: iStart = get_now_time()
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasFormset = (len(get) > 0)
+
+        # Fix the sort-order
+        get['sortOrder'] = 'name'
+
+        if self.bHasFormset:
+            # Get the formset from the input
+            lstQ = []
+
+            goldForm = SearchGoldForm(self.qd, prefix='gold')
+
+            # Process the criteria from this form 
+            oFields = goldForm.cleaned_data
+            lstThisQ = []
+
+            # Check for SermonGold [idno]
+            if 'signature' in oFields and oFields['signature'] != "": 
+                val = adapt_search(oFields['signature'])
+                lstThisQ.append(Q(signature__iregex=val))
+
+            # Check for author name
+            if 'author' in oFields and oFields['author'] != "": 
+                val = adapt_search(oFields['author'])
+                lstThisQ.append(Q(author__name__iregex=val))
+
+            # Check for incipit string
+            if 'incipit' in oFields and oFields['incipit'] != "": 
+                val = adapt_search(oFields['incipit'])
+                lstThisQ.append(Q(incipit__iregex=val))
+
+            # Check for explicit string
+            if 'explicit' in oFields and oFields['explicit'] != "": 
+                val = adapt_search(oFields['explicit'])
+                lstThisQ.append(Q(explicit__iregex=val))
+
+            # Calculate the final qs
+            if len(lstQ) == 0:
+                # Just show everything
+                qs = SermonGold.objects.all()
+            elif len(lstQ) == 1:
+                # criteria = reduce(operator.or_, lstQ)
+                qs = SermonGold.objects.filter(*lstQ).distinct()
+            else:
+                criteria = reduce(operator.or_, lstQ)
+                qs = SermonGold.objects.filter(criteria).distinct()
+        else:
+            # Just show everything
+            qs = SermonGold.objects.all()
+
+        # Set the sort order
+        qs = qs.order_by('author__name', 
+                         'incipit', 
+                         'explicit', 
+                         'signature')
+
+        # Time measurement
+        if self.bDoTime:
+            print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+            print("SermonGoldListView query: {}".format(qs.query))
+            iStart = get_now_time()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Time measurement
+        if self.bDoTime:
+            print("SermonGoldListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+
 class SermonDetailsView(DetailView):
     """The details of one sermon"""
 
@@ -1217,6 +1527,35 @@ class SermonDetailsView(DetailView):
 
         # Return the calculated context
         return context
+
+
+class SermonGoldDetailsView(PassimDetails):
+    """The details of one sermon"""
+
+    model = SermonGold
+    mForm = SermonGoldForm
+    template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_view.html'
+    prefix = "gold"
+    title = "SermonGold" 
+
+    def before_delete(self, instance):
+
+        oErr = ErrHandle()
+        try:
+            # (1) Check if there is an 'equality' link to another SermonGold
+
+            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
+
+            # (3) Remove all gold-to-gold links that include this one
+
+            # (4) Remove all links from SermonDescr to this instance of SermonGold
+
+            # All is well
+            return True, "" 
+        except:
+            msg = oErr.get_error_message()
+            return False, msg
 
 
 class AuthorListView(ListView):
