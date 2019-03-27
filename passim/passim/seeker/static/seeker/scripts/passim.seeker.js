@@ -1108,6 +1108,7 @@ var ru = (function ($, ru) {
             colspan = "",
             targeturl = "",
             targetid = "",
+            lHtml = [],
             data = null,
             frm = null,
             bOkay = true,
@@ -1117,6 +1118,10 @@ var ru = (function ($, ru) {
             elEdit = null;
 
         try {
+          // Possibly correct [el]
+          if (el !== undefined && "currentTarget" in el) {
+            el = el.currentTarget;
+          }
           // Get the mode
           if (sType !== undefined && sType !== "") {
             sMode = sType;
@@ -1158,8 +1163,8 @@ var ru = (function ($, ru) {
               targetid = $(el).attr("targetid");
 
               // Check
-              if (targeturl === undefined) { $(err).html("Save: not <code>targeturl</code> specified");  bOkay = false}
-              if (bOkay && targetid === undefined) { $(err).html("Save: not <code>targetid</code> specified"); }
+              if (targeturl === undefined) { $(err).html("Save: no <code>targeturl</code> specified"); bOkay = false }
+              if (bOkay && targetid === undefined) { $(err).html("Save: no <code>targetid</code> specified"); }
 
               // Get the form data
               frm = $(el).closest("form");
@@ -1186,7 +1191,14 @@ var ru = (function ($, ru) {
                           // If there is an error, indicate this
                           if (response.status === "error") {
                             if ("msg" in response) {
-                              $(err).html("Error: "+response['msg']);
+                              if (typeof response['msg'] === "object") {
+                                lHtml = []
+                                lHtml.push("Errors:");
+                                $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                                $(err).html(lHtml.join("<br />"));
+                              } else {
+                                $(err).html("Error: " + response['msg']);
+                              }
                             } else {
                               $(err).html("<code>There is an error</code>");
                             }

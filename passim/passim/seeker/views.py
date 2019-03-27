@@ -401,7 +401,7 @@ def get_countries(request):
     data = 'fail'
     if request.is_ajax():
         sName = request.GET.get('country', '')
-        if country == "": country = request.GET.get('country_ta', "")
+        if sName == "": sName = request.GET.get('country_ta', "")
         lstQ = []
         lstQ.append(Q(name__icontains=sName))
         countries = Country.objects.filter(*lstQ).order_by('name')

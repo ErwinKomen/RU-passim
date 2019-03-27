@@ -28,8 +28,8 @@
             <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
           </a>
           <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
-             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}" >
-             targetid="manuscript_info">
+             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
+             targetid="manuscript_info" >
             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
           </a>
 
