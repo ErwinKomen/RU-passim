@@ -9,6 +9,7 @@ from django.urls import reverse
 from datetime import datetime
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
+from passim.seeker.excel import excel_to_list
 import sys, os
 import copy
 import json
@@ -24,6 +25,7 @@ MAX_TEXT_LEN = 200
 
 VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
+LINK_TYPE = "seeker.linktype"
 
 
 class FieldChoice(models.Model):
@@ -82,7 +84,6 @@ def get_help(field):
 
     return help_text
 
-
 def get_crpp_date(dtThis):
     """Convert datetime to string"""
 
@@ -130,7 +131,6 @@ def getText(nodeStart):
             # Recursive
             rc.append(getText(node))
     return ' '.join(rc)
-
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -627,9 +627,9 @@ class Manuscript(models.Model):
     source = models.ForeignKey(SourceInfo, null=True, blank=True)
 
     # [m] Many-to-many: all the sermons of this manuscr
-    sermons = models.ManyToManyField("SermonDescr", through="SermonMan")
+    sermons = models.ManyToManyField("SermonDescr", null=True, through="SermonMan")
     # [m] Many-to-many: all the provenances of this manuscript
-    provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
+    provenances = models.ManyToManyField("Provenance", null=True, through="ProvenanceMan")
 
 
     def __str__(self):
@@ -1334,6 +1334,9 @@ class SermonGold(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
 
+    # [m] Many-to-many: all the gold sermons linked to me
+    relations = models.ManyToManyField("self", null=True, through="SermonGoldSame", symmetrical=False, related_name="related_to")
+
     def __str__(self):
         name = ""
         if self.signature:
@@ -1341,6 +1344,150 @@ class SermonGold(models.Model):
         else:
             name = "RU_sg_{}".format(self.id)
         return name
+
+    def find_or_create(author, incipit, explicit, signature):
+        """Find or create a SermonGold"""
+
+        lstQ = []
+        lstQ.append(Q(author=author))
+        if signature != "": lstQ.append(Q(signature=signature))
+        if incipit != "": lstQ.append(Q(incipit=incipit))
+        if explicit != "": lstQ.append(Q(explicit=explicit))
+        obj = SermonGold.objects.filter(*lstQ).first()
+        if obj == None:
+            # Create a new
+            obj = SermonGold(author=author, signature=signature, incipit=incipit, explicit=explicit)
+            obj.save()
+        # Return this object
+        return obj
+
+    def find_first(signature, author=None, incipit=None, explicit=None):
+        """Find a sermongold"""
+
+        lstQ = []
+        lstQ.append(Q(signature=signature))
+        if author != None: lstQ.append(Q(author=author))
+        if incipit != None: lstQ.append(Q(incipit=incipit))
+        if explicit != None: lstQ.append(Q(explicit=explicit))
+        obj = SermonGold.objects.filter(*lstQ).first()
+        # Return what we found
+        return obj
+
+    def add_relation(self, target, linktype):
+        """Add a relation from me to [target] with the indicated type"""
+
+        relation, created = SermonGoldSame.objects.get_or_create(
+            src=self, dst=target, linktype=linktype)
+        # Return the new SermonGoldSame instance that has been created
+        return relation
+
+    def remove_relation(self, target, linktype):
+        """Find and remove all links to target with the indicated type"""
+
+        SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).delete()
+        # Return positively
+        return True
+
+    def has_relation(self, target, linktype):
+        """Check if the indicated linktype relation exists"""
+
+        obj = SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).first()
+        # Return existance
+        return (obj != None)
+
+    def get_relations(self, linktype = None):
+        """Get all relations with the indicated linktype"""
+
+        lstQ = []
+        lstQ.append(Q(sermongold_src__src=self))
+        if linktype != None:
+            lstQ.append(Q(sermongold_src__linktype=linktype))
+        qs = self.relations.filter(*lstQ )
+        # Return the whole queryset that was found
+        return qs
+
+    def get_related_to(self, linktype):
+        """Get all sermongold instances that have a particular linktype relation with me"""
+
+        qs = self.related_to.filter(sermongold_dst__linktype=linktype, sermongold_dst__dst=self)
+        # Return the whole queryset that was found
+        return qs
+
+    def read_gold(username, data_file, filename, arErr, xmldoc=None, sName = None):
+        """Import an Excel file with golden sermon data and add it to the DB
+        
+        This approach makes use of openpyxl
+        """
+
+        # Number to order all the items we read
+        order = 0
+        iSermCount = 0
+
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+
+        # Overall keeping track of sermongold items
+        errHandle = ErrHandle()
+
+        try:
+            # Convert the data into a list of objects
+            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename)
+
+            # Iterate over the objects
+            for oGold in lst_goldsermon:
+                sAuthor = oGold['author']
+                # Check author
+                if sAuthor == "":
+                    # There must be a (gold) author...
+                    oBack['status'] = 'error'
+                    oBack['msg'] = "Without author, a gold sermon cannot be added"
+                    return oBack
+                # Get the author (gold)
+                author = Author.find(sAuthor)
+                if author == None:
+                    # Could not find this author, so indicate to the user
+                    oBack['status'] = 'error'
+                    oBack['msg'] = "Could not find golden Author [{}]".format(oGold['author'])
+                    return oBack
+                # Get or create this golden sermon
+                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'], oGold['signature'])
+                oGold['obj'] = gold
+                iSermCount += 1
+ 
+            # Iterate over the objects again, and add relations
+            for oGold in lst_goldsermon:
+                obj = oGold['obj']
+                # Check if any relation has been specified
+                if 'target' in oGold and oGold['target'] != "":
+                    # Determine the linktype
+                    if 'linktype' in oGold:
+                        linktype = "equals" if oGold['linktype'] == "" else oGold['linktype']
+                    else:
+                        linktype = "equals"
+                    # Get the target sermongold
+                    target = SermonGold.find_first(oGold['target'])
+                    if target == None:
+                        # Could not find this author, so indicate to the user
+                        oBack['status'] = 'error'
+                        oBack['msg'] = "Cannot find target signature [{}]".format(oGold['target'])
+                        return oBack
+
+                    # Check if this relation is already there
+                    if not obj.has_relation(target, linktype):
+                        obj.add_relation(target, linktype)
+
+            # Make sure the requester knows how many have been added
+            oBack['count'] = 1              # Only one manuscript is added here
+            oBack['sermons'] = iSermCount   # The number of sermons (=msitems) reviewed
+            oBack['filename'] = filename
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
+
 
 
 class SermonGoldSame(models.Model):
@@ -1350,9 +1497,12 @@ class SermonGoldSame(models.Model):
     src = models.ForeignKey(SermonGold, related_name="sermongold_src")
     # [1] It equals sermon [dst]
     dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
+    # [1] Each gold-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default="eq")
 
     def __str__(self):
-        combi = "{}: {}".format(self.src.signature, self.dst.signature)
+        combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
 
 
@@ -1403,7 +1553,7 @@ class SermonDescr(models.Model):
     order = models.IntegerField("Order", default = -1)
 
     # [0-n] Link to one or more golden standard sermons
-    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+    goldsermons = models.ManyToManyField(SermonGold, null=True, through="SermonDescrGold")
 
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")

@@ -1,0 +1,49 @@
+﻿{% if statuscode == "completed" %}
+  <div class='col-md-12'>
+    <p>
+    The list of gold sermons has been processed, and {{results|length}} new ones have been reviewed.
+    </p>
+    <p>
+      Possible actions:
+      <ul>
+        <li><b>Show</b> show the list of gold sermons that have been reviewed (existing ones have not been added anew)
+          <button class="btn btn-default btn-sm dropdown-toggle"
+                  type="button" data-toggle="collapse" data-target="#man-list">List</button>
+        </li>
+        <li><b>List</b> all gold sermons
+            <!-- When ready press this button -->
+            <span><a class="btn btn-xs jumbo-1" role="button" href="{% url 'search_gold' %}">List</a></span>
+        </li>
+      </ul>
+    </p>
+  </div>
+
+  <div class="col-md-12 collapse" id="man-list">
+    <table>
+      <thead><tr><th>#</th><th>File</th><th>Sermons</th></tr></thead>
+      <tbody>
+        {% for item in results %}
+          <tr>
+            <td>{{forloop.counter}}</td>
+            <td>{{item.filename}}</td>
+            <td>{{item.sermons}}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endif %}
+
+<!-- Any errors are shown here too-->
+<div class="errors">
+  {% if error_list  %} 
+    <h4>Errors:</h4>
+    {% if statuscode != "error" %}
+      <div>statuscode = {{statuscode}}</div>
+    {% endif %}
+    {% for item in error_list %}
+      <div class="error-item">{{item}}</div>
+    {% endfor %}
+  {% endif %}
+</div>

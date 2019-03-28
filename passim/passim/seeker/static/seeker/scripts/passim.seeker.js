@@ -1350,6 +1350,12 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").addClass("hidden");
               break;
             case "delete":
+              // Ask for confirmation
+              // NOTE: we cannot be more specific than "item", since this can be manuscript or sermongold
+              if (!confirm("Do you really want to remove this item?")) {
+                // Return from here
+                return;
+              }
               // Show waiting symbol
               $(elTr).find(".waiting").removeClass("hidden");
 

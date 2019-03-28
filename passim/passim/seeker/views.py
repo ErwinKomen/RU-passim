@@ -597,7 +597,7 @@ def import_ecodex(request):
     username = request.user.username
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST':
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
 
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -674,9 +674,104 @@ def import_ecodex(request):
             data['html'] = 'invalid form: {}'.format(form.errors)
             data['status'] = "error"
     else:
-        data['html'] = 'Only use POST and make sure you are logged in'
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
         data['status'] = "error"
  
+    # Return the information
+    return JsonResponse(data)
+
+def import_gold(request):
+    """Import one or more Excel files that each contain one Gold-Sermon definition in Excel"""
+
+    # Initialisations
+    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'seeker/import_gold.html'
+    obj = None
+    data_file = ""
+    bClean = False
+    username = request.user.username
+
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+
+        # Remove previous status object for this user
+        Status.objects.filter(user=username).delete()
+        # Create a status object
+        oStatus = Status(user=username, type="gold", status="preparing")
+        oStatus.save()
+
+
+        form = UploadFilesForm(request.POST, request.FILES)
+        lResults = []
+        if form.is_valid():
+            # NOTE: from here a breakpoint may be inserted!
+            print('import_gold: valid form')
+
+            # Initialise a list of files to be processed
+            file_list = []
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xlsx":
+                            # This is an Excel XLSX file
+                            oResult = SermonGold.read_gold(username, data_file, filename, arErr)
+
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            arErr.append("There was an error. No golden sermons have been added")
+                        elif statuscode == "error" and 'msg' in oResult:
+                            arErr.append(oResult['msg'])
+                        else:
+                            lResults.append(oResult)
+
+            # Indicate we are ready
+            oStatus.set("ready")
+            # Get a list of errors
+            error_list = [str(item) for item in arErr]
+
+            # Create the context
+            context = dict(
+                statuscode=statuscode,
+                results=lResults,
+                error_list=error_list
+                )
+
+            if statuscode == "error" and len(arErr) == 0:
+                data['html'] = "Please log in before continuing"
+            else:
+                # Get the HTML response
+                data['html'] = render_to_string(template_name, context, request)
+
+
+        else:
+            data['html'] = 'invalid form: {}'.format(form.errors)
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+
     # Return the information
     return JsonResponse(data)
 
@@ -759,8 +854,9 @@ def import_authors(request):
 class PassimDetails(DetailView):
     """Extension of the normal DetailView class for PASSIM"""
 
-    template_name = ""
-    template_post = ""
+    template_name = ""      # Template for GET
+    template_post = ""      # Template for POST
+    formset_objects = []    # List of formsets to be processed
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     title = ""              # The title to be passedon with the context
@@ -791,9 +887,6 @@ class PassimDetails(DetailView):
             response = response.replace("\ufeff", "")
             data['html'] = response
 
-            # response = self.render_to_response(self.template_name, context)
-            #response.content = treat_bom(response.rendered_content)
-        # return response
         # Return the response
         return JsonResponse(data)
 
@@ -839,6 +932,16 @@ class PassimDetails(DetailView):
     def before_save(self, instance):
         """Action to be performed after saving an item preliminarily, and before saving completely"""
         return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+        return context
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def get_formset_queryset(self, prefix):
+        return None
 
     def get_context_data(self, **kwargs):
         # Get the current context
@@ -926,6 +1029,30 @@ class PassimDetails(DetailView):
             else:
                 # Get the form for the sermon
                 frm = mForm(instance=instance, prefix=prefix)
+            # Walk all the formset objects
+            for formsetObj in self.formset_objects:
+                formsetClass = formsetObj['formsetClass']
+                prefix  = formsetObj['prefix']
+                form_kwargs = self.get_form_kwargs(prefix)
+                if self.add:
+                    # - CREATE a NEW formset, populating it with any initial data in the request
+                    # Saving a NEW item
+                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
+                else:
+                    # show the data belonging to the current [obj]
+                    qs = self.get_formset_queryset(prefix)
+                    if qs == None:
+                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                    else:
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                # Process all the forms in the formset
+                ordered_forms = self.process_formset(prefix, request, formset)
+                if ordered_forms:
+                    context[prefix + "_ordered"] = ordered_forms
+                # Store the instance
+                formsetObj['formsetinstance'] = formset
+                # Add the formset to the context
+                context[prefix + "_formset"] = formset
 
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
@@ -935,6 +1062,9 @@ class PassimDetails(DetailView):
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Possibly add to context by the calling function
+        context = self.add_to_context(context, instance)
 
         # Return the calculated context
         return context
@@ -1552,7 +1682,7 @@ class SermonGoldDetailsView(PassimDetails):
     model = SermonGold
     mForm = SermonGoldForm
     template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
-    # OLD: template_post = 'seeker/sermongold_view.html'
+    # NOTE: we need to have the same template for POST responses
     template_post = 'seeker/sermongold_info.html'
     prefix = "gold"
     title = "SermonGold" 
@@ -1581,7 +1711,20 @@ class SermonGoldDetailsView(PassimDetails):
         self.afternewurl = reverse('search_gold')
         return True, "" 
 
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
 
+        # Start a list of related gold sermons
+        lst_related = []
+        # Do we have an instance?
+        if instance != None:
+            # There is an instance: get the list of SermonGold items to which I link
+            lst_related = instance.get_relations()
+
+        # Add the list to the context
+        context['relations'] = lst_related
+
+        return context
 
 
 class AuthorListView(ListView):

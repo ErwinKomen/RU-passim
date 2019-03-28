@@ -34,6 +34,9 @@
     <Compile Include="manage.py" />
     <Compile Include="passim\seeker\admin.py" />
     <Compile Include="passim\seeker\apps.py" />
+    <Compile Include="passim\seeker\excel.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\seeker\forms.py">
       <SubType>Code</SubType>
     </Compile>
@@ -102,6 +105,7 @@
     <Content Include="passim\seeker\static\seeker\scripts\xhr2.js" />
     <Content Include="passim\seeker\templates\seeker\collection.html" />
     <Content Include="passim\seeker\templates\seeker\author_list.html" />
+    <Content Include="passim\seeker\templates\seeker\import_gold.html" />
     <Content Include="passim\seeker\templates\seeker\import_manuscripts.html" />
     <Content Include="passim\seeker\templates\seeker\import_authors.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />

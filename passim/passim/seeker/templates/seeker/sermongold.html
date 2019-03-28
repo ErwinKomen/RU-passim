@@ -26,6 +26,14 @@
                 <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
                   <span class="glyphicon glyphicon-search"></span>
                 </a>
+                <!-- Allow uploading sermongold Excel files -->
+                {% if is_passim_uploader %}
+                  <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_goldexcel" 
+                     role="button" title="Upload Excel files"
+                     onclick="ru.passim.seeker.hide('tab_list');">
+                    <span class="glyphicon glyphicon-upload"></span>
+                  </a>
+                {% endif %}
               </span>
             </div>
           </div>
@@ -83,6 +91,46 @@
             </div>
           </div>
         </form>
+
+        {% if is_passim_uploader %}
+        <!-- Upload tab for SermonGold Excel files -->
+        <div class="inert collapse" id="tab_upload_goldexcel">
+          <div id="import_gold" class="row container">
+            <form action="{% url 'import_gold' %}" method="POST" enctype="multipart/form-data">
+              {% csrf_token %}
+              <!-- Room for the filename to appear -->
+              <div class="col-md-6 form-group" id="gold-import_info"
+                    sync-progress="{% url 'sync_progress' %}?synctype=gold"
+                    targetid="gold_data_import"
+                    targeturl="{% url 'import_gold' %}">
+                <div class="input-group">
+                  <span>Specify the Excel file(s) with the Sermon-Gold data</span>
+                  <span class="input-group-btn">
+                    <span class="btn btn-default btn-xs btn-file">
+                      Browse...
+                      <input id="id_files_field" name="files_field" required="" multiple="" type="file" oninput="ru.passim.seeker.import_data('gold');" />
+                    </span>
+                  </span>
+                </div>
+            
+              </div>
+              <!-- Progress of upload indicator -->
+              <div class="col-md-6">
+                <progress class="hidden" style="width:100%;" id="gold-import_progress" value="0" min="0" max="100"></progress>
+              </div>
+              <!-- Any error reporting -->
+              <div id="gold-import_error"></div>
+            </form>
+
+            <!-- Import information -->
+            <div class="row">
+              <div id="gold_data_import" class="col-md-offset-1 col-md-10 project-part hidden"></div>
+            </div>
+
+          </div>
+
+        </div>
+        {% endif %}
 
         <!-- List tab -->
         <div class="" id="tab_list">

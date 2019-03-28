@@ -69,6 +69,7 @@ urlpatterns = [
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
+    url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
