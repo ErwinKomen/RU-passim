@@ -1330,9 +1330,9 @@ class SermonGold(models.Model):
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
     # [0-1] We would like to know the INCIPIT (first line in Latin)
-    incipit = models.CharField("Incipit", null=True, blank=True, max_length=LONG_STRING)
+    incipit = models.TextField("Incipit", null=True, blank=True)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
-    explicit = models.CharField("Explicit", null=True, blank=True, max_length=LONG_STRING)
+    explicit = models.TextField("Explicit", null=True, blank=True)
 
     def __str__(self):
         name = ""
@@ -1370,11 +1370,11 @@ class SermonDescr(models.Model):
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the INCIPIT (first line in Latin)
-    incipit = models.CharField("Incipit", null=True, blank=True, max_length=LONG_STRING)
+    incipit = models.TextField("Incipit", null=True, blank=True)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
-    explicit = models.CharField("Explicit", null=True, blank=True, max_length=LONG_STRING)
+    explicit = models.TextField("Explicit", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
-    quote = models.CharField("Quote", null=True, blank=True, max_length=LONG_STRING)
+    quote = models.TextField("Quote", null=True, blank=True)
     # [0-1] We would like to know the Clavis number (if available)
     clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the Gryson number (if available)
@@ -1382,7 +1382,7 @@ class SermonDescr(models.Model):
     # [0-1] The FEAST??
     feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] Edition
-    edition = models.CharField("Edition", null=True, blank=True, max_length=LONG_STRING)
+    edition = models.TextField("Edition", null=True, blank=True)
     # [0-1] Any notes for this sermon
     note = models.TextField("Note", null=True, blank=True)
     # [0-1] Additional information 

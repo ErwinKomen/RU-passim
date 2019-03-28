@@ -18,7 +18,7 @@
           </a>
 
           {% if is_passim_editor %}
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="sermon_edit"
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
              targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% else %}{% url 'gold_view' %}{% endif %}" >
             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
           </a>

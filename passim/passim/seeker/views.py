@@ -761,6 +761,7 @@ class PassimDetails(DetailView):
 
     template_name = ""
     template_post = ""
+    afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     title = ""              # The title to be passedon with the context
     mForm = None            # Model form
@@ -808,6 +809,9 @@ class PassimDetails(DetailView):
             else:
                 self.object = self.get_object()
             context = self.get_context_data(object=self.object)
+            # Check if 'afternewurl' needs adding
+            if 'afternewurl' in context:
+                data['afternewurl'] = context['afternewurl']
             # Possibly indicate form errors
             # NOTE: errors is a dictionary itself...
             if 'errors' in context and len(context['errors']) > 0:
@@ -910,6 +914,9 @@ class PassimDetails(DetailView):
                 if not bResult:
                     # Removing is not possible
                     context['errors'] = {'new': msg }
+                # Check if an 'afternewurl' is specified
+                if self.afternewurl != "":
+                    context['afternewurl'] = self.afternewurl
                 
         else:
             # Check if this is asking for a new form
@@ -1051,7 +1058,7 @@ class ManuscriptDetailsView(DetailView):
 
         # Put the form and the formset in the context
         context['manuForm'] = frm
-
+        
         sermon_list = []
         maxdepth = 0
         if instance != None:
@@ -1319,49 +1326,53 @@ class SermonGoldListView(ListView):
 
             goldForm = SearchGoldForm(self.qd, prefix='gold')
 
-            # Process the criteria from this form 
-            oFields = goldForm.cleaned_data
-            lstThisQ = []
+            if goldForm.is_valid():
 
-            # Check for SermonGold [idno]
-            if 'signature' in oFields and oFields['signature'] != "": 
-                val = adapt_search(oFields['signature'])
-                lstThisQ.append(Q(signature__iregex=val))
+                # Process the criteria from this form 
+                oFields = goldForm.cleaned_data
 
-            # Check for author name
-            if 'author' in oFields and oFields['author'] != "": 
-                val = adapt_search(oFields['author'])
-                lstThisQ.append(Q(author__name__iregex=val))
+                # Check for SermonGold [idno]
+                if 'signature' in oFields and oFields['signature'] != "": 
+                    val = adapt_search(goldForm['signature'])
+                    lstQ.append(Q(signature__iregex=val))
 
-            # Check for incipit string
-            if 'incipit' in oFields and oFields['incipit'] != "": 
-                val = adapt_search(oFields['incipit'])
-                lstThisQ.append(Q(incipit__iregex=val))
+                # Check for author name
+                if 'author' in oFields and oFields['author'] != "": 
+                    val = adapt_search(oFields['author'])
+                    lstQ.append(Q(author__name__iregex=val))
 
-            # Check for explicit string
-            if 'explicit' in oFields and oFields['explicit'] != "": 
-                val = adapt_search(oFields['explicit'])
-                lstThisQ.append(Q(explicit__iregex=val))
+                # Check for incipit string
+                if 'incipit' in oFields and oFields['incipit'] != "": 
+                    val = adapt_search(oFields['incipit'])
+                    lstQ.append(Q(incipit__iregex=val))
 
-            # Calculate the final qs
-            if len(lstQ) == 0:
+                # Check for explicit string
+                if 'explicit' in oFields and oFields['explicit'] != "": 
+                    val = adapt_search(oFields['explicit'])
+                    lstQ.append(Q(explicit__iregex=val))
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # Just show everything
+                    qs = SermonGold.objects.all()
+                else:
+                    qs = SermonGold.objects.filter(*lstQ).distinct()
+            else:
+                # TODO: communicate the error to the user???
+
+
                 # Just show everything
                 qs = SermonGold.objects.all()
-            elif len(lstQ) == 1:
-                # criteria = reduce(operator.or_, lstQ)
-                qs = SermonGold.objects.filter(*lstQ).distinct()
-            else:
-                criteria = reduce(operator.or_, lstQ)
-                qs = SermonGold.objects.filter(criteria).distinct()
+
         else:
             # Just show everything
             qs = SermonGold.objects.all()
 
         # Set the sort order
-        qs = qs.order_by('author__name', 
+        qs = qs.order_by('author__name',
+                         Lower('signature'),
                          'incipit', 
-                         'explicit', 
-                         'signature')
+                         'explicit')
 
         # Time measurement
         if self.bDoTime:
@@ -1482,6 +1493,7 @@ class SermonDetailsView(DetailView):
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
                 instance = frm.save(commit=False)
+
                 # Check what has been added
                 if 'nickname_ta' in frm.changed_data:
                     # Get its value
@@ -1506,6 +1518,11 @@ class SermonDetailsView(DetailView):
                         # Add to the SermonMan
                         obj = SermonMan(sermon=instance, manuscript=manuscript)
                         obj.save()
+                        # Calculate how many sermons there are
+                        sermon_count = manuscript.sermons.all().count()
+                        # Make sure the new sermon gets changed
+                        instance.order = sermon_count
+                        instance.save()
                 
         else:
             # Check if this is asking for a new form
@@ -1535,9 +1552,11 @@ class SermonGoldDetailsView(PassimDetails):
     model = SermonGold
     mForm = SermonGoldForm
     template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_view.html'
+    # OLD: template_post = 'seeker/sermongold_view.html'
+    template_post = 'seeker/sermongold_info.html'
     prefix = "gold"
     title = "SermonGold" 
+    afternewurl = ""
 
     def before_delete(self, instance):
 
@@ -1556,6 +1575,13 @@ class SermonGoldDetailsView(PassimDetails):
         except:
             msg = oErr.get_error_message()
             return False, msg
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+        self.afternewurl = reverse('search_gold')
+        return True, "" 
+
+
 
 
 class AuthorListView(ListView):

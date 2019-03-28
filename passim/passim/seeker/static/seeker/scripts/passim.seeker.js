@@ -10,6 +10,7 @@ var ru = (function ($, ru) {
   ru.passim.seeker = (function ($, config) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
+        loc_bManuSaved = false,
         loc_progr = [],       // Progress tracking
         loc_urlStore = "",    // Keep track of URL to be shown
         loc_divErr = "passim_err",
@@ -1118,6 +1119,7 @@ var ru = (function ($, ru) {
             data = null,
             frm = null,
             bOkay = true,
+            bReloading = false,
             err = "#little_err_msg",
             elTr = null,
             elView = null,
@@ -1163,6 +1165,10 @@ var ru = (function ($, ru) {
               if (targetid === undefined || targetid === "") {
                 // No targetid specified: just open the target url
                 window.location.href = targeturl;
+              } else if (loc_bManuSaved) {
+                loc_bManuSaved = false;
+                // Refresh page
+                window.location.href = window.location.href;
               } else {
                 targethead = $("#" + targetid).closest(".edit-mode");
                 if (targethead !== undefined && targethead.length > 0) {
@@ -1199,6 +1205,7 @@ var ru = (function ($, ru) {
                             // This is 'new', so don't show buttons cancel and delete
                             $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
                             $("#" + targetid).find(".edit-mode").removeClass("hidden");
+                            $("#" + targetid).find(".view-mode").addClass("hidden");
                           } else {
                             // Just viewing means we can also delete...
                             // What about CANCEL??
@@ -1251,6 +1258,14 @@ var ru = (function ($, ru) {
               targeturl = $(el).attr("targeturl");
               targetid = $(el).attr("targetid");
 
+              // What if no targetid is specified?
+              if (targetid === undefined || targetid === "") {
+                // Then we need the parent of our closest enclosing table
+                targetid = $(el).closest("form").parent();
+              } else {
+                targetid = $("#" + targetid);
+              }
+
               // Check
               if (targeturl === undefined) { $(err).html("Save: no <code>targeturl</code> specified"); bOkay = false }
               if (bOkay && targetid === undefined) { $(err).html("Save: no <code>targetid</code> specified"); }
@@ -1276,7 +1291,9 @@ var ru = (function ($, ru) {
                       case "error":
                         if ("html" in response) {
                           // Show the HTML in the targetid
-                          $("#" + targetid).html(response['html']);
+                          $(targetid).html(response['html']);
+                          // Signal globally that something has been saved
+                          loc_bManuSaved = true;
                           // If there is an error, indicate this
                           if (response.status === "error") {
                             if ("msg" in response) {
@@ -1291,6 +1308,14 @@ var ru = (function ($, ru) {
                             } else {
                               $(err).html("<code>There is an error</code>");
                             }
+                          } else {
+                            // If an 'afternewurl' is specified, go there
+                            if ('afternewurl' in response && response['afternewurl'] !== "") {
+                              window.location = response['afternewurl'];
+                              bReloading = true;
+                            } else {
+                              // Otherwise: we need to re-load the 
+                            }
                           }
                         } else {
                           // Send a message
@@ -1303,13 +1328,15 @@ var ru = (function ($, ru) {
                         break;
                     }
                   }
-                  // Return to view mode
-                  $(elTr).find(".view-mode").removeClass("hidden");
-                  $(elTr).find(".edit-mode").addClass("hidden");
-                  // Hide waiting symbol
-                  $(elTr).find(".waiting").addClass("hidden");
-                  // Perform init again
-                  ru.passim.seeker.init_events();
+                  if (!bReloading) {
+                    // Return to view mode
+                    $(elTr).find(".view-mode").removeClass("hidden");
+                    $(elTr).find(".edit-mode").addClass("hidden");
+                    // Hide waiting symbol
+                    $(elTr).find(".waiting").addClass("hidden");
+                    // Perform init again
+                    ru.passim.seeker.init_events();
+                  }
                 });
               } else {
                 // Or else stop waiting - with error message above
