@@ -1,0 +1,64 @@
+﻿{% load i18n %}
+
+<!-- Sermon information -->
+<form style="width: 100%;">
+  {% csrf_token %}
+    <table class="func-view">
+      <!-- Row with edit and delete buttons -->
+      <tr>
+        <td colspan="2"  class="ms editable table">
+          <!-- Provide the necessary buttons: edit, cancel and save -->
+          {% if is_passim_editor %}
+          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+            <span class="glyphicon glyphicon-pencil" title="Edit this gold-sermon link"></span>
+          </a>
+          {% endif %}
+
+          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save this link)"></span>
+          </a>
+
+          {% if is_passim_editor %}
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+             targeturl="{% if goldForm.instance.id %}{% url 'goldlink_view' glinkForm.instance.id %}{% else %}{% url 'goldlink_view' %}{% endif %}" >
+            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+          </a>
+          {% endif %}
+
+          <!-- Waiting symbol-->
+          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+          <!-- Little error message room -->
+          <span id="gold_err_msg" class="err-msg"></span>
+
+          {% if is_passim_editor %}
+          <!-- Put the delete button completely to the right-->
+          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" targetid="sermon_edit"
+             targeturl="{% if goldForm.instance.id %}{% url 'goldlink_view' glinkForm.instance.id %}{% endif %}">
+            <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Room for the standard fields -->
+      <tr>
+        <td class="hoverable" style="min-width: 100px;"><b>Link type</b></td>
+        <td class="hoverable" style="width: 100%;"><b>Towards</b></td>
+      </tr>
+      <tr>
+        <td style="min-width: 100px;">
+          <div class="edit-mode hidden">{{glinkForm.linktype}}</div>
+          <div class="view-mode">{{glinkForm.linktype.value}}</div>
+        </td>
+        <td style="width: 100%">
+          <div class="view-mode">
+            {% include 'seeker/sermongold_view.html' with msitem=glinkForm.instance.dst %}
+          </div>
+          <div class="edit-mode hidden">
+            HIER KOMT DAN EEN ZOEK-EN-SELECTEER
+          </div>
+        </td>
+      </tr>
+    </table>
+</form>

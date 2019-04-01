@@ -627,9 +627,9 @@ class Manuscript(models.Model):
     source = models.ForeignKey(SourceInfo, null=True, blank=True)
 
     # [m] Many-to-many: all the sermons of this manuscr
-    sermons = models.ManyToManyField("SermonDescr", null=True, through="SermonMan")
+    sermons = models.ManyToManyField("SermonDescr", through="SermonMan")
     # [m] Many-to-many: all the provenances of this manuscript
-    provenances = models.ManyToManyField("Provenance", null=True, through="ProvenanceMan")
+    provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
 
 
     def __str__(self):
@@ -1335,7 +1335,7 @@ class SermonGold(models.Model):
     explicit = models.TextField("Explicit", null=True, blank=True)
 
     # [m] Many-to-many: all the gold sermons linked to me
-    relations = models.ManyToManyField("self", null=True, through="SermonGoldSame", symmetrical=False, related_name="related_to")
+    relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
 
     def __str__(self):
         name = ""
@@ -1396,13 +1396,14 @@ class SermonGold(models.Model):
         return (obj != None)
 
     def get_relations(self, linktype = None):
-        """Get all relations with the indicated linktype"""
+        """Get all SermonGoldSame instances with me as source and with the indicated linktype"""
 
         lstQ = []
-        lstQ.append(Q(sermongold_src__src=self))
+        lstQ.append(Q(src=self))
         if linktype != None:
-            lstQ.append(Q(sermongold_src__linktype=linktype))
-        qs = self.relations.filter(*lstQ )
+            lstQ.append(Q(linktype=linktype))
+        qs = SermonGoldSame.objects.filter(*lstQ )
+        
         # Return the whole queryset that was found
         return qs
 
@@ -1429,8 +1430,15 @@ class SermonGold(models.Model):
         errHandle = ErrHandle()
 
         try:
+            errHandle.Status("Reading file {}".format(filename))
             # Convert the data into a list of objects
             bResult, lst_goldsermon, msg = excel_to_list(data_file, filename)
+
+            # Check the result
+            if bResult == False:
+                oBack['status'] = 'error'
+                oBack['msg'] = msg
+                return oBack
 
             # Iterate over the objects
             for oGold in lst_goldsermon:
@@ -1468,7 +1476,12 @@ class SermonGold(models.Model):
                     if target == None:
                         # Could not find this author, so indicate to the user
                         oBack['status'] = 'error'
-                        oBack['msg'] = "Cannot find target signature [{}]".format(oGold['target'])
+                        lMsg = []
+                        lMsg.append("Cannot find a target (a gold-sermon with signature [{}]).")
+                        lMsg.append("<br />Please add this separately and then perform import once more so as to lay the correct links.")
+                        lMsg.append("<br />(Sermons will <i>not</i> be added twice, so no worries about that.)")
+                        sMsg = "\n".join(lMsg)
+                        oBack['msg'] = sMsg.format(oGold['target'])
                         return oBack
 
                     # Check if this relation is already there
@@ -1487,8 +1500,7 @@ class SermonGold(models.Model):
 
         # Return the object that has been created
         return oBack
-
-
+    
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -1504,6 +1516,11 @@ class SermonGoldSame(models.Model):
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
+
+    def target(self):
+        # Get the URL to edit/view this sermon
+        sUrl = "" if self.id == None else reverse("goldlink_view", kwargs={'pk': self.id})
+        return sUrl
 
 
 class SermonDescr(models.Model):
@@ -1553,7 +1570,7 @@ class SermonDescr(models.Model):
     order = models.IntegerField("Order", default = -1)
 
     # [0-n] Link to one or more golden standard sermons
-    goldsermons = models.ManyToManyField(SermonGold, null=True, through="SermonDescrGold")
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
 
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
@@ -1589,12 +1606,15 @@ class SermonDescrGold(models.Model):
     sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
     # [1] The gold sermon
     gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
+    # [1] Each sermon-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default="eq")
 
     def __str__(self):
         # Temporary fix: sermon.id
         # Should be changed to something more significant in the future
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
-        combi = "{}: {}".format(self.sermon.id, self.gold.signature)
+        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
         return combi
 
 

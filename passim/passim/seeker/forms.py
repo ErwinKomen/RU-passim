@@ -8,9 +8,12 @@ from django.utils.translation import ugettext_lazy as _
 from django.forms.widgets import *
 from passim.seeker.models import *
 
-def init_choices(obj, sFieldName, sSet, maybe_empty=False):
+def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
     if (obj.fields != None and sFieldName in obj.fields):
-        obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
+        if bUseAbbr:
+            obj.fields[sFieldName].choices = build_abbr_list(sSet, maybe_empty=maybe_empty)
+        else:
+            obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
         obj.fields[sFieldName].help_text = get_help(sSet)
 
 
@@ -148,6 +151,26 @@ class SermonGoldForm(forms.ModelForm):
             sAuthor = "" if not instance.author else instance.author.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+
+
+class SermonGoldSameForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonGoldSame
+        fields = ['linktype', 'dst' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldSameForm, self).__init__(*args, **kwargs)
+        # Initialize choices for linktype
+        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=False)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
 
 
 class ManuscriptForm(forms.ModelForm):

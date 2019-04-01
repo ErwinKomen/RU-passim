@@ -43,7 +43,14 @@
       <div>statuscode = {{statuscode}}</div>
     {% endif %}
     {% for item in error_list %}
-      <div class="error-item">{{item}}</div>
+      <div class="error-item">{{item|safe}}</div>
     {% endfor %}
+    <!-- -->
+    <p>&nbsp;</p>
+    <p>
+      List <b>all</b> currently available gold sermons
+      <!-- When ready press this button -->
+      <span><a class="btn btn-xs jumbo-1" role="button" href="{% url 'search_gold' %}">List Gold Sermons</a></span>
+    </p>
   {% endif %}
 </div>

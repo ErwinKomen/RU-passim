@@ -1120,6 +1120,7 @@ var ru = (function ($, ru) {
             frm = null,
             bOkay = true,
             bReloading = false,
+            manutype = "",
             err = "#little_err_msg",
             elTr = null,
             elView = null,
@@ -1138,6 +1139,9 @@ var ru = (function ($, ru) {
           }
           // Get the <tr>
           elTr = $(el).closest("td");
+          // Get the manutype
+          manutype = $(el).attr("manutype");
+          if (manutype === undefined) { manutype = "other";}
 
           // Check if we need to take the table
           if ($(elTr).hasClass("table")) {
@@ -1170,15 +1174,31 @@ var ru = (function ($, ru) {
                 // Refresh page
                 window.location.href = window.location.href;
               } else {
-                targethead = $("#" + targetid).closest(".edit-mode");
-                if (targethead !== undefined && targethead.length > 0) {
-                  // Targetid is specified: check if we need to close
-                  if (!$(targethead).hasClass("hidden")) {
-                    // Close it
+                switch (manutype) {
+                  case "goldlink":
+                    targethead = $("#" + targetid);
+                    break;
+                  case "goldlinkclose":
+                    targethead = $("#" + targetid).closest(".goldlink");
                     $(targethead).addClass("hidden");
+                    $(elTr).find(".edit-mode").addClass("hidden");
+                    $(elTr).find(".view-mode").removeClass("hidden");
                     return;
-                  }
+                  default:
+                    targethead = $("#" + targetid).closest("tr.gold-head");
+                    if (targethead !== undefined && targethead.length > 0) {
+                      // Targetid is specified: check if we need to close
+                      if (!$(targethead).hasClass("hidden")) {
+                        // Close it
+                        $(targethead).addClass("hidden");
+                        return;
+                      }
+                    }
+                    break;
                 }
+                //if ($(el).hasClass("btn")) {
+                //} else {
+                //}
 
                 // There is a targetid specified, so make a GET request for the information and get it here
                 data = [];
@@ -1194,11 +1214,25 @@ var ru = (function ($, ru) {
                         if ("html" in response) {
                           // Show the HTML in the targetid
                           $("#" + targetid).html(response['html']);
+                          // Make sure invisible ancestors show up
+                          $("#" + targetid).closest(".hidden").removeClass("hidden");
 
-                          // Close any other edit-mode items
-                          $(".edit-mode").addClass("hidden");
-                          // Open this particular edit-mode item
-                          $(targethead).removeClass("hidden");
+                          switch (manutype) {
+                            case "goldsermon":
+                              // Close any other edit-mode items
+                              $(".edit-mode").addClass("hidden");
+                              // Open this particular edit-mode item
+                              $(targethead).removeClass("hidden");
+                              break;
+                            case "goldlink":
+                              $(el).closest("table").find(".edit-mode").addClass("hidden");
+                              $(el).closest("table").find(".view-mode").removeClass("hidden");
+                              $(elTr).find(".edit-mode").removeClass("hidden");
+                              $(elTr).find(".view-mode").addClass("hidden");
+                              break;
+                            default:
+                              break;
+                          }
 
                           // Check on specific modes
                           if (sMode === "new") {
@@ -1238,11 +1272,17 @@ var ru = (function ($, ru) {
                         break;
                     }
                   }
-                  // Return to view mode
-                  $(elTr).find(".view-mode").removeClass("hidden");
-                  $(elTr).find(".edit-mode").addClass("hidden");
-                  // Hide waiting symbol
-                  $(elTr).find(".waiting").addClass("hidden");
+                  switch (manutype) {
+                    case "goldlink":
+                      break;
+                    default:
+                      // Return to view mode
+                      $(elTr).find(".view-mode").removeClass("hidden");
+                      $(elTr).find(".edit-mode").addClass("hidden");
+                      // Hide waiting symbol
+                      $(elTr).find(".waiting").addClass("hidden");
+                      break;
+                  }
                   // Perform init again
                   ru.passim.init_typeahead();
                   ru.passim.seeker.init_events();

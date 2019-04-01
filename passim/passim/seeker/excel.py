@@ -1,4 +1,5 @@
 from passim.utils import ErrHandle
+from passim.settings import WRITABLE_DIR, MEDIA_DIR
 
 import io, sys, os
 import openpyxl
@@ -17,8 +18,8 @@ def excel_to_list(data, filename):
     lData = []
     msg = ""
     try:
-        # Write data temporarily
-        tmp_path = os.path.abspath(os.path.join( os.getcwd(), filename))
+        # Write data temporarily to the WRITABLE dir, but with a temporary filename
+        tmp_path = os.path.abspath(os.path.join( MEDIA_DIR, filename))
         with io.open(tmp_path, "wb") as f:
             sData = data.read()
             f.write(sData)
@@ -67,6 +68,8 @@ def excel_to_list(data, filename):
     except:
         # Note the error here
         msg = oErr.get_error_message()
+        bResult = False
+        oErr.DoError("excel_to_list")
 
     # Return what we have found
     return bResult, lData, msg

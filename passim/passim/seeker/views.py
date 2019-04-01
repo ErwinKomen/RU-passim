@@ -28,9 +28,9 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SearchGoldForm
+                                SearchGoldForm, SermonGoldSameForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame
 
 import fnmatch
 import sys
@@ -1676,6 +1676,38 @@ class SermonDetailsView(DetailView):
         return context
 
 
+class SermonGoldSameDetailsView(PassimDetails):
+    """The details of one gold-to-gold link"""
+
+    model = SermonGoldSame
+    mForm = SermonGoldSameForm
+    template_name = 'seeker/sermongoldlink_info.html'
+    template_post = 'seeker/sermongoldlink_info.html'
+    prefix = "glink"
+    title = "SermonGoldLink"
+    afternewurl = "" 
+
+    #def add_to_context(self, context, instance):
+    #    """Add to the existing context"""
+
+    #    # Get a form for the current or the new SermonGoldLink
+    #    lst_related = []
+    #    linkprefix = "glink"
+    #    # Do we have an instance?
+    #    if instance != None:
+    #        # There is an instance: get the list of SermonGold items to which I link
+    #        relations = instance.get_relations()
+    #        # Get a form for each of these relations
+    #        for instance in relations:
+    #            oForm = SermonGoldSameForm(instance=instance, prefix=linkprefix)
+    #            lst_related.append(oForm)
+
+    #    # Add the list to the context
+    #    context['relations'] = lst_related
+
+    #    return context
+
+
 class SermonGoldDetailsView(PassimDetails):
     """The details of one sermon"""
 
@@ -1716,10 +1748,15 @@ class SermonGoldDetailsView(PassimDetails):
 
         # Start a list of related gold sermons
         lst_related = []
+        linkprefix = "glink"
         # Do we have an instance?
         if instance != None:
             # There is an instance: get the list of SermonGold items to which I link
-            lst_related = instance.get_relations()
+            relations = instance.get_relations()
+            # Get a form for each of these relations
+            for instance in relations:
+                oForm = SermonGoldSameForm(instance=instance, prefix=linkprefix)
+                lst_related.append(oForm)
 
         # Add the list to the context
         context['relations'] = lst_related

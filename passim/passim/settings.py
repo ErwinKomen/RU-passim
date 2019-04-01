@@ -31,6 +31,8 @@ if "RU-passim\\writable" in WRITABLE_DIR:
 elif "/applejack" in BASE_DIR:
     WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/passim/database/"))
 
+MEDIA_DIR = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
+
 APP_PREFIX = ""
 if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or "c:" in WRITABLE_DIR or "C:" in WRITABLE_DIR or bUseTunnel:
     APP_PREFIX = ""
