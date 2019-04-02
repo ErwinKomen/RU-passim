@@ -28,7 +28,7 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SearchGoldForm, SermonGoldSameForm
+                                SelectGoldForm, SermonGoldSameForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame
 
@@ -53,6 +53,7 @@ bDebug = False
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
 def adapt_search(val):
+    if val == None: return None
     # First trim
     val = val.strip()
     val = '^' + fnmatch.translate(val) + '$'
@@ -118,7 +119,6 @@ def user_is_ingroup(request, sGroup):
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
-
 
 def home(request):
     """Renders the home page."""
@@ -851,6 +851,383 @@ def import_authors(request):
     return JsonResponse(data)
 
 
+class BasicPart(View):
+    # Initialisations
+    arErr = []              # errors   
+    template_name = None    # The template to be used
+    template_err_view = None
+    form_validated = True   # Used for POST form validation
+    savedate = None         # When saving information, the savedate is returned in the context
+    add = False             # Are we adding a new record or editing an existing one?
+    obj = None              # The instance of the MainModel
+    action = ""             # The action to be undertaken
+    MainModel = None        # The model that is mainly used for this form
+    form_objects = []       # List of forms to be processed
+    formset_objects = []    # List of formsets to be processed
+    bDebug = False          # Debugging information
+    data = {'status': 'ok', 'html': ''}       # Create data to be returned    
+    
+    def post(self, request, object_id=None):
+        # A POST request means we are trying to SAVE something
+        self.initializations(request, object_id)
+
+        # Explicitly set the status to OK
+        self.data['status'] = "ok"
+
+        if self.checkAuthentication(request):
+            # Build the context
+            context = dict(object_id = object_id, savedate=None)
+            # Action depends on 'action' value
+            if self.action == "":
+                if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
+                # Walk all the forms for preparation of the formObj contents
+                for formObj in self.form_objects:
+                    # Are we SAVING a NEW item?
+                    if self.add:
+                        # We are saving a NEW item
+                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
+                    else:
+                        # We are saving an EXISTING item
+                        # Determine the instance to be passed on
+                        instance = self.get_instance(formObj['prefix'])
+                        # Make the instance available in the form-object
+                        formObj['instance'] = instance
+                        # Get an instance of the form
+                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
+
+                # Initially we are assuming this just is a review
+                context['savedate']="reviewed at {}".format(datetime.now().strftime("%X"))
+
+                # Iterate again
+                for formObj in self.form_objects:
+                    prefix = formObj['prefix']
+                    # Adapt if it is not readonly
+                    if not formObj['readonly']:
+                        # Check validity of form
+                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
+                            # Save it preliminarily
+                            instance = formObj['forminstance'].save(commit=False)
+                            # The instance must be made available (even though it is only 'preliminary')
+                            formObj['instance'] = instance
+                            # Perform actions to this form BEFORE FINAL saving
+                            bNeedSaving = formObj['forminstance'].has_changed()
+                            if self.before_save(prefix, request, instance=instance): bNeedSaving = True
+                            if formObj['forminstance'].instance.id == None: bNeedSaving = True
+                            if bNeedSaving:
+                                # Perform the saving
+                                instance.save()
+                                # Set the context
+                                context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                # Put the instance in the form object
+                                formObj['instance'] = instance
+                                # Store the instance id in the data
+                                self.data[prefix + '_instanceid'] = instance.id
+                                # Any action after saving this form
+                                self.after_save(prefix, instance)
+                            # Also get the cleaned data from the form
+                            formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
+                        else:
+                            self.arErr.append(formObj['forminstance'].errors)
+                            self.form_validated = False
+                            formObj['cleaned_data'] = None
+                    else:
+                        # Form is readonly
+
+                        # Check validity of form
+                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
+                            # At least get the cleaned data from the form
+                            formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
+
+
+                    # Add instance to the context object
+                    context[prefix + "Form"] = formObj['forminstance']
+                # Walk all the formset objects
+                for formsetObj in self.formset_objects:
+                    prefix  = formsetObj['prefix']
+                    if self.can_process_formset(prefix):
+                        formsetClass = formsetObj['formsetClass']
+                        form_kwargs = self.get_form_kwargs(prefix)
+                        if self.add:
+                            # Saving a NEW item
+                            formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                        else:
+                            # Saving an EXISTING item
+                            instance = self.get_instance(prefix)
+                            qs = self.get_queryset(prefix)
+                            if qs == None:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, form_kwargs = form_kwargs)
+                            else:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, queryset=qs, form_kwargs = form_kwargs)
+                        # Process all the forms in the formset
+                        self.process_formset(prefix, request, formset)
+                        # Store the instance
+                        formsetObj['formsetinstance'] = formset
+                        # Adapt the formset contents only, when it is NOT READONLY
+                        if not formsetObj['readonly']:
+                            # Is the formset valid?
+                            if formset.is_valid():
+                                # Make sure all changes are saved in one database-go
+                                with transaction.atomic():
+                                    # Walk all the forms in the formset
+                                    for form in formset:
+                                        # At least check for validity
+                                        if form.is_valid() and self.is_custom_valid(prefix, form):
+                                            # Should we delete?
+                                            if form.cleaned_data['DELETE']:
+                                                # Delete this one
+                                                form.instance.delete()
+                                                # NOTE: the template knows this one is deleted by looking at form.DELETE
+                                                # form.delete()
+                                            else:
+                                                # Check if anything has changed so far
+                                                has_changed = form.has_changed()
+                                                # Save it preliminarily
+                                                instance = form.save(commit=False)
+                                                # Any actions before saving
+                                                if self.before_save(prefix, request, instance, form):
+                                                    has_changed = True
+                                                # Save this construction
+                                                if has_changed: 
+                                                    # Save the instance
+                                                    instance.save()
+                                                    # Adapt the last save time
+                                                    context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                                    # Store the instance id in the data
+                                                    self.data[prefix + '_instanceid'] = instance.id
+                                        else:
+                                            if len(form.errors) > 0:
+                                                self.arErr.append(form.errors)
+                            else:
+                                # Iterate over all errors
+                                for idx, err_this in enumerate(formset.errors):
+                                    if '__all__' in err_this:
+                                        self.arErr.append(err_this['__all__'][0])
+                                    elif err_this != {}:
+                                        # There is an error in item # [idx+1], field 
+                                        problem = err_this 
+                                        for k,v in err_this.items():
+                                            fieldName = k
+                                            errmsg = "Item #{} has an error at field [{}]: {}".format(idx+1, k, v[0])
+                                            self.arErr.append(errmsg)
+
+                            # self.arErr.append(formset.errors)
+                    else:
+                        formset = []
+                    # Add the formset to the context
+                    context[prefix + "_formset"] = formset
+            elif self.action == "download":
+                # We are being asked to download something
+                if self.dtype != "":
+                    # Initialise return status
+                    oBack = {'status': 'ok'}
+                    sType = "csv" if (self.dtype == "xlsx") else self.dtype
+
+                    # Get the data
+                    sData = self.get_data('', self.dtype)
+                    # Decode the data and compress it using gzip
+                    bUtf8 = (self.dtype != "db")
+                    bUsePlain = (self.dtype == "xlsx" or self.dtype == "csv")
+
+                    # Create name for download
+                    # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
+                    sDbName = "passim_libraries.{}".format(self.dtype)
+                    sContentType = ""
+                    if self.dtype == "csv":
+                        sContentType = "text/tab-separated-values"
+                    elif self.dtype == "json":
+                        sContentType = "application/json"
+                    elif self.dtype == "xlsx":
+                        sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+                    # Excel needs additional conversion
+                    if self.dtype == "xlsx":
+                        # Convert 'compressed_content' to an Excel worksheet
+                        response = HttpResponse(content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        response = csv_to_excel(sData, response)
+                    else:
+                        response = HttpResponse(sData, content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+
+                    # Continue for all formats
+                        
+                    # return gzip_middleware.process_response(request, response)
+                    return response
+
+            # Allow user to add to the context
+            context = self.add_to_context(context)
+
+            # Make sure we have a list of any errors
+            error_list = [str(item) for item in self.arErr]
+            context['error_list'] = error_list
+            context['errors'] = self.arErr
+            if len(self.arErr) > 0:
+                # Indicate that we have errors
+                self.data['has_errors'] = True
+                self.data['status'] = "error"
+            else:
+                self.data['has_errors'] = False
+            # Standard: add request user to context
+            context['requestuser'] = request.user
+
+            # Get the HTML response
+            if len(self.arErr) > 0:
+                if self.template_err_view != None:
+                     # Create a list of errors
+                    self.data['err_view'] = render_to_string(self.template_err_view, context, request)
+                else:
+                    self.data['error_list'] = error_list
+                self.data['html'] = ''
+            else:
+                # In this case reset the errors - they should be shown within the template
+                self.data['html'] = render_to_string(self.template_name, context, request)
+            # At any rate: empty the error basket
+            self.arErr = []
+            error_list = []
+
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+        
+    def get(self, request, object_id=None): 
+        self.data['status'] = 'ok'
+        # Perform the initializations that need to be made anyway
+        self.initializations(request, object_id)
+        if self.checkAuthentication(request):
+            context = dict(object_id = object_id, savedate=None)
+            # Walk all the form objects
+            for formObj in self.form_objects:        
+                # Used to populate a NEW research project
+                # - CREATE a NEW research form, populating it with any initial data in the request
+                initial = dict(request.GET.items())
+                if self.add:
+                    # Create a new form
+                    formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
+                else:
+                    # Used to show EXISTING information
+                    instance = self.get_instance(formObj['prefix'])
+                    # We should show the data belonging to the current Research [obj]
+                    formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
+                # Add instance to the context object
+                context[formObj['prefix'] + "Form"] = formObj['forminstance']
+            # Walk all the formset objects
+            for formsetObj in self.formset_objects:
+                formsetClass = formsetObj['formsetClass']
+                prefix  = formsetObj['prefix']
+                form_kwargs = self.get_form_kwargs(prefix)
+                if self.add:
+                    # - CREATE a NEW formset, populating it with any initial data in the request
+                    initial = dict(request.GET.items())
+                    # Saving a NEW item
+                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
+                else:
+                    # show the data belonging to the current [obj]
+                    instance = self.get_instance(prefix)
+                    qs = self.get_queryset(prefix)
+                    if qs == None:
+                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                    else:
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                # Process all the forms in the formset
+                ordered_forms = self.process_formset(prefix, request, formset)
+                if ordered_forms:
+                    context[prefix + "_ordered"] = ordered_forms
+                # Store the instance
+                formsetObj['formsetinstance'] = formset
+                # Add the formset to the context
+                context[prefix + "_formset"] = formset
+            # Allow user to add to the context
+            context = self.add_to_context(context)
+            # Make sure we have a list of any errors
+            error_list = [str(item) for item in self.arErr]
+            context['error_list'] = error_list
+            context['errors'] = self.arErr
+            # Standard: add request user to context
+            context['requestuser'] = request.user
+            
+            # Get the HTML response
+            sHtml = render_to_string(self.template_name, context, request)
+            sHtml = treat_bom(sHtml)
+            self.data['html'] = sHtml
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+      
+    def checkAuthentication(self,request):
+        # first check for authentication
+        if not request.user.is_authenticated:
+            # Simply redirect to the home page
+            self.data['html'] = "Please log in to work on this project"
+            return False
+        else:
+            return True
+
+    def initializations(self, request, object_id):
+        # Clear errors
+        self.arErr = []
+        # COpy the request
+        self.request = request
+        # Copy any object id
+        self.object_id = object_id
+        self.add = object_id is None
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+
+        # Check for action
+        if 'action' in self.qd:
+            self.action = self.qd['action']
+
+        # Find out what the Main Model instance is, if any
+        if self.add:
+            self.obj = None
+        else:
+            # Get the instance of the Main Model object
+            self.obj =  self.MainModel.objects.filter(pk=object_id).first()
+            # NOTE: if the object doesn't exist, we will NOT get an error here
+        # ALWAYS: perform some custom initialisations
+        self.custom_init()
+
+    def get_instance(self, prefix):
+        return self.obj
+
+    def is_custom_valid(self, prefix, form):
+        return True
+
+    def get_queryset(self, prefix):
+        return None
+
+    def get_form_kwargs(self, prefix):
+        return None
+
+    def get_data(self, prefix, dtype):
+        return ""
+
+    def before_save(self, prefix, request, instance=None, form=None):
+        return False
+
+    def after_save(self, prefix, instance=None):
+        return True
+
+    def add_to_context(self, context):
+        return context
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def can_process_formset(self, prefix):
+        return True
+
+    def custom_init(self):
+        pass    
+           
+
 class PassimDetails(DetailView):
     """Extension of the normal DetailView class for PASSIM"""
 
@@ -1402,7 +1779,6 @@ class SermonGoldListView(ListView):
         initial = self.request.GET
 
         # Add a files upload form
-        # context['goldForm'] = SearchGoldForm(prefix='gold')
         context['goldForm'] = SermonGoldForm(prefix='gold')
 
         # Determine the count 
@@ -1454,7 +1830,7 @@ class SermonGoldListView(ListView):
             # Get the formset from the input
             lstQ = []
 
-            goldForm = SearchGoldForm(self.qd, prefix='gold')
+            goldForm = SermonGoldForm(self.qd, prefix='gold')
 
             if goldForm.is_valid():
 
@@ -1462,22 +1838,25 @@ class SermonGoldListView(ListView):
                 oFields = goldForm.cleaned_data
 
                 # Check for SermonGold [idno]
-                if 'signature' in oFields and oFields['signature'] != "": 
-                    val = adapt_search(goldForm['signature'])
+                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                    val = adapt_search(oFields['signature'])
                     lstQ.append(Q(signature__iregex=val))
 
-                # Check for author name
-                if 'author' in oFields and oFields['author'] != "": 
-                    val = adapt_search(oFields['author'])
+                # Check for author name -- which is in the typeahead parameter
+                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+                    val = oFields['author']
+                    lstQ.append(Q(author=val))
+                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
+                    val = adapt_search(oFields['authorname'])
                     lstQ.append(Q(author__name__iregex=val))
 
                 # Check for incipit string
-                if 'incipit' in oFields and oFields['incipit'] != "": 
+                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
                     val = adapt_search(oFields['incipit'])
                     lstQ.append(Q(incipit__iregex=val))
 
                 # Check for explicit string
-                if 'explicit' in oFields and oFields['explicit'] != "": 
+                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
                     val = adapt_search(oFields['explicit'])
                     lstQ.append(Q(explicit__iregex=val))
 
@@ -1519,6 +1898,79 @@ class SermonGoldListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class SermonGoldSelect(BasicPart):
+    """Facilitate searching and selecting one gold sermon"""
+    MainModel = SermonGold
+    template_name = "seeker/sermongold_select.html"
+    # One form is attached to this 
+    prefix = 'gsel'
+    form_objects = [{'form': SelectGoldForm, 'prefix': prefix, 'readonly': True}]
+
+    def add_to_context(self, context):
+        """Anything that needs adding to the context"""
+
+        # Get the cleaned data
+        oFields = self.form_objects[0]['cleaned_data']
+        qs = SermonGold.objects.none()
+        if oFields != None:
+            # There is valid data to search with
+            lstQ = []
+            # (1) process signature
+            if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                lstQ.append(Q(signature=oFields['signature']))
+            elif 'signature_ta' in oFields and oFields['signature_ta'] != "" and oFields['signature_ta'] != None:
+                val = adapt_search(oFields['signature_ta'])
+                lstQ.append(Q(signature__iregex=val))
+
+            # (2) Check for author name -- which is in the typeahead parameter
+            if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+                val = oFields['author']
+                lstQ.append(Q(author=val))
+            elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
+                val = adapt_search(oFields['authorname'])
+                lstQ.append(Q(author__name__iregex=val))
+
+            # (3) Process incipit
+            if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
+                lstQ.append(Q(incipit=oFields['incipit']))
+            elif 'incipit_ta' in oFields and oFields['incipit_ta'] != "" and oFields['incipit_ta'] != None:
+                val = adapt_search(oFields['incipit_ta'])
+                lstQ.append(Q(incipit__iregex=val))
+
+            # (4) Process explicit
+            if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
+                lstQ.append(Q(explicit=oFields['explicit']))
+            elif 'explicit_ta' in oFields and oFields['explicit_ta'] != "" and oFields['explicit_ta'] != None:
+                val = adapt_search(oFields['explicit_ta'])
+                lstQ.append(Q(explicit__iregex=val))
+
+            # Calculate the final qs
+            if len(lstQ) == 0:
+                # Just show everything
+                qs = SermonGold.objects.all()
+            else:
+                qs = SermonGold.objects.filter(*lstQ)
+            # Make sure sorting is done correctly
+            qs = qs.order_by('author__name', 'signature', 'incipit', 'explicit')
+        # Add the result to the context
+        context['results'] = qs
+        
+        # Return the updated context
+        return context
+
+    #def get_queryset(self, prefix):
+
+    #    # Get parameters
+    #    name = self.qd.get("name", "")
+
+    #    # Construct the QS
+    #    lstQ = []
+    #    if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+    #    qs = Author.objects.filter(*lstQ).order_by('name')
+
+    #    return qs
 
 
 class SermonDetailsView(DetailView):
@@ -1681,31 +2133,11 @@ class SermonGoldSameDetailsView(PassimDetails):
 
     model = SermonGoldSame
     mForm = SermonGoldSameForm
-    template_name = 'seeker/sermongoldlink_info.html'
+    template_name = 'seeker/sermongoldlink_info.html'    # Use this for GET and for POST requests
     template_post = 'seeker/sermongoldlink_info.html'
     prefix = "glink"
     title = "SermonGoldLink"
     afternewurl = "" 
-
-    #def add_to_context(self, context, instance):
-    #    """Add to the existing context"""
-
-    #    # Get a form for the current or the new SermonGoldLink
-    #    lst_related = []
-    #    linkprefix = "glink"
-    #    # Do we have an instance?
-    #    if instance != None:
-    #        # There is an instance: get the list of SermonGold items to which I link
-    #        relations = instance.get_relations()
-    #        # Get a form for each of these relations
-    #        for instance in relations:
-    #            oForm = SermonGoldSameForm(instance=instance, prefix=linkprefix)
-    #            lst_related.append(oForm)
-
-    #    # Add the list to the context
-    #    context['relations'] = lst_related
-
-    #    return context
 
 
 class SermonGoldDetailsView(PassimDetails):
@@ -1714,7 +2146,6 @@ class SermonGoldDetailsView(PassimDetails):
     model = SermonGold
     mForm = SermonGoldForm
     template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
-    # NOTE: we need to have the same template for POST responses
     template_post = 'seeker/sermongold_info.html'
     prefix = "gold"
     title = "SermonGold" 
@@ -1954,372 +2385,6 @@ class LibraryListView(ListView):
         # Return the resulting filtered and sorted queryset
         return qs
 
-
-class BasicPart(View):
-    # Initialisations
-    arErr = []              # errors   
-    template_name = None    # The template to be used
-    template_err_view = None
-    form_validated = True   # Used for POST form validation
-    savedate = None         # When saving information, the savedate is returned in the context
-    add = False             # Are we adding a new record or editing an existing one?
-    obj = None              # The instance of the MainModel
-    action = ""             # The action to be undertaken
-    MainModel = None        # The model that is mainly used for this form
-    form_objects = []       # List of forms to be processed
-    formset_objects = []    # List of formsets to be processed
-    bDebug = False          # Debugging information
-    data = {'status': 'ok', 'html': ''}       # Create data to be returned    
-    
-    def post(self, request, object_id=None):
-        # A POST request means we are trying to SAVE something
-        self.initializations(request, object_id)
-
-        # Explicitly set the status to OK
-        self.data['status'] = "ok"
-
-        if self.checkAuthentication(request):
-            # Build the context
-            context = dict(object_id = object_id, savedate=None)
-            # Action depends on 'action' value
-            if self.action == "":
-                if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
-                # Walk all the forms for preparation of the formObj contents
-                for formObj in self.form_objects:
-                    # Are we SAVING a NEW item?
-                    if self.add:
-                        # We are saving a NEW item
-                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
-                    else:
-                        # We are saving an EXISTING item
-                        # Determine the instance to be passed on
-                        instance = self.get_instance(formObj['prefix'])
-                        # Make the instance available in the form-object
-                        formObj['instance'] = instance
-                        # Get an instance of the form
-                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
-
-                # Initially we are assuming this just is a review
-                context['savedate']="reviewed at {}".format(datetime.now().strftime("%X"))
-
-                # Iterate again
-                for formObj in self.form_objects:
-                    prefix = formObj['prefix']
-                    # Adapt if it is not readonly
-                    if not formObj['readonly']:
-                        # Check validity of form
-                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
-                            # Save it preliminarily
-                            instance = formObj['forminstance'].save(commit=False)
-                            # The instance must be made available (even though it is only 'preliminary')
-                            formObj['instance'] = instance
-                            # Perform actions to this form BEFORE FINAL saving
-                            bNeedSaving = formObj['forminstance'].has_changed()
-                            if self.before_save(prefix, request, instance=instance): bNeedSaving = True
-                            if formObj['forminstance'].instance.id == None: bNeedSaving = True
-                            if bNeedSaving:
-                                # Perform the saving
-                                instance.save()
-                                # Set the context
-                                context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
-                                # Put the instance in the form object
-                                formObj['instance'] = instance
-                                # Store the instance id in the data
-                                self.data[prefix + '_instanceid'] = instance.id
-                                # Any action after saving this form
-                                self.after_save(prefix, instance)
-                        else:
-                            self.arErr.append(formObj['forminstance'].errors)
-                            self.form_validated = False
-
-                    # Add instance to the context object
-                    context[prefix + "Form"] = formObj['forminstance']
-                # Walk all the formset objects
-                for formsetObj in self.formset_objects:
-                    prefix  = formsetObj['prefix']
-                    if self.can_process_formset(prefix):
-                        formsetClass = formsetObj['formsetClass']
-                        form_kwargs = self.get_form_kwargs(prefix)
-                        if self.add:
-                            # Saving a NEW item
-                            formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                        else:
-                            # Saving an EXISTING item
-                            instance = self.get_instance(prefix)
-                            qs = self.get_queryset(prefix)
-                            if qs == None:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, form_kwargs = form_kwargs)
-                            else:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, queryset=qs, form_kwargs = form_kwargs)
-                        # Process all the forms in the formset
-                        self.process_formset(prefix, request, formset)
-                        # Store the instance
-                        formsetObj['formsetinstance'] = formset
-                        # Adapt the formset contents only, when it is NOT READONLY
-                        if not formsetObj['readonly']:
-                            # Is the formset valid?
-                            if formset.is_valid():
-                                # Make sure all changes are saved in one database-go
-                                with transaction.atomic():
-                                    # Walk all the forms in the formset
-                                    for form in formset:
-                                        # At least check for validity
-                                        if form.is_valid() and self.is_custom_valid(prefix, form):
-                                            # Should we delete?
-                                            if form.cleaned_data['DELETE']:
-                                                # Delete this one
-                                                form.instance.delete()
-                                                # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                # form.delete()
-                                            else:
-                                                # Check if anything has changed so far
-                                                has_changed = form.has_changed()
-                                                # Save it preliminarily
-                                                instance = form.save(commit=False)
-                                                # Any actions before saving
-                                                if self.before_save(prefix, request, instance, form):
-                                                    has_changed = True
-                                                # Save this construction
-                                                if has_changed: 
-                                                    # Save the instance
-                                                    instance.save()
-                                                    # Adapt the last save time
-                                                    context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
-                                                    # Store the instance id in the data
-                                                    self.data[prefix + '_instanceid'] = instance.id
-                                        else:
-                                            if len(form.errors) > 0:
-                                                self.arErr.append(form.errors)
-                            else:
-                                # Iterate over all errors
-                                for idx, err_this in enumerate(formset.errors):
-                                    if '__all__' in err_this:
-                                        self.arErr.append(err_this['__all__'][0])
-                                    elif err_this != {}:
-                                        # There is an error in item # [idx+1], field 
-                                        problem = err_this 
-                                        for k,v in err_this.items():
-                                            fieldName = k
-                                            errmsg = "Item #{} has an error at field [{}]: {}".format(idx+1, k, v[0])
-                                            self.arErr.append(errmsg)
-
-                            # self.arErr.append(formset.errors)
-                    else:
-                        formset = []
-                    # Add the formset to the context
-                    context[prefix + "_formset"] = formset
-            elif self.action == "download":
-                # We are being asked to download something
-                if self.dtype != "":
-                    # Initialise return status
-                    oBack = {'status': 'ok'}
-                    sType = "csv" if (self.dtype == "xlsx") else self.dtype
-
-                    # Get the data
-                    sData = self.get_data('', self.dtype)
-                    # Decode the data and compress it using gzip
-                    bUtf8 = (self.dtype != "db")
-                    bUsePlain = (self.dtype == "xlsx" or self.dtype == "csv")
-
-                    # Create name for download
-                    # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
-                    sDbName = "passim_libraries.{}".format(self.dtype)
-                    sContentType = ""
-                    if self.dtype == "csv":
-                        sContentType = "text/tab-separated-values"
-                    elif self.dtype == "json":
-                        sContentType = "application/json"
-                    elif self.dtype == "xlsx":
-                        sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-                    # Excel needs additional conversion
-                    if self.dtype == "xlsx":
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = csv_to_excel(sData, response)
-                    else:
-                        response = HttpResponse(sData, content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-
-                    # Continue for all formats
-                        
-                    # return gzip_middleware.process_response(request, response)
-                    return response
-
-            # Allow user to add to the context
-            context = self.add_to_context(context)
-
-            # Make sure we have a list of any errors
-            error_list = [str(item) for item in self.arErr]
-            context['error_list'] = error_list
-            context['errors'] = self.arErr
-            if len(self.arErr) > 0:
-                # Indicate that we have errors
-                self.data['has_errors'] = True
-                self.data['status'] = "error"
-            else:
-                self.data['has_errors'] = False
-            # Standard: add request user to context
-            context['requestuser'] = request.user
-
-            # Get the HTML response
-            if len(self.arErr) > 0:
-                if self.template_err_view != None:
-                     # Create a list of errors
-                    self.data['err_view'] = render_to_string(self.template_err_view, context, request)
-                else:
-                    self.data['error_list'] = error_list
-                self.data['html'] = ''
-            else:
-                # In this case reset the errors - they should be shown within the template
-                self.data['html'] = render_to_string(self.template_name, context, request)
-            # At any rate: empty the error basket
-            self.arErr = []
-            error_list = []
-
-        else:
-            self.data['html'] = "Please log in before continuing"
-
-        # Return the information
-        return JsonResponse(self.data)
-        
-    def get(self, request, object_id=None): 
-        self.data['status'] = 'ok'
-        # Perform the initializations that need to be made anyway
-        self.initializations(request, object_id)
-        if self.checkAuthentication(request):
-            context = dict(object_id = object_id, savedate=None)
-            # Walk all the form objects
-            for formObj in self.form_objects:        
-                # Used to populate a NEW research project
-                # - CREATE a NEW research form, populating it with any initial data in the request
-                initial = dict(request.GET.items())
-                if self.add:
-                    # Create a new form
-                    formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
-                else:
-                    # Used to show EXISTING information
-                    instance = self.get_instance(formObj['prefix'])
-                    # We should show the data belonging to the current Research [obj]
-                    formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
-                # Add instance to the context object
-                context[formObj['prefix'] + "Form"] = formObj['forminstance']
-            # Walk all the formset objects
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                form_kwargs = self.get_form_kwargs(prefix)
-                if self.add:
-                    # - CREATE a NEW formset, populating it with any initial data in the request
-                    initial = dict(request.GET.items())
-                    # Saving a NEW item
-                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
-                else:
-                    # show the data belonging to the current [obj]
-                    instance = self.get_instance(prefix)
-                    qs = self.get_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                    else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
-            # Allow user to add to the context
-            context = self.add_to_context(context)
-            # Make sure we have a list of any errors
-            error_list = [str(item) for item in self.arErr]
-            context['error_list'] = error_list
-            context['errors'] = self.arErr
-            # Standard: add request user to context
-            context['requestuser'] = request.user
-            
-            # Get the HTML response
-            sHtml = render_to_string(self.template_name, context, request)
-            sHtml = treat_bom(sHtml)
-            self.data['html'] = sHtml
-        else:
-            self.data['html'] = "Please log in before continuing"
-
-        # Return the information
-        return JsonResponse(self.data)
-      
-    def checkAuthentication(self,request):
-        # first check for authentication
-        if not request.user.is_authenticated:
-            # Simply redirect to the home page
-            self.data['html'] = "Please log in to work on this project"
-            return False
-        else:
-            return True
-
-    def initializations(self, request, object_id):
-        # Clear errors
-        self.arErr = []
-        # COpy the request
-        self.request = request
-        # Copy any object id
-        self.object_id = object_id
-        self.add = object_id is None
-        # Get the parameters
-        if request.POST:
-            self.qd = request.POST
-        else:
-            self.qd = request.GET
-
-        # Check for action
-        if 'action' in self.qd:
-            self.action = self.qd['action']
-
-        # Find out what the Main Model instance is, if any
-        if self.add:
-            self.obj = None
-        else:
-            # Get the instance of the Main Model object
-            self.obj =  self.MainModel.objects.filter(pk=object_id).first()
-            # NOTE: if the object doesn't exist, we will NOT get an error here
-        # ALWAYS: perform some custom initialisations
-        self.custom_init()
-
-    def get_instance(self, prefix):
-        return self.obj
-
-    def is_custom_valid(self, prefix, form):
-        return True
-
-    def get_queryset(self, prefix):
-        return None
-
-    def get_form_kwargs(self, prefix):
-        return None
-
-    def get_data(self, prefix, dtype):
-        return ""
-
-    def before_save(self, prefix, request, instance=None, form=None):
-        return False
-
-    def after_save(self, prefix, instance=None):
-        return True
-
-    def add_to_context(self, context):
-        return context
-
-    def process_formset(self, prefix, request, formset):
-        return None
-
-    def can_process_formset(self, prefix):
-        return True
-
-    def custom_init(self):
-        pass    
-           
 
 class LibraryListDownload(BasicPart):
     MainModel = Library

@@ -1,0 +1,58 @@
+﻿{% load i18n %}
+
+<div id="goldselect_top" >
+  <!-- Form with search parameters -->
+  <form>
+    {% csrf_token %}
+    <table style="width: 100%;">
+      <tr style="width: 100%;">
+        <td>Signature</td>
+        <td style="width: 100%;">
+          <div class="signature-key hidden">{{gselForm.signature}}</div>
+          <div>{{gselForm.signature_ta}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>Author</td>
+        <td>
+          <div class="author-key hidden">{{gselForm.author}}</div>
+          <div>{{gselForm.authorname}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>Incipit</td>
+        <td>
+          <div class="incipit-key hidden">{{gselForm.incipit}}</div>
+          <div>{{gselForm.incipit_ta}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>Explicit</td>
+        <td>
+          <div class="explicit-key hidden">{{gselForm.explicit}}</div>
+          <div>{{gselForm.explicit_ta}}</div>
+        </td>
+      </tr>
+      <tr class="hidden">
+        <td>Golden source</td>
+        <td>{{source_id}}</td>
+      </tr>
+      <tr><td colspan="2">&nbsp;</td></tr>
+    </table>
+
+  </form>
+</div>
+
+<div id="goldselect_results">
+  <table>
+    <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
+    <tbody>
+      {% for item in results %}
+      <tr>
+        <td>{{forloop.counter}}</td>
+        <td>{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

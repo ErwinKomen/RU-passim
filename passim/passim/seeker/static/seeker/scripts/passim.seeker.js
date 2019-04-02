@@ -1154,6 +1154,43 @@ var ru = (function ($, ru) {
           // Action depends on the mode
           switch (sMode) {
             case "edit":
+              // Make sure all targetid's that need opening are shown
+              $(elTr).find(".view-mode:not(.hidden)").each(function () {
+                var elTarget = $(this).attr("targetid");
+                var targeturl = $(this).attr("targeturl");
+
+                frm = $(el).closest("form");
+                data = frm.serializeArray();
+                if (elTarget !== undefined && elTarget !== "") {
+                  // Do we have a targeturl?
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Make a post to the targeturl
+                    $.post(targeturl, data, function (response) {
+                      // Action depends on the response
+                      if (response === undefined || response === null || !("status" in response)) {
+                        private_methods.errMsg("No status returned");
+                      } else {
+                        switch (response.status) {
+                          case "ready":
+                          case "ok":
+                            if ("html" in response) {
+                              // Show the HTML in the targetid
+                              $("#" + elTarget).html(response['html']);
+                            }
+                            // In all cases: open the target
+                            $("#" + elTarget).removeClass("hidden");
+                            // And make sure typeahead works
+                            ru.passim.init_typeahead();
+                            break;
+                        }
+                      }
+                    });
+                  } else {
+                    // Just open the target
+                    $("#" + elTarget).removeClass("hidden");
+                  }
+                }
+              });
               // Go to edit mode
               $(elTr).find(".view-mode").addClass("hidden");
               $(elTr).find(".edit-mode").removeClass("hidden");
@@ -1176,6 +1213,7 @@ var ru = (function ($, ru) {
               } else {
                 switch (manutype) {
                   case "goldlink":
+                  case "goldnew":
                     targethead = $("#" + targetid);
                     break;
                   case "goldlinkclose":
@@ -1196,9 +1234,6 @@ var ru = (function ($, ru) {
                     }
                     break;
                 }
-                //if ($(el).hasClass("btn")) {
-                //} else {
-                //}
 
                 // There is a targetid specified, so make a GET request for the information and get it here
                 data = [];
@@ -1230,6 +1265,12 @@ var ru = (function ($, ru) {
                               $(elTr).find(".edit-mode").removeClass("hidden");
                               $(elTr).find(".view-mode").addClass("hidden");
                               break;
+                            case "goldnew":
+                              // Click on the 'edit' button
+                              ru.passim.seeker.init_events();
+                              $("#edit-goldlink").find("a[mode='new']").first().trigger("click");
+                              // ru.passim.seeker.manu_edit($("#edit-goldlink").find("a[mode='edit']").first(), 'new');
+                              return;
                             default:
                               break;
                           }
@@ -1274,6 +1315,7 @@ var ru = (function ($, ru) {
                   }
                   switch (manutype) {
                     case "goldlink":
+                    case "goldnew":
                       break;
                     default:
                       // Return to view mode
@@ -1385,6 +1427,13 @@ var ru = (function ($, ru) {
 
               break;
             case "cancel":
+              // Make sure all targetid's that need closing are hidden
+              $(elTr).find(".edit-mode:not(.hidden)").each(function () {
+                var elTarget = $(this).attr("targetid");
+                if (elTarget !== undefined && elTarget !== "") {
+                  $("#" + elTarget).addClass("hidden");
+                }
+              });
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
