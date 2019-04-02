@@ -80,7 +80,7 @@
   <span id="add_gold_link" class="pull-right">
     <a class="btn btn-xs jumbo-3" role="button" 
         manutype="goldnew"
-        targetid="edit-goldlink"
+        targetid="edit-goldlink-{{goldForm.instance.id}}"
         targeturl="{% url 'goldlink_view' %}"
         onclick="ru.passim.seeker.manu_edit(this, 'new');">
       <span class="glyphicon glyphicon-plus"></span>Add a link to this golden sermon
@@ -89,18 +89,18 @@
 </h4>
 
 
-{% if relations|length == 0 %}
-  <i>(There are no links from this sermongold)</i>
-{% else %}
-
   <!-- This is where the goldsermon link that is currently being edited shows up -->
   <div class="row goldlink hidden">
     <div class="col-md-10 col-md-offset-1">
-      <div class="panel panel-default" id="edit-goldlink">
+      <div class="panel panel-default" id="edit-goldlink-{{goldForm.instance.id}}">
         <!-- This is where the current gold-to-gold link shows up -->
       </div>
     </div>
   </div>
+
+{% if relations|length == 0 %}
+  <i>(There are no links from this sermongold)</i>
+{% else %}
 
   <table class="func-view" style="width: 100%;">
     <thead>
@@ -115,14 +115,14 @@
             <form>
               <div class="view-mode clickable" 
                    manutype="goldlink"
-                   targetid="edit-goldlink"
+                   targetid="edit-goldlink-{{goldForm.instance.id}}"
                    targeturl="{% url 'goldlink_view' linkform.instance.id %}"
                    onclick="ru.passim.seeker.manu_edit(this, 'view');">
                 {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
               </div>
               <div class="edit-mode hidden selected"
                    manutype="goldlinkclose"
-                   targetid="edit-goldlink"
+                   targetid="edit-goldlink-{{goldForm.instance.id}}"
                    onclick="ru.passim.seeker.manu_edit(this, 'view');">
                 <!-- Issue #61: allow user to select a SermonGold based on typeahead searches for incipit, explicit, signature, author -->
                 <!-- TODO!! -->
