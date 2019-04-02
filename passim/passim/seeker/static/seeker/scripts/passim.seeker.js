@@ -1108,7 +1108,7 @@ var ru = (function ($, ru) {
        *   And if saving is required, then call the [targeturl] to send a POST of the form data
        *
        */
-      manu_edit: function (el, sType) {
+      manu_edit: function (el, sType, oParams) {
         var //el = this,
             sMode = "",
             colspan = "",
@@ -1128,9 +1128,7 @@ var ru = (function ($, ru) {
 
         try {
           // Possibly correct [el]
-          if (el !== undefined && "currentTarget" in el) {
-            el = el.currentTarget;
-          }
+          if (el !== undefined && "currentTarget" in el) { el = el.currentTarget; }
           // Get the mode
           if (sType !== undefined && sType !== "") {
             sMode = sType;
@@ -1141,7 +1139,12 @@ var ru = (function ($, ru) {
           elTr = $(el).closest("td");
           // Get the manutype
           manutype = $(el).attr("manutype");
-          if (manutype === undefined) { manutype = "other";}
+          if (manutype === undefined) { manutype = "other"; }
+
+          // Get alternative parameters from [oParams] if this is defined
+          if (oParams !== undefined) {
+            if ('manutype' in oParams) { manutype = oParams['manutype']; }
+          }
 
           // Check if we need to take the table
           if ($(elTr).hasClass("table")) {
@@ -1197,8 +1200,8 @@ var ru = (function ($, ru) {
               // Make sure typeahead works here
               ru.passim.init_typeahead();
               break;
-            case "new":
             case "view":
+            case "new":
               // Get any possible targeturl
               targeturl = $(el).attr("targeturl");
               targetid = $(el).attr("targetid");
@@ -1214,6 +1217,7 @@ var ru = (function ($, ru) {
                 switch (manutype) {
                   case "goldlink":
                   case "goldnew":
+                  case "newgoldlink":
                     targethead = $("#" + targetid);
                     break;
                   case "goldlinkclose":
@@ -1229,6 +1233,12 @@ var ru = (function ($, ru) {
                       if (!$(targethead).hasClass("hidden")) {
                         // Close it
                         $(targethead).addClass("hidden");
+                        return;
+                      }
+                    } else if ($("#" + targetid).attr("showing") !== undefined) {
+                      if ($("#" + targetid).attr("showing") === "true") {
+                        $("#" + targetid).attr("showing", "false");
+                        $("#" + targetid).html("");
                         return;
                       }
                     }
@@ -1251,6 +1261,8 @@ var ru = (function ($, ru) {
                           $("#" + targetid).html(response['html']);
                           // Make sure invisible ancestors show up
                           $("#" + targetid).closest(".hidden").removeClass("hidden");
+                          // Indicate that we are showing here
+                          $("#" + targetid).attr("showing", "true");
 
                           switch (manutype) {
                             case "goldsermon":
@@ -1268,8 +1280,13 @@ var ru = (function ($, ru) {
                             case "goldnew":
                               // Click on the 'edit' button
                               ru.passim.seeker.init_events();
-                              $("#edit-goldlink").find("a[mode='new']").first().trigger("click");
-                              // ru.passim.seeker.manu_edit($("#edit-goldlink").find("a[mode='edit']").first(), 'new');
+                              $("#" + targetid).find("a[mode='edit']").first().trigger("click");
+
+                              //ru.passim.seeker.manu_edit($("#edit-goldlink"),
+                              //  'edit', {'manutype': 'newgoldlink', 'delete': 'false'});
+
+                              //ru.passim.seeker.manu_edit($("#" + targetid).find("a[mode='new']").first(),
+                              //  'new', { 'manutype': 'newgoldlink', 'delete': 'false' });
                               return;
                             default:
                               break;
@@ -1277,10 +1294,11 @@ var ru = (function ($, ru) {
 
                           // Check on specific modes
                           if (sMode === "new") {
-                            // This is 'new', so don't show buttons cancel and delete
-                            $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
                             $("#" + targetid).find(".edit-mode").removeClass("hidden");
                             $("#" + targetid).find(".view-mode").addClass("hidden");
+                            // This is 'new', so don't show buttons cancel and delete
+                            // $("#" + targetid).find("a[mode='delete']").addClass("hidden");
+                            $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
                           } else {
                             // Just viewing means we can also delete...
                             // What about CANCEL??

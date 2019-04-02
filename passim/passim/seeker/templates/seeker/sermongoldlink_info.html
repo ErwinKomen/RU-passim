@@ -12,9 +12,9 @@
           <a mode="edit" class="view-mode btn btn-xs jumbo-1">
             <span class="glyphicon glyphicon-pencil" title="Edit this gold-sermon link"></span>
           </a>
-          <a mode="new" class="hidden view-mode btn btn-xs jumbo-1"
-             targetid="sermongold_select"
-             targeturl="{% url 'goldlink_view' %}">
+          <a mode="new" class="hidden view-mode btn btn-xs jumbo-1" 
+             targetid="sermongold_select_{{glinkForm.instance.id}}"
+             targeturl="{% url 'select_gold' %}">
             <span class="glyphicon glyphicon-pencil" title="Create a new gold-sermon link"></span>
           </a>
           {% endif %}
@@ -39,7 +39,7 @@
           {% if is_passim_editor %}
           <!-- Put the delete button completely to the right-->
           <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" targetid="sermon_edit"
-             targeturl="{% if goldForm.instance.id %}{% url 'goldlink_view' glinkForm.instance.id %}{% endif %}">
+             targeturl="{% if glinkForm.instance.id %}{% url 'goldlink_view' glinkForm.instance.id %}{% endif %}">
             <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
           </a>
           {% endif %}
@@ -57,12 +57,13 @@
           <div class="view-mode">{{glinkForm.linktype.value}}</div>
         </td>
         <td style="width: 100%">
-          <div class="view-mode" targetid="sermongold_select"
+          <div class="view-mode" 
+               targetid="sermongold_select_{{glinkForm.instance.id}}"
                targeturl="{% url 'select_gold' %}">
             {% include 'seeker/sermongold_view.html' with msitem=glinkForm.instance.dst %}
           </div>
           <div class="edit-mode hidden selected" 
-               targetid="sermongold_select">
+               targetid="sermongold_select_{{glinkForm.instance.id}}">
             Search and select the correct Gold Sermon in the list below
           </div>
         </td>
@@ -71,6 +72,6 @@
 </form>
 
 <!-- Searching for a gold sermon-->
-<div id="sermongold_select" class="hidden">
+<div id="sermongold_select_{{glinkForm.instance.id}}" class="hidden">
   {% include 'seeker/sermongold_select.html' with source_id=glinkForm.instance.dst.id %}
 </div>
