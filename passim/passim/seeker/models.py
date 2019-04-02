@@ -5,9 +5,11 @@ from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.urls import reverse
 from datetime import datetime
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
+from passim.seeker.excel import excel_to_list
 import sys, os
 import copy
 import json
@@ -19,8 +21,11 @@ from xml.dom import minidom
 
 STANDARD_LENGTH=100
 LONG_STRING=255
+MAX_TEXT_LEN = 200
 
+VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
+LINK_TYPE = "seeker.linktype"
 
 
 class FieldChoice(models.Model):
@@ -37,6 +42,54 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
+
+
+class HelpChoice(models.Model):
+    """Define the URL to link to for the help-text"""
+    
+    field = models.CharField(max_length=200)        # The 'path' to and including the actual field
+    searchable = models.BooleanField(default=False) # Whether this field is searchable or not
+    display_name = models.CharField(max_length=50)  # Name between the <a></a> tags
+    help_url = models.URLField(default='')          # THe actual help url (if any)
+
+    def __str__(self):
+        return "[{}]: {}".format(
+            self.field, self.display_name)
+
+    def Text(self):
+        help_text = ''
+        # is anything available??
+        if (self.help_url != ''):
+            if self.help_url[:4] == 'http':
+                help_text = "See: <a href='{}'>{}</a>".format(
+                    self.help_url, self.display_name)
+            else:
+                help_text = "{} ({})".format(
+                    self.display_name, self.help_url)
+        return help_text
+
+
+def get_help(field):
+    """Create the 'help_text' for this element"""
+
+    # find the correct instance in the database
+    help_text = ""
+    try:
+        entry_list = HelpChoice.objects.filter(field__iexact=field)
+        entry = entry_list[0]
+        # Note: only take the first actual instance!!
+        help_text = entry.Text()
+    except:
+        help_text = "Sorry, no help available for " + field
+
+    return help_text
+
+def get_crpp_date(dtThis):
+    """Convert datetime to string"""
+
+    # Model: yyyy-MM-dd'T'HH:mm:ss
+    sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
+    return sDate
 
 def get_now_time():
     return time.clock()
@@ -78,7 +131,6 @@ def getText(nodeStart):
             # Recursive
             rc.append(getText(node))
     return ' '.join(rc)
-
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -500,6 +552,49 @@ class Origin(models.Model):
         return hit
 
 
+class Provenance(models.Model):
+    """The 'origin' is a location where manuscripts were originally created"""
+
+    # [1] Name of the location
+    name = models.CharField("Provenance location", max_length=LONG_STRING)
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Notes on this provenance", blank=True, null=True)
+    # TODO: city/country??
+
+    def __str__(self):
+        return self.name
+
+    def find_or_create(sName, note=None):
+        """Find a location or create it."""
+
+        lstQ = []
+        lstQ.append(Q(name__iexact=sName))
+        if note!=None: lstQ.append(Q(note__iexact=note))
+        qs = Provenance.objects.filter(*lstQ)
+        if qs.count() == 0:
+            # Create one
+            hit = Provenance(name=sName)
+            if note!=None: hit.note=note
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
+
+class SourceInfo(models.Model):
+    """Details of the source from which we get information"""
+
+    # [1] Obligatory time of extraction
+    created = models.DateTimeField(default=datetime.now)
+    # [0-1] Code used to collect information
+    code = models.TextField("Code", null=True, blank=True)
+    # [0-1] URL that was used
+    url = models.URLField("URL", null=True, blank=True)
+    # [1] The person who was in charge of extracting the information
+    collector = models.CharField("Collected by", max_length=LONG_STRING)
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -528,6 +623,15 @@ class Manuscript(models.Model):
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
+    # Where do we get our information from? And when was it added?
+    source = models.ForeignKey(SourceInfo, null=True, blank=True)
+
+    # [m] Many-to-many: all the sermons of this manuscr
+    sermons = models.ManyToManyField("SermonDescr", through="SermonMan")
+    # [m] Many-to-many: all the provenances of this manuscript
+    provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
+
+
     def __str__(self):
         return self.name
 
@@ -538,26 +642,26 @@ class Manuscript(models.Model):
         sermon = None
         try:
             lstQ = []
-            lstQ.append(Q(sermon__title=oDescr['title']))
-            if 'location' in oDescr: lstQ.append(Q(sermon__locus__iexact=oDescr['location']))
-            if 'author' in oDescr: lstQ.append(Q(sermon__author__name__iexact=oDescr['author']))
-            if 'incipit' in oDescr: lstQ.append(Q(sermon__incipit__iexact=oDescr['incipit']))
-            if 'explicit' in oDescr: lstQ.append(Q(sermon__explicit__iexact=oDescr['explicit']))
+            if 'title' in oDescr: lstQ.append(Q(title__iexact=oDescr['title']))
+            if 'gryson' in oDescr: lstQ.append(Q(gryson__iexact=oDescr['gryson']))
+            if 'location' in oDescr: lstQ.append(Q(locus__iexact=oDescr['location']))
+            if 'author' in oDescr: lstQ.append(Q(author__name__iexact=oDescr['author']))
+            if 'incipit' in oDescr: lstQ.append(Q(incipit__iexact=oDescr['incipit']))
+            if 'explicit' in oDescr: lstQ.append(Q(explicit__iexact=oDescr['explicit']))
+            if 'quote' in oDescr: lstQ.append(Q(quote__iexact=oDescr['quote']))
+
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
-            sermonman = self.sermons.filter(*lstQ).first()
-            if sermonman != None:
-                # Alternative: prescribe manuscript
-                lstQ.append(Q(manuscript=self))
-                sermonman = self.sermons.filter(*lstQ).first()
-                if sermonman != None:
-                    sermon = sermonman.sermon
+            sermon = self.sermons.filter(*lstQ).first()
+
+            # Return the sermon instance
             return sermon
         except:
             sMsg = oErr.get_error_message()
             oErr.DoError("Manuscript/find_or_create")
             return None
 
-    def find_or_create(name,yearstart, yearfinish, library, origin, idno="", filename=None, url="", support = "", extent = "", format = ""):
+    def find_or_create(name,yearstart, yearfinish, library, idno="", 
+                       filename=None, url="", support = "", extent = "", format = "", source=None):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -567,17 +671,19 @@ class Manuscript(models.Model):
             lstQ.append(Q(yearstart=yearstart))
             lstQ.append(Q(yearfinish=yearfinish))
             lstQ.append(Q(library=library))
+            # Ideally take along the idno too
+            if idno != "": lstQ.append(Q(idno=idno))
             qs = Manuscript.objects.filter(*lstQ)
             if qs.count() == 0:
                 # Note: do *NOT* let the place of origin play a role in locating the manuscript
                 manuscript = Manuscript(name=name, yearstart=yearstart, yearfinish=yearfinish, library=library )
                 if idno != "": manuscript.idno = idno
-                if origin != None: manuscript.origin = origin
                 if filename != None: manuscript.filename = filename
                 if support != "": manuscript.support = support
                 if extent != "": manuscript.extent = extent
                 if format != "": manuscript.format = format
                 if url != "": manuscript.url = url
+                if source != None: manuscript.source=source
                 manuscript.save()
             else:
                 manuscript = qs[0]
@@ -589,6 +695,7 @@ class Manuscript(models.Model):
                 if extent != manuscript.extent: manuscript.extent = extent ; bNeedSave = True
                 if format != manuscript.format: manuscript.format = format ; bNeedSave = True
                 if url != manuscript.url: manuscript.url = url ; bNeedSave = True
+                if source != None: manuscript.source=source ; bNeedSave = True
                 if bNeedSave:
                     manuscript.save()
             return manuscript
@@ -597,21 +704,225 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
-    def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None):
+    def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
         
         This approach makes use of MINIDOM (which is part of the standard xml.dom)
         """
 
+        # Number to order all the items we read
+        order = 0
+
+        def read_msitem(msItem, oParent, lMsItem, level=0):
+            """Recursively process one <msItem> and return in an object"""
+        
+            errHandle = ErrHandle()
+            sError = ""
+            nonlocal order
+            
+            level += 1
+            order  += 1
+            try:
+                # Create a new item
+                oMsItem = {}
+                oMsItem['level'] = level
+                oMsItem['order'] = order 
+                oMsItem['childof'] = 0 if len(oParent) == 0 else oParent['order']
+
+                # Already put it into the overall list
+                lMsItem.append(oMsItem)
+
+                # Check if we have a title
+                if not 'title' in oMsItem:
+                    # Perhaps we have a parent <msItem> that contains a title
+                    parent = msItem.parentNode
+                    if parent.nodeName == "msItem":
+                        # Check if this one has a title
+                        if 'title' in parent.childNodes:
+                            oMsItem['title'] = getText(parent.childNodes['title'])
+
+                # NOTE: this would give the wrong information
+                #
+                ## Try to find the author within msItem
+                #authors = msItem.getElementsByTagName("persName")
+                #for person in authors:
+                #    # Check if this is linked as author
+                #    if 'role' in person.attributes and person.attributes['role'].value == "author":
+                #        oMsItem['author'] = getText(person)
+                #        # Don't look further: the first author is the *best*
+                #        break
+
+                # If there is no author, then supply the default author (if that exists)
+                if not 'author' in oMsItem and 'author' in oParent:
+                    oMsItem['author'] = oParent['author']
+
+                # Process all child nodes
+                lastChild = None
+                lAdditional = []
+                for item in msItem.childNodes:
+                    if item.nodeType == minidom.Node.ELEMENT_NODE:
+                        # Get the tag name of this item
+                        sTag = item.tagName
+                        # Action depends on the tag
+                        if sTag in mapItem:
+                            oMsItem[mapItem[sTag]] = getText(item)
+                        elif sTag == "note":
+                            if not 'note' in oMsItem:
+                                oMsItem['note'] = ""
+                            oMsItem['note'] = oMsItem['note'] + getText(item) + " "
+                        elif sTag == "msItem":
+                            # This is another <msItem>, a child of mine
+                            bResult, oChild, msg = read_msitem(item, oMsItem, lMsItem, level=level)
+                            if bResult:
+                                if 'firstChild' in oMsItem:
+                                    lastChild['next'] = oChild
+                                else:
+                                    oMsItem['firstChild'] = oChild
+                                    lastChild = oChild
+                            else:
+                                sError = msg
+                                break
+                        else:
+                            # Add the text to 'additional'
+                            sAdd = getText(item).strip()
+                            if sAdd != "":
+                                lAdditional.append(sAdd)
+                # Process the additional stuff
+                if len(lAdditional) > 0:
+                    oMsItem['additional'] = " | ".join(lAdditional)
+                # Return what we made
+                return True, oMsItem, "" 
+            except:
+                if sError == "":
+                    sError = errHandle.get_error_message()
+                return False, None, sError
+
+        def add_msitem(msItem, type="recursive"):
+            """Add one item to the list of sermons for this manuscript"""
+
+            errHandle = ErrHandle()
+            sError = ""
+            nonlocal iSermCount
+            try:
+                # Check if we already have this *particular* sermon (as part of this manuscript)
+                sermon = manuscript.find_sermon(msItem)
+
+                if sermon == None:
+                    # Create a SermonDescr
+                    sermon = SermonDescr()
+
+                    if 'title' in msItem: sermon.title = msItem['title']
+                    if 'location' in msItem: sermon.locus = msItem['location']
+                    if 'incipit' in msItem: sermon.incipit = msItem['incipit']
+                    if 'explicit' in msItem: sermon.explicit = msItem['explicit']
+                    if 'edition' in msItem: sermon.edition = msItem['edition']
+                    if 'quote' in msItem: sermon.quote = msItem['quote']
+                    if 'gryson' in msItem: sermon.gryson = msItem['gryson']
+                    if 'clavis' in msItem: sermon.clavis = msItem['clavis']
+                    if 'feast' in msItem: sermon.feast = msItem['feast']
+                    if 'keyword' in msItem: sermon.keyword = msItem['keyword']
+                    if 'bibleref' in msItem: sermon.bibleref = msItem['bibleref']
+                    if 'additional' in msItem: sermon.additional = msItem['additional']
+                    if 'note' in msItem: sermon.note = msItem['note']
+                    if 'order' in msItem: sermon.order = msItem['order']
+                    if 'author' in msItem:
+                        author = Author.find(msItem['author'])
+                        if author == None:
+                            # Create a nickname
+                            nickname = Nickname.find_or_create(msItem['author'])
+                            sermon.nickname = nickname
+                        else:
+                            sermon.author = author
+
+                    # Now save it
+                    sermon.save()
+                    # Make a link using the SermonMan
+                    sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
+                    sermonman.save()
+                    # Keep track of the number of sermons added
+                    iSermCount += 1
+                else:
+                    # DEBUG: There already exists a sermon
+                    # So there is no need to add it
+
+                    # Sanity check: the order of the sermon we found may *NOT* be lower than that in msItem
+                    if sermon.order < msItem['order']:
+                        bStop = True
+
+                    # However: double check the fields
+                    bNeedSaving = False
+
+                    if 'title' in msItem and sermon.title != msItem['title']: sermon.title = msItem['title'] ; bNeedSaving = True
+                    if 'location' in msItem and sermon.locus != msItem['location']: sermon.locus = msItem['location'] ; bNeedSaving = True
+                    if 'incipit' in msItem and sermon.incipit != msItem['incipit']: sermon.incipit = msItem['incipit'] ; bNeedSaving = True
+                    if 'explicit' in msItem and sermon.explicit != msItem['explicit']: sermon.explicit = msItem['explicit'] ; bNeedSaving = True
+                    if 'edition' in msItem and sermon.edition != msItem['edition']: sermon.edition = msItem['edition'] ; bNeedSaving = True
+                    if 'quote' in msItem and sermon.quote != msItem['quote']: sermon.quote = msItem['quote'] ; bNeedSaving = True
+                    if 'gryson' in msItem and sermon.gryson != msItem['gryson']: sermon.gryson = msItem['gryson'] ; bNeedSaving = True
+                    if 'clavis' in msItem and sermon.clavis != msItem['clavis']: sermon.clavis = msItem['clavis'] ; bNeedSaving = True
+                    if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = msItem['feast'] ; bNeedSaving = True
+                    if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
+                    if 'bibleref' in msItem and sermon.bibleref != msItem['bibleref']: sermon.bibleref = msItem['bibleref'] ; bNeedSaving = True
+                    if 'additional' in msItem and sermon.additional != msItem['additional']: sermon.additional = msItem['additional'] ; bNeedSaving = True
+                    if 'note' in msItem and sermon.note != msItem['note']: sermon.note = msItem['note'] ; bNeedSaving = True
+                    if 'order' in msItem and sermon.order != msItem['order']: sermon.order = msItem['order'] ; bNeedSaving = True
+                    if 'author' in msItem and (    (sermon.author == None or sermon.author.name != msItem['author']) and
+                                               (sermon.nickname == None or sermon.nickname != msItem['author'])):
+                        author = Author.find(msItem['author'])
+                        if author == None:
+                            # Create a nickname
+                            nickname = Nickname.find_or_create(msItem['author'])
+                            sermon.nickname = nickname
+                        else:
+                            sermon.author = author
+                        bNeedSaving = True
+
+                    if bNeedSaving:
+                        # Now save it
+                        sermon.save()
+
+                # In all instances: link the sermon object to the msItem
+                msItem['obj'] = sermon
+
+                # Action depends on type
+                if type=="recursive":
+                    # If this [msItem] has a child, then treat it first
+                    if 'firstChild' in msItem:
+                        bResult, sermon_child, msg = add_msitem(msItem['firstChild'])
+                        # Adapt the [sermon] to point to this child
+                        sermon.firstchild = sermon_child
+                        sermon.save()
+                    # Do all the 'next' items
+                    while 'next' in msItem:
+                        bResult, sermon_next, msg = add_msitem(msItem['next'])
+                        msItem = msItem['next']
+                        # Adapt the [sermon] to point to this next one
+                        sermon.next = sermon_next
+                        sermon.save()
+
+                # Return positively
+                return True, sermon, ""
+            except:
+                if sError == "":
+                    sError = errHandle.get_error_message()
+                return False, None, sError
+
+
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
         oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
         mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'idno'}
-        mapHead = {'title': 'name', 'origPlace': 'origPlace', 'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
+        mapHead = {'title': 'name', 'origPlace': 'origPlace', 
+                   'origDate': {'notBefore': "origDateFrom", 'notAfter': "origDateTo"}}
         mapPhys = {'support': 'support', 'extent': {'leavesCount': 'extent', 'pageDimensions': 'format'}}
-        # mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'note': 'note', 'incipit': 'incipit', 'explicit': 'explicit'}
-        mapItem = {'locus': 'location', 'author': 'author', 'title': 'title', 'incipit': 'incipit', 'explicit': 'explicit'}
+        mapItem = {'locus': 'location', 'author': 'author', 'title': 'gryson', 'rubric': 'title', 
+                   'incipit': 'incipit', 'explicit': 'explicit', 'quote': 'quote', 'bibl': 'edition'}
         ns = {'k': 'http://www.tei-c.org/ns/1.0'}
         errHandle = ErrHandle()
+        iSermCount = 0
+
+        # Overall keeping track of ms items
+        lst_msitem = []
+
         try:
             # Make sure we have the data
             if xmldoc == None:
@@ -663,6 +974,7 @@ class Manuscript(models.Model):
                 # (2) Find the 'head' in msDesc
                 msHeads = msDesc.getElementsByTagName("head")
                 if msHeads.length > 0:
+                    # Only (!) look at the *FIRST* head if <msDesc> contains more than one
                     for item in msHeads[0].childNodes:
                         if item.nodeType == minidom.Node.ELEMENT_NODE:
                             # Get the tag name of this item
@@ -697,97 +1009,141 @@ class Manuscript(models.Model):
                                             oInfo['extent'] = getText(measure)
                                         elif mType == "pageDimensions":
                                             oInfo['format'] = getText(measure)
-                # (4) Walk all the ./msContents/msItem, which are the content items
-                msItems = msDesc.getElementsByTagName("msItem")
+
+                # Set the method to process [msItem]
+                itemProcessing = "recursive"
                 lItems = []
-                for msItem in msItems:
-                    # Create a new item
-                    oMsItem = {}
-                    # Process all child nodes
-                    for item in msItem.childNodes:
-                        if item.nodeType == minidom.Node.ELEMENT_NODE:
-                            # Get the tag name of this item
-                            sTag = item.tagName
-                            # Action depends on the tag
-                            if sTag in mapItem:
-                                oMsItem[mapItem[sTag]] = getText(item)
-                            elif sTag == "note":
-                                oMsItem['note'] = getText(item)
-                    # Check if we have a title
-                    if not 'title' in oMsItem:
-                        # Perhaps we have a parent <msItem> that contains a title
-                        parent = msItem.parentNode
-                        if parent.nodeName == "msItem":
-                            # Check if this one has a title
-                            if 'title' in parent.childNodes:
-                                oMsItem['title'] = getText(parent.childNodes['title'])
-                    # Try to find the author within msItem
-                    authors = msItem.getElementsByTagName("persName")
-                    for person in authors:
-                        # Check if this is linked as author
-                        if 'role' in person.attributes and person.attributes['role'].value == "author":
-                            oMsItem['author'] = getText(person)
-                            # Don't look further: the first author is the *best*
-                            break
-                    # If there is no author, then supply the default author (if that exists)
-                    if not 'author' in oMsItem and mainAuthor != "":
-                        oMsItem['author'] = mainAuthor
-                    # Add to the list of items
-                    lItems.append(oMsItem)
+                # order = 0
+
+                # Action depends on the processing type
+                if itemProcessing == "recursive":
+                    # Get to the *first* (and only) [msContents] item
+                    msContents = msDesc.getElementsByTagName("msContents")
+                    for msOneCont in msContents:
+                        for item in msOneCont.childNodes:
+                            if item.nodeType == minidom.Node.ELEMENT_NODE and item.tagName == "msItem":
+                                # Now we have one 'top-level' <msItem> instance
+                                msItem = item
+                                # Process this top-level item 
+                                bResult, oMsItem, msg = read_msitem(msItem, {}, lst_msitem)
+                                # Add to the list of items -- provided it is not empty
+                                if len(oMsItem) > 0:
+                                    lItems.append(oMsItem)
+
+                else:
+                    # (4) Walk all the ./msContents/msItem, which are the content items
+                    msItems = msDesc.getElementsByTagName("msItem")
+
+                    for msItem in msItems:
+                        # Create a new item
+                        oMsItem = {}
+                        # Process all child nodes
+                        for item in msItem.childNodes:
+                            if item.nodeType == minidom.Node.ELEMENT_NODE:
+                                # Get the tag name of this item
+                                sTag = item.tagName
+                                # Action depends on the tag
+                                if sTag in mapItem:
+                                    oMsItem[mapItem[sTag]] = getText(item)
+                                elif sTag == "note":
+                                    oMsItem['note'] = getText(item)
+                        # Check if we have a title
+                        if not 'title' in oMsItem:
+                            # Perhaps we have a parent <msItem> that contains a title
+                            parent = msItem.parentNode
+                            if parent.nodeName == "msItem":
+                                # Check if this one has a title
+                                if 'title' in parent.childNodes:
+                                    oMsItem['title'] = getText(parent.childNodes['title'])
+                        # Try to find the author within msItem
+                        authors = msItem.getElementsByTagName("persName")
+                        for person in authors:
+                            # Check if this is linked as author
+                            if 'role' in person.attributes and person.attributes['role'].value == "author":
+                                oMsItem['author'] = getText(person)
+                                # Don't look further: the first author is the *best*
+                                break
+                        # If there is no author, then supply the default author (if that exists)
+                        if not 'author' in oMsItem and mainAuthor != "":
+                            oMsItem['author'] = mainAuthor
+
+                        # Add to the list of items -- provided it is not empty
+                        if len(msItem) > 0:
+                            lItems.append(oMsItem)
+
                 # Add to the info object
                 oInfo['list'] = lItems
 
+            lProvenances = []
+            for hist in xmldoc.getElementsByTagName("history"):
+                for item in hist.childNodes:
+                    if item.nodeType == minidom.Node.ELEMENT_NODE:
+                        # Get the tag name of this item
+                        sTag = item.tagName
+                        if sTag == "provenance":
+                            org = item.getElementsByTagName("orgName")
+                            if org.length>0:
+                                orgName = getText(org[0])
+                            oProv = {'name': orgName, 'note': getText(item)}
+                            lProvenances.append(oProv)
+                        elif sTag == "acquisition":
+                            pass
+
             # Now [oInfo] has a full description of the contents to be added to the database
-            # (1) Get the library from the info object
-            library = Library.find_or_create(oInfo['city'], oInfo['library'], "Switzerland")
+            # (1) Get the country from the city
+            city = City.objects.filter(name__iexact=oInfo['city']).first()
+            country = None if city == None else city.country.name
 
-            # (2) Get or create place of origin
-            origin = Origin.find_or_create(oInfo['origPlace'])
+            # (2) Get the library from the info object
+            library = Library.find_or_create(oInfo['city'], oInfo['library'], country)
 
-            # (3) Get or create the Manuscript
-            yearstart = oInfo['origDateFrom'] if oInfo['origDateFrom'] != "" else 0
+            # (3) Get or create place of origin: This should be placed into 'provenance'
+            # origin = Origin.find_or_create(oInfo['origPlace'])
+            provenance_origin = Provenance.find_or_create(oInfo['origPlace'], 'origPlace')
+
+            # (4) Get or create the Manuscript
+            yearstart = oInfo['origDateFrom'] if oInfo['origDateFrom'] != "" else 1800
             yearfinish = oInfo['origDateTo'] if oInfo['origDateTo'] != "" else 2020
             support = "" if 'support' not in oInfo else oInfo['support']
             extent = "" if 'extent' not in oInfo else oInfo['extent']
             format = "" if 'format' not in oInfo else oInfo['format']
             idno = "" if 'idno' not in oInfo else oInfo['idno']
             url = oInfo['url']
-            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, origin, idno, filename, url, support, extent, format)
+            manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, idno, filename, url, support, extent, format, source)
 
-            # (3) Create all the manuscript content items
-            iCount = 0
-            for msItem in oInfo['list']:
-                # Obligatory: each sermon must have a title
-                if 'title' in msItem:
-                    # Check if we already have this kind of sermon
-                    sermon = manuscript.find_sermon(msItem)
-                    # sermon = manuscript.sermons.filter(title=msItem['title']).first()
-                    if sermon == None:
-                        # Create a SermonDescr
-                        sermon = SermonDescr(title=msItem['title'])
-                        if 'location' in msItem: sermon.locus = msItem['location']
-                        if 'incipit' in msItem: sermon.incipit = msItem['incipit']
-                        if 'explicit' in msItem: sermon.explicit = msItem['explicit']
-                        if 'note' in msItem: sermon.note = msItem['note']
-                        if 'author' in msItem:
-                            author = Author.find(msItem['author'])
-                            if author == None:
-                                # Create a nickname
-                                nickname = Nickname.find_or_create(msItem['author'])
-                                sermon.nickname = nickname
-                            else:
-                                sermon.author = author
-                        sermon.save()
-                        # Make a link using the SermonMan
-                        sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
-                        sermonman.save()
-                        # Keep track of the number of sermons added
-                        iCount += 1
+            # Add all the provenances we know of
+            pm = ProvenanceMan(provenance=provenance_origin, manuscript=manuscript)
+            pm.save()
+            for oProv in lProvenances:
+                provenance = Provenance.find_or_create(oProv['name'], oProv['note'])
+                pm = ProvenanceMan(provenance=provenance, manuscript=manuscript)
+                pm.save()
 
+            # (5) Create or emend all the manuscript content items
+            # NOTE: doesn't work with transaction.atomic(), because need to find similar ones that include just-created-ones
+            for msItem in lst_msitem:
+                # emend or create the 'bare' bone of this item
+                bResult, sermon, msg = add_msitem(msItem, type="bare")
+
+            # (6) Make the relations clear
+            with transaction.atomic():
+                for msItem in lst_msitem:
+                    # Check and emend the relations of this instance
+                    instance = msItem['obj']
+                    # Reset relations
+                    instance.parent = None
+                    instance.firstchild = None
+                    instance.next = None    
+                    # Add relations where appropriate
+                    if 'childof' in msItem and msItem['childof']>0: 
+                        instance.parent = lst_msitem[msItem['childof']-1]['obj']
+                    if 'firstChild' in msItem: instance.firstchild = msItem['firstChild']['obj']
+                    if 'next' in msItem: instance.next = msItem['next']['obj']
+                    instance.save()
 
             # Make sure the requester knows how many have been added
-            oBack['count'] = 1          # Only one manuscript is added here
-            oBack['sermons'] = iCount   # The number of sermans added
+            oBack['count'] = 1              # Only one manuscript is added here
+            oBack['sermons'] = iSermCount   # The number of sermons (=msitems) added
             oBack['name'] = oInfo['name']
             oBack['filename'] = filename
 
@@ -964,6 +1320,209 @@ class Nickname(models.Model):
         return hit
 
 
+class SermonGold(models.Model):
+    """The signature of a standard sermon"""
+
+    # [0-1] Every sermongold should at some point end up with a signature (a name)
+    signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
+
+    # ======= OPTIONAL FIELDS describing the sermon ============
+    # [0-1] We would very much like to know the *REAL* author
+    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
+    # [0-1] We would like to know the INCIPIT (first line in Latin)
+    incipit = models.TextField("Incipit", null=True, blank=True)
+    # [0-1] We would like to know the EXPLICIT (last line in Latin)
+    explicit = models.TextField("Explicit", null=True, blank=True)
+
+    # [m] Many-to-many: all the gold sermons linked to me
+    relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
+
+    def __str__(self):
+        name = ""
+        if self.signature:
+            name = self.signature
+        else:
+            name = "RU_sg_{}".format(self.id)
+        return name
+
+    def find_or_create(author, incipit, explicit, signature):
+        """Find or create a SermonGold"""
+
+        lstQ = []
+        lstQ.append(Q(author=author))
+        if signature != "": lstQ.append(Q(signature=signature))
+        if incipit != "": lstQ.append(Q(incipit=incipit))
+        if explicit != "": lstQ.append(Q(explicit=explicit))
+        obj = SermonGold.objects.filter(*lstQ).first()
+        if obj == None:
+            # Create a new
+            obj = SermonGold(author=author, signature=signature, incipit=incipit, explicit=explicit)
+            obj.save()
+        # Return this object
+        return obj
+
+    def find_first(signature, author=None, incipit=None, explicit=None):
+        """Find a sermongold"""
+
+        lstQ = []
+        lstQ.append(Q(signature=signature))
+        if author != None: lstQ.append(Q(author=author))
+        if incipit != None: lstQ.append(Q(incipit=incipit))
+        if explicit != None: lstQ.append(Q(explicit=explicit))
+        obj = SermonGold.objects.filter(*lstQ).first()
+        # Return what we found
+        return obj
+
+    def add_relation(self, target, linktype):
+        """Add a relation from me to [target] with the indicated type"""
+
+        relation, created = SermonGoldSame.objects.get_or_create(
+            src=self, dst=target, linktype=linktype)
+        # Return the new SermonGoldSame instance that has been created
+        return relation
+
+    def remove_relation(self, target, linktype):
+        """Find and remove all links to target with the indicated type"""
+
+        SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).delete()
+        # Return positively
+        return True
+
+    def has_relation(self, target, linktype):
+        """Check if the indicated linktype relation exists"""
+
+        obj = SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).first()
+        # Return existance
+        return (obj != None)
+
+    def get_relations(self, linktype = None):
+        """Get all SermonGoldSame instances with me as source and with the indicated linktype"""
+
+        lstQ = []
+        lstQ.append(Q(src=self))
+        if linktype != None:
+            lstQ.append(Q(linktype=linktype))
+        qs = SermonGoldSame.objects.filter(*lstQ )
+        
+        # Return the whole queryset that was found
+        return qs
+
+    def get_related_to(self, linktype):
+        """Get all sermongold instances that have a particular linktype relation with me"""
+
+        qs = self.related_to.filter(sermongold_dst__linktype=linktype, sermongold_dst__dst=self)
+        # Return the whole queryset that was found
+        return qs
+
+    def read_gold(username, data_file, filename, arErr, xmldoc=None, sName = None):
+        """Import an Excel file with golden sermon data and add it to the DB
+        
+        This approach makes use of openpyxl
+        """
+
+        # Number to order all the items we read
+        order = 0
+        iSermCount = 0
+
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+
+        # Overall keeping track of sermongold items
+        errHandle = ErrHandle()
+
+        try:
+            errHandle.Status("Reading file {}".format(filename))
+            # Convert the data into a list of objects
+            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename)
+
+            # Check the result
+            if bResult == False:
+                oBack['status'] = 'error'
+                oBack['msg'] = msg
+                return oBack
+
+            # Iterate over the objects
+            for oGold in lst_goldsermon:
+                sAuthor = oGold['author']
+                # Check author
+                if sAuthor == "":
+                    # There must be a (gold) author...
+                    oBack['status'] = 'error'
+                    oBack['msg'] = "Without author, a gold sermon cannot be added"
+                    return oBack
+                # Get the author (gold)
+                author = Author.find(sAuthor)
+                if author == None:
+                    # Could not find this author, so indicate to the user
+                    oBack['status'] = 'error'
+                    oBack['msg'] = "Could not find golden Author [{}]".format(oGold['author'])
+                    return oBack
+                # Get or create this golden sermon
+                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'], oGold['signature'])
+                oGold['obj'] = gold
+                iSermCount += 1
+ 
+            # Iterate over the objects again, and add relations
+            for oGold in lst_goldsermon:
+                obj = oGold['obj']
+                # Check if any relation has been specified
+                if 'target' in oGold and oGold['target'] != "":
+                    # Determine the linktype
+                    if 'linktype' in oGold:
+                        linktype = "equals" if oGold['linktype'] == "" else oGold['linktype']
+                    else:
+                        linktype = "equals"
+                    # Get the target sermongold
+                    target = SermonGold.find_first(oGold['target'])
+                    if target == None:
+                        # Could not find this author, so indicate to the user
+                        oBack['status'] = 'error'
+                        lMsg = []
+                        lMsg.append("Cannot find a target (a gold-sermon with signature [{}]).")
+                        lMsg.append("<br />Please add this separately and then perform import once more so as to lay the correct links.")
+                        lMsg.append("<br />(Sermons will <i>not</i> be added twice, so no worries about that.)")
+                        sMsg = "\n".join(lMsg)
+                        oBack['msg'] = sMsg.format(oGold['target'])
+                        return oBack
+
+                    # Check if this relation is already there
+                    if not obj.has_relation(target, linktype):
+                        obj.add_relation(target, linktype)
+
+            # Make sure the requester knows how many have been added
+            oBack['count'] = 1              # Only one manuscript is added here
+            oBack['sermons'] = iSermCount   # The number of sermons (=msitems) reviewed
+            oBack['filename'] = filename
+
+        except:
+            sError = errHandle.get_error_message()
+            oBack['status'] = 'error'
+            oBack['msg'] = sError
+
+        # Return the object that has been created
+        return oBack
+    
+
+class SermonGoldSame(models.Model):
+    """Link to identical sermons that have a different signature"""
+
+    # [1] Starting from sermon [src]
+    src = models.ForeignKey(SermonGold, related_name="sermongold_src")
+    # [1] It equals sermon [dst]
+    dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
+    # [1] Each gold-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default="eq")
+
+    def __str__(self):
+        combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
+        return combi
+
+    def target(self):
+        # Get the URL to edit/view this sermon
+        sUrl = "" if self.id == None else reverse("goldlink_view", kwargs={'pk': self.id})
+        return sUrl
+
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -978,31 +1537,131 @@ class SermonDescr(models.Model):
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the INCIPIT (first line in Latin)
-    incipit = models.CharField("Incipit", null=True, blank=True, max_length=LONG_STRING)
+    incipit = models.TextField("Incipit", null=True, blank=True)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
-    explicit = models.CharField("Explicit", null=True, blank=True, max_length=LONG_STRING)
+    explicit = models.TextField("Explicit", null=True, blank=True)
+    # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
+    quote = models.TextField("Quote", null=True, blank=True)
     # [0-1] We would like to know the Clavis number (if available)
     clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the Gryson number (if available)
     gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] The FEAST??
     feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Edition
+    edition = models.TextField("Edition", null=True, blank=True)
     # [0-1] Any notes for this sermon
     note = models.TextField("Note", null=True, blank=True)
+    # [0-1] Additional information 
+    additional = models.TextField("Additional", null=True, blank=True)
+    # [0-1] Any number of bible references (as stringified JSON list)
+    bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
     # [0-1] One keyword or more??
     keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
+    # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
+    # [0-1] Parent sermon, if applicable
+    parent = models.ForeignKey('self', null=True, blank=True, related_name="sermon_parent")
+    # [0-1] Parent sermon, if applicable
+    firstchild = models.ForeignKey('self', null=True, blank=True, related_name="sermon_child")
+    # [0-1] Parent sermon, if applicable
+    next = models.ForeignKey('self', null=True, blank=True, related_name="sermon_next")
+    # [1]
+    order = models.IntegerField("Order", default = -1)
+
+    # [0-n] Link to one or more golden standard sermons
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [0-1] Method
+    method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
+
     def __str__(self):
-        return self.title
+        if self.author:
+            sAuthor = self.author.name
+        elif self.nickname:
+            sAuthor = self.nickname.name
+        else:
+            sAuthor = "-"
+        sSignature = "{}/{}".formate(sAuthor,self.locus)
+        return sSignature
+
+    def target(self):
+        # Get the URL to edit/view this sermon
+        sUrl = "" if self.id == None else reverse("sermon_view", kwargs={'pk': self.id})
+        return sUrl
+
+    def getdepth(self):
+        depth = 1
+        node = self
+        while node.parent:
+            depth += 1
+            node = node.parent
+        return depth
+
+
+class SermonDescrGold(models.Model):
+    """Link from sermon description to gold standard"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
+    # [1] The gold sermon
+    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
+    # [1] Each sermon-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default="eq")
+
+    def __str__(self):
+        # Temporary fix: sermon.id
+        # Should be changed to something more significant in the future
+        # E.G: manuscript+locus?? (assuming each sermon has a locus)
+        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
+        return combi
 
 
 class SermonMan(models.Model):
     """A particular sermon is located in a particular manuscript"""
 
     # [1] The sermon we are talking about
-    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts")
+    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts_sermons")
     # [1] The manuscript this sermon is written on 
-    manuscript = models.ForeignKey(Manuscript, related_name = "sermons")
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_sermons")
 
     def __str__(self):
         combi = "{}: {}".format(self.manuscript.name, self.sermon.title)
+
+
+class ProvenanceMan(models.Model):
+
+    # [1] The provenance
+    provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
+    # [1] The manuscript this sermon is written on 
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
+
+
+class NewsItem(models.Model):
+    """A news-item that can be displayed for a limited time"""
+
+    # [1] title of this news-item
+    title = models.CharField("Title",  max_length=MAX_TEXT_LEN)
+    # [1] the date when this item was created
+    created = models.DateTimeField(default=datetime.now)
+    saved = models.DateTimeField(null=True, blank=True)
+    # [0-1] optional time after which this should not be shown anymore
+    until = models.DateTimeField("Remove at", null=True, blank=True)
+    # [1] the message that needs to be shown (in html)
+    msg = models.TextField("Message")
+    # [1] the status of this message (can e.g. be 'archived')
+    status = models.CharField("Status", choices=build_abbr_list(VIEW_STATUS), 
+                              max_length=5, help_text=get_help(VIEW_STATUS))
+
+    def __str__(self):
+        # A news item is the tile and the created
+        sDate = get_crpp_date(self.created)
+        sItem = "{}-{}".format(self.title, sDate)
+        return sItem
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+      # Adapt the save date
+      self.saved = datetime.now()
+      response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
+      return response

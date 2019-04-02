@@ -627,8 +627,12 @@ a.jumbotron:hover {
 	font-weight: 500;
 	background-color: inherit;
 	background-repeat: no-repeat;
-    background-position: 0 40px;
-    background-size: 100% 2px;
+  background-position: 0 40px;
+  background-size: 100% 2px;
+}
+
+#tabs a:focus {
+  background-color: lightblue !important;
 }
 
 #tabs li.active a, #tabs li.active a:hover, #tabs li.active a:focus {

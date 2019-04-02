@@ -8,11 +8,13 @@ from django.utils.translation import ugettext_lazy as _
 from django.forms.widgets import *
 from passim.seeker.models import *
 
-def init_choices(obj, sFieldName, sSet, maybe_empty=False):
+def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
     if (obj.fields != None and sFieldName in obj.fields):
-        obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
+        if bUseAbbr:
+            obj.fields[sFieldName].choices = build_abbr_list(sSet, maybe_empty=maybe_empty)
+        else:
+            obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
         obj.fields[sFieldName].help_text = get_help(sSet)
-
 
 
 class BootstrapAuthenticationForm(AuthenticationForm):
@@ -38,6 +40,8 @@ class SignUpForm(UserCreationForm):
 
 
 class SearchSermonForm(forms.Form):
+    """Note: only for SEARCHING"""
+
     author = forms.CharField(label=_("Author"), required=False)
     incipit = forms.CharField(label=_("Incipit"), required=False)
     explicit = forms.CharField(label=_("Explicit"), required=False)
@@ -47,7 +51,19 @@ class SearchSermonForm(forms.Form):
     feast = forms.CharField(label=_("Feast"), required=False)
     keyword = forms.CharField(label=_("Keyword"), required=False)
 
+
+class SearchGoldForm(forms.Form):
+    """Note: only for SEARCHING"""
+
+    author = forms.CharField(label=_("Author"), required=False)
+    incipit = forms.CharField(label=_("Incipit"), required=False)
+    explicit = forms.CharField(label=_("Explicit"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False)
+
+
 class SearchManuscriptForm(forms.Form):
+    """Note: only for SEARCHING"""
+
     country = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city = forms.CharField(label=_("City"), required=False, 
@@ -59,14 +75,112 @@ class SearchManuscriptForm(forms.Form):
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
 
-class ManuscriptForm(forms.ModelForm):
-    country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    libname = forms.CharField(label=_("Library"), required=False, 
+
+class SermonForm(forms.ModelForm):
+    # parent_id = forms.CharField(required=False)
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
+    libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    origname = forms.CharField(label=_("Origin"), required=False, 
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescr
+        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
+                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword']
+        widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'locus':       forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'clavis':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'gryson':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'edition':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+
+                 'incipit':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'explicit':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonForm, self).__init__(*args, **kwargs)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            sAuthor = "" if not instance.author else instance.author.name
+            # If there is an instance, then check the nickname specification
+            sNickName = "" if not instance.nickname else instance.nickname.name
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+            self.fields['nickname_ta'].initial = sNickName
+            self.fields['nickname_ta'].required = False
+
+
+class SermonGoldForm(forms.ModelForm):
+    # parent_id = forms.CharField(required=False)
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonGold
+        fields = ['signature', 'author', 'incipit', 'explicit' ]
+        widgets={'signature':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldForm, self).__init__(*args, **kwargs)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            sAuthor = "" if not instance.author else instance.author.name
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+
+
+class SermonGoldSameForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonGoldSame
+        fields = ['linktype', 'dst' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldSameForm, self).__init__(*args, **kwargs)
+        # Initialize choices for linktype
+        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=False)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+
+class ManuscriptForm(forms.ModelForm):
+    country_ta = forms.CharField(label=_("Country"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city_ta = forms.CharField(label=_("City"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    libname_ta = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    origname_ta = forms.CharField(label=_("Origin"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
 
     class Meta:
@@ -81,9 +195,10 @@ class ManuscriptForm(forms.ModelForm):
                  'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'support': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format': forms.TextInput(attrs={'style': 'width: 100%;'}),
+
+                 'support': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -101,14 +216,13 @@ class ManuscriptForm(forms.ModelForm):
                 if country == None and city != None and city != "":
                     country = library.city.country.name
                 # Put them in the fields
-                self.fields['city'].initial = city
-                self.fields['country'].initial = country
+                self.fields['city_ta'].initial = city
+                self.fields['country_ta'].initial = country
                 # Also: make sure we put the library NAME in the initial
-                self.fields['libname'].initial = library.name
+                self.fields['libname_ta'].initial = library.name
             # Look after origin
             origin = instance.origin
-            self.fields['origname'].initial = "" if origin == None else origin.name
-
+            self.fields['origname_ta'].initial = "" if origin == None else origin.name
 
 
 class SearchCollectionForm(forms.Form):

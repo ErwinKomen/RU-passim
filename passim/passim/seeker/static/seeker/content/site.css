@@ -63,6 +63,15 @@ a.list-group-item-info:hover {
   background-color: lightgoldenrodyellow !important;
 }
 table tbody tr:hover {
+  /* 
+  background-color: lightblue !important;
+  cursor: pointer;*/
+  /*  */
+}
+table tbody tr td.clickable:hover, div.clickable:hover {
+  cursor: pointer;
+}
+table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }
 
@@ -82,6 +91,17 @@ div.inline-group a.add-related {
     margin-right: 15px;
     padding-left: 15px;
     padding-right: 15px;
+}
+
+.panel-news {
+  margin-top: 5px;
+	/* margin-bottom:20px;
+	background-color:#fff;
+	-webkit-box-shadow:0 1px 1px rgba(0,0,0,0.05);
+	box-shadow:0 1px 1px rgba(0,0,0,0.05);
+    */
+	border-radius:4px;
+	border:1px solid #ddd;
 }
 
 .panel-function {
@@ -278,6 +298,21 @@ p {
     background-color: lightgoldenrodyellow;
     text-decoration-line: none;
 }
+
+/* Patch for Google Chrome */
+/* */
+.glyphicon {
+  position: relative;
+  top: 1px;
+  display: inline-block;
+  font-family: 'Glyphicons Halflings';
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.5;     /* This is the correct measure for btn-xs */
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}/
 
 .glyphicon-refresh-animate {
     animation: spin .7s infinite linear;
@@ -557,7 +592,7 @@ a.jumbotron:hover {
 }
 
 /* Specify how a keyword should be shown */
-kw {
+.kw {
   font-family: monospace;
   color: darkblue;
   background-color: whitesmoke;
@@ -1024,6 +1059,10 @@ table.compact-table td:hover {
 
 .sermon-nickname {
   color: darkred;
+}
+
+div.selected {
+  background-color: lightcyan;
 }
 
 /* Type ahead stuff 

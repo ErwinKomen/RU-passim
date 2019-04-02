@@ -36,6 +36,7 @@ urlpatterns = [
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
+    url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
 
     url(r'^sync/entry/$', passim.seeker.views.sync_entry, name='entries_json'),
@@ -48,11 +49,15 @@ urlpatterns = [
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
+    url(r'^search/gold', SermonGoldListView.as_view(), name='search_gold'),
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
 
-    url(r'^manuscript/view/(?P<pk>\d+)/$', ManuscriptDetailsView.as_view(), name='manuscript_view'),
+    url(r'^manuscript/view(?:/(?P<pk>\d+))?/$', ManuscriptDetailsView.as_view(), name='manuscript_view'),
+    url(r'^sermon/view(?:/(?P<pk>\d+))?/$', SermonDetailsView.as_view(), name='sermon_view'),
+    url(r'^gold/view(?:/(?P<pk>\d+))?/$', SermonGoldDetailsView.as_view(), name='gold_view'),
+    url(r'^goldlink/view(?:/(?P<pk>\d+))?/$', SermonGoldSameDetailsView.as_view(), name='goldlink_view'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
@@ -60,10 +65,12 @@ urlpatterns = [
     url(r'^api/origins/$', passim.seeker.views.get_origins, name='api_origins'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
+    url(r'^api/nicknames/$', passim.seeker.views.get_nicknames, name='api_nicknames'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
+    url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
