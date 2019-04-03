@@ -1902,6 +1902,7 @@ class SermonGoldListView(ListView):
 
 class SermonGoldSelect(BasicPart):
     """Facilitate searching and selecting one gold sermon"""
+
     MainModel = SermonGold
     template_name = "seeker/sermongold_select.html"
     # One form is attached to this 
@@ -1959,18 +1960,6 @@ class SermonGoldSelect(BasicPart):
         
         # Return the updated context
         return context
-
-    #def get_queryset(self, prefix):
-
-    #    # Get parameters
-    #    name = self.qd.get("name", "")
-
-    #    # Construct the QS
-    #    lstQ = []
-    #    if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
-    #    qs = Author.objects.filter(*lstQ).order_by('name')
-
-    #    return qs
 
 
 class SermonDetailsView(DetailView):
