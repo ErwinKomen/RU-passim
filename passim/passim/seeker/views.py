@@ -590,7 +590,6 @@ def import_ead(request):
     # hoe zit dit samen?
     pass
 
-
 def import_ecodex(request):
     """Import one or more XML files that each contain one manuscript definition from e-codices, from Switzerland"""
 
