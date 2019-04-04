@@ -59,6 +59,16 @@ def adapt_search(val):
     val = '^' + fnmatch.translate(val) + '$'
     return val
 
+def treat_bom(sHtml):
+    """REmove the BOM marker except at the beginning of the string"""
+
+    # Check if it is in the beginning
+    bStartsWithBom = sHtml.startswith(u'\ufeff')
+    # Remove everywhere
+    sHtml = sHtml.replace(u'\ufeff', '')
+    # Return what we have
+    return sHtml
+
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
 
@@ -852,6 +862,11 @@ def import_authors(request):
 
 
 class BasicPart(View):
+    """This is my own versatile handling view.
+
+    Note: this version works with <pk> and not with <object_id>
+    """
+
     # Initialisations
     arErr = []              # errors   
     template_name = None    # The template to be used
@@ -867,16 +882,16 @@ class BasicPart(View):
     bDebug = False          # Debugging information
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
-    def post(self, request, object_id=None):
+    def post(self, request, pk=None):
         # A POST request means we are trying to SAVE something
-        self.initializations(request, object_id)
+        self.initializations(request, pk)
 
         # Explicitly set the status to OK
         self.data['status'] = "ok"
 
         if self.checkAuthentication(request):
             # Build the context
-            context = dict(object_id = object_id, savedate=None)
+            context = dict(object_id = pk, savedate=None)
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -1091,12 +1106,12 @@ class BasicPart(View):
         # Return the information
         return JsonResponse(self.data)
         
-    def get(self, request, object_id=None): 
+    def get(self, request, pk=None): 
         self.data['status'] = 'ok'
         # Perform the initializations that need to be made anyway
-        self.initializations(request, object_id)
+        self.initializations(request, pk)
         if self.checkAuthentication(request):
-            context = dict(object_id = object_id, savedate=None)
+            context = dict(object_id = pk, savedate=None)
             # Walk all the form objects
             for formObj in self.form_objects:        
                 # Used to populate a NEW research project
@@ -2117,16 +2132,33 @@ class SermonDetailsView(DetailView):
         return context
 
 
-class SermonGoldSameDetailsView(PassimDetails):
+class SermonGoldSameDetailsView(BasicPart):
     """The details of one gold-to-gold link"""
 
-    model = SermonGoldSame
-    mForm = SermonGoldSameForm
+    MainModel = SermonGoldSame
     template_name = 'seeker/sermongoldlink_info.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongoldlink_info.html'
-    prefix = "glink"
     title = "SermonGoldLink"
-    afternewurl = "" 
+    form_objects = [{'form': SermonGoldSameForm, 'prefix': 'glink', 'readonly': False},
+                    {'form': SelectGoldForm, 'prefix': 'gsel', 'readonly': True}]
+
+    def get_instance(self, prefix):
+        instance = None
+        if prefix == "glink":
+            # The instance is the SermonGoldSame instance, the link description
+            instance = self.obj
+        elif prefix == "gsel":
+            # The instance is where the SermonGoldSame instance is pointing to, the dst
+            instance = self.obj.dst
+        return instance
+
+    def add_to_context(self, context):
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['results'] = []
+        return context
 
 
 class SermonGoldDetailsView(PassimDetails):

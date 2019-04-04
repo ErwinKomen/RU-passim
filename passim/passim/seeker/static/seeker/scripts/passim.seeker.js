@@ -1278,16 +1278,10 @@ var ru = (function ($, ru) {
                               $(elTr).find(".view-mode").addClass("hidden");
                               break;
                             case "goldnew":
-                              // Click on the 'edit' button
-                              ru.passim.seeker.init_events();
-                              $("#" + targetid).find("a[mode='edit']").first().trigger("click");
-
-                              //ru.passim.seeker.manu_edit($("#edit-goldlink"),
-                              //  'edit', {'manutype': 'newgoldlink', 'delete': 'false'});
-
-                              //ru.passim.seeker.manu_edit($("#" + targetid).find("a[mode='new']").first(),
-                              //  'new', { 'manutype': 'newgoldlink', 'delete': 'false' });
-                              return;
+                              // Use the new standard approach for *NEW* elements
+                              $("#" + targetid).closest(".subform").find(".edit-mode").removeClass("hidden");
+                              $("#" + targetid).closest(".subform").find(".view-mode").addClass("hidden");
+                              break;
                             default:
                               break;
                           }

@@ -44,6 +44,14 @@
 </div>
 
 <div id="goldselect_results">
+  {% if results|length == 0 %}
+    <p>There are no results. Here are your options:
+      <ul>
+        <li>press <b>Search</b> to get a list of <i>all</i> gold sermons to link to</li>
+        <li>select one or more of the criteria above, and then press <b>Search</b> to get a filtered list of gold sermons</li>
+      </ul>
+    </p>
+  {% else %}
   <table>
     <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
     <tbody>
@@ -55,4 +63,5 @@
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
 </div>
