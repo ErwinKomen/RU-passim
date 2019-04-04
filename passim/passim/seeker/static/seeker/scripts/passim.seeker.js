@@ -496,10 +496,11 @@ var ru = (function ($, ru) {
        *    Clear the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart) {
+      search_start: function (elStart, method) {
         var frm = null,
             url = "",
-            bTry = false,
+            targetid = null,
+            targeturl = "",
             data = null;
 
         try {
@@ -508,27 +509,60 @@ var ru = (function ($, ru) {
           // Get the data from the form
           data = frm.serializeArray();
 
+          // Determine the method
+          if (method === undefined) { method = "submit";}
+
           // Get the URL from the form
           url = $(frm).attr("action");
 
-          // Check if all is there
-          if (bTry && data !== null && data.length > 0 && url !== undefined && url !== "") {
-            // Show we are waiting
-            $("#waitingsign").removeClass("hidden");
-            // Yes, use GET
-            $.get(url, data, function (response) {
-              // Replace the contents of the current page with what we receive
-              $("html").html(response);
-              // Show the state
-              history.pushState(url);
-            });
-          } else {
-            // Show we are waiting
-            $("#waitingsign").removeClass("hidden");
-            // Store the current URL
-            loc_urlStore = url;
-            // Now submit the form
-            frm.submit();
+          // Action depends on the method
+          switch (method) {
+            case "submit":
+              // Show we are waiting
+              $("#waitingsign").removeClass("hidden");
+              // Store the current URL
+              loc_urlStore = url;
+              // Now submit the form
+              frm.submit();
+              break;
+            case "post":
+              // Determine the targetid
+              targetid = $(elStart).attr("targetid");
+              if (targetid == "subform") {
+                targetid = $(elStart).closest(".subform");
+              } else {
+                targetid = $("#" + targetid);
+              }
+              // Get the targeturl
+              targeturl = $(elStart).attr("targeturl");
+              // Issue a post
+              $.post(targeturl, data, function (response) {
+                // Action depends on the response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ready":
+                    case "ok":
+                      // Show the HTML target
+                      $(targetid).html(response['html']);
+                      // Possibly do some initialisations again??
+
+                      break;
+                    case "error":
+                      // Show the error
+                      if ('msg' in response) {
+                        $(targetid).html(response.msg);
+                      } else {
+                        $(targetid).html("An error has occurred");
+                      }
+                      break;
+                  }
+                }
+              });
+
+
+              break;
           }
 
         } catch (ex) {
