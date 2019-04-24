@@ -1923,6 +1923,13 @@ class SermonGoldSelect(BasicPart):
     prefix = 'gsel'
     form_objects = [{'form': SelectGoldForm, 'prefix': prefix, 'readonly': True}]
 
+    def get_instance(self, prefix):
+        instance = None
+        if prefix == "gsel":
+            # The instance is the SRC of a link
+            instance = self.obj
+        return instance
+
     def add_to_context(self, context):
         """Anything that needs adding to the context"""
 
@@ -1963,14 +1970,22 @@ class SermonGoldSelect(BasicPart):
 
             # Calculate the final qs
             if len(lstQ) == 0:
-                # Just show everything
+                # Show everything excluding myself
                 qs = SermonGold.objects.all()
             else:
+                # Make sure to exclude myself, and then apply the filter
                 qs = SermonGold.objects.filter(*lstQ)
+            # Check if we have a self object
+            if self.obj:
+                qs = qs.exclude(id=self.obj.id)
             # Make sure sorting is done correctly
             qs = qs.order_by('author__name', 'signature', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
+
+        # If possible add source_id
+        if self.obj:
+            context['source_id'] = self.obj.id
         
         # Return the updated context
         return context

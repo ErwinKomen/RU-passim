@@ -50,7 +50,7 @@
           <!-- Submit the search form -->
           <span>
             <a role="button" class="btn btn-sm jumbo-3" 
-               targeturl="{% url 'select_gold' %}"
+               targeturl="{% url 'select_gold' pk=source_id %}"
                targetid="subform"
                title="Start searching..." 
                onclick="ru.passim.seeker.search_start(this, 'post');">Search</a>
@@ -71,13 +71,13 @@
       </ul>
     </p>
   {% else %}
-  <table>
+  <table class="" style="width: 100%;">
     <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
     <tbody>
       {% for item in results %}
-      <tr>
-        <td>{{forloop.counter}}</td>
-        <td>{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
+      <tr onclick="ru.passim.seeker.select_row(this, 'gold_link', {{item.id}});">
+        <td class="clickable" >{{forloop.counter}}</td>
+        <td class="clickable" >{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -50,7 +50,7 @@ urlpatterns = [
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
     url(r'^search/gold', SermonGoldListView.as_view(), name='search_gold'),
-    url(r'^select/gold', SermonGoldSelect.as_view(), name='select_gold'),
+    url(r'^select/gold(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),

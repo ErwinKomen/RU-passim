@@ -82,8 +82,8 @@
         manutype="goldnew"
         targetid="edit-goldlink-{{goldForm.instance.id}}"
         targeturl="{% url 'goldlink_view' %}"
-        onclick="ru.passim.seeker.manu_edit(this, 'new');">
-      <span class="glyphicon glyphicon-plus"></span>Add a link to this golden sermon
+        onclick="ru.passim.seeker.manu_edit(this, 'new', {'src': {{goldForm.instance.id}} });">
+      <span class="glyphicon glyphicon-plus"></span>Add a link from this golden sermon to another one
     </a>
   </span>
 </h4>
@@ -110,7 +110,7 @@
       {% for linkform in relations %}
         <tr >
           <td>{{forloop.counter}}</td>
-          <td>{{linkform.linktype.value}}</td>
+          <td>{{linkform.instance.get_linktype_display}}</td>
           <td targeturl="{{linkform.instance.target}}" >
             <form>
               <div class="view-mode clickable" 
@@ -126,7 +126,7 @@
                    onclick="ru.passim.seeker.manu_edit(this, 'view');">
                 <!-- Issue #61: allow user to select a SermonGold based on typeahead searches for incipit, explicit, signature, author -->
                 <!-- TODO!! -->
-                Edit the link above and then either SAVE or CANCEL
+                Edit the link above and then either SAVE, CANCEL (=close it) or DELETE (=remove the link). Click HERE to close the link editor.
               </div>
               <!-- Deleting can be done after selecting more information -->
             </form>

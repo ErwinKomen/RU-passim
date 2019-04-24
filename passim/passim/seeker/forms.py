@@ -193,7 +193,7 @@ class SermonGoldSameForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGoldSame
-        fields = ['linktype', 'dst' ]
+        fields = ['src', 'linktype', 'dst' ]
         widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -201,10 +201,15 @@ class SermonGoldSameForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonGoldSameForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=False)
+        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+            if instance != None:
+                pass
+                #  NOTE: the following has no effect because we use bound fields
+                #       self.fields['linktype'].initial = instance.linktype
+                #       self.fields['dst'].initial = instance.dst
 
 
 class ManuscriptForm(forms.ModelForm):

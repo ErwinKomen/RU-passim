@@ -44,23 +44,28 @@
 
         <!-- Room for the standard fields -->
         <tr>
+          <!-- Pro Forma: first element is the source -->
+          <td class="hidden">SOURCE</td>
+          <!-- Next come the features of the link -->
           <td class="hoverable" style="min-width: 100px;"><b>Link type</b></td>
           <td class="hoverable" style="width: 100%;"><b>Towards</b></td>
         </tr>
         <tr>
+          <td class="hidden"><input id="id_glink-src" name="glink-src" value="{{glinkForm.src.value}}" /></td>
           <td style="min-width: 100px;">
             <div class="edit-mode hidden">{{glinkForm.linktype}}</div>
-            <div class="view-mode">{{glinkForm.linktype.value}}</div>
+            <div class="view-mode">{{glinkForm.instance.get_linktype_display}}</div>
           </td>
-          <td style="width: 100%">
+          <td id="sermongoldlink_{{glinkForm.src.value}}" style="width: 100%">
+            <div class="hidden"><input id="id_glink-dst" name="glink-dst" value="{{glinkForm.instance.dst.id}}" /></div>
             <div class="view-mode" 
-                 targetid="sermongold_select_{{glinkForm.instance.id}}"
-                 targeturl="{% url 'select_gold' %}">
+                 targetid="sermongold_select_{{glinkForm.src.value}}"
+                 targeturl="{% if glinkForm.instance.src %}{% url 'select_gold' glinkForm.instance.src.id %}{% else %}{% url 'select_gold' %}{% endif %}">
               {% include 'seeker/sermongold_view.html' with msitem=glinkForm.instance.dst %}
             </div>
             <div class="edit-mode hidden selected" 
-                 targetid="sermongold_select_{{glinkForm.instance.id}}">
-              Search and select the correct Gold Sermon in the list below
+                 targetid="sermongold_select_{{glinkForm.src.value}}">
+              {% include 'seeker/sermongold_view.html' with msitem=glinkForm.instance.dst %}
             </div>
           </td>
         </tr>
@@ -69,6 +74,8 @@
 </form>
 
 <!-- Searching for a gold sermon-->
-<div id="sermongold_select_{{glinkForm.instance.id}}" class="edit-mode hidden subform">
-  {% include 'seeker/sermongold_select.html' with source_id=glinkForm.instance.dst.id %}
+<div id="sermongold_select_{{glinkForm.src.value}}" 
+     class="edit-mode hidden subform"
+     towardsid="sermongoldlink_{{glinkForm.src.value}}" >
+  {% include 'seeker/sermongold_select.html' with source_id=glinkForm.src.value %}
 </div>

@@ -68,6 +68,26 @@ class HelpChoice(models.Model):
                     self.display_name, self.help_url)
         return help_text
 
+def get_linktype_abbr(sLinkType):
+    """Convert a linktype into a valid abbreviation"""
+
+    options = [{'abbr': 'eqs', 'input': 'equals' },
+               {'abbr': 'prt', 'input': 'part_of' },
+               {'abbr': 'prt', 'input': 'part of' },
+               {'abbr': 'prt', 'input': 'part-of' },
+               {'abbr': 'sim', 'input': 'similar_to' },
+               {'abbr': 'sim', 'input': 'similar' },
+               {'abbr': 'sim', 'input': 'similar to' },
+               {'abbr': 'use', 'input': 'uses' },
+               {'abbr': 'use', 'input': 'makes_use_of' },
+               ]
+    for opt in options:
+        if sLinkType == opt['abbr']:
+            return sLinkType
+        elif sLinkType == opt['input']:
+            return opt['abbr']
+    # Return default
+    return 'eqs'
 
 def get_help(field):
     """Create the 'help_text' for this element"""
@@ -1468,9 +1488,11 @@ class SermonGold(models.Model):
                 if 'target' in oGold and oGold['target'] != "":
                     # Determine the linktype
                     if 'linktype' in oGold:
-                        linktype = "equals" if oGold['linktype'] == "" else oGold['linktype']
+                        linktype = "eqs" if oGold['linktype'] == "" else oGold['linktype']
+                        # Double check valid linktype
+                        linktype = get_linktype_abbr(linktype)
                     else:
-                        linktype = "equals"
+                        linktype = "eqs"
                     # Get the target sermongold
                     target = SermonGold.find_first(oGold['target'])
                     if target == None:
@@ -1511,7 +1533,7 @@ class SermonGoldSame(models.Model):
     dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
-                            max_length=5, default="eq")
+                            max_length=5, default="eqs")
 
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)

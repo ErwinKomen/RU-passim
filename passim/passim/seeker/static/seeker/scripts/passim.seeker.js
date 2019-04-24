@@ -640,6 +640,61 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * select_row
+       *   Select one row in a table
+       *
+       */
+      select_row: function (elStart, method, id) {
+        var tbl = null,
+            elsubform = null,
+            eltowards = null,
+            sSermon = "",
+            select_id = "";
+
+        try {
+          // Get the table
+          tbl = $(elStart).closest("table");
+          // Deselect all other rows
+          $(tbl).children("tbody").children("tr").removeClass("selected");
+          // Select my current row
+          $(elStart).addClass("selected");
+
+          // Determine the select id: the id of the selected target
+          if (id !== undefined && id !== "") {
+            select_id = id;
+          }
+
+          // Determine the element in [sermongoldlink_info.html] where we need to change something
+          elsubform = $(elStart).closest("div .subform");
+          if (elsubform !== null && elsubform !== undefined) {
+            eltowards = $(elsubform).attr("towardsid");
+            if (eltowards === undefined) {
+              eltowards = null;
+            } else {
+              eltowards = $("#" + eltowards);
+            }
+          }
+
+          // Action depends on the method
+          switch (method) {
+            case "gold_link":
+              // Select the correct gold sermon above
+              if (eltowards !== null && $(eltowards).length > 0) {
+                // Set the text of this sermon
+                sSermon = $(elStart).find("td").last().html();
+                $(eltowards).find(".edit-mode").first().html(sSermon);
+
+                // Set the id of this sermon
+                $(eltowards).find("#id_glink-dst").val(select_id.toString());
+              }
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("select_row", ex);
+        }
+      },
+
+      /**
        * import_data
        *   Allow user to upload a file
        *
@@ -1151,6 +1206,7 @@ var ru = (function ($, ru) {
             targethead = null,
             lHtml = [],
             data = null,
+            key = "",
             frm = null,
             bOkay = true,
             bReloading = false,
@@ -1281,6 +1337,13 @@ var ru = (function ($, ru) {
 
                 // There is a targetid specified, so make a GET request for the information and get it here
                 data = [];
+                // Check if there are any parameters in [oParams]
+                if (oParams !== undefined) {
+                  for (key in oParams) {
+                    data.push({'name': key, 'value': oParams[key]});
+                  }
+                }
+
                 $.get(targeturl, data, function (response) {
                   // Action depends on the response
                   if (response === undefined || response === null || !("status" in response)) {

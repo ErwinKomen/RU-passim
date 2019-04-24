@@ -71,6 +71,10 @@ table tbody tr:hover {
 table tbody tr td.clickable:hover, div.clickable:hover {
   cursor: pointer;
 }
+table tbody tr td.clickable:hover {
+  background-color: lightgoldenrodyellow ;
+}
+
 table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }
@@ -1003,6 +1007,13 @@ table.result-list tr:hover {
 
 .tablefield input {
   width: 100%;
+}
+
+tr .selected {
+  background-color: lightgreen;
+}
+tr .selected:hover, table tbody tr .selected td.clickable:hover {
+  background-color: greenyellow !important;
 }
 
 table.compact-table, 
