@@ -8,7 +8,7 @@ var $ = jQuery;
   $(function () {
     $(document).ready(function () {
       // Initialize event listeners
-      ru.passim.project.init_event_listeners();
+      ru.passimproject.init_event_listeners();
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
       $('[data-toggle="popover"]').popover();
@@ -24,7 +24,7 @@ var $ = jQuery;
 var ru = (function ($, ru) {
   "use strict";
 
-  ru.passim.project = (function ($, config) {
+  ru.passimproject = (function ($, config) {
     // Define variables for ru.collbank here
     var loc_divErr = "passim_err",
         base_url = "",
@@ -51,9 +51,10 @@ var ru = (function ($, ru) {
     // Public methods
     return {
 
-      init_event_listeners : function() {
+      init_event_listeners: function () {
+        // Make sure #footinfo stays on bottom if it gets too high
+      },
 
-      }
 
     };
   }($, ru.config));

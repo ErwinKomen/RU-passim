@@ -1,7 +1,9 @@
 ﻿body {
+  /*
   background-image: url("../img/paper.png");
   background-position: left top;
   background-repeat: repeat;
+    */
   padding-top: 0px;
   padding-bottom: 5px;
   font-size: medium;
@@ -36,11 +38,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 a, a:active, a:visited {
-	color: darkslateblue;
+	/*color: darkorange; /* darkslateblue; */
+  color: #d96f3b;
 }
 
 a:focus, a:hover {
-	color: darkblue;
+	color: darkorange;
 }
 
 
@@ -137,9 +140,12 @@ div.inline-group a.add-related {
   margin: 0;
   border-radius: 0;
   color: white;
+	min-height: 70px;
 }
+
 .navbar-custom {
-  background-color: #47396d;  /* #b82b22; */
+  /*background-color: #47396d;   #b82b22; */
+  background-color: white;
   border-color: white;
 }
 
@@ -148,7 +154,14 @@ a.navbar-img {
 }
 
 a.navbar-img > img.mini-logo {
-	height: 60px;
+	height: 70px;
+  width: auto;
+  display: inline-block;
+  /* margin-left: 15px; /* */
+}
+
+a.navbar-img > img.mini-mini-logo {
+	height: 52px;
   width: auto;
   display: inline-block;
   /* margin-left: 15px; /* */
@@ -241,8 +254,11 @@ a.navbar-img > img.mini-logo {
 
 /* BASE.css */
 p { 
-    padding: 0;
-    line-height: 140%;
+  padding: 0;
+  line-height: 140%;
+	font-family: Calibri, sans-serif !important;
+	font-size: 20px;
+  margin-top: 20px;
 }
 
 /* Extra small pagination */
@@ -603,6 +619,7 @@ a.jumbotron:hover {
 	background: 0;
 	position: relative;
 	padding-bottom: 0px;
+  padding-top:  120px;
 }
 
 .jumbotron > img.stamp {
@@ -622,8 +639,8 @@ a.jumbotron:hover {
 }
 
 #tabs a, #tabs a:active, #tabs a:focus, #tabs a:hover, #tabs a:visited {
-	font-family: 'Raleway', sans-serif;
-	font-size: medium;
+	font-family: Calibri, sans-serif;
+	font-size: x-large;
 	font-weight: 500;
 	background-color: inherit;
 	background-repeat: no-repeat;
@@ -631,23 +648,13 @@ a.jumbotron:hover {
   background-size: 100% 2px;
 }
 
+body p {
+}
+
 #tabs a:focus {
-  background-color: lightblue !important;
+  background-color: white !important;
 }
 
-#tabs li.active a, #tabs li.active a:hover, #tabs li.active a:focus {
-    background-image: -webkit-linear-gradient(left, rgba(255,0,0,0), #b82b22, rgba(255,0,0,0)); /*Safari 5.1-6*/
-	background-image: -o-linear-gradient(right, rgba(255,0,0,0), #b82b22, rgba(255,0,0,0)); /*Opera 11.1-12*/
-	background-image: -moz-linear-gradient(right, rgba(255,0,0,0), #b82b22, rgba(255,0,0,0)); /*Fx 3.6-15*/
-	background-image: linear-gradient(to right, rgba(255,0,0,0), #b82b22, rgba(255,0,0,0)); /*Standard*/
-}
-
-#tabs li a:hover, #tabs li a:focus {
-    background-image: -webkit-linear-gradient(left, rgba(255,0,0,0), darkgray, rgba(255,0,0,0)); /*Safari 5.1-6*/
-	background-image: -o-linear-gradient(right, rgba(255,0,0,0), darkgray, rgba(255,0,0,0)); /*Opera 11.1-12*/
-	background-image: -moz-linear-gradient(right, rgba(255,0,0,0), darkgray, rgba(255,0,0,0)); /*Fx 3.6-15*/
-	background-image: linear-gradient(to right, rgba(255,0,0,0), darkgray, rgba(255,0,0,0)); /*Standard*/
-}
 
 .tab-pane {
 	padding: 20px 0;
@@ -656,11 +663,11 @@ a.jumbotron:hover {
 .tab-pane p, .tab-pane a, .tab-pane em {
 	text-align: justify;
   text-justify: inter-word;
-  font-family: 'Lora', serif;
+  font-family: Calibri, sans-serif;
 }
 
 .tab-pane p b {
-	color: #b82b22;
+	color: #b82b22; 
 }
 
 .page-content {
@@ -721,6 +728,9 @@ div.up {
 
 /* FOOTER that stays completely at the bottom */
 
+body {
+    min-height: 100%;
+}
 body > div > footer {
   height: 18px;
   padding-top: 4px;
@@ -740,10 +750,11 @@ body > div > footer a {
 
 /* FOOTER information that moves up and down */
 .footinfo {
-	background-color: #b82b22;
+	background-color: #ead7ef; /* #cbc7bc; #d96f3b; /* #b82b22; */
+  opacity: 1.5;
 	min-height: 200px;
 	color: white;
-  font-family: 'Lora', serif;
+  font-family: Calibri, sans-serif ;
   font-size: large;
   font-weight: 700;
   padding: 25px;
@@ -1136,4 +1147,12 @@ table.compact-table td:hover {
     color: darkred;
     font-family: monospace;
     font-size: smaller;
+}
+
+.people_team {
+  min-height: 200px;
+}
+.people_team  img {
+  max-height: 190px;
+  height: 190px;
 }
