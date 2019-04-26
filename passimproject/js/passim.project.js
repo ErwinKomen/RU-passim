@@ -52,7 +52,48 @@ var ru = (function ($, ru) {
     return {
 
       init_event_listeners: function () {
+
+        /*
         // Make sure #footinfo stays on bottom if it gets too high
+        $("a[data-toggle=tab]").on("click", function (ev) {
+          var elLi = null,
+              elUl = null;
+
+          elLi = $(this).closest("li");
+          elUl = $(elLi).closest("ul");
+          $(elUl).children("li").removeClass("active");
+          $(elLi).addClass("active");
+
+          // ev.preventDefault();
+          // ev.stopPropagation();
+          // return true;
+        });
+        */
+        /*
+        // Make sure #footinfo stays on bottom if it gets too high
+        $("a[data-toggle=tab]").on("mouseup", function (e) {
+          var elLi = null,
+              elUl = null;
+
+          e.preventDefault();
+          $(this).tab('show');
+          elLi = $(this).closest("li");
+          elUl = $(elLi).closest("ul");
+          $(elUl).children("li").removeClass("active");
+          $(elLi).addClass("active");
+        });
+
+        /*
+        $('li a').unbind("click").on("click", function (e) {
+          $('a').removeClass('active');
+          $(this).parent().addClass('active');
+
+          e.preventDefault();
+          e.stopPropagation();
+          $(this).tab('show');
+          // return true;
+        });
+        /**/
       },
 
 
