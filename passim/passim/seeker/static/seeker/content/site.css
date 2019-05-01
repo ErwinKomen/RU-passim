@@ -1114,3 +1114,8 @@ div.selected {
     color: #999;
 }
 
+/* Adapt the standard modal to my own */
+.modal-dialog {
+    width: 80%;
+    margin: 30px auto;
+  }

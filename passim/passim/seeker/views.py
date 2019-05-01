@@ -1351,9 +1351,12 @@ class PassimDetails(DetailView):
         # Get the instance
         instance = self.object
         bNew = False
-        prefix = self.prefix
         mForm = self.mForm
         oErr = ErrHandle()
+
+        # prefix = self.prefix
+        id = "n" if instance == None else instance.id
+        prefix = "{}-{}".format(self.prefix, id)
 
         # Check if this is a POST or a GET request
         if self.request.method == "POST":
@@ -2214,14 +2217,14 @@ class SermonGoldDetailsView(PassimDetails):
 
         # Start a list of related gold sermons
         lst_related = []
-        linkprefix = "glink"
         # Do we have an instance?
         if instance != None:
             # There is an instance: get the list of SermonGold items to which I link
             relations = instance.get_relations()
             # Get a form for each of these relations
-            for instance in relations:
-                oForm = SermonGoldSameForm(instance=instance, prefix=linkprefix)
+            for instance_rel in relations:
+                linkprefix = "glink-{}".format(instance_rel.id)
+                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
                 lst_related.append(oForm)
 
         # Add the list to the context

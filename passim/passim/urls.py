@@ -49,14 +49,15 @@ urlpatterns = [
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
-    url(r'^search/gold', SermonGoldListView.as_view(), name='search_gold'),
-    url(r'^select/gold(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
 
     url(r'^manuscript/view(?:/(?P<pk>\d+))?/$', ManuscriptDetailsView.as_view(), name='manuscript_view'),
     url(r'^sermon/view(?:/(?P<pk>\d+))?/$', SermonDetailsView.as_view(), name='sermon_view'),
+
+    url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
+    url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/view(?:/(?P<pk>\d+))?/$', SermonGoldDetailsView.as_view(), name='gold_view'),
     url(r'^goldlink/view(?:/(?P<pk>\d+))?/$', SermonGoldSameDetailsView.as_view(), name='goldlink_view'),
 

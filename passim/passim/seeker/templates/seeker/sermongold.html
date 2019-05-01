@@ -144,7 +144,7 @@
                     {% csrf_token %}
                     <a class="btn btn-xs jumbo-3" role="button" 
                         targeturl="{% url 'gold_view' %}"
-                        targetid="sermongold_edit"
+                        targetid="sermongold_new"
                         onclick="ru.passim.seeker.manu_edit(this, 'new');">
                       <span class="glyphicon glyphicon-plus"></span>Add a gold sermon
                     </a>
@@ -152,9 +152,9 @@
               </h3>
             </form>
 
-            <div class="row">
+            <div class="row subform">
               <div class="col-md-offset-1 col-md-10">
-                <div id="sermongold_edit">
+                <div id="sermongold_new">
                   <!-- Room to create a new sermongold instance-->
                 </div>
               </div>

@@ -75,65 +75,104 @@
 </form>
 
 <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
-<h4>
-  <span>Links:</span>
-  <span id="add_gold_link" class="pull-right">
-    <a class="btn btn-xs jumbo-3" role="button" 
-        manutype="goldnew"
-        targetid="edit-goldlink-{{goldForm.instance.id}}"
-        targeturl="{% url 'goldlink_view' %}"
-        onclick="ru.passim.seeker.manu_edit(this, 'new', {'src': {{goldForm.instance.id}} });">
-      <span class="glyphicon glyphicon-plus"></span>Add a link from this golden sermon to another one
-    </a>
-  </span>
-</h4>
+{% if goldForm.instance.id %}
+  <div id="sermongold-links-{{goldForm.instance.id}}">
+    <h4>
+      <span>Links:</span>
+      <span id="add_gold_link" class="pull-right">
+        <a class="btn btn-xs jumbo-3" role="button" 
+            manutype="goldnew"
+            data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
+            targetid="edit-goldlink-{{goldForm.instance.id}}"
+            targeturl="{% url 'goldlink_view' %}"
+            onclick="ru.passim.seeker.manu_edit(this, 'new', {'src': {{goldForm.instance.id}} });">
+          <span class="glyphicon glyphicon-plus"></span>Add a link from this golden sermon to another one
+        </a>
+      </span>
+    </h4>
 
 
-  <!-- This is where the goldsermon link that is currently being edited shows up -->
-  <div class="row goldlink hidden subform">
-    <div class="col-md-10 col-md-offset-1">
-      <div class="panel panel-default" id="edit-goldlink-{{goldForm.instance.id}}">
-        <!-- This is where the current gold-to-gold link shows up -->
+    <!-- This is where the goldsermon link that is currently being edited shows up -->
+    <div class="row goldlink hidden subform">
+      <div class="col-md-10 col-md-offset-1">
+        <div class="panel panel-default" id="ORIGINAL-edit-goldlink-{{goldForm.instance.id}}">
+          <!-- This is where the current gold-to-gold link shows up -->
+        </div>
       </div>
     </div>
+
+    <!-- Modal attempt -->
+    <div id="modal-goldlink-{{goldForm.instance.id}}" class="modal fade goldlink subform" role="dialog">
+      <div class="modal-dialog">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <!-- introduction header -->
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title">Set the link type and select the gold sermon to link to</h4>
+          </div>
+
+          <!-- Body of the modal-->
+          <div class="modal-body" id="edit-goldlink-{{goldForm.instance.id}}">
+            <!-- This is where the current gold-to-gold link shows up -->
+          </div>
+
+          <!-- Footer with the save button -->
+          <div class="modal-footer">
+            <button type="button" class="btn btn-success" data-dismiss="modal">Save</button>
+            {% if is_passim_editor %}
+              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                 targeturl="" >
+                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if relations|length == 0 %}
+      <i>(There are no links from this sermongold)</i>
+    {% else %}
+
+      <table class="func-view" style="width: 100%;">
+        <thead>
+          <tr><th>#</th><th>Link type</th><th>Target golden sermon</th></tr>
+        </thead>
+        <tbody>
+          {% for linkform in relations %}
+            <tr >
+              <td>{{forloop.counter}}</td>
+              <td data-toggle="modal" 
+                  data-target="#modal-goldlink-{{goldForm.instance.id}}">{{linkform.instance.get_linktype_display}}</td>
+              <td targeturl="{{linkform.instance.target}}" >
+                <form>
+                  <div class="view-mode clickable" 
+                       data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
+                       manutype="goldlink"
+                       targetid="edit-goldlink-{{goldForm.instance.id}}"
+                       targeturl="{% url 'goldlink_view' linkform.instance.id %}"
+                       onclick="ru.passim.seeker.manu_edit(this, 'view');">
+                    {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                  </div>
+                  <div class="edit-mode hidden selected"
+                       data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
+                       manutype="goldlinkclose"
+                       targetid="edit-goldlink-{{goldForm.instance.id}}"
+                       onclick="ru.passim.seeker.manu_edit(this, 'view');">
+                    <!-- Issue #61: allow user to select a SermonGold based on typeahead searches for incipit, explicit, signature, author -->
+                    <!-- TODO!! -->
+                    Edit the link above and then either SAVE, CANCEL (=close it) or DELETE (=remove the link). Click HERE to close the link editor.
+                  </div>
+                  <!-- Deleting can be done after selecting more information -->
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
   </div>
-
-{% if relations|length == 0 %}
-  <i>(There are no links from this sermongold)</i>
-{% else %}
-
-  <table class="func-view" style="width: 100%;">
-    <thead>
-      <tr><th>#</th><th>Link type</th><th>Target golden sermon</th></tr>
-    </thead>
-    <tbody>
-      {% for linkform in relations %}
-        <tr >
-          <td>{{forloop.counter}}</td>
-          <td>{{linkform.instance.get_linktype_display}}</td>
-          <td targeturl="{{linkform.instance.target}}" >
-            <form>
-              <div class="view-mode clickable" 
-                   manutype="goldlink"
-                   targetid="edit-goldlink-{{goldForm.instance.id}}"
-                   targeturl="{% url 'goldlink_view' linkform.instance.id %}"
-                   onclick="ru.passim.seeker.manu_edit(this, 'view');">
-                {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
-              </div>
-              <div class="edit-mode hidden selected"
-                   manutype="goldlinkclose"
-                   targetid="edit-goldlink-{{goldForm.instance.id}}"
-                   onclick="ru.passim.seeker.manu_edit(this, 'view');">
-                <!-- Issue #61: allow user to select a SermonGold based on typeahead searches for incipit, explicit, signature, author -->
-                <!-- TODO!! -->
-                Edit the link above and then either SAVE, CANCEL (=close it) or DELETE (=remove the link). Click HERE to close the link editor.
-              </div>
-              <!-- Deleting can be done after selecting more information -->
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
 {% endif %}
 

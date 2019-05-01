@@ -1364,7 +1364,7 @@ var ru = (function ($, ru) {
                           switch (manutype) {
                             case "goldsermon":
                               // Close any other edit-mode items
-                              $(".edit-mode").addClass("hidden");
+                              $(targethead).closest("table").find(".edit-mode").addClass("hidden");
                               // Open this particular edit-mode item
                               $(targethead).removeClass("hidden");
                               break;
