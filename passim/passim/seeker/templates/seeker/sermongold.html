@@ -4,7 +4,7 @@
 {% block breadcrumbs %}
   <div class="breadcrumbs">
       <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Gold-Sermon
+      &rsaquo; Gold-Sermon List
   </div>
 {% endblock %}
 
@@ -182,7 +182,10 @@
                         <td class="hidden"> {{ gold.id }}</td>
                         <!-- Author / Signature / Incipit -->
                         <td class="gold-author tdnowrap" align="left" title="{{gold.author.name}}">{{gold.author.name|truncatechars:12}}</td>
-                        <td class="gold-signature tdnowrap" align="left" title="{{gold.signature}}">{{gold.signature}}</td>
+                        <td class="gold-signature tdnowrap clickable" 
+                            align="left" 
+                            data-toggle="collapse" data-target="#gold-buttons-{{gold.id}}" 
+                            title="{{gold.signature}}">{{gold.signature}}</td>
                         <td style="width: 100%;">
                           <span>{{gold.incipit}}</span>
                           <span>{% if gold.incipit %}...{% endif %}</span>
@@ -211,6 +214,19 @@
                         </td>
                         <td>&nbsp;</td>
                       </tr>
+
+                      <!-- Showing buttons otherwise hidden for one sermon-gold -->
+                      <tr class="inert collapse" id="gold-buttons-{{gold.id}}">
+                        <td>&nbsp;</td>
+                        <td colspan="2">
+                          <a role="button" class="btn btn-xs jumbo-3" title="Edit this gold sermon"
+                             href="{% url 'gold_details' gold.id %}">
+                            <span class="glyphicon glyphicon-pencil"></span>
+                          </a>
+                        </td>
+                        <td>&nbsp;</td>
+                      </tr>
+
                     {% endfor %}
                     </tbody>
                   </table>

@@ -1251,6 +1251,7 @@ class PassimDetails(DetailView):
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     title = ""              # The title to be passedon with the context
+    rtype = "json"          # JSON response (alternative: html)
     mForm = None            # Model form
 
     def get(self, request, *args, **kwargs):
@@ -1279,7 +1280,10 @@ class PassimDetails(DetailView):
             data['html'] = response
 
         # Return the response
-        return JsonResponse(data)
+        if self.rtype == "json":
+            return JsonResponse(data)
+        else:
+            return HttpResponse(data['html'].encode())
 
     def post(self, request, *args, **kwargs):
         # Initialisation
@@ -1310,7 +1314,10 @@ class PassimDetails(DetailView):
             data['status'] = "error"
 
         # Return the response
-        return JsonResponse(data)
+        if self.rtype == "json":
+            return JsonResponse(data)
+        else:
+            return HttpResponse(data['html'].encode())
 
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
@@ -2175,6 +2182,62 @@ class SermonGoldSameDetailsView(BasicPart):
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         context['results'] = []
+        return context
+
+
+class SermonGoldDetails(PassimDetails):
+    """The details of one sermon"""
+
+    model = SermonGold
+    mForm = SermonGoldForm
+    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_details.html'
+    prefix = "gold"
+    title = "SermonGold" 
+    afternewurl = ""
+    rtype = "html"
+
+    def before_delete(self, instance):
+
+        oErr = ErrHandle()
+        try:
+            # (1) Check if there is an 'equality' link to another SermonGold
+
+            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
+
+            # (3) Remove all gold-to-gold links that include this one
+
+            # (4) Remove all links from SermonDescr to this instance of SermonGold
+
+            # All is well
+            return True, "" 
+        except:
+            msg = oErr.get_error_message()
+            return False, msg
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+        # self.afternewurl = reverse('search_gold')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start a list of related gold sermons
+        lst_related = []
+        # Do we have an instance?
+        if instance != None:
+            # There is an instance: get the list of SermonGold items to which I link
+            relations = instance.get_relations()
+            # Get a form for each of these relations
+            for instance_rel in relations:
+                linkprefix = "glink-{}".format(instance_rel.id)
+                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
+                lst_related.append(oForm)
+
+        # Add the list to the context
+        context['relations'] = lst_related
+
         return context
 
 

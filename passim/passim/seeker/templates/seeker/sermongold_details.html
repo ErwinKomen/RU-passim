@@ -1,0 +1,222 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+      <a href="{% url 'home' %}">Home</a>
+      &rsaquo; Gold-Sermon Details
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div>
+
+    {% if authenticated %}
+      <!-- Upper part of the gold-sermon details interface -->
+      <div class="panel panel-default gold-head subform">
+        <div class="row">&nbsp;</div>
+        <div class="row">
+          <div class="col-md-1">
+            <a class="btn jumbo-1" title="Back to the list of gold sermons">&lt;&lt;</a>
+          </div>
+          <div class="col-md-10">
+
+            <h3>Gold sermon details</h3>
+
+            <!-- SermonGold information -->
+            <form>
+              {% csrf_token %}
+                <table style="width: 100%;">
+                  <tr>
+                    <td colspan="2"  class="ms editable table">
+                      <!-- Provide the necessary buttons: edit, cancel and save -->
+                      {% if is_passim_editor %}
+                      <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+                        <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+                      </a>
+                      {% endif %}
+
+                      <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+                        <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+                      </a>
+
+                      {% if is_passim_editor %}
+                      <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                         targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% else %}{% url 'gold_view' %}{% endif %}" >
+                        <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+                      </a>
+                      {% endif %}
+
+                      <!-- Waiting symbol-->
+                      <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+                      <!-- Little error message room -->
+                      <span id="gold_err_msg" class="err-msg"></span>
+
+                      {% if is_passim_editor %}
+                      <!-- Put the delete button completely to the right-->
+                      <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" targetid="sermon_edit"
+                         targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% endif %}">
+                        <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
+                      </a>
+                      {% endif %}
+                    </td>
+                  </tr>
+
+                  <!-- Room for the standard fields -->
+                  <tr>
+                    <td class="hoverable" style="min-width: 150px;">Signature</td>
+                    <td style="width: 100%">
+                      <div class="edit-mode hidden">{{goldForm.signature}}</div>
+                      <div class="view-mode">{{goldForm.signature.value}}</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="hoverable">Author (gold standard)</td>
+                    <td>
+                      <div class="author-key hidden">{{goldForm.author}}</div>
+                      <div class="edit-mode hidden">{{goldForm.authorname}}</div>
+                      <div class="view-mode">{{goldForm.instance.author.name}}</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="hoverable">Incipit</td>
+                    <td>
+                      <div class="edit-mode hidden">{{goldForm.incipit}}</div>
+                      <div class="view-mode">{{goldForm.incipit.value}}</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="hoverable">Explicit</td>
+                    <td>
+                      <div class="edit-mode hidden">{{goldForm.explicit}}</div>
+                      <div class="view-mode">{{goldForm.explicit.value}}</div>
+                    </td>
+                  </tr>
+
+                </table>
+            </form>
+
+            <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
+            {% if goldForm.instance.id %}
+              <div id="sermongold-links-{{goldForm.instance.id}}">
+                <h4>
+                  <span>Links:</span>
+                  <span id="add_gold_link" class="pull-right">
+                    <a class="btn btn-xs jumbo-3" role="button" 
+                        manutype="goldnew"
+                        data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
+                        targetid="edit-goldlink-{{goldForm.instance.id}}"
+                        targeturl="{% url 'goldlink_view' %}"
+                        onclick="ru.passim.seeker.manu_edit(this, 'new', {'src': {{goldForm.instance.id}} });">
+                      <span class="glyphicon glyphicon-plus"></span>Add a link from this golden sermon to another one
+                    </a>
+                  </span>
+                </h4>
+
+
+                <!-- This is where the goldsermon link that is currently being edited shows up -->
+                <div class="row goldlink hidden subform">
+                  <div class="col-md-10 col-md-offset-1">
+                    <div class="panel panel-default" id="ORIGINAL-edit-goldlink-{{goldForm.instance.id}}">
+                      <!-- This is where the current gold-to-gold link shows up -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Modal attempt -->
+                <div id="modal-goldlink-{{goldForm.instance.id}}" class="modal fade goldlink subform" role="dialog">
+                  <div class="modal-dialog">
+                    <!-- Modal content -->
+                    <div class="modal-content">
+                      <!-- introduction header -->
+                      <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Set the link type and select the gold sermon to link to</h4>
+                      </div>
+
+                      <!-- Body of the modal-->
+                      <div class="modal-body" id="edit-goldlink-{{goldForm.instance.id}}">
+                        <!-- This is where the current gold-to-gold link shows up -->
+                      </div>
+
+                      <!-- Footer with the save button -->
+                      <div class="modal-footer">
+                        {% if is_passim_editor %}
+                          <a mode="save"
+                             class="btn jumbo-1" 
+                             data-dismiss="modal"
+                             targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% else %}{% url 'gold_view' %}{% endif %}"
+                             targetid="gold-sermon-{{goldForm.instance.id}}"
+                             onclick="ru.passim.seeker.manu_edit(this, 'view');">
+                            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+                          </a>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {% if relations|length == 0 %}
+                  <i>(There are no links from this sermongold)</i>
+                {% else %}
+
+                  <table class="func-view" style="width: 100%;">
+                    <thead>
+                      <tr><th>#</th><th>Link type</th><th>Target golden sermon</th></tr>
+                    </thead>
+                    <tbody>
+                      {% for linkform in relations %}
+                        <tr >
+                          <td>{{forloop.counter}}</td>
+                          <td>{{linkform.instance.get_linktype_display}}</td>
+                          <td targeturl="{{linkform.instance.target}}" >
+                            <form>
+                              <div class="clickable" 
+                                   data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
+                                   manutype="goldlink"
+                                   targetid="edit-goldlink-{{goldForm.instance.id}}"
+                                   targeturl="{% url 'goldlink_view' linkform.instance.id %}"
+                                   onclick="ru.passim.seeker.manu_edit(this, 'view');">
+                                {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                              </div>
+                              <!-- Deleting can be done after selecting more information -->
+                            </form>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                {% endif %}
+
+              </div>
+            {% endif %}
+
+          </div>
+        </div>
+        <div class="row">&nbsp;</div>
+
+      </div>
+
+    
+    {% else %}
+      <div class="explanation">
+        <p>Dear user, you are <b>not</b> logged in.</p>
+        <p>Unfortunately this means that you will not be able to perform any searches.</p>
+        <p>Should you want to work with Passim, here are your options:
+          <ul>
+            <li><a class="btn btn-info btn-xs" href="{% url 'login' %}">Login</a> - if you already have an account</li> 
+            <li><a class="btn btn-warning btn-xs" href="{% url 'signup' %}">Sign up</a> - if you don't have an account yet</li>
+          </ul>
+        </p>
+      </div>
+    {% endif %}
+    
+  </div>
+
+
+<script>
+  ru.passim.seeker.init_events();
+</script>
+
+{% endblock content %}
