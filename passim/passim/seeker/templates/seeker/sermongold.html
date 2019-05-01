@@ -194,7 +194,7 @@
                           <!-- information on this manuscript -->
                           <a role="button" class="btn btn-xs jumbo-3" title="Information" 
                              manutype="goldsermon"
-                             targetid="gold-sermon-{{forloop.counter}}"
+                             targetid="gold-sermon-{{gold.id}}"
                              targeturl="{% url 'gold_view' gold.id %}"
                              onclick="ru.passim.seeker.manu_edit(this, 'view');">
                             <span class="glyphicon glyphicon-info-sign"></span>
@@ -207,7 +207,7 @@
                       <tr class="edit-mode hidden gold-head subform">
                         <td>&nbsp;</td>
                         <td colspan="2">
-                          <div id="gold-sermon-{{forloop.counter}}"></div>
+                          <div id="gold-sermon-{{gold.id}}"></div>
                         </td>
                         <td>&nbsp;</td>
                       </tr>
