@@ -1092,6 +1092,8 @@ class BasicPart(View):
                 else:
                     self.data['error_list'] = error_list
                 self.data['html'] = ''
+            elif self.action == "delete":
+                self.data['html'] = "deleted" 
             else:
                 # In this case reset the errors - they should be shown within the template
                 self.data['html'] = render_to_string(self.template_name, context, request)
@@ -1253,19 +1255,22 @@ class PassimDetails(DetailView):
     title = ""              # The title to be passedon with the context
     rtype = "json"          # JSON response (alternative: html)
     mForm = None            # Model form
+    add = False             # Are we adding a new record or editing an existing one?
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request, pk=None, *args, **kwargs):
         # Initialisation
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # always do this initialisation to get the object
+        self.initializations(request, pk)
         if not request.user.is_authenticated:
             # Do not allow to get a good response
-            data['html'] = "(No authorization)"
-            data['status'] = "error"
-        else:
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                self.object = None
+            if self.rtype == "json":
+                data['html'] = "(No authorization)"
+                data['status'] = "error"
+                response = JsonResponse(data)
             else:
-                self.object = self.get_object()
+                response = reverse('nlogin')
+        else:
             context = self.get_context_data(object=self.object)
 
             # Possibly indicate form errors
@@ -1274,28 +1279,26 @@ class PassimDetails(DetailView):
                 data['status'] = "error"
                 data['msg'] = context['errors']
 
-            # We render to the _name 
-            response = render_to_string(self.template_name, context, request)
-            response = response.replace("\ufeff", "")
-            data['html'] = response
+            if self.rtype == "json":
+                # We render to the _name 
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = sHtml.replace("\ufeff", "")
+                data['html'] = sHtml
+                response = JsonResponse(data)
+            else:
+                # This takes self.template_name...
+                response = self.render_to_response(context)
 
         # Return the response
-        if self.rtype == "json":
-            return JsonResponse(data)
-        else:
-            return HttpResponse(data['html'].encode())
+        return response
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, pk=None, *args, **kwargs):
         # Initialisation
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # always do this initialisation to get the object
+        self.initializations(request, pk)
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW instance for this model
-                self.object = None
-            else:
-                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:
@@ -1314,10 +1317,30 @@ class PassimDetails(DetailView):
             data['status'] = "error"
 
         # Return the response
-        if self.rtype == "json":
-            return JsonResponse(data)
+        return JsonResponse(data)
+
+    def initializations(self, request, pk):
+        # Copy any pk
+        self.pk = pk
+        self.add = pk is None
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
         else:
-            return HttpResponse(data['html'].encode())
+            self.qd = request.GET
+
+        # Check for action
+        if 'action' in self.qd:
+            self.action = self.qd['action']
+
+        # Find out what the Main Model instance is, if any
+        if self.add:
+            self.object = None
+        else:
+            # Get the instance of the Main Model object
+            self.object = self.get_object()
+            # NOTE: if the object doesn't exist, we will NOT get an error here
+
 
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
@@ -1339,6 +1362,9 @@ class PassimDetails(DetailView):
         return None
 
     def get_formset_queryset(self, prefix):
+        return None
+
+    def get_form_kwargs(self, prefix):
         return None
 
     def get_context_data(self, **kwargs):
@@ -1447,7 +1473,7 @@ class PassimDetails(DetailView):
                     else:
                         formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
                 # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, request, formset)
+                ordered_forms = self.process_formset(prefix, self.request, formset)
                 if ordered_forms:
                     context[prefix + "_ordered"] = ordered_forms
                 # Store the instance
@@ -2182,6 +2208,18 @@ class SermonGoldSameDetailsView(BasicPart):
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         context['results'] = []
+
+        # Is this a request for deletion?
+        if self.action == "delete":
+            # Delete the current object
+            if self.obj != None:
+                self.obj.delete()
+                deletestatus = True
+            else:
+                deletestatus = False
+            context['deleted'] = deletestatus
+
+        # Return the adapted context
         return context
 
 
@@ -2196,6 +2234,11 @@ class SermonGoldDetails(PassimDetails):
     title = "SermonGold" 
     afternewurl = ""
     rtype = "html"
+    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+                                         form=SermonGoldSameForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
     def before_delete(self, instance):
 
@@ -2241,13 +2284,13 @@ class SermonGoldDetails(PassimDetails):
         return context
 
 
-class SermonGoldDetailsView(PassimDetails):
+class SermonGoldEdit(PassimDetails):
     """The details of one sermon"""
 
     model = SermonGold
     mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_info.html'
+    template_name = 'seeker/sermongold_edit.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_edit.html'
     prefix = "gold"
     title = "SermonGold" 
     afternewurl = ""

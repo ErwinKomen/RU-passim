@@ -3,8 +3,9 @@
 
 {% block breadcrumbs %}
   <div class="breadcrumbs">
-      <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Gold-Sermon Details
+    <a href="{% url 'home' %}">Home</a>
+    &rsaquo; <a href="{% url 'search_gold' %}">Gold-Sermon List</a>
+    &rsaquo; Gold-Sermon Details
   </div>
 {% endblock %}
 
@@ -17,7 +18,9 @@
         <div class="row">&nbsp;</div>
         <div class="row">
           <div class="col-md-1">
-            <a class="btn jumbo-1" title="Back to the list of gold sermons">&lt;&lt;</a>
+            <a class="btn jumbo-1" 
+               href="{% url 'search_gold' %}"
+               title="Back to the list of gold sermons">&lt;&lt;</a>
           </div>
           <div class="col-md-10">
 
@@ -42,7 +45,7 @@
 
                       {% if is_passim_editor %}
                       <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
-                         targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% else %}{% url 'gold_view' %}{% endif %}" >
+                         targeturl="{% if goldForm.instance.id %}{% url 'gold_details' goldForm.instance.id %}{% else %}{% url 'gold_details' %}{% endif %}" >
                         <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
                       </a>
                       {% endif %}
@@ -55,8 +58,8 @@
 
                       {% if is_passim_editor %}
                       <!-- Put the delete button completely to the right-->
-                      <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" targetid="sermon_edit"
-                         targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% endif %}">
+                      <a mode="delete" class="view-mode btn btn-xs jumbo-3 pull-right" targetid="sermon_edit"
+                         targeturl="{% if goldForm.instance.id %}{% url 'gold_details' goldForm.instance.id %}{% endif %}">
                         <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
                       </a>
                       {% endif %}
@@ -100,25 +103,26 @@
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
             {% if goldForm.instance.id %}
               <div id="sermongold-links-{{goldForm.instance.id}}">
+                <!--
                 <h4>
                   <span>Links:</span>
                   <span id="add_gold_link" class="pull-right">
                     <a class="btn btn-xs jumbo-3" role="button" 
                         manutype="goldnew"
-                        data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
-                        targetid="edit-goldlink-{{goldForm.instance.id}}"
+                        targetid="plain-edit-goldlink-{{goldForm.instance.id}}"
                         targeturl="{% url 'goldlink_view' %}"
                         onclick="ru.passim.seeker.manu_edit(this, 'new', {'src': {{goldForm.instance.id}} });">
-                      <span class="glyphicon glyphicon-plus"></span>Add a link from this golden sermon to another one
+                      <span class="glyphicon glyphicon-plus"></span>Add a link from this gold sermon to another one
                     </a>
                   </span>
                 </h4>
+                  -->
 
 
                 <!-- This is where the goldsermon link that is currently being edited shows up -->
                 <div class="row goldlink hidden subform">
                   <div class="col-md-10 col-md-offset-1">
-                    <div class="panel panel-default" id="ORIGINAL-edit-goldlink-{{goldForm.instance.id}}">
+                    <div class="panel panel-default" id="plain-edit-goldlink-{{goldForm.instance.id}}">
                       <!-- This is where the current gold-to-gold link shows up -->
                     </div>
                   </div>
@@ -146,7 +150,7 @@
                           <a mode="save"
                              class="btn jumbo-1" 
                              data-dismiss="modal"
-                             targeturl="{% if goldForm.instance.id %}{% url 'gold_view' goldForm.instance.id %}{% else %}{% url 'gold_view' %}{% endif %}"
+                             targeturl="{% if goldForm.instance.id %}{% url 'gold_details' goldForm.instance.id %}{% else %}{% url 'gold_details' %}{% endif %}"
                              targetid="gold-sermon-{{goldForm.instance.id}}"
                              onclick="ru.passim.seeker.manu_edit(this, 'view');">
                             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
@@ -160,33 +164,88 @@
                 {% if relations|length == 0 %}
                   <i>(There are no links from this sermongold)</i>
                 {% else %}
+                  <div id="glink_formset">
+                    <form action="">
+                      {% csrf_token %}
+                      <!-- Need to have the management stuff for 'glink' -->
+                      {{ glink_formset.management_form }}
 
-                  <table class="func-view" style="width: 100%;">
-                    <thead>
-                      <tr><th>#</th><th>Link type</th><th>Target golden sermon</th></tr>
-                    </thead>
-                    <tbody>
-                      {% for linkform in relations %}
-                        <tr >
-                          <td>{{forloop.counter}}</td>
-                          <td>{{linkform.instance.get_linktype_display}}</td>
-                          <td targeturl="{{linkform.instance.target}}" >
-                            <form>
-                              <div class="clickable" 
-                                   data-toggle="modal" data-target="#modal-goldlink-{{goldForm.instance.id}}"
-                                   manutype="goldlink"
-                                   targetid="edit-goldlink-{{goldForm.instance.id}}"
-                                   targeturl="{% url 'goldlink_view' linkform.instance.id %}"
-                                   onclick="ru.passim.seeker.manu_edit(this, 'view');">
-                                {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
-                              </div>
-                              <!-- Deleting can be done after selecting more information -->
-                            </form>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+                      <table class="func-view" style="width: 100%;">
+                        <thead>
+                          <tr><th colspan="2">#</th><th class="tdnowrap">Link type</th><th>Target golden sermon</th><th>&nbsp;</th></tr>
+                        </thead>
+                        <tbody>
+                          {% for linkform in glink_formset %}
+                            <tr class="form-row">
+                              <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+                              <td valign="top" class="clickable"  style="min-width: 20px;">
+                                <div class="view-mode">
+                                  <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                                    <span class="glyphicon glyphicon-pencil"></span>
+                                  </a>
+                                </div>
+                                <div class="edit-mode hidden">
+                                  <a onclick="ru.passim.seeker.gold_row_edit(this, 'view');" title="Save changes to this link">
+                                    <span class="glyphicon glyphicon-ok"></span>
+                                  </a>
+                                </div>
+                              </td>
+                              <td  style="min-width: 100px;">
+                                <div class="view-mode">{{linkform.instance.get_linktype_display}}</div>
+                                <div class="edit-mode hidden"> 
+                                  {{linkform.linktype}}
+                                </div>
+                              </td>
+                              <td style="width: 100%;">
+                                <div class="hidden"><input id="id_glink-{{forloop.counter0}}-dst" name="glink-{{forloop.counter0}}-dst" value="{{linkform.instance.dst.id}}" /></div>
+                                <div class="view-mode">
+                                  {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                                </div>
+                                <div class="edit-mode hidden selected" 
+                                      targetid="sermongold_select_{{linkform.src.value}}">
+                                  {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                                </div>
+                              </td>
+                              <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
+                                <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                              </td>
+                            </tr>
+
+                            <!-- Row to confirm deletion -->
+                            <tr class="delete-confirm hidden">
+                              <td style="min-width: 20px;">&nbsp;</td>
+                              <td style="min-width: 20px;">&nbsp;</td>
+                              <td colspan="2" style="width: 100%;" class="selected">
+                                Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)
+                                <span><a onclick="ru.passim.seeker.delete_cancel(this);" class="btn btn-xs jumbo-1" extra="glink" counter="">Cancel</a></span>
+                                <span>
+                                  <a href="#" class="btn btn-xs jumbo-4 delete-row" 
+                                     extra="glink" counter="" targeturl="{% url 'goldlink_view' linkform.instance.id %}">Delete</a>
+                                </span>
+                              </td>
+                              <td>&nbsp;</td>
+                            </tr>
+
+                          {% endfor %}
+
+                          <!-- Empty row with specifications -->
+                          <tr class="form-row empty-form">
+                            <td colspan="5"></td>
+                          </tr>
+
+                          <!-- Add row -->
+                          <tr class="add-row">
+                            <td colspan="5">
+                              <span id="add_gold_link">
+                                <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a link from this gold sermon to another one</a>
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </form>
+                  </div>
+
                 {% endif %}
 
               </div>

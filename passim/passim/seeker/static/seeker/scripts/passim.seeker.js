@@ -16,7 +16,8 @@ var ru = (function ($, ru) {
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
-          { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead }
+          { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
 
@@ -1641,6 +1642,81 @@ var ru = (function ($, ru) {
         }
       },
 
+
+      /**
+       * goto_url
+       *   Go to the indicated target URL
+       *
+       */
+      goto_url: function (target) {
+        try {
+          location.href = target;
+        } catch (ex) {
+          private_methods.errMsg("goto_url", ex);
+        }
+      },
+
+      /**
+       * gold_row_edit
+       *   Switch everything in the current <tr> according to the mode
+       *
+       */
+      gold_row_edit: function (el, mode) {
+        var elTr = null;
+
+        try {
+          // Get to the <tr>
+          elTr = $(el).closest("tr");
+          // Action depends on mode
+          switch (mode) {
+            case "edit":
+              // Start editing
+              $(elTr).find(".edit-mode").removeClass("hidden");
+              $(elTr).find(".view-mode").addClass("hidden");
+              break;
+            case "view":
+              // Save edit results, post the results and if all is well, show the view
+
+              // If everything went well show the view mode
+              $(elTr).find(".edit-mode").addClass("hidden");
+              $(elTr).find(".view-mode").removeClass("hidden");
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("gold_row_edit", ex);
+        }
+      },
+
+      /**
+       * delete_confirm
+       *   Open the next <tr> to get delete confirmation (or not)
+       *
+       */
+      delete_confirm: function (el) {
+        var elNext = null;
+
+        try {
+          // Get the next row
+          elNext = $(el).closest("tr").next();
+          $(elNext).removeClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("delete_confirm", ex);
+        }
+      },
+
+      /**
+       * delete_cancel
+       *   Hide this <tr> and cancel the delete
+       *
+       */
+      delete_cancel: function (el) {
+        try {
+          $(el).closest("tr").addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("delete_cancel", ex);
+        }
+      },
+
       /**
        * tabular_deleterow
        *   Delete one row from a tabular inline
@@ -1649,12 +1725,17 @@ var ru = (function ($, ru) {
       tabular_deleterow: function () {
         var sId = "",
             elRow = null,
+            elPrev = null,
             sPrefix = "",
             elForms = "",
             counter = $(this).attr("counter"),
+            deleteurl = "",
+            data = [],
+            frm = null,
             bCounter = false,
             iForms = 0,
             prefix = "simplerel",
+            use_prev_row = false,   // Delete the previous row instead of the current one
             bValidated = false;
 
         try {
@@ -1666,18 +1747,35 @@ var ru = (function ($, ru) {
           sId = $(this).closest("div").attr("id");
           // Find out how many forms there are right now
           iForms = $(elForms).val();
+          frm = $(this).closest("form");
           // The validation action depends on this id
           switch (sId) {
-            case "manu_search":
-              // Indicate that deep evaluation is needed
+            case "glink_formset":
+              //// Indicate that deep evaluation is needed
+              //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
+              //  // Return from here
+              //  return;
+              //}
+              use_prev_row = true;
               bValidated = true;
               break;
           }
           // Continue with deletion only if validated
           if (bValidated) {
+            // Get the deleteurl (if existing)
+            deleteurl = $(this).attr("targeturl");
             // Get to the row
-            elRow = $(this).closest("tr");
-            $(elRow).remove();
+            if (use_prev_row) {
+              // Delete both the current and the previous row
+              elRow = $(this).closest("tr");
+              elPrev = $(elRow).prev();
+              $(elRow).remove();
+              $(elPrev).remove();
+            } else {
+              // Only delete the current row
+              elRow = $(this).closest("tr");
+              $(elRow).remove();
+            }
             // Decrease the amount of forms
             iForms -= 1;
             $(elForms).val(iForms);
@@ -1720,6 +1818,35 @@ var ru = (function ($, ru) {
               case "search_mode_simple":
                 // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
                 ru.passim.seeker.simple_update();
+                break;
+              case "glink_formset":
+                if (deleteurl !== "") {
+                  // prepare data
+                  data = $(frm).serializeArray();
+                  data.push({ 'name': 'action', 'value': 'delete' });
+                  $.post(deleteurl, data, function (response) {
+                    // Action depends on the response
+                    if (response === undefined || response === null || !("status" in response)) {
+                      private_methods.errMsg("No status returned");
+                    } else {
+                      switch (response.status) {
+                        case "ready":
+                        case "ok":
+                          // Refresh the current page
+                          window.location = window.location;
+                          break;
+                        case "error":
+                          // Show the error
+                          if ('msg' in response) {
+                            $(targetid).html(response.msg);
+                          } else {
+                            $(targetid).html("An error has occurred");
+                          }
+                          break;
+                      }
+                    }
+                  });
+                }
                 break;
             }
           }
