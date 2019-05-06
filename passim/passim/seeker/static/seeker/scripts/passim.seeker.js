@@ -638,8 +638,10 @@ var ru = (function ($, ru) {
           gold_html = $(elSelect).find("td.gold-text").html();
           // Set the items correctly in loc_goldlink_td
           $(loc_goldlink_td).find("input").val(gold_id);
-          $(loc_goldlink_td).find(".view-mode, .edit-mode").html(gold_html);
-
+          $(loc_goldlink_td).find(".view-mode").first().html(gold_html);
+          $(loc_goldlink_td).find(".edit-mode").first().html(gold_html);
+          // Remove the selection
+          $(elSelect).removeClass("selected");
 
         } catch (ex) {
           private_methods.errMsg("gold_select_save", ex);
@@ -1748,8 +1750,10 @@ var ru = (function ($, ru) {
               // Start editing
               $(elTr).find(".edit-mode").removeClass("hidden");
               $(elTr).find(".view-mode").addClass("hidden");
+              $(el).closest("td").addClass("hightlighted");
               break;
             case "view":
+              $(el).closest("td").removeClass("hightlighted");
               // Save edit results, post the results and if all is well, show the view
 
               // If everything went well show the view mode
@@ -1789,6 +1793,94 @@ var ru = (function ($, ru) {
           $(el).closest("div.delete-confirm").addClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_cancel", ex);
+        }
+      },
+
+      /**
+       * formset_update
+       *   Send an Ajax POST request and process the response in a standard way
+       *
+       */
+      formset_update: function (elStart, sAction) {
+        var targetid = "",
+            err = "#error_location",
+            data = [],
+            lHtml = [],
+            i = 0,
+            frm = null,
+            targeturl = "";
+
+        try {
+          // Get attributes
+          targetid = $(elStart).attr("targetid");
+          targeturl = $(elStart).attr("targeturl");
+
+          // Possibly set delete flag
+          if (sAction !== undefined && sAction !== "") {
+            switch (sAction) {
+              case "delete":
+                // Set the delete value of the checkbox
+                $(elStart).closest("td").find("input[type=checkbox]").first().prop("checked", true);
+                break;
+            }
+          }
+
+          // Gather the data
+          frm = $(elStart).closest("form");
+          data = $(frm).serializeArray();
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                case "error":
+                  if ("html" in response) {
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else if ('error_list' in response) {
+                        lHtml = []
+                        lHtml.push("Errors:");
+                        for (i = 0; i < response['error_list'].length; i++) {
+                          lHtml.push(response['error_list'][i]);
+                        }
+                        $(err).html(lHtml.join("<br />"));
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                      $(err).removeClass("hidden");
+                    } else {
+                      // Show the HTML in the targetid
+                      $("#" + targetid).html(response['html']);
+                    }
+                    // But make sure events are back on again
+                    ru.passim.seeker.init_events();
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("formset_update", ex);
         }
       },
 
@@ -1894,7 +1986,7 @@ var ru = (function ($, ru) {
                 // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
                 ru.passim.seeker.simple_update();
                 break;
-              case "glink_formset":
+              case "glink_formset_OLD":
                 if (deleteurl !== "") {
                   // prepare data
                   data = $(frm).serializeArray();
@@ -1998,7 +2090,7 @@ var ru = (function ($, ru) {
             // There is no TOTAL_FORMS for this type, so calculate myself
           } else {
             // Just copy the TOTAL_FORMS value
-            total = $(elTotalForms).val();
+            total = parseInt($(elTotalForms).val(), 10);
           }
 
           // Find each <input> element
@@ -2038,14 +2130,14 @@ var ru = (function ($, ru) {
             if (elText !== undefined) {
               var sHtml = $(elText).html();
               if (sHtml !== undefined && sHtml !== "") {
-                sHtml = sHtml.replace("__counter__", total.toString());
+                sHtml = sHtml.replace("__counter__", (total+1).toString());
                 $(elText).html(sHtml);
               }
               // $(elText).html($(elText).html().replace("__counter__", total.toString()));
             }
           });
-          // Look at the attributes of <a>
-          newElement.find('a').each(function (idx, el) {
+          // Look at the attributes of <a> and of <input>
+          newElement.find('a, input').each(function (idx, el) {
             // Iterate over all attributes
             var elA = el;
             $.each(elA.attributes, function (i, attrib) {

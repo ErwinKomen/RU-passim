@@ -7,6 +7,7 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db import transaction
 from django.db.models import Q
 import operator
 from functools import reduce
@@ -980,6 +981,7 @@ class BasicPart(View):
                         if not formsetObj['readonly']:
                             # Is the formset valid?
                             if formset.is_valid():
+                                has_deletions = False
                                 # Make sure all changes are saved in one database-go
                                 with transaction.atomic():
                                     # Walk all the forms in the formset
@@ -987,30 +989,38 @@ class BasicPart(View):
                                         # At least check for validity
                                         if form.is_valid() and self.is_custom_valid(prefix, form):
                                             # Should we delete?
-                                            if form.cleaned_data['DELETE']:
+                                            if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
                                                 # Delete this one
                                                 form.instance.delete()
                                                 # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                # form.delete()
+                                                has_deletions = True
                                             else:
                                                 # Check if anything has changed so far
                                                 has_changed = form.has_changed()
                                                 # Save it preliminarily
-                                                instance = form.save(commit=False)
+                                                sub_instance = form.save(commit=False)
                                                 # Any actions before saving
-                                                if self.before_save(prefix, request, instance, form):
+                                                if self.before_save(prefix, request, sub_instance, form):
                                                     has_changed = True
                                                 # Save this construction
                                                 if has_changed: 
                                                     # Save the instance
-                                                    instance.save()
+                                                    sub_instance.save()
                                                     # Adapt the last save time
                                                     context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
                                                     # Store the instance id in the data
-                                                    self.data[prefix + '_instanceid'] = instance.id
+                                                    self.data[prefix + '_instanceid'] = sub_instance.id
                                         else:
                                             if len(form.errors) > 0:
                                                 self.arErr.append(form.errors)
+                                
+                                # Rebuild the formset if it contains deleted forms
+                                if has_deletions:
+                                    if qs == None:
+                                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                                    else:
+                                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                                    formsetObj['formsetinstance'] = formset
                             else:
                                 # Iterate over all errors
                                 for idx, err_this in enumerate(formset.errors):
@@ -1181,6 +1191,9 @@ class BasicPart(View):
             return False
         else:
             return True
+
+    def rebuild_formset(self, prefix, formset):
+        return formset
 
     def initializations(self, request, object_id):
         # Clear errors
@@ -2240,6 +2253,11 @@ class SermonGoldLinkset(BasicPart):
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+
+    def rebuild_formset(self, prefix, formset):
+        if prefix == 'glink':
+            formset = self.GlinkFormSet()
+        return formset
 
 
 class SermonGoldDetails(PassimDetails):

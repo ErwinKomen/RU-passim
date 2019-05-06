@@ -1125,3 +1125,7 @@ div.selected {
     width: 80%;
     margin: 30px auto;
   }
+
+td.hightlighted {
+  background-color: yellow;
+}
