@@ -1015,10 +1015,10 @@ table.result-list tr:hover {
   width: 100%;
 }
 
-tr .selected {
+tr .selected, tr.selected {
   background-color: lightgreen;
 }
-tr .selected:hover, table tbody tr .selected td.clickable:hover {
+tr .selected:hover, table tbody tr .selected td.clickable:hover, tr.selected td.clickable:hover {
   background-color: greenyellow !important;
 }
 

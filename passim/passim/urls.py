@@ -60,6 +60,7 @@ urlpatterns = [
     url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
+    url(r'^gold/linkset(?:/(?P<pk>\d+))?/$', SermonGoldLinkset.as_view(), name='gold_linkset'),
     url(r'^goldlink/view(?:/(?P<pk>\d+))?/$', SermonGoldSameDetailsView.as_view(), name='goldlink_view'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),

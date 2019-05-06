@@ -114,6 +114,7 @@
     <Content Include="passim\seeker\templates\seeker\sermongoldlink_info.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_select.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_info.html" />

@@ -1969,10 +1969,18 @@ class SermonGoldSelect(BasicPart):
     def add_to_context(self, context):
         """Anything that needs adding to the context"""
 
+        # If possible add source_id
+        source_id = None
+        if 'source_id' in self.qd:
+            source_id = self.qd['source_id']
+        context['source_id'] = source_id
+        
         # Get the cleaned data
-        oFields = self.form_objects[0]['cleaned_data']
+        oFields = None
+        if 'cleaned_data' in self.form_objects[0]:
+            oFields = self.form_objects[0]['cleaned_data']
         qs = SermonGold.objects.none()
-        if oFields != None:
+        if oFields != None and self.request.method == 'POST':
             # There is valid data to search with
             lstQ = []
             # (1) process signature
@@ -2011,18 +2019,16 @@ class SermonGoldSelect(BasicPart):
             else:
                 # Make sure to exclude myself, and then apply the filter
                 qs = SermonGold.objects.filter(*lstQ)
-            # Check if we have a self object
-            if self.obj:
-                qs = qs.exclude(id=self.obj.id)
+
+            # Always exclude the source
+            if source_id != None:
+                qs = qs.exclude(id=source_id)
+
             # Make sure sorting is done correctly
-            qs = qs.order_by('author__name', 'signature', 'incipit', 'explicit')
+            qs = qs.order_by('signature', 'author__name', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
 
-        # If possible add source_id
-        if self.obj:
-            context['source_id'] = self.obj.id
-        
         # Return the updated context
         return context
 
@@ -2221,6 +2227,19 @@ class SermonGoldSameDetailsView(BasicPart):
 
         # Return the adapted context
         return context
+
+
+class SermonGoldLinkset(BasicPart):
+    """The set of links from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_linkset.html'
+    title = "SermonGoldLinkset"
+    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+                                         form=SermonGoldSameForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
 
 class SermonGoldDetails(PassimDetails):

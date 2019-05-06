@@ -11,8 +11,10 @@ var ru = (function ($, ru) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
         loc_bManuSaved = false,
-        loc_progr = [],       // Progress tracking
-        loc_urlStore = "",    // Keep track of URL to be shown
+        loc_progr = [],         // Progress tracking
+        loc_urlStore = "",      // Keep track of URL to be shown
+        loc_goldlink_td = null, // Where the goldlink selection should go
+        loc_goldlink = {},      // Store one or more goldlinks
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
@@ -568,6 +570,79 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("search_start", ex);
+        }
+      },
+
+      /**
+       * gold_search_prepare
+       *    Prepare the modal form to search for gold-sermon destinations
+       *
+       */
+      gold_search_prepare: function (elStart) {
+        var targetid = "",
+            data = [],
+            targeturl = "";
+
+        try {
+          // Set our own location
+          loc_goldlink_td = $(elStart).closest("td");
+          // Get the target url and the target id
+          targeturl = $(elStart).attr("targeturl");
+          targetid = $(elStart).attr("targetid");
+          // Show the waiting signal at the targetid
+          $("#" + targetid).html(loc_sWaiting);
+          // Fetch and show the targeturl
+          $.get(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ok":
+                  // Show the result
+                  $("#" + targetid).html(response['html']);
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $("#" + targetid).html(response.msg);
+                  } else {
+                    $("#" + targetid).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("gold_search_prepare", ex);
+        }
+      },
+
+      /**
+       * gold_select_save
+       *    When a gold sermon has been chosen as destination link, make sure it is shown in the list
+       *
+       */
+      gold_select_save: function (elStart) {
+        var elResults = "#goldselect_results",
+            elSelect = null,
+            gold_html = "",
+            gold_id = "";
+
+        try {
+          // Find out which one has been selected
+          elSelect = $(elResults).find("tr.selected").first();
+          gold_id = $(elSelect).find("td.gold-id").text();
+          gold_html = $(elSelect).find("td.gold-text").html();
+          // Set the items correctly in loc_goldlink_td
+          $(loc_goldlink_td).find("input").val(gold_id);
+          $(loc_goldlink_td).find(".view-mode, .edit-mode").html(gold_html);
+
+
+        } catch (ex) {
+          private_methods.errMsg("gold_select_save", ex);
         }
       },
 
@@ -1693,12 +1768,12 @@ var ru = (function ($, ru) {
        *
        */
       delete_confirm: function (el) {
-        var elNext = null;
+        var elDiv = null;
 
         try {
-          // Get the next row
-          elNext = $(el).closest("tr").next();
-          $(elNext).removeClass("hidden");
+          // Find the [.delete-row] to be shown
+          elDiv = $(el).closest("tr").find(".delete-confirm").first();
+          $(elDiv).removeClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_confirm", ex);
         }
@@ -1711,7 +1786,7 @@ var ru = (function ($, ru) {
        */
       delete_cancel: function (el) {
         try {
-          $(el).closest("tr").addClass("hidden");
+          $(el).closest("div.delete-confirm").addClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_cancel", ex);
         }
@@ -1744,7 +1819,7 @@ var ru = (function ($, ru) {
           bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
           elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
           // Find out just where we are
-          sId = $(this).closest("div").attr("id");
+          sId = $(this).closest("div[id]").attr("id");
           // Find out how many forms there are right now
           iForms = $(elForms).val();
           frm = $(this).closest("form");
@@ -1756,7 +1831,7 @@ var ru = (function ($, ru) {
               //  // Return from here
               //  return;
               //}
-              use_prev_row = true;
+              use_prev_row = false;
               bValidated = true;
               break;
           }
