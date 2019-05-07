@@ -26,7 +26,7 @@
 
             <h3>Gold sermon details</h3>
 
-            <!-- SermonGold information -->
+            <!-- SermonGold Main information -->
             <div id="sermongold_edit">
               <form>
                 {% csrf_token %}
@@ -70,13 +70,6 @@
 
                     <!-- Room for the standard fields -->
                     <tr>
-                      <td class="hoverable" style="min-width: 150px;">Signature</td>
-                      <td style="width: 100%">
-                        <div class="edit-mode hidden">{{goldForm.signature}}</div>
-                        <div class="view-mode">{{goldForm.signature.value}}</div>
-                      </td>
-                    </tr>
-                    <tr>
                       <td class="hoverable">Author (gold standard)</td>
                       <td>
                         <div class="author-key hidden">{{goldForm.author}}</div>
@@ -101,6 +94,11 @@
 
                   </table>
               </form>
+            </div>
+
+            <!-- SermonGold edition links (Gryson, Clavis): zero-to-many -->
+            <div id="sermongold_signset">
+              {% include 'seeker/sermongold_signset.html' with object_id=goldForm.instance.id %}
             </div>
 
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->

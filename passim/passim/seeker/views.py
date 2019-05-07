@@ -29,9 +29,9 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SelectGoldForm, SermonGoldSameForm
+                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition
 
 import fnmatch
 import sys
@@ -563,21 +563,106 @@ def get_authors(request):
 def get_nicknames(request):
     """Get a list of nicknames for autocomplete"""
 
-    data = 'fail'
-    if request.is_ajax():
-        author = request.GET.get("name", "")
-        lstQ = []
-        lstQ.append(Q(name__icontains=author))
-        authors = Nickname.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in authors:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
-    else:
-        data = "Request is not ajax"
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            authors = Nickname.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in authors:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_incipits(request):
+    """Get a list of incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(incipit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("incipit").distinct().all().order_by('incipit')
+            # items = SermonGold.objects.order_by("incipit").distinct()
+            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
+            results = []
+            for idx, co in enumerate(items):
+                co_json = {'name': co['incipit'], 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_explicits(request):
+    """Get a list of explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(explicit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("explicit").distinct().all().order_by('explicit')
+            # items = SermonGold.objects.order_by("explicit").distinct()
+            # items = SermonGold.objects.filter(*lstQ).order_by('explicit').distinct()
+            results = []
+            for idx, co in enumerate(items):
+                co_json = {'name': co['explicit'], 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_signatures(request):
+    """Get a list of signature codes for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(code__icontains=author))
+            items = Signature.objects.order_by("code").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.code, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
 
 
 def import_ead(request):
@@ -1763,8 +1848,13 @@ class ManuscriptListView(ListView):
                             lstThisQ.append(Q(name__iregex=val))
 
                         # Check for Manuscript [idno]
-                        if 'signature' in oFields and oFields['signature'] != "": 
-                            val = adapt_search(oFields['signature'])
+                        if 'gryson' in oFields and oFields['gryson'] != "": 
+                            val = adapt_search(oFields['gryson'])
+                            lstThisQ.append(Q(idno__iregex=val))
+
+                        # Check for Manuscript [idno]
+                        if 'clavis' in oFields and oFields['clavis'] != "": 
+                            val = adapt_search(oFields['clavis'])
                             lstThisQ.append(Q(idno__iregex=val))
 
                         # Check for country name
@@ -1901,11 +1991,6 @@ class SermonGoldListView(ListView):
                 # Process the criteria from this form 
                 oFields = goldForm.cleaned_data
 
-                # Check for SermonGold [idno]
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(signature__iregex=val))
-
                 # Check for author name -- which is in the typeahead parameter
                 if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
                     val = oFields['author']
@@ -1924,6 +2009,11 @@ class SermonGoldListView(ListView):
                     val = adapt_search(oFields['explicit'])
                     lstQ.append(Q(explicit__iregex=val))
 
+                # Check for SermonGold [signature]
+                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                    val = adapt_search(oFields['signature'])
+                    lstQ.append(Q(goldsignatures__code__iregex=val))
+
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # Just show everything
@@ -1935,22 +2025,25 @@ class SermonGoldListView(ListView):
 
 
                 # Just show everything
-                qs = SermonGold.objects.all()
+                qs = SermonGold.objects.all().distinct()
 
         else:
             # Just show everything
-            qs = SermonGold.objects.all()
+            qs = SermonGold.objects.all().distinct()
 
         # Set the sort order
-        qs = qs.order_by('author__name',
-                         Lower('signature'),
-                         'incipit', 
-                         'explicit')
+        #qs = qs.order_by('author__name',
+        #                 'signatures',
+        #                 'incipit', 
+        #                 'explicit')
+
+        # Sort the python way
+        qs = sorted(qs, key=lambda x: x.get_sermon_string())
 
         # Time measurement
         if self.bDoTime:
             print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("SermonGoldListView query: {}".format(qs.query))
+            # print("SermonGoldListView query: {}".format(qs.query))
             iStart = get_now_time()
 
         # Determine the length
@@ -1997,14 +2090,8 @@ class SermonGoldSelect(BasicPart):
         if oFields != None and self.request.method == 'POST':
             # There is valid data to search with
             lstQ = []
-            # (1) process signature
-            if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                lstQ.append(Q(signature=oFields['signature']))
-            elif 'signature_ta' in oFields and oFields['signature_ta'] != "" and oFields['signature_ta'] != None:
-                val = adapt_search(oFields['signature_ta'])
-                lstQ.append(Q(signature__iregex=val))
 
-            # (2) Check for author name -- which is in the typeahead parameter
+            # (1) Check for author name -- which is in the typeahead parameter
             if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
                 val = oFields['author']
                 lstQ.append(Q(author=val))
@@ -2012,19 +2099,20 @@ class SermonGoldSelect(BasicPart):
                 val = adapt_search(oFields['authorname'])
                 lstQ.append(Q(author__name__iregex=val))
 
-            # (3) Process incipit
+            # (2) Process incipit
             if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                lstQ.append(Q(incipit=oFields['incipit']))
-            elif 'incipit_ta' in oFields and oFields['incipit_ta'] != "" and oFields['incipit_ta'] != None:
-                val = adapt_search(oFields['incipit_ta'])
+                val = adapt_search(oFields['incipit'])
                 lstQ.append(Q(incipit__iregex=val))
 
-            # (4) Process explicit
+            # (3) Process explicit
             if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                lstQ.append(Q(explicit=oFields['explicit']))
-            elif 'explicit_ta' in oFields and oFields['explicit_ta'] != "" and oFields['explicit_ta'] != None:
-                val = adapt_search(oFields['explicit_ta'])
+                val = adapt_search(oFields['explicit'])
                 lstQ.append(Q(explicit__iregex=val))
+
+            # (4) Process signature
+            if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                val = adapt_search(oFields['signature'])
+                lstQ.append(Q(signature__code__iregex=val))
 
             # Calculate the final qs
             if len(lstQ) == 0:
@@ -2039,7 +2127,7 @@ class SermonGoldSelect(BasicPart):
                 qs = qs.exclude(id=source_id)
 
             # Make sure sorting is done correctly
-            qs = qs.order_by('signature', 'author__name', 'incipit', 'explicit')
+            qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
 
@@ -2255,10 +2343,18 @@ class SermonGoldLinkset(BasicPart):
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
-    #def rebuild_formset(self, prefix, formset):
-    #    if prefix == 'glink':
-    #        formset = self.GlinkFormSet()
-    #    return formset
+
+class SermonGoldSignset(BasicPart):
+    """The set of signatures from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_signset.html'
+    title = "SermonGoldSignset"
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
 
 
 class SermonGoldDetails(PassimDetails):
@@ -2276,7 +2372,12 @@ class SermonGoldDetails(PassimDetails):
                                          form=SermonGoldSameForm, min_num=0,
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
 
     def before_delete(self, instance):
 
@@ -2359,20 +2460,22 @@ class SermonGoldEdit(PassimDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Start a list of related gold sermons
-        lst_related = []
-        # Do we have an instance?
-        if instance != None:
-            # There is an instance: get the list of SermonGold items to which I link
-            relations = instance.get_relations()
-            # Get a form for each of these relations
-            for instance_rel in relations:
-                linkprefix = "glink-{}".format(instance_rel.id)
-                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
-                lst_related.append(oForm)
+        # This is not longer needed, since it is handled by SermonGoldLinkset
 
-        # Add the list to the context
-        context['relations'] = lst_related
+        ## Start a list of related gold sermons
+        #lst_related = []
+        ## Do we have an instance?
+        #if instance != None:
+        #    # There is an instance: get the list of SermonGold items to which I link
+        #    relations = instance.get_relations()
+        #    # Get a form for each of these relations
+        #    for instance_rel in relations:
+        #        linkprefix = "glink-{}".format(instance_rel.id)
+        #        oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
+        #        lst_related.append(oForm)
+
+        ## Add the list to the context
+        #context['relations'] = lst_related
 
         return context
 

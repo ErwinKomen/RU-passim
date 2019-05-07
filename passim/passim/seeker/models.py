@@ -26,6 +26,7 @@ MAX_TEXT_LEN = 200
 VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+EDI_TYPE = "seeker.editype"
 
 
 class FieldChoice(models.Model):
@@ -1344,7 +1345,7 @@ class SermonGold(models.Model):
     """The signature of a standard sermon"""
 
     # [0-1] Every sermongold should at some point end up with a signature (a name)
-    signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
+    # signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
@@ -1392,6 +1393,23 @@ class SermonGold(models.Model):
         obj = SermonGold.objects.filter(*lstQ).first()
         # Return what we found
         return obj
+
+    def signatures(self):
+        """Combine all signatures into one string"""
+
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return " | ".join(lSign)
+
+    def get_sermon_string(self):
+        """Get a string summary of this one"""
+
+        author = "" if self.author == None else self.author.name
+        incipit = "" if self.incipit == None else self.incipit
+        explicit = "" if self.explicit == None else self.explicit
+        return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
+
 
     def add_relation(self, target, linktype):
         """Add a relation from me to [target] with the indicated type"""
@@ -1543,6 +1561,42 @@ class SermonGoldSame(models.Model):
         # Get the URL to edit/view this sermon
         sUrl = "" if self.id == None else reverse("goldlink_view", kwargs={'pk': self.id})
         return sUrl
+
+
+class Edition(models.Model):
+    """One Gryson or Clavis edition"""
+
+    # [1] It must have a name - that is the Gryson book or the Clavis book or something
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Every edition must be of a limited number of types
+    editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
+                            max_length=5, default="gr")
+
+    def __str__(self):
+        return "{}: {}".format(self.editype, self.name)
+
+    def short(self):
+        return "{}: {}".format(self.editype, self.name)
+
+
+class Signature(models.Model):
+    """One Gryson, Clavis or other code as taken up in an edition"""
+
+    # [1] It must have a code = gryson code or clavis number
+    code = models.CharField("Code", max_length=LONG_STRING)
+    # [1] Every edition must be of a limited number of types
+    editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
+                            max_length=5, default="gr")
+    # [0-1] Every signature should belong to a particular edition
+    edition = models.ForeignKey(Edition, null=True, blank=True, related_name="edisignatures")
+    # [1] Every signature belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures")
+
+    def __str__(self):
+        return "{}: {}".format(self.editype, self.code)
+
+    def short(self):
+        return "{}: {}".format(self.editype, self.code)
 
 
 class SermonDescr(models.Model):

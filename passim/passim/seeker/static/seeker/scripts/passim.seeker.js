@@ -19,7 +19,8 @@ var ru = (function ($, ru) {
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead }
+          { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
 
@@ -413,12 +414,15 @@ var ru = (function ($, ru) {
        */
       init_events: function (sUrlShow) {
         var lHtml = [],
+            elA = null,
             sHtml = "";
 
         try {
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
           $("tr.add-row").each(function () {
-            $(this).find("a").first().click(ru.passim.seeker.tabular_addrow);
+            elA = $(this).find("a").first();
+            $(elA).unbind("click");
+            $(elA).click(ru.passim.seeker.tabular_addrow);
           });
           // Bind one 'tabular_deletrow' event handler to clicking that button
           $(".delete-row").unbind("click");
@@ -551,6 +555,9 @@ var ru = (function ($, ru) {
                       $(targetid).html(response['html']);
                       // Possibly do some initialisations again??
 
+                      // Make sure events are re-established
+                      // ru.passim.seeker.init_events();
+                      ru.passim.init_typeahead();
                       break;
                     case "error":
                       // Show the error
@@ -611,6 +618,9 @@ var ru = (function ($, ru) {
                   }
                   break;
               }
+              // Make sure events are re-established
+              // ru.passim.seeker.init_events();
+              ru.passim.init_typeahead();
             }
 
           });
@@ -764,7 +774,7 @@ var ru = (function ($, ru) {
                 $(eltowards).find(".edit-mode").first().html(sSermon);
 
                 // Set the id of this sermon
-                $(eltowards).find("#id_glink-dst").val(select_id.toString());
+                // DOESN'T EXIST!!! $(eltowards).find("#id_glink-dst").val(select_id.toString());
               }
               break;
           }

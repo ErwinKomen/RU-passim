@@ -5,13 +5,6 @@
   <form>
     {% csrf_token %}
     <table style="width: 100%;">
-      <tr style="width: 100%;">
-        <td>Signature</td>
-        <td style="width: 100%;">
-          <div class="signature-key hidden">{{gselForm.signature}}</div>
-          <div>{{gselForm.signature_ta}}</div>
-        </td>
-      </tr>
       <tr>
         <td>Author</td>
         <td>
@@ -22,15 +15,25 @@
       <tr>
         <td>Incipit</td>
         <td>
-          <div class="incipit-key hidden">{{gselForm.incipit}}</div>
-          <div>{{gselForm.incipit_ta}}</div>
+          <div class="incipit-key">{{gselForm.incipit}}</div>
         </td>
       </tr>
       <tr>
         <td>Explicit</td>
         <td>
-          <div class="explicit-key hidden">{{gselForm.explicit}}</div>
-          <div>{{gselForm.explicit_ta}}</div>
+          <div class="explicit-key">{{gselForm.explicit}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>Gryson code</td>
+        <td>
+          <div class="incipit-key">{{gselForm.gryson}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>Clavis number</td>
+        <td>
+          <div class="incipit-key">{{gselForm.clavis}}</div>
         </td>
       </tr>
 
