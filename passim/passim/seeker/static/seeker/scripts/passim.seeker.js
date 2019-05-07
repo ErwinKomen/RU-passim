@@ -640,8 +640,9 @@ var ru = (function ($, ru) {
           $(loc_goldlink_td).find("input").val(gold_id);
           $(loc_goldlink_td).find(".view-mode").first().html(gold_html);
           $(loc_goldlink_td).find(".edit-mode").first().html(gold_html);
+
           // Remove the selection
-          $(elSelect).removeClass("selected");
+          //$(elResults).find("tr.selected").find(".selected").removeClass("selected");
 
         } catch (ex) {
           private_methods.errMsg("gold_select_save", ex);
@@ -1828,6 +1829,9 @@ var ru = (function ($, ru) {
           // Gather the data
           frm = $(elStart).closest("form");
           data = $(frm).serializeArray();
+          data = jQuery.grep(data, function (item) {
+            return (item['value'].indexOf("__counter__") < 0 && item['value'].indexOf("__prefix__") < 0);
+          });
           $.post(targeturl, data, function (response) {
             // Action depends on the response
             if (response === undefined || response === null || !("status" in response)) {

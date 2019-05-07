@@ -1015,7 +1015,8 @@ class BasicPart(View):
                                                 self.arErr.append(form.errors)
                                 
                                 # Rebuild the formset if it contains deleted forms
-                                if has_deletions:
+                                if has_deletions or not has_deletions:
+                                    # Or: ALWAYS
                                     if qs == None:
                                         formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                                     else:
@@ -2254,10 +2255,10 @@ class SermonGoldLinkset(BasicPart):
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
-    def rebuild_formset(self, prefix, formset):
-        if prefix == 'glink':
-            formset = self.GlinkFormSet()
-        return formset
+    #def rebuild_formset(self, prefix, formset):
+    #    if prefix == 'glink':
+    #        formset = self.GlinkFormSet()
+    #    return formset
 
 
 class SermonGoldDetails(PassimDetails):
