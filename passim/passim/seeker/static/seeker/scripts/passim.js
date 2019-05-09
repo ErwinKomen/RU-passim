@@ -227,9 +227,9 @@ var ru = (function ($, ru) {
           },
           // loc_countries will be an array of countries
           local: loc_signatureL,
-          prefetch: { url: base_url + 'api/signature/', cache: true },
+          prefetch: { url: base_url + 'api/signatures/', cache: true },
           remote: {
-            url: base_url + 'api/signature/?name=',
+            url: base_url + 'api/signatures/?name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;

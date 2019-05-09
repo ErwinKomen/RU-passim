@@ -55,8 +55,12 @@ class SelectGoldForm(forms.ModelForm):
     """Note: only for searching and selecting"""
 
     source_id = forms.CharField(label=_("Source"), required=False)
-    authorname = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    authorname = forms.CharField(label=_("Author"), 
+        required=False, 
+        widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), 
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -74,6 +78,7 @@ class SelectGoldForm(forms.ModelForm):
         super(SelectGoldForm, self).__init__(*args, **kwargs)
         # Make sure to set required and optional fields
         self.fields['source_id'].required = False
+        self.fields['signature'].required = False
         self.fields['authorname'].required = False
         if 'author' in self.fields: self.fields['author'].required = False
         if 'incipit' in self.fields: self.fields['incipit'].required = False
@@ -296,7 +301,6 @@ class AuthorEditForm(forms.ModelForm):
         widgets={'name':      forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
                  'abbr':     forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
                  }
-
 
 
 class AuthorSearchForm(forms.ModelForm):

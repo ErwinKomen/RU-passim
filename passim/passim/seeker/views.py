@@ -2112,7 +2112,7 @@ class SermonGoldSelect(BasicPart):
             # (4) Process signature
             if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
                 val = adapt_search(oFields['signature'])
-                lstQ.append(Q(signature__code__iregex=val))
+                lstQ.append(Q(goldsignatures__code__iregex=val))
 
             # Calculate the final qs
             if len(lstQ) == 0:
@@ -2126,8 +2126,10 @@ class SermonGoldSelect(BasicPart):
             if source_id != None:
                 qs = qs.exclude(id=source_id)
 
-            # Make sure sorting is done correctly
-            qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
+            # Sort the python way
+            qs = sorted(qs, key=lambda x: x.get_sermon_string())
+            ## Make sure sorting is done correctly
+            #qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
 

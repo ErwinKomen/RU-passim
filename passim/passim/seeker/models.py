@@ -1362,25 +1362,22 @@ class SermonGold(models.Model):
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
 
     def __str__(self):
-        name = ""
-        if self.signature:
-            name = self.signature
-        else:
+        name = self.signatures()
+        if name == "":
             name = "RU_sg_{}".format(self.id)
         return name
 
-    def find_or_create(author, incipit, explicit, signature):
+    def find_or_create(author, incipit, explicit):
         """Find or create a SermonGold"""
 
         lstQ = []
-        lstQ.append(Q(author=author))
-        if signature != "": lstQ.append(Q(signature=signature))
+        if author != None: lstQ.append(Q(author=author))
         if incipit != "": lstQ.append(Q(incipit=incipit))
         if explicit != "": lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         if obj == None:
             # Create a new
-            obj = SermonGold(author=author, signature=signature, incipit=incipit, explicit=explicit)
+            obj = SermonGold(author=author, incipit=incipit, explicit=explicit)
             obj.save()
         # Return this object
         return obj
@@ -1389,7 +1386,10 @@ class SermonGold(models.Model):
         """Find a sermongold"""
 
         lstQ = []
-        lstQ.append(Q(signature=signature))
+        # Check if it is linked to a particular signature
+        val = adapt_search(signature)
+        lstQ.append(Q(goldsignatures__code__iregex=val))
+        # Optionally look for other fields
         if author != None: lstQ.append(Q(author=author))
         if incipit != None: lstQ.append(Q(incipit=incipit))
         if explicit != None: lstQ.append(Q(explicit=explicit))
@@ -1428,8 +1428,7 @@ class SermonGold(models.Model):
         incipit = "" if self.incipit == None else self.incipit
         explicit = "" if self.explicit == None else self.explicit
         return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
-
-
+    
     def add_relation(self, target, linktype):
         """Add a relation from me to [target] with the indicated type"""
 
@@ -1514,7 +1513,11 @@ class SermonGold(models.Model):
                     oBack['msg'] = "Could not find golden Author [{}]".format(oGold['author'])
                     return oBack
                 # Get or create this golden sermon
-                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'], oGold['signature'])
+                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
+                # ========================================================
+                # TODO: weggehaald maar moet ik het volgende verwerken??
+                #       oGold['signature']
+
                 oGold['obj'] = gold
                 iSermCount += 1
  
@@ -1530,6 +1533,12 @@ class SermonGold(models.Model):
                         linktype = get_linktype_abbr(linktype)
                     else:
                         linktype = "eqs"
+
+                    # ==========================================================================
+                    # TODO: ['target'] is een signature is, en die staat niet meer in de SermonGold
+                    #       Controleer dus of dit wel gaat werken: 
+                    #           ik zoek nu naar gold sermons die een link hebben naar signature
+                    # ==========================================================================
                     # Get the target sermongold
                     target = SermonGold.find_first(oGold['target'])
                     if target == None:
@@ -1615,7 +1624,7 @@ class Signature(models.Model):
         return "{}: {}".format(self.editype, self.code)
 
     def short(self):
-        return "{}: {}".format(self.editype, self.code)
+        return self.code
 
 
 class SermonDescr(models.Model):

@@ -6,43 +6,26 @@
     {% csrf_token %}
     <table style="width: 100%;">
       <tr>
-        <td>Author</td>
-        <td>
-          <div class="author-key hidden">{{gselForm.author}}</div>
-          <div>{{gselForm.authorname}}</div>
-        </td>
+        <td style="width: 100px;">Author</td>
+        <td style="width: 100%;"><div class="author-key hidden">{{gselForm.author}}</div><div>{{gselForm.authorname}}</div></td>
       </tr>
       <tr>
         <td>Incipit</td>
-        <td>
-          <div class="incipit-key">{{gselForm.incipit}}</div>
-        </td>
+        <td><div class="incipit-key">{{gselForm.incipit}}</div></td>
       </tr>
       <tr>
         <td>Explicit</td>
-        <td>
-          <div class="explicit-key">{{gselForm.explicit}}</div>
-        </td>
+        <td><div class="explicit-key">{{gselForm.explicit}}</div></td>
       </tr>
       <tr>
-        <td>Gryson code</td>
-        <td>
-          <div class="incipit-key">{{gselForm.gryson}}</div>
-        </td>
-      </tr>
-      <tr>
-        <td>Clavis number</td>
-        <td>
-          <div class="incipit-key">{{gselForm.clavis}}</div>
-        </td>
+        <td>Signature</td>
+        <td><div class="incipit-key">{{gselForm.signature}}</div></td>
       </tr>
 
       <!-- Keep track of our source -- Is this necessary?? -->
       <tr class="hidden">
         <td>Golden source</td>
-        <td>
-          <input id="id_source_id" name="source_id" value="{{source_id}}" />
-        </td>
+        <td><input id="id_source_id" name="source_id" value="{{source_id}}" /></td>
       </tr>
 
       <!-- Row of buttons to facilitate searching -->

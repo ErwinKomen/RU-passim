@@ -185,10 +185,8 @@
                         <td class="hidden"> {{ gold.id }}</td>
                         <!-- Author / Signature / Incipit -->
                         <td class="gold-author tdnowrap" align="left" title="{{gold.author.name}}">{{gold.author.name|truncatechars:12}}</td>
-                        <td class="gold-signature tdnowrap" align="left" title="All signatures">
-                          {% for item in gold.goldsignatures.all %}
-                            <span>{{item.code}}</span>
-                          {% endfor %}
+                        <td class="gold-signature tdnowrap" align="left" title="{{gold.signatures}}">
+                          <span>{{gold.signatures|truncatechars:20}}</span>
                         </td>
                         <td style="width: 100%;">
                           <span>{{gold.incipit}}</span>

@@ -1,6 +1,10 @@
 ﻿{% load i18n %}
 
-    {% if msitem.signature %}<b>{{msitem.signature}}</b>{% endif %}
+    {% if msitem.goldsignatures.all|length > 0 %}
+      <b>{{msitem.signatures}}</b>
+    {% else %}
+      [-]
+    {% endif %}
     {% if msitem.author %}
       (by <span class="sermon-author">{{msitem.author.name}}</span>)
     {% else %}
