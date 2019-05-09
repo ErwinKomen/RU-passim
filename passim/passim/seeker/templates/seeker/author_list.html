@@ -55,11 +55,11 @@
             <div id="searchdefault" class="row">
               <div class="col-sm-10">
                 <label>&nbsp;</label>
-                <div class='input-group'>
-                    <label class='input-group-addon' 
+                <div class='input-group input-group-sm'>
+                    <span class='input-group-addon ' 
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
-                           for='id_name'>{{searchform.name.label}}</label>
+                           >{{searchform.name.label}}</span>
                     <input name='name' class='form-control typeahead authors input-sm' type="text" 
                            {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
                            placeholder="Name of the author..."
@@ -170,12 +170,13 @@
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
-              <thead><tr><th class="hidden">id</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
+              <thead><tr><th class="hidden">id</th><th>&nbsp;</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
               <tbody>
               {% for author in object_list %}
                 <tr class="dict-entry clickable"
                     onclick="ru.passim.seeker.goto_url('{% url 'author_details' author.id %}')">
                   <td class="hidden"> {{ author.id }}</td>
+                  <td class="author-abbr tdnowrap" style="min-width: 100px;">{% if author.abbr %}{{author.abbr}}{% endif %}</td>
                   <td style="width: 100%;">
                     <span class="author-name">{{author.name}}</span>
                   </td>

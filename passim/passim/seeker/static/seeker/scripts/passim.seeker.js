@@ -1292,6 +1292,7 @@ var ru = (function ($, ru) {
             colspan = "",
             targeturl = "",
             targetid = "",
+            afterurl = "",
             targethead = null,
             lHtml = [],
             data = null,
@@ -1335,6 +1336,9 @@ var ru = (function ($, ru) {
 
           // Action depends on the mode
           switch (sMode) {
+            case "skip":
+              return;
+              break;
             case "edit":
               // Make sure all targetid's that need opening are shown
               $(elTr).find(".view-mode:not(.hidden)").each(function () {
@@ -1637,11 +1641,17 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").addClass("hidden");
               break;
             case "delete":
-              // Ask for confirmation
-              // NOTE: we cannot be more specific than "item", since this can be manuscript or sermongold
-              if (!confirm("Do you really want to remove this item?")) {
-                // Return from here
-                return;
+              // Do we have an afterurl?
+              afterurl = $(el).attr("afterurl");
+
+              // Check if we are under a delete-confirm
+              if ($(el).closest("div[delete-confirm]").lenght === 0) {
+                // Ask for confirmation
+                // NOTE: we cannot be more specific than "item", since this can be manuscript or sermongold
+                if (!confirm("Do you really want to remove this item?")) {
+                  // Return from here
+                  return;
+                }
               }
               // Show waiting symbol
               $(elTr).find(".waiting").removeClass("hidden");
@@ -1675,9 +1685,15 @@ var ru = (function ($, ru) {
                     switch (response.status) {
                       case "ready":
                       case "ok":
-                        // Delete visually
-                        $(targetid).remove();
-                        $(targethead).remove();
+                        // Do we have an afterurl?
+                        if (afterurl === undefined || afterurl === "") {
+                          // Delete visually
+                          $(targetid).remove();
+                          $(targethead).remove();
+                        } else {
+                          // Make sure we go to the afterurl
+                          window.location = afterurl;
+                        }
                         break;
                       case "error":
                         if ("html" in response) {
@@ -1697,7 +1713,7 @@ var ru = (function ($, ru) {
                             } else {
                               $(err).html("<code>There is an error</code>");
                             }
-                          }
+                          } 
                         } else {
                           // Send a message
                           $(err).html("<i>There is no <code>html</code> in the response from the server</i>");

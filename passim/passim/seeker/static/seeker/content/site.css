@@ -1120,6 +1120,10 @@ div.selected {
     color: #999;
 }
 
+.twitter-typeahead {
+  display: inherit !important;
+}
+
 /* Adapt the standard modal to my own */
 .modal-dialog {
     width: 80%;
