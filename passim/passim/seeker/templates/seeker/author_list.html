@@ -90,7 +90,7 @@
 
         </form>
 
-      <!-- Allow adding a project -->
+      <!-- Allow importing authors from Excel -->
       {% if is_passim_uploader %}
         <div id="import_main" class="row hidden container">
           <form action="{% url 'import_authors' %}" method="POST" enctype="multipart/form-data">
@@ -129,7 +129,32 @@
     {% if object_list %}
       <div class="panel panel-default">
 
-        <h3>Authors</h3>
+        <!-- Heading and button to add a new author -->
+        <form>
+          <h3>
+            <span title="These are 'gold standard' authors">Authors</span>
+            <span id="add_author" class="pull-right">
+              {% csrf_token %}
+              <a class="btn btn-xs jumbo-3" role="button" 
+                  targeturl="{% url 'author_edit' %}"
+                  targetid="author_new"
+                  onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                <span class="glyphicon glyphicon-plus"></span>Add an author
+              </a>
+            </span>
+          </h3>
+        </form>
+
+        <!-- Room to add a new author -->
+        <div class="row subform">
+          <div class="col-md-offset-1 col-md-10">
+            <div id="author_new">
+              <!-- Room to create a new author instance-->
+            </div>
+          </div>
+        </div>
+
+        <!-- Top pagination -->
         <div class="row">
             <div class="col-sm-4"><span>Found: </span><span>{{entrycount}}</span></div>
             <div class="col-sm-8">
@@ -140,41 +165,24 @@
             </span>
             </div>
         </div>
+
+        <!-- Table that lists all authors -->
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
               <thead><tr><th class="hidden">id</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
               <tbody>
               {% for author in object_list %}
-                <tr class="dict-entry">
+                <tr class="dict-entry clickable"
+                    onclick="ru.passim.seeker.goto_url('{% url 'author_details' author.id %}')">
                   <td class="hidden"> {{ author.id }}</td>
                   <td style="width: 100%;">
                     <span class="author-name">{{author.name}}</span>
                   </td>
-                  <!-- Buttons for this author-->
-                  <td style="min-width: 80px;">
-                    <form>
-                      {% csrf_token %}
-                      <!-- information on this author -->
-                      <a role="button" class="btn btn-xs jumbo-3" title="Information" data-toggle="collapse" data-target="#author-info-{{author.id}}">
-                        <span class="glyphicon glyphicon-info-sign"></span>
-                      </a>
-                    </form>
-                  </td>
-                </tr>
 
-                <!-- Nicknames for this author -->
-                <tr id="author-info-{{author.id}}" class="collapse">
-                  <td colspan="1">
-                    {% if author.author_nicknames.count == 0 %}
-                      <span>This author doesn't have any local names (yet)</span>
-                    {% else %}
-                      {% for knick in author.author_nicknames.all %}
-                      <span class="author-nickname">{{knick.name}}</span>
-                      {% endfor %}
-                    {% endif %}
+                  <!-- Short indications for this author-->
+                  <td style="min-width: 80px;">
                   </td>
-                  <td>&nbsp;</td>
                 </tr>
 
               {% endfor %}
@@ -182,6 +190,8 @@
             </table>
           </div>
         </div>
+
+        <!-- Bottom pagination -->
         <div class="pagination">
             <span class="step-links">
 

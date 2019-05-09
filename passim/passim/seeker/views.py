@@ -29,7 +29,7 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm
+                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition
 
@@ -2480,6 +2480,44 @@ class SermonGoldEdit(PassimDetails):
         return context
 
 
+class AuthorDetails(PassimDetails):
+    """The details of one author"""
+
+    model = Author
+    mForm = AuthorEditForm
+    template_name = 'seeker/author_details.html'
+    template_post = 'seeker/author_details.html'
+    prefix = 'author'
+    title = "AuthorDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('author_search')
+        return True, "" 
+
+
+class AuthorEdit(PassimDetails):
+    """The details of one author"""
+
+    model = Author
+    mForm = AuthorEditForm
+    template_name = 'seeker/author_edit.html'
+    template_post = 'seeker/author_edit.html'
+    prefix = 'author'
+    title = "AuthorEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('author_search')
+        return True, "" 
+
+
 class AuthorListView(ListView):
     """Listview of authors"""
 
@@ -2546,7 +2584,8 @@ class AuthorListView(ListView):
         # Check for author [name]
         if 'name' in get and get['name'] != '':
             val = adapt_search(get['name'])
-            lstQ.append(Q(name__iregex=val))
+            # Search in both the name as well as the abbr field
+            lstQ.append(Q(name__iregex=val) | Q(abbr__iregex=val))
 
         # Calculate the final qs
         qs = Author.objects.filter(*lstQ).order_by('name').distinct()

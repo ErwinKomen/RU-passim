@@ -1,0 +1,62 @@
+﻿{% load i18n %}
+
+<!-- Author information -->
+<form>
+  {% csrf_token %}
+    <table style="width: 100%;">
+      <tr>
+        <td colspan="2"  class="ms editable table">
+          <!-- Provide the necessary buttons: edit, cancel and save -->
+          {% if is_passim_editor %}
+          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+            <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+          </a>
+          {% endif %}
+
+          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+          </a>
+
+          {% if is_passim_editor %}
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+             targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% else %}{% url 'author_edit' %}{% endif %}" >
+            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+          </a>
+          {% endif %}
+
+          <!-- Waiting symbol-->
+          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+          <!-- Little error message room -->
+          <span id="gold_err_msg" class="err-msg"></span>
+
+          {% if is_passim_editor %}
+          <!-- Put the delete button completely to the right-->
+          <a mode="delete" class="view-mode btn btn-xs jumbo-3 pull-right" targetid="sermon_edit"
+             targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% endif %}">
+            <span class="glyphicon glyphicon-remove" title="Delete this author"></span>
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Room for the standard fields -->
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">Name</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{authorForm.name}}</div>
+          <div class="view-mode">{{authorForm.name.value}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="hoverable">Abbreviation</td>
+        <td>
+          <div class="edit-mode hidden">{{authorForm.abbr}}</div>
+          <div class="view-mode">{% if authorForm.abbr %}{{authorForm.abbr.value}}{% else %}-{% endif %}</div>
+        </td>
+      </tr>
+
+    </table>
+</form>
+
+

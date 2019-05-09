@@ -1182,6 +1182,8 @@ class Author(models.Model):
 
     # [1] Name of the author
     name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] Possibly add the Gryson abbreviation for the author
+    abbr = models.CharField("Abbreviation", null=True, blank=True, max_length=LONG_STRING)
 
     def __str__(self):
         return self.name
@@ -1202,7 +1204,8 @@ class Author(models.Model):
     def find(sName):
         """Find an author."""
 
-        qs = Author.objects.filter(Q(name__iexact=sName))
+        # Check for the author's full name as well as the abbreviation
+        qs = Author.objects.filter(Q(name__iexact=sName) | Q(abbr__iexact=sName))
         hit = None
         if qs.count() != 0:
             hit = qs[0]
@@ -1401,6 +1404,22 @@ class SermonGold(models.Model):
         for item in self.goldsignatures.all():
             lSign.append(item.short())
         return " | ".join(lSign)
+
+    def link_oview(self):
+        """provide an overview of links from this gold sermon to others"""
+
+        link_list = [
+            {'abbr': 'eqs', 'class': 'eqs-link', 'count': 0, 'title': 'Is equal to' },
+            {'abbr': 'prt', 'class': 'prt-link', 'count': 0, 'title': 'Is part of' },
+            {'abbr': 'sim', 'class': 'sim-link', 'count': 0, 'title': 'Is similar to' },
+            {'abbr': 'use', 'class': 'use-link', 'count': 0, 'title': 'Makes us of' },
+            ]
+        lHtml = []
+        for link_def in link_list:
+            lt = link_def['abbr']
+            links = SermonGoldSame.objects.filter(src=self, linktype=lt).count()
+            link_def['count'] = links
+        return link_list
 
     def get_sermon_string(self):
         """Get a string summary of this one"""

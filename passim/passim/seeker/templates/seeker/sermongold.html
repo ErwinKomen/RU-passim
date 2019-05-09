@@ -161,7 +161,7 @@
             </div>
 
             {% if object_list %}
-
+              <!-- Top pagination -->
               <div class="row">
                   <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
                   <div class="col-sm-8">
@@ -172,6 +172,8 @@
                   </span>
                   </div>
               </div>
+
+              <!-- Table that contains a list of gold sermons -->
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
@@ -194,8 +196,14 @@
                           <span>{{gold.explicit}}</span>
                         </td>
 
-                        <!-- Give an overview of the links of this gold sermon -->
-                        <td>(links)</td>
+                        <!-- Give an overview of the links *from* this gold sermon to others -->
+                        <td class="tdnowrap">
+                          {% for link_def in gold.link_oview %}
+                            {% if link_def.count > 0 %}
+                            <span class="badge {{link_def.class}}" title="{{link_def.title}}">{{link_def.count}}</span>
+                            {% endif %}
+                          {% endfor %}
+                        </td>
                       </tr>
 
                     {% endfor %}
@@ -203,6 +211,8 @@
                   </table>
                 </div>
               </div>
+
+              <!-- Bottom pagination -->
               <div class="pagination">
                   <span class="step-links">
 

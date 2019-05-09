@@ -152,7 +152,9 @@ class SermonForm(forms.ModelForm):
 
 class SermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+        widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -284,6 +286,17 @@ class LibrarySearchForm(forms.ModelForm):
 
         model = Library
         fields = ('country', 'city', 'libtype', 'name')
+
+
+class AuthorEditForm(forms.ModelForm):
+
+    class Meta:
+        model = Author
+        fields = ['name', 'abbr']
+        widgets={'name':      forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
+                 'abbr':     forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
+                 }
+
 
 
 class AuthorSearchForm(forms.ModelForm):

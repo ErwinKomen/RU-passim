@@ -1129,3 +1129,17 @@ div.selected {
 td.hightlighted {
   background-color: yellow;
 }
+
+/* Badges with background color for link types */
+span.badge.eqs-link {
+  background-color: darkblue;
+}
+span.badge.prt-link {
+  background-color: lightgreen;
+}
+span.badge.sim-link {
+  background-color: darkgreen;
+}
+span.badge.use-link {
+  background-color: mediumorchid;
+}
