@@ -31,9 +31,31 @@
               {% include 'seeker/sermongold_edit.html' %}
             </div>
 
-            <!-- SermonGold edition links (Gryson, Clavis): zero-to-many -->
-            <div id="sermongold_signset">
-              {% include 'seeker/sermongold_signset.html' with object_id=goldForm.instance.id %}
+            <!-- SermonGold signatures (Gryson, Clavis): zero-to-many -->
+            <div class="row">&nbsp;</div>
+            <div id="sermongold_signset" class="post-load" targeturl="{% url 'gold_signset' pk=goldForm.instance.id %}" >
+              <!-- The wait symbol will be overwritten -->
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+
+            <!-- SermonGold critical editions: zero-to-many -->
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <!-- One or more critical editions -->
+              <div class="col-md-6">
+                <div id="sermongold_ediset" class="post-load" targeturl="{% url 'gold_ediset' pk=goldForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+
+              <!-- One or more fulltext links (to critical editions) -->
+              <div class="col-md-6">
+                <div id="sermongold_ftxtset" class="post-load" targeturl="{% url 'gold_ftxtset' pk=goldForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
             </div>
 
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
@@ -70,8 +92,9 @@
                 </div>
 
                 <!-- Room for the links from this gold sermon -->
-                <div id="sermongold_linkset">
-                  {% include 'seeker/sermongold_linkset.html' with object_id=goldForm.instance.id %}
+                <div class="row">&nbsp;</div>
+                <div id="sermongold_linkset" class="post-load" targeturl="{% url 'gold_linkset' pk=goldForm.instance.id %}" >
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
                 </div>
 
               </div>

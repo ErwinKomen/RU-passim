@@ -165,10 +165,11 @@ class SermonGoldForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['author', 'incipit', 'explicit' ]
+        fields = ['author', 'incipit', 'explicit', 'bibliography' ]
         widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'})
+                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -212,16 +213,35 @@ class SermonGoldSignatureForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Signature
-        fields = ['code', 'edition', 'gold' ]
-        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
+        fields = ['code', 'editype', 'gold']
+        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
         # Initialize choices for editype
-        # init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+        init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
 
+
+class SermonGoldEditionForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Edition
+        fields = ['name', 'gold']
+        widgets={'name':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Critical text edition...', 'style': 'width: 100%;'})
+                 }
+
+
+class SermonGoldFtextlinkForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Ftextlink
+        fields = ['url', 'gold']
+        widgets={'url':     forms.URLInput(attrs={'placeholder': 'Full text URLs...', 'style': 'width: 100%;'})
+                 }
 
 
 class ManuscriptForm(forms.ModelForm):

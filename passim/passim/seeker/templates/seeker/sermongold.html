@@ -177,7 +177,7 @@
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
-                    <thead><tr><th class="hidden">id</th><th>Author</th><th>Signature</th><th>Incipit ... Explicit</th><th><!-- Links --></th></tr></thead>
+                    <thead><tr><th class="hidden">id</th><th>Author</th><th>Signature</th><th>Incipit ... Explicit</th><th>Editions</th><th>Links</th></tr></thead>
                     <tbody>
                     {% for gold in object_list %}
                       <tr class="dict-entry clickable"
@@ -192,6 +192,11 @@
                           <span>{{gold.incipit}}</span>
                           <span>{% if gold.incipit %}...{% endif %}</span>
                           <span>{{gold.explicit}}</span>
+                        </td>
+
+                        <!-- Editions -->
+                        <td class="gold-edition tdnowrap" style="min-width: 100px;" align="left" title="{{gold.editions}}">
+                          <span>{{gold.editions|truncatechars:20}}</span>
                         </td>
 
                         <!-- Give an overview of the links *from* this gold sermon to others -->

@@ -29,9 +29,10 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm
+                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
+                                SermonGoldEditionForm, SermonGoldFtextlinkForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink
 
 import fnmatch
 import sys
@@ -663,6 +664,30 @@ def get_signatures(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
+@csrf_exempt
+def get_editions(request):
+    """Get a list of edition codes for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            items = Edition.objects.order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
 
 
 def import_ead(request):
@@ -1192,7 +1217,10 @@ class BasicPart(View):
                 self.data['html'] = "deleted" 
             else:
                 # In this case reset the errors - they should be shown within the template
-                self.data['html'] = render_to_string(self.template_name, context, request)
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = treat_bom(sHtml)
+                self.data['html'] = sHtml
+
             # At any rate: empty the error basket
             self.arErr = []
             error_list = []
@@ -2357,6 +2385,38 @@ class SermonGoldSignset(BasicPart):
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
+    
+    def add_to_context(self, context):
+        context['edi_list'] = [{'type': 'gr', 'name': 'Gryson'},
+                               {'type': 'cl', 'name': 'Clavis'},
+                               {'type': 'ot', 'name': 'Other'}]
+        return context
+
+
+class SermonGoldEdiset(BasicPart):
+    """The set of critical text editions from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_ediset.html'
+    title = "SermonGoldEditions"
+    GediFormSet = inlineformset_factory(SermonGold, Edition,
+                                         form=SermonGoldEditionForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GediFormSet, 'prefix': 'gedi', 'readonly': False}]
+
+
+class SermonGoldFtxtset(BasicPart):
+    """The set of critical text editions from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_ftxtset.html'
+    title = "SermonGoldFulltextLinks"
+    GftextFormSet = inlineformset_factory(SermonGold, Ftextlink,
+                                         form=SermonGoldFtextlinkForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GftextFormSet, 'prefix': 'gftxt', 'readonly': False}]
 
 
 class SermonGoldDetails(PassimDetails):

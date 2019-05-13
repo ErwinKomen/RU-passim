@@ -48,8 +48,10 @@ var ru = (function ($, ru) {
         loc_incipitsL = [],
         loc_explicits = [],     // Use in sermongold_select.html
         loc_explicitsL = [],
-        loc_signature = [],        // Use in sermongold_select.html
+        loc_signature = [],     // Use in sermongold_select.html
         loc_signatureL = [],
+        loc_edition = [],       // critical editions that belong to a gold sermon
+        loc_editionL = [],      
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
@@ -237,6 +239,26 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: EDITION
+        loc_edition = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_editionL,
+          prefetch: { url: base_url + 'api/editions/', cache: true },
+          remote: {
+            url: base_url + 'api/editions/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Initialize typeahead
         ru.passim.init_typeahead();
 
@@ -258,6 +280,7 @@ var ru = (function ($, ru) {
           $(".typeahead.incipits").typeahead('destroy');
           $(".typeahead.explicits").typeahead('destroy');
           $(".typeahead.signatures").typeahead('destroy');
+          $(".typeahead.editions").typeahead('destroy');
 
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
@@ -384,6 +407,22 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".signature-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: EDITION -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.editions, tr .typeahead.editions").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'editions', source: loc_edition, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark an inexact wording of an edition</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".edition-key input").last().val(suggestion.id);
           });
 
           // Make sure we know which element is pressed in typeahead

@@ -19,6 +19,8 @@ var ru = (function ($, ru) {
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
@@ -415,9 +417,50 @@ var ru = (function ($, ru) {
       init_events: function (sUrlShow) {
         var lHtml = [],
             elA = null,
+            object_id = "",
+            targetid = null,
             sHtml = "";
 
         try {
+          // See if there are any post-loads to do
+          $(".post-load").each(function (idx, value) {
+            var targetid = $(this),
+                data = [],
+                targeturl = $(targetid).attr("targeturl");
+
+            // Only do this on the first one
+            if (idx === 0) {
+              // Load this one with a GET action
+              $.get(targeturl, data, function (response) {
+                // Remove the class
+                $(targetid).removeClass("post-load");
+
+                // Action depends on the response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ok":
+                      // Show the result
+                      $(targetid).html(response['html']);
+                      // Call initialisation again
+                      ru.passim.seeker.init_events(sUrlShow);
+                      break;
+                    case "error":
+                      // Show the error
+                      if ('msg' in response) {
+                        $(targetid).html(response.msg);
+                      } else {
+                        $(targetid).html("An error has occurred");
+                      }
+                      break;
+                  }
+                }
+
+              });
+            }
+          });
+
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
           $("tr.add-row").each(function () {
             elA = $(this).find("a").first();
@@ -443,6 +486,8 @@ var ru = (function ($, ru) {
             history.pushState(null, null, sUrlShow);
           }
 
+          // Make sure typeahead is re-established
+          ru.passim.init_typeahead();
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
@@ -1831,6 +1876,7 @@ var ru = (function ($, ru) {
       formset_update: function (elStart, sAction) {
         var targetid = "",
             err = "#error_location",
+            errdiv = null,
             data = [],
             lHtml = [],
             i = 0,
@@ -1838,6 +1884,12 @@ var ru = (function ($, ru) {
             targeturl = "";
 
         try {
+          // Get the correct error div
+          errdiv = $(elStart).closest("form").find(err).first();
+          if (errdiv === undefined || errdiv === null) {
+            errdiv = $(err);
+          }
+
           // Get attributes
           targetid = $(elStart).attr("targetid");
           targeturl = $(elStart).attr("targeturl");
@@ -1875,9 +1927,9 @@ var ru = (function ($, ru) {
                           lHtml = []
                           lHtml.push("Errors:");
                           $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
-                          $(err).html(lHtml.join("<br />"));
+                          $(errdiv).html(lHtml.join("<br />"));
                         } else {
-                          $(err).html("Error: " + response['msg']);
+                          $(errdiv).html("Error: " + response['msg']);
                         }
                       } else if ('error_list' in response) {
                         lHtml = []
@@ -1885,11 +1937,11 @@ var ru = (function ($, ru) {
                         for (i = 0; i < response['error_list'].length; i++) {
                           lHtml.push(response['error_list'][i]);
                         }
-                        $(err).html(lHtml.join("<br />"));
+                        $(errdiv).html(lHtml.join("<br />"));
                       } else {
-                        $(err).html("<code>There is an error</code>");
+                        $(errdiv).html("<code>There is an error</code>");
                       }
-                      $(err).removeClass("hidden");
+                      $(errdiv).removeClass("hidden");
                     } else {
                       // Show the HTML in the targetid
                       $("#" + targetid).html(response['html']);
@@ -1898,12 +1950,12 @@ var ru = (function ($, ru) {
                     ru.passim.seeker.init_events();
                   } else {
                     // Send a message
-                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                    $(errdiv).html("<i>There is no <code>html</code> in the response from the server</i>");
                   }
                   break;
                 default:
                   // Something went wrong -- show the page or not?
-                  $(err).html("The status returned is unknown: " + response.status);
+                  $(errdiv).html("The status returned is unknown: " + response.status);
                   break;
               }
             }
@@ -1948,6 +2000,9 @@ var ru = (function ($, ru) {
           // The validation action depends on this id
           switch (sId) {
             case "glink_formset":
+            case "gedi_formset":
+            case "gftxt_formset":
+            case "gsign_formset":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
               //  // Return from here
@@ -2070,7 +2125,7 @@ var ru = (function ($, ru) {
 
         try {
           // Find out just where we are
-          sId = $(this).closest("div").attr("id");
+          sId = $(this).closest("div[id]").attr("id");
           // Walk all tables
           for (i = 0; i < arTdef.length; i++) {
             // Get the definition
@@ -2125,13 +2180,26 @@ var ru = (function ($, ru) {
 
           // Find each <input> element
           newElement.find(':input').each(function (idx, el) {
+            var name = "",
+                id = "",
+                val = "",
+                td = null;
+
             if ($(el).attr("name") !== undefined) {
               // Get the name of this element, adapting it on the fly
-              var name = $(el).attr("name").replace("__prefix__", total.toString());
+              name = $(el).attr("name").replace("__prefix__", total.toString());
               // Produce a new id for this element
-              var id = $(el).attr("id").replace("__prefix__", total.toString());
+              id = $(el).attr("id").replace("__prefix__", total.toString());
               // Adapt this element's name and id, unchecking it
               $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              // Possibly set a default value
+              td = $(el).parent('td');
+              if (td.length === 1) {
+                val = $(td).attr("defaultvalue");
+                if (val !== undefined && val !== "") {
+                  $(el).val(val);
+                }
+              }
             }
           });
           newElement.find('select').each(function (idx, el) {

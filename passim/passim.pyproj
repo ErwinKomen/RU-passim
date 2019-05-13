@@ -115,7 +115,9 @@
     <Content Include="passim\seeker\templates\seeker\sermongold.html" />
     <Content Include="passim\seeker\templates\seeker\sermongoldlink_info.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_ftxtset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_ediset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_signset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_select.html" />

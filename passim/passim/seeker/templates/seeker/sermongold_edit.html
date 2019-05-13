@@ -49,6 +49,8 @@
           <div class="view-mode">{{goldForm.instance.author.name}}</div>
         </td>
       </tr>
+
+      <!-- Incipit -->
       <tr>
         <td class="hoverable">Incipit</td>
         <td>
@@ -56,11 +58,22 @@
           <div class="view-mode">{{goldForm.incipit.value}}</div>
         </td>
       </tr>
+
+      <!-- Explicit -->
       <tr>
         <td class="hoverable">Explicit</td>
         <td>
           <div class="edit-mode hidden">{{goldForm.explicit}}</div>
           <div class="view-mode">{{goldForm.explicit.value}}</div>
+        </td>
+      </tr>
+
+      <!-- Bibliography -->
+      <tr>
+        <td class="hoverable" valign="top">Bibliography</td>
+        <td valign="top">
+          <div class="edit-mode hidden">{{goldForm.bibliography}}</div>
+          <div class="view-mode">{{goldForm.instance.get_bibliography_markdown}}</div>
         </td>
       </tr>
 

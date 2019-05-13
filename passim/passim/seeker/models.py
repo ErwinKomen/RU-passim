@@ -5,8 +5,10 @@ from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.utils.html import mark_safe
 from django.urls import reverse
 from datetime import datetime
+from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
@@ -1347,9 +1349,6 @@ class Nickname(models.Model):
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
 
-    # [0-1] Every sermongold should at some point end up with a signature (a name)
-    # signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
-
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
@@ -1357,6 +1356,12 @@ class SermonGold(models.Model):
     incipit = models.TextField("Incipit", null=True, blank=True)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
+
+    # [0-1] Every gold sermon must have room for a bibliography
+    bibliography = models.TextField("Bibliography", null=True, blank=True)
+    # [1] Every gold sermon may have 0 or more URI links to critical editions
+    critlinks = models.TextField("Critical edition full text links", default="[]")
+
 
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
@@ -1404,6 +1409,30 @@ class SermonGold(models.Model):
         for item in self.goldsignatures.all():
             lSign.append(item.short())
         return " | ".join(lSign)
+
+    def editions(self):
+        """Combine all editions into one string"""
+
+        lEdition = []
+        for item in self.goldeditions.all():
+            lEdition.append(item.short())
+        return " | ".join(lEdition)
+
+    def ftxtlinks(self):
+        """Combine all editions into one string"""
+
+        lFtxtlink = []
+        for item in self.goldftxtlinks.all():
+            lFtxtlink.append(item.short())
+        return ", ".join(lFtxtlink)
+
+    def get_bibliography_markdown(self):
+        """Get the contents of the bibliography field using markdown"""
+
+        sBack = ""
+        if self.bibliography != None:
+            sBack = mark_safe(markdown(self.bibliography, safe_mode='escape'))
+        return sBack
 
     def link_oview(self):
         """provide an overview of links from this gold sermon to others"""
@@ -1592,19 +1621,33 @@ class SermonGoldSame(models.Model):
 
 
 class Edition(models.Model):
-    """One Gryson or Clavis edition"""
+    """Critical text edition of a Gold Sermon"""
 
     # [1] It must have a name - that is the Gryson book or the Clavis book or something
     name = models.CharField("Name", max_length=LONG_STRING)
-    # [1] Every edition must be of a limited number of types
-    editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
-                            max_length=5, default="gr")
+    # [1] Every edition belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
 
     def __str__(self):
-        return "{}: {}".format(self.editype, self.name)
+        return self.name
 
     def short(self):
-        return "{}: {}".format(self.editype, self.name)
+        return self.name
+
+
+class Ftextlink(models.Model):
+    """Link to the full text of a critical edition of a Gold Sermon"""
+
+    # [1] It must have a name - that is the Gryson book or the Clavis book or something
+    url = models.URLField("Full text URL", max_length=LONG_STRING)
+    # [1] Every edition belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldftxtlinks")
+
+    def __str__(self):
+        return self.url
+
+    def short(self):
+        return self.url
 
 
 class Signature(models.Model):
@@ -1615,8 +1658,6 @@ class Signature(models.Model):
     # [1] Every edition must be of a limited number of types
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
-    # [0-1] Every signature should belong to a particular edition
-    edition = models.ForeignKey(Edition, null=True, blank=True, related_name="edisignatures")
     # [1] Every signature belongs to exactly one gold-sermon
     gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures")
 

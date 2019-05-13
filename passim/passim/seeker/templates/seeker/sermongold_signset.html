@@ -1,121 +1,153 @@
 ﻿{% load i18n %}
 
-<div id="gsign_formset">
+<div id="gsign_formset" class="row">
   <form action="">
     {% csrf_token %}
     <!-- Need to have the management stuff for 'gsign' -->
     {{ gsign_formset.management_form }}
 
-    <table class="func-view" style="width: 100%;">
-      <thead>
-        <tr><th colspan="2">#</th><th class="tdnowrap">Signature code</th><th>Edition</th><th>&nbsp;</th></tr>
-      </thead>
-      <tbody>
-        {% for signform in gsign_formset %}
-          <tr class="form-row">
-            <!-- A 1-based counter for the forms in this set-->
-            <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+    {% for item in edi_list %}
 
-            <!-- Hidden but essential: the id of this gold-to-gold link -->
-            <td class="hidden">{{signform.id}}</td>
+      <div class="col-md-4">
+        <!-- One table for Gryson, one for Clavis, one for others -->
+        <table class="func-view" style="width: 100%;">
+          <thead>
+            <tr><th colspan="2">#</th><th class="tdnowrap">{{item.name}} code</th><th>&nbsp;</th></tr>
+          </thead>
+          <tbody>
+            {% for signform in gsign_formset %}
+              {% if signform.instance.editype == item.type %}
+                <tr class="form-row">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
 
-            <!-- A button to edit or save this link -->
-            <td valign="top" class="clickable"  style="min-width: 20px;">
-              <div class="view-mode">
-                <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this signature">
-                  <span class="glyphicon glyphicon-pencil"></span>
-                </a>
-              </div>
-              <div class="edit-mode hidden">
-                <a title="Save changes to this signature"
-                   onclick="ru.passim.seeker.formset_update(this);"
-                   targetid="sermongold_signset"
-                   targeturl="{% url 'gold_signset' pk=object_id %}">
-                  <span class="glyphicon glyphicon-ok"></span>
-                </a>
-              </div>
-            </td>
+                  <!-- Hidden but essential: the id of this gold-to-gold link -->
+                  <td class="hidden">{{signform.id}}</td>
 
-            <!-- The signature -->
-            <td  style="min-width: 100px;">
-              <div class="view-mode">{{signform.code.value}}</div>
-              <div class="edit-mode hidden">{{signform.code}}</div>
-            </td>
+                  <!-- A button to edit or save this link -->
+                  <td valign="top" class="clickable"  style="min-width: 20px;">
+                    <div class="view-mode">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this signature">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                      </a>
+                    </div>
+                    <div class="edit-mode hidden">
+                      <a title="Save changes to this signature"
+                          onclick="ru.passim.seeker.formset_update(this);"
+                          targetid="sermongold_signset"
+                          targeturl="{% url 'gold_signset' pk=object_id %}">
+                        <span class="glyphicon glyphicon-ok"></span>
+                      </a>
+                    </div>
+                  </td>
 
-            <!-- The edition -->
-            <td  style="width: 100%;">
-              <div class="view-mode">{{signform.instance.edition.short}}</div>
-              <div class="edit-mode hidden">{{signform.edition}}</div>
-            </td>
+                  <!-- The signature -->
+                  <td  style="width: 100%;">
+                    <div class="view-mode">{{signform.code.value}}</div>
+                    <div class="edit-mode hidden">{{signform.code}}</div>
+                    <!-- Confirmation of delete -->
+                    <div class="delete-confirm hidden">
+                      <span>Do you really want to delete this {{item.name}} code?</span>
+                      <span>
+                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                      </span>
+                      <span class="hidden">{{signform.DELETE}}</span>
+                      <span>
+                        <a class="btn btn-xs jumbo-4" 
+                           onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                           targetid="sermongold_signset"
+                           targeturl="{% url 'gold_signset' pk=object_id %}">Delete</a>
+                      </span>
+                    </div>
+                  </td>
 
-            <!-- The gold target -->
-            <td class="hidden">
-              <input id="id_gsign-{{forloop.counter0}}-gold" name="gsign-{{forloop.counter0}}-gold" value="{{object_id}}" />
-            </td>
+                  <!-- The editype -->
+                  <td  class="hidden">
+                    <input id="id_gsign-{{forloop.counter0}}-editype" name="gsign-{{forloop.counter0}}-editype" value="{{item.type}}" />
+                  </td>
 
-            <!-- A delete button -->
-            <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
-              <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-            </td>
-          </tr>
+                  <!-- The gold target -->
+                  <td class="hidden">
+                    <input id="id_gsign-{{forloop.counter0}}-gold" name="gsign-{{forloop.counter0}}-gold" value="{{signform.instance.gold.id}}" />
+                  </td>
 
-        {% endfor %}
+                  <!-- A delete button -->
+                  <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
+                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                  </td>
+                </tr>
+              {% endif %}
 
-        <!-- Empty row with specifications -->
-        <tr class="form-row empty-form">
-          <!-- A 1-based counter for the forms in this set-->
-          <td style="min-width: 20px;"><span>__counter__</span></td>
+            {% endfor %}
 
-          <!-- A button to edit or save this signature -->
-          <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
-            <div class="view-mode hidden">
-              <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
-                <span class="glyphicon glyphicon-pencil"></span>
-              </a>
-            </div>
-            <div class="edit-mode">
-              <a title="Save changes to this signature"
-                  onclick="ru.passim.seeker.formset_update(this);"
-                  targetid="sermongold_signset"
-                  targeturl="{% url 'gold_signset' pk=object_id %}">
-                <span class="glyphicon glyphicon-ok"></span>
-              </a>
-            </div>
-          </td>
+            <!-- Empty row with specifications -->
+            <tr class="form-row empty-form">
+              <!-- A 1-based counter for the forms in this set-->
+              <td style="min-width: 20px;"><span>__counter__</span></td>
 
-          <!-- The signature -->
-          <td  style="min-width: 100px;">
-            <div class="view-mode hidden">{{gsign_formset.empty_form.code.value}}</div>
-            <div class="edit-mode">{{gsign_formset.empty_form.code}}</div>
-          </td>
+              <!-- A button to edit or save this signature -->
+              <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                <div class="view-mode hidden">
+                  <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                    <span class="glyphicon glyphicon-pencil"></span>
+                  </a>
+                </div>
+                <div class="edit-mode">
+                  <a title="Save changes to this signature"
+                      onclick="ru.passim.seeker.formset_update(this);"
+                      targetid="sermongold_signset"
+                      targeturl="{% url 'gold_signset' pk=object_id %}">
+                    <span class="glyphicon glyphicon-ok"></span>
+                  </a>
+                </div>
+              </td>
 
-          <!-- The edition -->
-          <td  style="width: 100%;">
-            <div class="view-mode hidden">{{gsign_formset.empty_form.instance.edition.short}}</div>
-            <div class="edit-mode">{{gsign_formset.empty_form.edition}}</div>
-          </td>
+              <!-- The signature -->
+              <td  style="width: 100%;">
+                <div class="view-mode hidden">{{gsign_formset.empty_form.code.value}}</div>
+                <div class="edit-mode">{{gsign_formset.empty_form.code}}</div>
+                <!-- Confirmation of delete -->
+                <div class="delete-confirm hidden">
+                  <span>Do you really want to delete this {{item.name}} code?</span>
+                  <span>
+                    <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                  </span>
+                  <span>
+                    <a class="btn btn-xs jumbo-4 delete-row" extra="gsign">Delete</a>
+                  </span>
+                </div>
+              </td>
 
-            <!-- The gold target -->
-            <td class="hidden">
-              <input id="id_gsign-__counter__-gold" name="gsign-__counter__-gold" value="{{object_id}}" />
-            </td>
+              <!-- The editype -->
+              <td  class="hidden" defaultvalue="{{item.type}}" >
+                <input id="id_gsign-__counter__-editype" name="gsign-__counter__-editype" />
+              </td>
 
-          <!-- A delete button -->
-          <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
-            <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-          </td>
-        </tr>
+              <!-- The gold target -->
+              <td class="hidden" defaultvalue="{{object_id}}">
+                <input id="id_gsign-__counter__-gold" name="gsign-__counter__-gold"  />
+              </td>
 
-        <!-- Add row -->
-        <tr class="add-row">
-          <td colspan="5">
-            <span id="add_gold_signature">
-              <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a signature to this gold sermon</a>
-            </span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <!-- A delete button -->
+              <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
+                <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+              </td>
+            </tr>
+
+            <!-- Add row -->
+            <tr class="add-row">
+              <td colspan="5">
+                <span id="add_gold_signature">
+                  <a href="#" title="Add one {{item.name}} signature to this gold sermon"><span class="glyphicon glyphicon-plus">&nbsp;</span>{{item.name}}</a>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+    {% endfor %}
+
     <div id="error_location"></div>
   </form>
 </div>
