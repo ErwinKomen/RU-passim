@@ -29,7 +29,7 @@
           </a>
           <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
              targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
-             targetid="manuscript_info" >
+             targetid="" oldtargetid="manuscript_info" >
             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
           </a>
 
@@ -40,7 +40,8 @@
           <span id="little_err_msg" class="err-msg"></span>
 
           <!-- Delete button completely to the right -->
-          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" targetid="manuscript_info"
+          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" 
+             targetid="" oldtargetid="manuscript_info"
              targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% endif %}" >
             <span class="glyphicon glyphicon-remove" title="Delete this manuscript"></span>
           </a>

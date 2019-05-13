@@ -18,7 +18,8 @@
           </a>
 
           {% if is_passim_editor %}
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
+             targetid=""
              targeturl="{% if goldForm.instance.id %}{% url 'gold_edit' goldForm.instance.id %}{% else %}{% url 'gold_edit' %}{% endif %}" >
             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
           </a>
@@ -32,7 +33,8 @@
 
           {% if is_passim_editor %}
           <!-- Put the delete button completely to the right-->
-          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" targetid="sermon_edit"
+          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" 
+             targetid="" oldtargetid="sermon_edit"
              targeturl="{% if goldForm.instance.id %}{% url 'gold_edit' goldForm.instance.id %}{% endif %}">
             <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
           </a>
