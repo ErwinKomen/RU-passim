@@ -238,13 +238,15 @@
 
                 <h3>
                   <span>Manuscripts</span>
-                  <span id="add_manuscript" class="pull-right">
-                    <a class="btn btn-xs jumbo-3" role="button" 
-                       targeturl="{% url 'manuscript_view' %}"
-                       onclick="ru.passim.seeker.manu_edit(this, 'new');">
-                      <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
-                    </a>
-                  </span>
+                  {% if is_passim_editor %}
+                    <span id="add_manuscript" class="pull-right">
+                      <a class="btn btn-xs jumbo-3" role="button" 
+                         targeturl="{% url 'manuscript_view' %}"
+                         onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                        <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
+                      </a>
+                    </span>
+                  {% endif %}
                 </h3>
                 <div class="row">
                     <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
@@ -267,11 +269,13 @@
                           <!-- City / Library / Manuscript name -->
                           <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
                           <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
-                          <td style="width: 100%;">
-                            <span class="manuscript-idno">{{man.idno}}</span>
-                            {% if man.name %}
-                            <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
-                            {% endif %}
+                          <td style="width: 100%;" class="clickable" >
+                            <a href="{% url 'manuscript_view' man.id %}" class="nostyle">
+                              <span class="manuscript-idno">{{man.idno}}</span>
+                              {% if man.name %}
+                              <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
+                              {% endif %}
+                            </a>
                           </td>
                           <!-- Number of sermons -->
                           <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
@@ -280,13 +284,15 @@
                           <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
 
                           <!-- Buttons for more information on this manuscript -->
-                          <td style="min-width: 80px;">
+                          <td style="min-width: {% if make_use_of_buttons %}80px;{% else %}40px;{% endif %}">
                             <!-- Information button -->
-                              <!-- information on this manuscript -->
-                              <a role="button" class="btn btn-xs jumbo-3" title="Information" 
-                                  href="{% url 'manuscript_view' man.id %}">
-                                <span class="glyphicon glyphicon-info-sign"></span>
-                              </a>
+                              {% if make_use_of_buttons %}
+                                <!-- information on this manuscript -->
+                                <a role="button" class="btn btn-xs jumbo-3" title="Information" 
+                                    href="{% url 'manuscript_view' man.id %}">
+                                  <span class="glyphicon glyphicon-info-sign"></span>
+                                </a>
+                              {% endif %}
                               <!-- external link button -->
                               {% if man.url %}
                                 <a role="button" class="btn btn-xs jumbo-1" title="External link"

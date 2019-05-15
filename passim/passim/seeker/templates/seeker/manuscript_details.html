@@ -24,27 +24,31 @@
           <!-- Sermons in this manuscript -->
           <h3>
             <span>Contents</span>
-            <span id="add_search_criteria" class="pull-right">
-              <a class="btn btn-xs jumbo-3" role="button" 
-                 targeturl="{% url 'sermon_view' %}"
-                 onclick="ru.passim.seeker.sermo_edit(this, 'new');">
-                <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
-              </a>
-            </span>
+            {% if is_passim_editor %}
+              <span id="add_search_criteria" class="pull-right">
+                <a class="btn btn-xs jumbo-3" role="button" 
+                   targeturl="{% url 'sermon_view' %}"
+                   onclick="ru.passim.seeker.sermo_edit(this, 'new');">
+                  <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
+                </a>
+              </span>
+            {% endif %}
           </h3>
           {% if object.sermons.count == 0 %}
             <p><i>This manuscript does not contain a definition of its contents</i></p>
           {% else %}
             <!-- This is where the sermon that is currently being edited shows up -->
-            <div class="row edit-sermon hidden">
-              <div class="col-md-10 col-md-offset-1">
-                <div class="panel panel-default" 
-                     parent="{{manuForm.instance.id}}"
-                     manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
-                     id="sermon_edit">
+            {% if is_passim_editor %}
+              <div class="row edit-sermon hidden">
+                <div class="col-md-10 col-md-offset-1">
+                  <div class="panel panel-default" 
+                       parent="{{manuForm.instance.id}}"
+                       manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
+                       id="sermon_edit">
+                  </div>
                 </div>
               </div>
-            </div>
+            {% endif %}
 
             <!-- A table to show all the sermons of this manuscript -->
             <table id="sermon_list" class="func-view">
@@ -67,15 +71,16 @@
                     <td id="sermon-number-{{forloop.counter}}" colspan="{{sermon.cols}}" 
                         style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
                       <!-- View mode is visible by default-->
-                      <div class="view-mode clickable" onclick="ru.passim.seeker.sermo_edit(this);">
+                      <div class="view-mode clickable" 
+                           {% if is_passim_editor %}onclick="ru.passim.seeker.sermo_edit(this);"{% endif %}>
                         {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
                       </div>
 
                       {% if is_passim_editor %}
-                      <!-- Edit mode is only visible for passim editors -->
-                      <div class="edit-mode hidden selected">
-                        <!-- One possibility for editable to appear -->
-                      </div>
+                        <!-- Edit mode is only visible for passim editors -->
+                        <div class="edit-mode hidden selected">
+                          <!-- One possibility for editable to appear -->
+                        </div>
                       {% endif %}
                     </td>
                     <td class="tdnowrap">{{sermon.obj.id}}</td>

@@ -1147,3 +1147,13 @@ span.badge.sim-link {
 span.badge.use-link {
   background-color: mediumorchid;
 }
+
+a.nostyle:link, a.nostyle:visited {
+    text-decoration: inherit;
+    color: inherit;
+    cursor: inherit;
+}
+
+td a.nostyle {
+  display: block;
+}
