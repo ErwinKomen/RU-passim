@@ -231,100 +231,114 @@
             </div>
           </div>
 
-          <!-- List tab -->
-          <div class="" id="tab_list">
-            <div class="panel panel-default">
-              {% if object_list %}
+        </form>
 
+        <!-- List tab -->
+        <div class="" id="tab_list">
+          <div class="panel panel-default">
+            {% if object_list %}
+
+              <form>
                 <h3>
                   <span>Manuscripts</span>
                   {% if is_passim_editor %}
+                    {% csrf_token %}
                     <span id="add_manuscript" class="pull-right">
                       <a class="btn btn-xs jumbo-3" role="button" 
-                         targeturl="{% url 'manuscript_view' %}"
-                         onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                          targetid="manuscript_new"
+                          targeturl="{% url 'manuscript_edit' %}"
+                          onclick="ru.passim.seeker.manu_edit(this, 'new');">
                         <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
                       </a>
                     </span>
                   {% endif %}
                 </h3>
-                <div class="row">
-                    <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
-                    <div class="col-sm-8">
-                    <span class="step-links pull-right">
+              </form>
 
-                    {% include 'pagination.html' %}
-
-                    </span>
-                    </div>
-                </div>
-                <div class="row">
-                  <div class="col-md-12">
-                    <table class="table table-hover">
-                      <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th><!-- Buttons --></th></tr></thead>
-                      <tbody>
-                      {% for man in object_list %}
-                        <tr class="dict-entry">
-                          <td class="hidden"> {{ man.id }}</td>
-                          <!-- City / Library / Manuscript name -->
-                          <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
-                          <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
-                          <td style="width: 100%;" class="clickable" >
-                            <a href="{% url 'manuscript_view' man.id %}" class="nostyle">
-                              <span class="manuscript-idno">{{man.idno}}</span>
-                              {% if man.name %}
-                              <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
-                              {% endif %}
-                            </a>
-                          </td>
-                          <!-- Number of sermons -->
-                          <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
-                          <!-- Dates for this manuscript -->
-                          <td class="manuscript-date" align="right">{{man.yearstart}}</td>
-                          <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
-
-                          <!-- Buttons for more information on this manuscript -->
-                          <td style="min-width: {% if make_use_of_buttons %}80px;{% else %}40px;{% endif %}">
-                            <!-- Information button -->
-                              {% if make_use_of_buttons %}
-                                <!-- information on this manuscript -->
-                                <a role="button" class="btn btn-xs jumbo-3" title="Information" 
-                                    href="{% url 'manuscript_view' man.id %}">
-                                  <span class="glyphicon glyphicon-info-sign"></span>
-                                </a>
-                              {% endif %}
-                              <!-- external link button -->
-                              {% if man.url %}
-                                <a role="button" class="btn btn-xs jumbo-1" title="External link"
-                                   href="{{man.url}}" target="_blank" >
-                                  <span class="glyphicon glyphicon-link"></span>
-                                </a>
-                              {% endif %}
-                          </td>
-                        </tr>
-
-                      {% endfor %}
-                      </tbody>
-                    </table>
+              <div class="row subform">
+                <div class="col-md-offset-1 col-md-10">
+                  <div id="manuscript_new">
+                    <!-- Room to create a new manuscript instance-->
                   </div>
                 </div>
-                <div class="pagination">
-                    <span class="step-links">
-
-                    {% include 'pagination.html' %}
-
-                    </span>
-                </div>
-
-              {% else %}
-                <p>No manuscripts have been found.</p>
-              {% endif %}
-
               </div>
+
+              <div class="row">
+                  <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
+                  <div class="col-sm-8">
+                  <span class="step-links pull-right">
+
+                  {% include 'pagination.html' %}
+
+                  </span>
+                  </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <table class="table table-hover">
+                    <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th><!-- Buttons --></th></tr></thead>
+                    <tbody>
+                    {% for man in object_list %}
+                      <tr class="dict-entry">
+                        <td class="hidden"> {{ man.id }}</td>
+                        <!-- City / Library / Manuscript name -->
+                        <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
+                        <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
+                        <td style="width: 100%;" class="clickable" >
+                          <a href="{% url 'manuscript_details' man.id %}" class="nostyle">
+                            <span class="manuscript-idno">{{man.idno}}</span>
+                            {% if man.name %}
+                            <span class="manuscript-title" title="{{man.name}}">| {{man.name|truncatechars:100}}</span>
+                            {% endif %}
+                          </a>
+                        </td>
+                        <!-- Number of sermons -->
+                        <td class="manuscript-date" align="right">{{man.sermons.count}}</td>
+                        <!-- Dates for this manuscript -->
+                        <td class="manuscript-date" align="right">{{man.yearstart}}</td>
+                        <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
+
+                        <!-- Buttons for more information on this manuscript -->
+                        <td style="min-width: {% if make_use_of_buttons %}80px;{% else %}40px;{% endif %}">
+                          <!-- Information button -->
+                            {% if make_use_of_buttons %}
+                              <!-- information on this manuscript -->
+                              <a role="button" class="btn btn-xs jumbo-3" title="Information" 
+                                  href="{% url 'manuscript_edit' man.id %}">
+                                <span class="glyphicon glyphicon-info-sign"></span>
+                              </a>
+                            {% endif %}
+                            <!-- external link button -->
+                            {% if man.url %}
+                              <a role="button" class="btn btn-xs jumbo-1" title="External link"
+                                  href="{{man.url}}" target="_blank" >
+                                <span class="glyphicon glyphicon-link"></span>
+                              </a>
+                            {% endif %}
+                        </td>
+                      </tr>
+
+                    {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="pagination">
+                  <span class="step-links">
+
+                  {% include 'pagination.html' %}
+
+                  </span>
+              </div>
+
+            {% else %}
+              <p>No manuscripts have been found.</p>
+            {% endif %}
 
           </div>
 
-        </form>
+        </div>
+
       </div>
 
     

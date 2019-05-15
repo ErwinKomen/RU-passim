@@ -1039,7 +1039,7 @@ class BasicPart(View):
                             formObj['instance'] = instance
                             # Perform actions to this form BEFORE FINAL saving
                             bNeedSaving = formObj['forminstance'].has_changed()
-                            if self.before_save(prefix, request, instance=instance): bNeedSaving = True
+                            if self.before_save(prefix, request, instance=instance, form=formObj['forminstance']): bNeedSaving = True
                             if formObj['forminstance'].instance.id == None: bNeedSaving = True
                             if bNeedSaving:
                                 # Perform the saving
@@ -1194,6 +1194,10 @@ class BasicPart(View):
 
             # Allow user to add to the context
             context = self.add_to_context(context)
+
+            # Check if 'afternewurl' needs adding
+            if 'afternewurl' in context:
+                self.data['afternewurl'] = context['afternewurl']
 
             # Make sure we have a list of any errors
             error_list = [str(item) for item in self.arErr]
@@ -1630,125 +1634,43 @@ class PassimDetails(DetailView):
         return context
 
 
-class ManuscriptDetailsView(DetailView):
+class ManuscriptEdit(BasicPart):
     """The details of one manuscript"""
 
     model = Manuscript
-    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
-    template_post = 'seeker/manuscript_info.html'       # Use this for POST requests
-    # Define a formset for the sermons that are part of a manuscript
-    # SermoFormset = modelformset_factory(SermonDescr, form=SermonForm, extra=0)
+    template_name = 'seeker/manuscript_edit.html'  
+    title = "Manuscript" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "manu"
+    form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': True}]
 
-    def get(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            # Do not allow to get a good response
-            response = nlogin(request)
-        else:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW sermon
-                self.object = None
-            else:
-                self.object = self.get_object()
-            context = self.get_context_data(object=self.object)
-            response = self.render_to_response(context)
-            #response.content = treat_bom(response.rendered_content)
-        return response
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "manu":
+            # Check if a new 'Origin' has been added
+            if 'origname_ta' in form.changed_data:
 
-    def post(self, request, *args, **kwargs):
-        # Initialisation
-        data = {'status': 'ok', 'html': '', 'statuscode': ''}
-        # Make sure only POSTS get through that are authorized
-        if request.user.is_authenticated:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW sermon
-                self.object = None
-            else:
-                self.object = self.get_object()
-            context = self.get_context_data(object=self.object)
-            # Possibly indicate form errors
-            # NOTE: errors is a dictionary itself...
-            if 'errors' in context and len(context['errors']) > 0:
-                data['status'] = "error"
-                data['msg'] = context['errors']
-            # response = self.render_to_response(self.template_post, context)
-            data['html'] = render_to_string(self.template_post, context, request)
-        else:
-            data['html'] = "(No authorization)"
-            data['status'] = "error"
+                # TODO: check if this is not already taken care of...
 
-        # Return the response
-        return JsonResponse(data)
+                # Get its value
+                sOrigin = form.cleaned_data['origname_ta']
+                # Check if it is already in the Nicknames
+                origin = Origin.find_or_create(sOrigin)
+                if instance.origin != origin:
+                    # Add it
+                    instance.origin = origin
+                    # Make sure that it is being saved
+                    bNeedSaving = True
 
-    def get_context_data(self, **kwargs):
-        # Get the current context
-        context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
+        return bNeedSaving
 
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        initial = get.copy()
-        self.qd = initial
-
-        self.bHasFormset = (len(self.qd) > 0)
-
-        # Set the title of the application
-        context['title'] = "Manuscript"
+    def add_to_context(self, context):
 
         # Get the instance
-        instance = self.object
-        bNew = False
+        instance = self.obj
 
-        # Get a form for this manuscript
-        if self.request.method == "POST":
-            # Do we have an existing object or are we creating?
-            if instance == None:
-                # Saving a new item
-                frm = ManuscriptForm(initial, prefix="manu")
-                bNew = True
-            else:
-                # Editing an existing one
-                frm = ManuscriptForm(initial, prefix="manu", instance=instance)
-
-            # Both cases: validation and saving
-            if frm.is_valid():
-                # The form is valid - do a preliminary saving
-                instance = frm.save(commit=False)
-                # Check if a new 'Origin' has been added
-                if 'origname_ta' in frm.changed_data:
-
-                    # TODO: check if this is not already taken care of...
-
-                    # Get its value
-                    sOrigin = frm.cleaned_data['origname_ta']
-                    # Check if it is already in the Nicknames
-                    origin = Origin.find_or_create(sOrigin)
-                    if instance.origin != origin:
-                        # Add it
-                        instance.origin = origin
-                # Now save it for real
-                instance.save()
-            else:
-                # We need to pass on to the user that there are errors
-                context['errors'] = frm.errors
-
-            # Check if this is a new one
-            if bNew:
-                # Put anything here that needs handling if it is a new manuscript instance
-                pass
-                
-        else:
-            # Check if this is asking for a new form
-            if instance == None:
-                # Get the form for the manuscript
-                frm = ManuscriptForm(prefix="manu")
-            else:
-                # Get the form for the manuscript
-                frm = ManuscriptForm(instance=instance, prefix="manu")
-
-        # Put the form and the formset in the context
-        context['manuForm'] = frm
-        
+        # Construct the hierarchical list
         sermon_list = []
         maxdepth = 0
         if instance != None:
@@ -1773,18 +1695,121 @@ class ManuscriptDetailsView(DetailView):
             for oSermon in sermon_list:
                 oSermon['cols'] = maxdepth - oSermon['level'] + 1
                 if oSermon['group']: oSermon['cols'] -= 1
+
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list
         context['sermon_count'] = len(sermon_list)
         context['maxdepth'] = maxdepth
-        context['isnew'] = bNew
+        # context['isnew'] = bNew
 
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['afternewurl'] = reverse('search_manuscript')
 
-        # Return the calculated context
+        return context
+
+
+class SermonEdit(BasicPart):
+    """The details of one manuscript"""
+
+    model = SermonDescr
+    template_name = 'seeker/sermon_edit.html'  
+    title = "Sermon" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "sermo"
+    form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}]
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        # Not sure if this is still needed
+        context['msitem'] = instance
+
+        # Make sure to pass on the manuscript_id
+        manuscript_id = None
+        if 'manuscript_id' in self.qd:
+            manuscript_id = self.qd['manuscript_id']
+            # Set the URL to be taken after saving
+            context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+        context['manuscript_id'] = manuscript_id
+
+
+        return context
+
+    def after_save(self, prefix, instance = None):
+
+        # Check if this is a new one
+        if self.add:
+            # This is a new one, so it should be coupled to the correct manuscript
+            if 'manuscript_id' in self.qd:
+                # It is there, so we can add it
+                manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
+                if manuscript != None:
+                    # Add to the SermonMan
+                    obj = SermonMan(sermon=instance, manuscript=manuscript)
+                    obj.save()
+                    # Calculate how many sermons there are
+                    sermon_count = manuscript.sermons.all().count()
+                    # Make sure the new sermon gets changed
+                    instance.order = sermon_count
+                    instance.save()
+        
+        # There's is no real return value needed here 
+        return True
+
+
+class ManuscriptDetails(PassimDetails):
+    """Editable manuscript details"""
+
+    model = Manuscript
+    mForm = ManuscriptForm
+    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
+    template_post = 'seeker/manuscript_details.html'    # Use this for POST requests
+    title = "Manuscript" 
+    afternewurl = ""
+    prefix = "manu"
+    rtype = "html"      # Load this as straight forward html
+
+    def add_to_context(self, context, instance):
+
+        # Get the instance
+        instance = self.object
+
+        # Construct the hierarchical list
+        sermon_list = []
+        maxdepth = 0
+        if instance != None:
+            # Create a well sorted list of sermons
+            qs = instance.sermons.filter(order__gte=0).order_by('order')
+            prev_level = 0
+            for sermon in qs:
+                oSermon = {}
+                oSermon['obj'] = sermon
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                level = sermon.getdepth()
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = (sermon.firstchild != None)
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
+
+        # Add instances to the list, noting their childof and order
+        context['sermon_list'] = sermon_list
+        context['sermon_count'] = len(sermon_list)
+        context['maxdepth'] = maxdepth
+        #context['isnew'] = bNew
+
+        context['afternewurl'] = reverse('search_manuscript')
+
         return context
 
 

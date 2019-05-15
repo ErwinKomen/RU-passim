@@ -1139,7 +1139,7 @@ var ru = (function ($, ru) {
               // (2) Request information from the server
               $.get(targeturl, data, function (response) {
                 $(".edit-sermon").removeClass("hidden");
-                $("#sermon_edit").html(response);
+                $("#sermon_new").html(response);
                 // Determine the number of rows we have
                 number = $("#sermon_list").find("tr").length;
                 $("#sermon_number").html(" new item (will be #"+number+")");

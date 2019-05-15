@@ -3,50 +3,53 @@
 <!-- Manuscript information -->
 <form>
   {% csrf_token %}
+
   <h3>
-    <span>Manuscript</span>
-    <span class="pull-right" style="font-size: xx-small;">
-      {% if manuForm.instance.id  %}
-        {{manuForm.city_ta.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}
-      {% else %}
-        <i>(New Manuscript)</i>
-      {% endif %}
-    </span>
+    {% if manuForm.instance.id  %}
+      <span>Manuscript</span>
+      <span class="pull-right" style="font-size: xx-small;">
+          {{manuForm.city_ta.value}}, {{manuForm.instance.library.name}}, {{manuForm.idno.value}}
+      </span>
+    {% else %}
+      <span class="pull-right" style="font-size: xx-small;">
+          <i>(New Manuscript)</i>
+      </span>
+    {% endif %}
   </h3>
 
   <table style="width: 90%;" class="manuscript-details">
     <tbody>
       <!-- Row to indicate editing, if possible -->
       {% if is_passim_editor %}
-      <tr>
-        <td>&nbsp;</td>
-        <td class="ms editable table">
-          <a mode="edit" class="view-mode btn btn-xs jumbo-1">
-            <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
-          </a>
-          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
-            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
-          </a>
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
-             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
-             targetid="" oldtargetid="manuscript_info" >
-            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
-          </a>
+        <tr>
+          <td>&nbsp;</td>
+          <td class="ms editable table">
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
+               targeturl="{% if manuForm.instance.id %}{% url 'manuscript_edit' manuForm.instance.id %}{% else %}{% url 'manuscript_edit' %}{% endif %}"
+               targetid="" oldtargetid="manuscript_info" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
 
-          <!-- Waiting symbol-->
-          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
 
-          <!-- Little error message room -->
-          <span id="little_err_msg" class="err-msg"></span>
+            <!-- Little error message room -->
+            <span id="little_err_msg" class="err-msg"></span>
 
-          <!-- Delete button completely to the right -->
-          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" 
-             targetid="" oldtargetid="manuscript_info"
-             targeturl="{% if manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% endif %}" >
-            <span class="glyphicon glyphicon-remove" title="Delete this manuscript"></span>
-          </a>
-        </td>
-      </tr>
+            <!-- Delete button completely to the right -->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" 
+               targetid="" oldtargetid="manuscript_info"
+               targeturl="{% if manuForm.instance.id %}{% url 'manuscript_edit' manuForm.instance.id %}{% endif %}" >
+              <span class="glyphicon glyphicon-remove" title="Delete this manuscript"></span>
+            </a>
+          </td>
+        </tr>
       {% endif %}
 
       <tr class="form-row">
@@ -153,20 +156,20 @@
 
       <!-- The remainder is only visible by passim editors, and only in EDIT mode, and only as visualisation... -->
       {% if is_passim_editor %}
-      <tr class="edit-mode hidden">
-        <td valign="top"><b>Information:</b></td>
-        <td>
-          <div>
-            <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#source_info" role="button" title="Show source information...">
-              <span class="glyphicon glyphicon-search">&nbsp;Source collection</span>
-            </a>
-          </div>
-          <div id="source_info" class="collapse inert">
-            Collected by {{ manuForm.instance.source.collector}} on {{manuForm.instance.source.created}} (<a href="{{manuForm.instance.source.url}}">url</a>).
-            Code: <span class="kw">{{manuForm.instance.source.code}}</span>
-          </div>
-        </td>
-      </tr>
+        <tr class="edit-mode hidden">
+          <td valign="top"><b>Information:</b></td>
+          <td>
+            <div>
+              <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#source_info" role="button" title="Show source information...">
+                <span class="glyphicon glyphicon-search">&nbsp;Source collection</span>
+              </a>
+            </div>
+            <div id="source_info" class="collapse inert">
+              Collected by {{ manuForm.instance.source.collector}} on {{manuForm.instance.source.created}} (<a href="{{manuForm.instance.source.url}}">url</a>).
+              Code: <span class="kw">{{manuForm.instance.source.code}}</span>
+            </div>
+          </td>
+        </tr>
       {% endif %}
     </tbody>
   </table>

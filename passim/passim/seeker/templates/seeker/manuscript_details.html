@@ -4,7 +4,7 @@
 {% block breadcrumbs %}
   <div class="breadcrumbs">
       <a href="{% url 'home' %}">Home</a>
-      &rsaquo; <a href="{% url 'search_manuscript' %}">Search manuscripts</a>
+      &rsaquo; <a href="{% url 'search_manuscript' %}">List manuscripts</a>
       &rsaquo; Manuscript Details
   </div>
 {% endblock %}
@@ -14,9 +14,22 @@
 
     {% if authenticated %}
  
-      <!-- Incorporate the manuscript details-->
-      <div id="manuscript_info" class="panel panel-default">
-        {% include 'seeker/manuscript_info.html' %}
+       <div class="panel panel-default subform">
+        <div class="row">&nbsp;</div>
+        <div class="row">
+          <div class="col-md-1">
+            <a class="btn jumbo-1" 
+               href="{% url 'search_manuscript' %}"
+               title="Back to the list of manuscripts">&lt;&lt;</a>
+          </div>
+          <div class="col-md-10">
+            <!-- Incorporate the manuscript details-->
+            <div id="manuscript_info" >
+              <!-- Used to be: seeker/manuscript_info -->
+              {% include 'seeker/manuscript_edit.html' %}
+            </div>
+          </div>
+        </div>
       </div>
 
       {% if manuForm.instance.id  %}
@@ -27,8 +40,9 @@
             {% if is_passim_editor %}
               <span id="add_search_criteria" class="pull-right">
                 <a class="btn btn-xs jumbo-3" role="button" 
-                   targeturl="{% url 'sermon_view' %}"
-                   onclick="ru.passim.seeker.sermo_edit(this, 'new');">
+                   targetid="sermon_new"
+                   targeturl="{% url 'sermon_edit' %}?manuscript_id={{manuForm.instance.id}}"
+                   onclick="ru.passim.seeker.manu_edit(this, 'new');">
                   <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
                 </a>
               </span>
@@ -43,8 +57,19 @@
                 <div class="col-md-10 col-md-offset-1">
                   <div class="panel panel-default" 
                        parent="{{manuForm.instance.id}}"
-                       manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_view' manuForm.instance.id %}{% else %}{% url 'manuscript_view' %}{% endif %}"
+                       manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_edit' manuForm.instance.id %}{% else %}{% url 'manuscript_edit' %}{% endif %}"
                        id="sermon_edit">
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+
+            <!-- This is where a NEW sermon definition can be edited -->
+            {% if is_passim_editor %}
+              <div class="row subform">
+                <div class="col-md-10 col-md-offset-1">
+                  <div id="sermon_new">
+                    <!-- Room to create a new sermon instance that should be added to this manuscript -->
                   </div>
                 </div>
               </div>
