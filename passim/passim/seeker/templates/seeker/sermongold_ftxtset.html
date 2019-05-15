@@ -7,7 +7,7 @@
     {{ gftxt_formset.management_form }}
 
     <div class="">
-      {% if not is_passim_editor and gedit_formset|length == 0 %}
+      {% if not is_passim_editor and gftxt_formset|length == 0 %}
         <p>No full-text links defined for this gold sermon</p>
       {% else %}
       <!-- Table of critical full text links for the current gold sermon -->

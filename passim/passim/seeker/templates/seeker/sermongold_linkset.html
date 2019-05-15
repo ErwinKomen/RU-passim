@@ -7,7 +7,7 @@
     {{ glink_formset.management_form }}
 
     <div class="col-md-12">
-      {% if not is_passim_editor and gedit_formset|length == 0 %}
+      {% if not is_passim_editor and glink_formset|length == 0 %}
         <p>No links to other gold sermons defined for this gold sermon</p>
       {% else %}
         <table class="func-view" style="width: 100%;">

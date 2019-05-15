@@ -7,7 +7,7 @@
     {{ gedi_formset.management_form }}
 
     <div class="">
-      {% if not is_passim_editor and gedit_formset|length == 0 %}
+      {% if not is_passim_editor and gedi_formset|length == 0 %}
         <p>No critical editions defined for this gold sermon</p>
       {% else %}
         <!-- Table of critical editions for the current gold sermon -->

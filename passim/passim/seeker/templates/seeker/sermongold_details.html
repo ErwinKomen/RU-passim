@@ -91,14 +91,14 @@
                   </div>
                 </div>
 
-                <!-- Room for the links from this gold sermon -->
-                <div class="row">&nbsp;</div>
-                <div id="sermongold_linkset" class="post-load" targeturl="{% url 'gold_linkset' pk=goldForm.instance.id %}" >
-                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-                </div>
-
               </div>
             {% endif %}
+
+            <!-- Room for the links from this gold sermon -->
+            <div class="row">&nbsp;</div>
+            <div id="sermongold_linkset" class="post-load" targeturl="{% url 'gold_linkset' pk=goldForm.instance.id %}" >
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
 
           </div>
         </div>
