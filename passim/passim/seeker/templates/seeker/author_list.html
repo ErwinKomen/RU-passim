@@ -133,15 +133,17 @@
         <form>
           <h3>
             <span title="These are 'gold standard' authors">Authors</span>
-            <span id="add_author" class="pull-right">
-              {% csrf_token %}
-              <a class="btn btn-xs jumbo-3" role="button" 
-                  targeturl="{% url 'author_edit' %}"
-                  targetid="author_new"
-                  onclick="ru.passim.seeker.manu_edit(this, 'new');">
-                <span class="glyphicon glyphicon-plus"></span>Add an author
-              </a>
-            </span>
+            {% if is_passim_editor %}
+              <span id="add_author" class="pull-right">
+                {% csrf_token %}
+                <a class="btn btn-xs jumbo-3" role="button" 
+                    targeturl="{% url 'author_edit' %}"
+                    targetid="author_new"
+                    onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                  <span class="glyphicon glyphicon-plus"></span>Add an author
+                </a>
+              </span>
+            {% endif %}
           </h3>
         </form>
 

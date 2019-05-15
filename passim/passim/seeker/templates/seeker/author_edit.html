@@ -9,9 +9,9 @@
           <!-- Provide the necessary buttons: edit, cancel and save -->
           <div>
             {% if is_passim_editor %}
-            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
-              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
-            </a>
+              <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+              </a>
             {% endif %}
 
             <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
@@ -19,10 +19,10 @@
             </a>
 
             {% if is_passim_editor %}
-            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
-               targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% else %}{% url 'author_edit' %}{% endif %}" >
-              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
-            </a>
+              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                 targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% else %}{% url 'author_edit' %}{% endif %}" >
+                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+              </a>
             {% endif %}
 
             <!-- Waiting symbol-->
@@ -32,29 +32,32 @@
             <span id="gold_err_msg" class="err-msg"></span>
 
             {% if is_passim_editor %}
-            <!-- Put the delete button completely to the right-->
-            <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
-               onclick="ru.passim.seeker.delete_confirm(this);">
-              <span class="glyphicon glyphicon-remove" title="Delete this author"></span>
-            </a>
+              <!-- Put the delete button completely to the right-->
+              <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+                 onclick="ru.passim.seeker.delete_confirm(this);">
+                <span class="glyphicon glyphicon-remove" title="Delete this author"></span>
+              </a>
             {% endif %}
           </div>
+
           <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-          <div class="delete-confirm hidden selected">
-            <span>Are you sure you would like to delete this author?</span>
-            <span>
-              <!-- The button to cancel deletion -->
-              <a title="Cancel deletion" class="btn btn-xs jumbo-1"
-                 onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
-              <!-- The actual delete button-->
-              <a mode="delete" title="Delete this author" class="btn btn-xs jumbo-3"
-                 afterurl="{% url 'author_search' %}"
-                 targetid="sermon_edit"
-                 targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% endif %}">
-                Delete
-              </a>
-            </span>
-          </div>
+          {% if is_passim_editor %}
+            <div class="delete-confirm hidden selected">
+              <span>Are you sure you would like to delete this author?</span>
+              <span>
+                <!-- The button to cancel deletion -->
+                <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                   onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                <!-- The actual delete button-->
+                <a mode="delete" title="Delete this author" class="btn btn-xs jumbo-3"
+                   afterurl="{% url 'author_search' %}"
+                   targetid="sermon_edit"
+                   targeturl="{% if authorForm.instance.id %}{% url 'author_edit' authorForm.instance.id %}{% endif %}">
+                  Delete
+                </a>
+              </span>
+            </div>
+          {% endif %}
         </td>
       </tr>
 

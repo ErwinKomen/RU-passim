@@ -26,39 +26,44 @@
 
                   <!-- A button to edit or save this link -->
                   <td valign="top" class="clickable"  style="min-width: 20px;">
-                    <div class="view-mode">
-                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this signature">
-                        <span class="glyphicon glyphicon-pencil"></span>
-                      </a>
-                    </div>
-                    <div class="edit-mode hidden">
-                      <a title="Save changes to this signature"
-                          onclick="ru.passim.seeker.formset_update(this);"
-                          targetid="sermongold_signset"
-                          targeturl="{% url 'gold_signset' pk=object_id %}">
-                        <span class="glyphicon glyphicon-ok"></span>
-                      </a>
-                    </div>
+                    {% if is_passim_editor %}
+                      <div class="view-mode">
+                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this signature">
+                          <span class="glyphicon glyphicon-pencil"></span>
+                        </a>
+                      </div>
+                      <div class="edit-mode hidden">
+                        <a title="Save changes to this signature"
+                            onclick="ru.passim.seeker.formset_update(this);"
+                            targetid="sermongold_signset"
+                            targeturl="{% url 'gold_signset' pk=object_id %}">
+                          <span class="glyphicon glyphicon-ok"></span>
+                        </a>
+                      </div>
+                    {% endif %}
                   </td>
 
                   <!-- The signature -->
                   <td  style="width: 100%;">
                     <div class="view-mode">{{signform.code.value}}</div>
                     <div class="edit-mode hidden">{{signform.code}}</div>
+
                     <!-- Confirmation of delete -->
-                    <div class="delete-confirm hidden">
-                      <span>Do you really want to delete this {{item.name}} code?</span>
-                      <span>
-                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
-                      </span>
-                      <span class="hidden">{{signform.DELETE}}</span>
-                      <span>
-                        <a class="btn btn-xs jumbo-4" 
-                           onclick="ru.passim.seeker.formset_update(this, 'delete');"
-                           targetid="sermongold_signset"
-                           targeturl="{% url 'gold_signset' pk=object_id %}">Delete</a>
-                      </span>
-                    </div>
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete this {{item.name}} code?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span class="hidden">{{signform.DELETE}}</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4" 
+                             onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                             targetid="sermongold_signset"
+                             targeturl="{% url 'gold_signset' pk=object_id %}">Delete</a>
+                        </span>
+                      </div>
+                    {% endif %}
                   </td>
 
                   <!-- The editype -->
@@ -73,75 +78,79 @@
 
                   <!-- A delete button -->
                   <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
-                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    {% if is_passim_editor %}
+                      <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    {% endif %}
                   </td>
                 </tr>
               {% endif %}
 
             {% endfor %}
 
-            <!-- Empty row with specifications -->
-            <tr class="form-row empty-form">
-              <!-- A 1-based counter for the forms in this set-->
-              <td style="min-width: 20px;"><span>__counter__</span></td>
+            {% if is_passim_editor %}
+              <!-- Empty row with specifications -->
+              <tr class="form-row empty-form">
+                <!-- A 1-based counter for the forms in this set-->
+                <td style="min-width: 20px;"><span>__counter__</span></td>
 
-              <!-- A button to edit or save this signature -->
-              <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
-                <div class="view-mode hidden">
-                  <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
-                    <span class="glyphicon glyphicon-pencil"></span>
-                  </a>
-                </div>
-                <div class="edit-mode">
-                  <a title="Save changes to this signature"
-                      onclick="ru.passim.seeker.formset_update(this);"
-                      targetid="sermongold_signset"
-                      targeturl="{% url 'gold_signset' pk=object_id %}">
-                    <span class="glyphicon glyphicon-ok"></span>
-                  </a>
-                </div>
-              </td>
+                <!-- A button to edit or save this signature -->
+                <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                  <div class="view-mode hidden">
+                    <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                      <span class="glyphicon glyphicon-pencil"></span>
+                    </a>
+                  </div>
+                  <div class="edit-mode">
+                    <a title="Save changes to this signature"
+                        onclick="ru.passim.seeker.formset_update(this);"
+                        targetid="sermongold_signset"
+                        targeturl="{% url 'gold_signset' pk=object_id %}">
+                      <span class="glyphicon glyphicon-ok"></span>
+                    </a>
+                  </div>
+                </td>
 
-              <!-- The signature -->
-              <td  style="width: 100%;">
-                <div class="view-mode hidden">{{gsign_formset.empty_form.code.value}}</div>
-                <div class="edit-mode">{{gsign_formset.empty_form.code}}</div>
-                <!-- Confirmation of delete -->
-                <div class="delete-confirm hidden">
-                  <span>Do you really want to delete this {{item.name}} code?</span>
-                  <span>
-                    <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                <!-- The signature -->
+                <td  style="width: 100%;">
+                  <div class="view-mode hidden">{{gsign_formset.empty_form.code.value}}</div>
+                  <div class="edit-mode">{{gsign_formset.empty_form.code}}</div>
+                  <!-- Confirmation of delete -->
+                  <div class="delete-confirm hidden">
+                    <span>Do you really want to delete this {{item.name}} code?</span>
+                    <span>
+                      <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                    </span>
+                    <span>
+                      <a class="btn btn-xs jumbo-4 delete-row" extra="gsign">Delete</a>
+                    </span>
+                  </div>
+                </td>
+
+                <!-- The editype -->
+                <td  class="hidden" defaultvalue="{{item.type}}" >
+                  <input id="id_gsign-__counter__-editype" name="gsign-__counter__-editype" />
+                </td>
+
+                <!-- The gold target -->
+                <td class="hidden" defaultvalue="{{object_id}}">
+                  <input id="id_gsign-__counter__-gold" name="gsign-__counter__-gold"  />
+                </td>
+
+                <!-- A delete button -->
+                <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
+                  <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                </td>
+              </tr>
+
+              <!-- Add row -->
+              <tr class="add-row">
+                <td colspan="5">
+                  <span id="add_gold_signature">
+                    <a href="#" title="Add one {{item.name}} signature to this gold sermon"><span class="glyphicon glyphicon-plus">&nbsp;</span>{{item.name}}</a>
                   </span>
-                  <span>
-                    <a class="btn btn-xs jumbo-4 delete-row" extra="gsign">Delete</a>
-                  </span>
-                </div>
-              </td>
-
-              <!-- The editype -->
-              <td  class="hidden" defaultvalue="{{item.type}}" >
-                <input id="id_gsign-__counter__-editype" name="gsign-__counter__-editype" />
-              </td>
-
-              <!-- The gold target -->
-              <td class="hidden" defaultvalue="{{object_id}}">
-                <input id="id_gsign-__counter__-gold" name="gsign-__counter__-gold"  />
-              </td>
-
-              <!-- A delete button -->
-              <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
-                <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-              </td>
-            </tr>
-
-            <!-- Add row -->
-            <tr class="add-row">
-              <td colspan="5">
-                <span id="add_gold_signature">
-                  <a href="#" title="Add one {{item.name}} signature to this gold sermon"><span class="glyphicon glyphicon-plus">&nbsp;</span>{{item.name}}</a>
-                </span>
-              </td>
-            </tr>
+                </td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
 

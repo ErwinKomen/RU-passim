@@ -315,7 +315,7 @@ p {
   line-height: 1.5;     /* This is the correct measure for btn-xs */
 
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /*-moz-osx-font-smoothing: grayscale; */
 }
 
 /* If the remove glyphicon is *not* in a button, it should be aligned differently */
@@ -595,7 +595,7 @@ td.editable:hover, span.editable:hover {
 a.jumbotron:visited {color:inherit;}
 a.jumbotron:hover {
     text-decoration: none;
-    cursor: pointer; cursor: hand;
+    cursor: pointer;
 }
 .jumbotron p {
     font-size: 12px;
@@ -1120,7 +1120,7 @@ div.selected {
     color: #999;
 }
 
-.twitter-typeahead {
+div > span.twitter-typeahead {
   display: inherit !important;
 }
 
