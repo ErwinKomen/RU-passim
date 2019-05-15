@@ -1002,6 +1002,9 @@ class BasicPart(View):
         if self.checkAuthentication(request):
             # Build the context
             context = dict(object_id = pk, savedate=None)
+            context['authenticated'] = user_is_authenticated(request)
+            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -1237,6 +1240,9 @@ class BasicPart(View):
         self.initializations(request, pk)
         if self.checkAuthentication(request):
             context = dict(object_id = pk, savedate=None)
+            context['authenticated'] = user_is_authenticated(request)
+            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
             # Walk all the form objects
             for formObj in self.form_objects:        
                 # Used to populate a NEW research project
@@ -1830,6 +1836,7 @@ class ManuscriptListView(ListView):
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
@@ -2160,6 +2167,9 @@ class SermonGoldSelect(BasicPart):
             #qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the updated context
         return context
@@ -2481,6 +2491,7 @@ class SermonGoldDetails(PassimDetails):
 
         # Add the list to the context
         context['relations'] = lst_related
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         return context
 
@@ -2560,6 +2571,10 @@ class AuthorDetails(PassimDetails):
         self.afternewurl = reverse('author_search')
         return True, "" 
 
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        return context
+
 
 class AuthorEdit(PassimDetails):
     """The details of one author"""
@@ -2578,6 +2593,10 @@ class AuthorEdit(PassimDetails):
 
         self.afternewurl = reverse('author_search')
         return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        return context
 
 
 class AuthorListView(ListView):
@@ -2619,6 +2638,7 @@ class AuthorListView(ListView):
         # Check this user: is he allowed to UPLOAD data?
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
@@ -2708,6 +2728,7 @@ class LibraryListView(ListView):
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
