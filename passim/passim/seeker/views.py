@@ -578,6 +578,102 @@ def import_ead(request):
     # Moet ik dit niet apart testen? Wat hieronder staat is nogal...weinig
     # ook bij Manuscript.codex kijken en andee delen genoemd in mail van Erwin read_ecodex in models.py
     # hoe zit dit samen?
+    
+    # Initialisations
+    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'seeker/import_manuscripts.html' # Adapt because of multiple descriptions in 1 xml?
+    obj = None
+    data_file = ""
+    bClean = False
+    username = request.user.username
+
+    # Check if the user is authenticated and if it is POST
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    
+        # Remove previous status object for this user
+        Status.objects.filter(user=username).delete()
+        
+        # Create a status object # TH: type goed aangepast?
+        oStatus = Status(user=username, type="ead", status="preparing")
+        oStatus.save()
+
+        form = UploadFilesForm(request.POST, request.FILES)
+        lResults = []
+        if form.is_valid():
+            # NOTE: from here a breakpoint may be inserted!
+            print('import_ead: valid form') # TH: import_ aangepast import ead_am?
+
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username) # TH: aanpassen, klopt niet, ccfr
+            source.save()
+            file_list = []
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = Manuscript.read_ecodex(username, data_file, filename, arErr, source=source) # TH:aanpassen , models.py
+
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+            # Adapt the 'source' to tell what we did
+            source.code = "Imported using the [import_ead??] function on these XML files: {}".format(", ".join(file_list)) # TH: aanpassen
+            source.save()
+            # Indicate we are ready
+            oStatus.set("ready")
+            # Get a list of errors
+            error_list = [str(item) for item in arErr]
+
+            # Create the context
+            context = dict(
+                statuscode=statuscode,
+                results=lResults,
+                error_list=error_list
+                )
+
+            if len(arErr) == 0:
+                # Get the HTML response
+                data['html'] = render_to_string(template_name, context, request)
+            else:
+                data['html'] = "Please log in before continuing"
+
+
+        else:
+            data['html'] = 'invalid form: {}'.format(form.errors)
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
     pass
 
 
@@ -648,7 +744,7 @@ def import_ecodex(request):
                         else:
                             lResults.append(oResult)
 
-            # Adapt the 'source' to tell what we did
+            # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
             source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
             source.save()
             # Indicate we are ready
