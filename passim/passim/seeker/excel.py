@@ -4,10 +4,11 @@ from passim.settings import WRITABLE_DIR, MEDIA_DIR
 import io, sys, os
 import openpyxl
 from openpyxl.utils.cell import get_column_letter
+from openpyxl.cell import Cell
 from openpyxl import Workbook
 from io import StringIO
 
-def excel_to_list(data, filename):
+def excel_to_list(data, filename, lExpected = None, lField = None):
     """Read an excel file into a list of objects
 
     This assumes that the first row contains column headers
@@ -25,20 +26,24 @@ def excel_to_list(data, filename):
             f.write(sData)
 
         # Read string file
-        wb = openpyxl.load_workbook(tmp_path, read_only=True)
+        wb = openpyxl.load_workbook(tmp_path, read_only=False)
         ws = wb.active
 
         # Iterate through rows
         bFirst = True
         
         lHeader = []
-        lExpected = ["author", "incipit", "explicit", "gryson", "type", "linked"]
-        lField = ['author', 'incipit', 'explicit', 'signature', 'linktype', 'target']
+        if lExpected == None or lField == None:
+            # Cannot handle this
+            msg = "Please specify lExpected and lField"
+            return False, [], msg
+
+        # Iterate
         for row in ws.iter_rows(min_row=1, min_col=1):
             if bFirst:
                 # Expect header
                 for cell in row:
-                    sValue = cell.value.strip().lower()
+                    sValue = cell.value.strip().lower()                    
                     sKey = ""
                     for idx, item in enumerate(lExpected):
                         if item in sValue:

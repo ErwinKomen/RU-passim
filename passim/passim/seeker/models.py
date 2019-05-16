@@ -155,6 +155,13 @@ def getText(nodeStart):
             rc.append(getText(node))
     return ' '.join(rc)
 
+def get_searchable(sText):
+    sText = sText.lower()
+    sText = "<".replace(sText, "")
+    sText = ">".replace(sText, "")
+    sText = "_".replace(sText, "")
+    return sText
+
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
 
@@ -1376,16 +1383,23 @@ class SermonGold(models.Model):
         """Find or create a SermonGold"""
 
         lstQ = []
-        if author != None: lstQ.append(Q(author=author))
-        if incipit != "": lstQ.append(Q(incipit=incipit))
-        if explicit != "": lstQ.append(Q(explicit=explicit))
+        bCreated = False
+        if author != None: 
+            lstQ.append(Q(author=author))
+        if incipit != "": 
+            incipit = "...".replace(incipit, u'\u2026')
+            lstQ.append(Q(incipit=incipit))
+        if explicit != "": 
+            explicit = "...".replace(explicit, u'\u2026')
+            lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         if obj == None:
             # Create a new
             obj = SermonGold(author=author, incipit=incipit, explicit=explicit)
             obj.save()
+            bCreated = True
         # Return this object
-        return obj
+        return bCreated, obj
 
     def find_first(signature, author=None, incipit=None, explicit=None):
         """Find a sermongold"""
@@ -1396,11 +1410,23 @@ class SermonGold(models.Model):
         lstQ.append(Q(goldsignatures__code__iregex=val))
         # Optionally look for other fields
         if author != None: lstQ.append(Q(author=author))
-        if incipit != None: lstQ.append(Q(incipit=incipit))
-        if explicit != None: lstQ.append(Q(explicit=explicit))
+        if incipit != None: 
+            incipit = "...".replace(incipit, u'\u2026')
+            lstQ.append(Q(incipit=incipit))
+        if explicit != None: 
+            explicit = "...".replace(explicit, u'\u2026')
+            lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         # Return what we found
         return obj
+
+    def get_incipit(self):
+        """Return the *searchable* incipit, without any additional formatting"""
+        return get_searchable(self.incipit)
+
+    def get_explicit(self):
+        """Return the *searchable* explicit, without any additional formatting"""
+        return get_searchable(self.explicit)
 
     def signatures(self):
         """Combine all signatures into one string"""
@@ -1505,11 +1531,27 @@ class SermonGold(models.Model):
         This approach makes use of openpyxl
         """
 
+        def add_to_manual_list(lst, type, error, oGold):
+            oManual = {}
+            oManual['type'] = type
+            oManual['error'] = error
+            oManual['obj'] = oGold
+            lst.append(oManual)
+            return True
+
         # Number to order all the items we read
         order = 0
         iSermCount = 0
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+
+        # Expected column names
+        lExpected = ["status", "author", "incipit", "explicit", "nr.gryson", "cppm", "edition", "link type", "linked objects"]
+        # Names of the fields in which these need to be transformed
+        lField = ['status', 'author', 'incipit', 'explicit', 'gryson', 'clavis', 'edition', 'linktype', 'targetlist']
+
+        # Keep a list of lines that need to be treated manually
+        lst_manual = []
 
         # Overall keeping track of sermongold items
         errHandle = ErrHandle()
@@ -1517,7 +1559,7 @@ class SermonGold(models.Model):
         try:
             errHandle.Status("Reading file {}".format(filename))
             # Convert the data into a list of objects
-            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename)
+            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename, lExpected, lField)
 
             # Check the result
             if bResult == False:
@@ -1527,25 +1569,62 @@ class SermonGold(models.Model):
 
             # Iterate over the objects
             for oGold in lst_goldsermon:
+                # Prepare a possible manual object
+                oManual = {}
+
+                # Get the status of this line
+                status = oGold['status'].lower()
+
                 sAuthor = oGold['author']
                 # Check author
                 if sAuthor == "":
                     # There must be a (gold) author...
-                    oBack['status'] = 'error'
-                    oBack['msg'] = "Without author, a gold sermon cannot be added"
-                    return oBack
+                    add_to_manual_list(lst_manual, "author", "Without author, a gold sermon cannot be added", oGold)
+                    # Skip the remainder of this line
+                    break
                 # Get the author (gold)
                 author = Author.find(sAuthor)
                 if author == None:
                     # Could not find this author, so indicate to the user
-                    oBack['status'] = 'error'
-                    oBack['msg'] = "Could not find golden Author [{}]".format(oGold['author'])
-                    return oBack
-                # Get or create this golden sermon
-                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
-                # ========================================================
-                # TODO: weggehaald maar moet ik het volgende verwerken??
-                #       oGold['signature']
+                    add_to_manual_list(lst_manual, "author", "Could not find golden Author [{}]".format(oGold['author']), oGold)
+                    # Skip the remainder of this line
+                    break
+
+                # Get or create this golden sermon (the ... symbol is treated there)
+                bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
+
+                # Process Gryson ('+' means ... ), Clavis and possible Other
+                signature_lst = [{'lst': 'gryson', 'editype': 'gr'}, {'lst': 'clavis', 'editype': 'cl'}, {'lst': 'other', 'editype': 'ot'}]
+                for item in signature_lst:
+                    code_lst = oGold[item['lst']]
+                    editype = item['editype']
+                    if code_lst != None and code_lst != "":
+                        for code in code_lst.split("+"):
+                            code = code_lst.strip()
+                            # Add this code to the signatures
+                            obj = Signature.find(code, editype)
+                            if obj == None:
+                                obj = Signature(code=code, editype=editype, gold=gold)
+                                obj.save()
+                            elif not bCreated:
+                                # Pass a message that something is wrong here?
+                                oBack['status'] = 'error'
+                                oBack['msg'] = "The signature [{}] of this line is already linked to a gold sermon".format(code)
+                                return oBack
+
+                # Process Editions (separated by ';')
+                edition_lst = oGold['edition'].split(";")
+                for item in edition_lst:
+                    item = item.strip()
+                    edition = Edition.find(item)
+                    if edition == None:
+                        edition = Edition(name=item, gold=gold)
+                        edition.save()
+                    else:
+                        # Pass a message that something is wrong here?
+                        oBack['status'] = 'error'
+                        oBack['msg'] = "The edition specification [{}] of this line is already linked to a gold sermon".format(name)
+                        return oBack
 
                 oGold['obj'] = gold
                 iSermCount += 1
@@ -1564,7 +1643,7 @@ class SermonGold(models.Model):
                         linktype = "eqs"
 
                     # ==========================================================================
-                    # TODO: ['target'] is een signature is, en die staat niet meer in de SermonGold
+                    # TODO: ['target'] is een signature, en die staat niet meer in de SermonGold
                     #       Controleer dus of dit wel gaat werken: 
                     #           ik zoek nu naar gold sermons die een link hebben naar signature
                     # ==========================================================================
@@ -1634,6 +1713,17 @@ class Edition(models.Model):
     def short(self):
         return self.name
 
+    def find(self, name):
+        obj = Edition.objects.filter(Q(name__iexact=name)).first()
+        return obj
+
+    def find_or_create(self, name):
+        obj = self.find(name)
+        if obj == None:
+            obj = Edition(name=name)
+            obj.save()
+        return obj
+
 
 class Ftextlink(models.Model):
     """Link to the full text of a critical edition of a Gold Sermon"""
@@ -1666,6 +1756,10 @@ class Signature(models.Model):
 
     def short(self):
         return self.code
+
+    def find(self, code, editype):
+        obj = Signature.objects.filter(code=code, editype=editype).first()
+        return obj
 
 
 class SermonDescr(models.Model):
