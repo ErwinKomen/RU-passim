@@ -5,8 +5,10 @@ from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.utils.html import mark_safe
 from django.urls import reverse
 from datetime import datetime
+from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
@@ -26,6 +28,7 @@ MAX_TEXT_LEN = 200
 VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+EDI_TYPE = "seeker.editype"
 
 
 class FieldChoice(models.Model):
@@ -68,6 +71,26 @@ class HelpChoice(models.Model):
                     self.display_name, self.help_url)
         return help_text
 
+def get_linktype_abbr(sLinkType):
+    """Convert a linktype into a valid abbreviation"""
+
+    options = [{'abbr': 'eqs', 'input': 'equals' },
+               {'abbr': 'prt', 'input': 'part_of' },
+               {'abbr': 'prt', 'input': 'part of' },
+               {'abbr': 'prt', 'input': 'part-of' },
+               {'abbr': 'sim', 'input': 'similar_to' },
+               {'abbr': 'sim', 'input': 'similar' },
+               {'abbr': 'sim', 'input': 'similar to' },
+               {'abbr': 'use', 'input': 'uses' },
+               {'abbr': 'use', 'input': 'makes_use_of' },
+               ]
+    for opt in options:
+        if sLinkType == opt['abbr']:
+            return sLinkType
+        elif sLinkType == opt['input']:
+            return opt['abbr']
+    # Return default
+    return 'eqs'
 
 def get_help(field):
     """Create the 'help_text' for this element"""
@@ -131,6 +154,13 @@ def getText(nodeStart):
             # Recursive
             rc.append(getText(node))
     return ' '.join(rc)
+
+def get_searchable(sText):
+    sText = sText.lower()
+    sText = "<".replace(sText, "")
+    sText = ">".replace(sText, "")
+    sText = "_".replace(sText, "")
+    return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1161,6 +1191,8 @@ class Author(models.Model):
 
     # [1] Name of the author
     name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] Possibly add the Gryson abbreviation for the author
+    abbr = models.CharField("Abbreviation", null=True, blank=True, max_length=LONG_STRING)
 
     def __str__(self):
         return self.name
@@ -1181,7 +1213,8 @@ class Author(models.Model):
     def find(sName):
         """Find an author."""
 
-        qs = Author.objects.filter(Q(name__iexact=sName))
+        # Check for the author's full name as well as the abbreviation
+        qs = Author.objects.filter(Q(name__iexact=sName) | Q(abbr__iexact=sName))
         hit = None
         if qs.count() != 0:
             hit = qs[0]
@@ -1323,9 +1356,6 @@ class Nickname(models.Model):
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
 
-    # [0-1] Every sermongold should at some point end up with a signature (a name)
-    signature = models.CharField("Signature", null=True, blank=True, max_length=LONG_STRING)
-
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
@@ -1334,45 +1364,126 @@ class SermonGold(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
 
+    # [0-1] Every gold sermon must have room for a bibliography
+    bibliography = models.TextField("Bibliography", null=True, blank=True)
+    # [1] Every gold sermon may have 0 or more URI links to critical editions
+    critlinks = models.TextField("Critical edition full text links", default="[]")
+
+
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
 
     def __str__(self):
-        name = ""
-        if self.signature:
-            name = self.signature
-        else:
+        name = self.signatures()
+        if name == "":
             name = "RU_sg_{}".format(self.id)
         return name
 
-    def find_or_create(author, incipit, explicit, signature):
+    def find_or_create(author, incipit, explicit):
         """Find or create a SermonGold"""
 
         lstQ = []
-        lstQ.append(Q(author=author))
-        if signature != "": lstQ.append(Q(signature=signature))
-        if incipit != "": lstQ.append(Q(incipit=incipit))
-        if explicit != "": lstQ.append(Q(explicit=explicit))
+        bCreated = False
+        if author != None: 
+            lstQ.append(Q(author=author))
+        if incipit != "": 
+            incipit = "...".replace(incipit, u'\u2026')
+            lstQ.append(Q(incipit=incipit))
+        if explicit != "": 
+            explicit = "...".replace(explicit, u'\u2026')
+            lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         if obj == None:
             # Create a new
-            obj = SermonGold(author=author, signature=signature, incipit=incipit, explicit=explicit)
+            obj = SermonGold(author=author, incipit=incipit, explicit=explicit)
             obj.save()
+            bCreated = True
         # Return this object
-        return obj
+        return bCreated, obj
 
     def find_first(signature, author=None, incipit=None, explicit=None):
         """Find a sermongold"""
 
         lstQ = []
-        lstQ.append(Q(signature=signature))
+        # Check if it is linked to a particular signature
+        val = adapt_search(signature)
+        lstQ.append(Q(goldsignatures__code__iregex=val))
+        # Optionally look for other fields
         if author != None: lstQ.append(Q(author=author))
-        if incipit != None: lstQ.append(Q(incipit=incipit))
-        if explicit != None: lstQ.append(Q(explicit=explicit))
+        if incipit != None: 
+            incipit = "...".replace(incipit, u'\u2026')
+            lstQ.append(Q(incipit=incipit))
+        if explicit != None: 
+            explicit = "...".replace(explicit, u'\u2026')
+            lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         # Return what we found
         return obj
 
+    def get_incipit(self):
+        """Return the *searchable* incipit, without any additional formatting"""
+        return get_searchable(self.incipit)
+
+    def get_explicit(self):
+        """Return the *searchable* explicit, without any additional formatting"""
+        return get_searchable(self.explicit)
+
+    def signatures(self):
+        """Combine all signatures into one string"""
+
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return " | ".join(lSign)
+
+    def editions(self):
+        """Combine all editions into one string"""
+
+        lEdition = []
+        for item in self.goldeditions.all():
+            lEdition.append(item.short())
+        return " | ".join(lEdition)
+
+    def ftxtlinks(self):
+        """Combine all editions into one string"""
+
+        lFtxtlink = []
+        for item in self.goldftxtlinks.all():
+            lFtxtlink.append(item.short())
+        return ", ".join(lFtxtlink)
+
+    def get_bibliography_markdown(self):
+        """Get the contents of the bibliography field using markdown"""
+
+        sBack = ""
+        if self.bibliography != None:
+            sBack = mark_safe(markdown(self.bibliography, safe_mode='escape'))
+        return sBack
+
+    def link_oview(self):
+        """provide an overview of links from this gold sermon to others"""
+
+        link_list = [
+            {'abbr': 'eqs', 'class': 'eqs-link', 'count': 0, 'title': 'Is equal to' },
+            {'abbr': 'prt', 'class': 'prt-link', 'count': 0, 'title': 'Is part of' },
+            {'abbr': 'sim', 'class': 'sim-link', 'count': 0, 'title': 'Is similar to' },
+            {'abbr': 'use', 'class': 'use-link', 'count': 0, 'title': 'Makes us of' },
+            ]
+        lHtml = []
+        for link_def in link_list:
+            lt = link_def['abbr']
+            links = SermonGoldSame.objects.filter(src=self, linktype=lt).count()
+            link_def['count'] = links
+        return link_list
+
+    def get_sermon_string(self):
+        """Get a string summary of this one"""
+
+        author = "" if self.author == None else self.author.name
+        incipit = "" if self.incipit == None else self.incipit
+        explicit = "" if self.explicit == None else self.explicit
+        return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
+    
     def add_relation(self, target, linktype):
         """Add a relation from me to [target] with the indicated type"""
 
@@ -1420,11 +1531,27 @@ class SermonGold(models.Model):
         This approach makes use of openpyxl
         """
 
+        def add_to_manual_list(lst, type, error, oGold):
+            oManual = {}
+            oManual['type'] = type
+            oManual['error'] = error
+            oManual['obj'] = oGold
+            lst.append(oManual)
+            return True
+
         # Number to order all the items we read
         order = 0
         iSermCount = 0
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+
+        # Expected column names
+        lExpected = ["status", "author", "incipit", "explicit", "nr.gryson", "cppm", "edition", "link type", "linked objects"]
+        # Names of the fields in which these need to be transformed
+        lField = ['status', 'author', 'incipit', 'explicit', 'gryson', 'clavis', 'edition', 'linktype', 'targetlist']
+
+        # Keep a list of lines that need to be treated manually
+        lst_manual = []
 
         # Overall keeping track of sermongold items
         errHandle = ErrHandle()
@@ -1432,7 +1559,7 @@ class SermonGold(models.Model):
         try:
             errHandle.Status("Reading file {}".format(filename))
             # Convert the data into a list of objects
-            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename)
+            bResult, lst_goldsermon, msg = excel_to_list(data_file, filename, lExpected, lField)
 
             # Check the result
             if bResult == False:
@@ -1442,22 +1569,63 @@ class SermonGold(models.Model):
 
             # Iterate over the objects
             for oGold in lst_goldsermon:
+                # Prepare a possible manual object
+                oManual = {}
+
+                # Get the status of this line
+                status = oGold['status'].lower()
+
                 sAuthor = oGold['author']
                 # Check author
                 if sAuthor == "":
                     # There must be a (gold) author...
-                    oBack['status'] = 'error'
-                    oBack['msg'] = "Without author, a gold sermon cannot be added"
-                    return oBack
+                    add_to_manual_list(lst_manual, "author", "Without author, a gold sermon cannot be added", oGold)
+                    # Skip the remainder of this line
+                    break
                 # Get the author (gold)
                 author = Author.find(sAuthor)
                 if author == None:
                     # Could not find this author, so indicate to the user
-                    oBack['status'] = 'error'
-                    oBack['msg'] = "Could not find golden Author [{}]".format(oGold['author'])
-                    return oBack
-                # Get or create this golden sermon
-                gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'], oGold['signature'])
+                    add_to_manual_list(lst_manual, "author", "Could not find golden Author [{}]".format(oGold['author']), oGold)
+                    # Skip the remainder of this line
+                    break
+
+                # Get or create this golden sermon (the ... symbol is treated there)
+                bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
+
+                # Process Gryson ('+' means ... ), Clavis and possible Other
+                signature_lst = [{'lst': 'gryson', 'editype': 'gr'}, {'lst': 'clavis', 'editype': 'cl'}, {'lst': 'other', 'editype': 'ot'}]
+                for item in signature_lst:
+                    code_lst = oGold[item['lst']]
+                    editype = item['editype']
+                    if code_lst != None and code_lst != "":
+                        for code in code_lst.split("+"):
+                            code = code_lst.strip()
+                            # Add this code to the signatures
+                            obj = Signature.find(code, editype)
+                            if obj == None:
+                                obj = Signature(code=code, editype=editype, gold=gold)
+                                obj.save()
+                            elif not bCreated:
+                                # Pass a message that something is wrong here?
+                                oBack['status'] = 'error'
+                                oBack['msg'] = "The signature [{}] of this line is already linked to a gold sermon".format(code)
+                                return oBack
+
+                # Process Editions (separated by ';')
+                edition_lst = oGold['edition'].split(";")
+                for item in edition_lst:
+                    item = item.strip()
+                    edition = Edition.find(item)
+                    if edition == None:
+                        edition = Edition(name=item, gold=gold)
+                        edition.save()
+                    else:
+                        # Pass a message that something is wrong here?
+                        oBack['status'] = 'error'
+                        oBack['msg'] = "The edition specification [{}] of this line is already linked to a gold sermon".format(name)
+                        return oBack
+
                 oGold['obj'] = gold
                 iSermCount += 1
  
@@ -1468,9 +1636,17 @@ class SermonGold(models.Model):
                 if 'target' in oGold and oGold['target'] != "":
                     # Determine the linktype
                     if 'linktype' in oGold:
-                        linktype = "equals" if oGold['linktype'] == "" else oGold['linktype']
+                        linktype = "eqs" if oGold['linktype'] == "" else oGold['linktype']
+                        # Double check valid linktype
+                        linktype = get_linktype_abbr(linktype)
                     else:
-                        linktype = "equals"
+                        linktype = "eqs"
+
+                    # ==========================================================================
+                    # TODO: ['target'] is een signature, en die staat niet meer in de SermonGold
+                    #       Controleer dus of dit wel gaat werken: 
+                    #           ik zoek nu naar gold sermons die een link hebben naar signature
+                    # ==========================================================================
                     # Get the target sermongold
                     target = SermonGold.find_first(oGold['target'])
                     if target == None:
@@ -1511,7 +1687,7 @@ class SermonGoldSame(models.Model):
     dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
-                            max_length=5, default="eq")
+                            max_length=5, default="eqs")
 
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
@@ -1521,6 +1697,69 @@ class SermonGoldSame(models.Model):
         # Get the URL to edit/view this sermon
         sUrl = "" if self.id == None else reverse("goldlink_view", kwargs={'pk': self.id})
         return sUrl
+
+
+class Edition(models.Model):
+    """Critical text edition of a Gold Sermon"""
+
+    # [1] It must have a name - that is the Gryson book or the Clavis book or something
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Every edition belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
+
+    def __str__(self):
+        return self.name
+
+    def short(self):
+        return self.name
+
+    def find(self, name):
+        obj = Edition.objects.filter(Q(name__iexact=name)).first()
+        return obj
+
+    def find_or_create(self, name):
+        obj = self.find(name)
+        if obj == None:
+            obj = Edition(name=name)
+            obj.save()
+        return obj
+
+
+class Ftextlink(models.Model):
+    """Link to the full text of a critical edition of a Gold Sermon"""
+
+    # [1] It must have a name - that is the Gryson book or the Clavis book or something
+    url = models.URLField("Full text URL", max_length=LONG_STRING)
+    # [1] Every edition belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldftxtlinks")
+
+    def __str__(self):
+        return self.url
+
+    def short(self):
+        return self.url
+
+
+class Signature(models.Model):
+    """One Gryson, Clavis or other code as taken up in an edition"""
+
+    # [1] It must have a code = gryson code or clavis number
+    code = models.CharField("Code", max_length=LONG_STRING)
+    # [1] Every edition must be of a limited number of types
+    editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
+                            max_length=5, default="gr")
+    # [1] Every signature belongs to exactly one gold-sermon
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures")
+
+    def __str__(self):
+        return "{}: {}".format(self.editype, self.code)
+
+    def short(self):
+        return self.code
+
+    def find(self, code, editype):
+        obj = Signature.objects.filter(code=code, editype=editype).first()
+        return obj
 
 
 class SermonDescr(models.Model):

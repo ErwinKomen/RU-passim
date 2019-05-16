@@ -46,8 +46,7 @@ class SearchSermonForm(forms.Form):
     incipit = forms.CharField(label=_("Incipit"), required=False)
     explicit = forms.CharField(label=_("Explicit"), required=False)
     title = forms.CharField(label=_("Title"), required=False)
-    clavis = forms.CharField(label=_("Clavis"), required=False)
-    gryson = forms.CharField(label=_("Gryson"), required=False)
+    signature = forms.CharField(label=_("Signature"), required=False)
     feast = forms.CharField(label=_("Feast"), required=False)
     keyword = forms.CharField(label=_("Keyword"), required=False)
 
@@ -56,24 +55,22 @@ class SelectGoldForm(forms.ModelForm):
     """Note: only for searching and selecting"""
 
     source_id = forms.CharField(label=_("Source"), required=False)
-    authorname = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
-    incipit_ta = forms.CharField(label=_("Incipit"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
-    explicit_ta = forms.CharField(label=_("Explicit"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
-    signature_ta = forms.CharField(label=_("Signature"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'}))
+    authorname = forms.CharField(label=_("Author"), 
+        required=False, 
+        widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), 
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['signature', 'author', 'incipit', 'explicit' ]
-        widgets={'signature':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+        fields = ['author', 'incipit', 'explicit' ]
+        widgets={
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'})
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -81,14 +78,11 @@ class SelectGoldForm(forms.ModelForm):
         super(SelectGoldForm, self).__init__(*args, **kwargs)
         # Make sure to set required and optional fields
         self.fields['source_id'].required = False
+        self.fields['signature'].required = False
         self.fields['authorname'].required = False
-        self.fields['incipit_ta'].required = False
-        self.fields['explicit_ta'].required = False
-        self.fields['signature_ta'].required = False
         if 'author' in self.fields: self.fields['author'].required = False
         if 'incipit' in self.fields: self.fields['incipit'].required = False
         if 'explicit' in self.fields: self.fields['explicit'].required = False
-        if 'signature' in self.fields: self.fields['signature'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -107,7 +101,7 @@ class SearchManuscriptForm(forms.Form):
     library = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
 
@@ -163,17 +157,19 @@ class SermonForm(forms.ModelForm):
 
 class SermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+        widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['signature', 'author', 'incipit', 'explicit' ]
-        widgets={'signature':   forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+        fields = ['author', 'incipit', 'explicit', 'bibliography' ]
+        widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'})
+                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -193,7 +189,7 @@ class SermonGoldSameForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGoldSame
-        fields = ['linktype', 'dst' ]
+        fields = ['src', 'linktype', 'dst' ]
         widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -201,10 +197,51 @@ class SermonGoldSameForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonGoldSameForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=False)
+        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+            if instance != None:
+                pass
+                #  NOTE: the following has no effect because we use bound fields
+                #       self.fields['linktype'].initial = instance.linktype
+                #       self.fields['dst'].initial = instance.dst
+
+
+class SermonGoldSignatureForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Signature
+        fields = ['code', 'editype', 'gold']
+        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
+        # Initialize choices for editype
+        init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+
+
+class SermonGoldEditionForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Edition
+        fields = ['name', 'gold']
+        widgets={'name':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Critical text edition...', 'style': 'width: 100%;'})
+                 }
+
+
+class SermonGoldFtextlinkForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Ftextlink
+        fields = ['url', 'gold']
+        widgets={'url':     forms.URLInput(attrs={'placeholder': 'Full text URLs...', 'style': 'width: 100%;'})
+                 }
 
 
 class ManuscriptForm(forms.ModelForm):
@@ -263,7 +300,7 @@ class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
     city = forms.CharField(label=_("City"), required=False)
     library = forms.CharField(label=_("Library"), required=False)
-    signature = forms.CharField(label=_("Signature"), required=False)
+    signature = forms.CharField(label=_("Signature code"), required=False)
 
 
 class LibrarySearchForm(forms.ModelForm):
@@ -274,6 +311,16 @@ class LibrarySearchForm(forms.ModelForm):
 
         model = Library
         fields = ('country', 'city', 'libtype', 'name')
+
+
+class AuthorEditForm(forms.ModelForm):
+
+    class Meta:
+        model = Author
+        fields = ['name', 'abbr']
+        widgets={'name':      forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
+                 'abbr':     forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
+                 }
 
 
 class AuthorSearchForm(forms.ModelForm):

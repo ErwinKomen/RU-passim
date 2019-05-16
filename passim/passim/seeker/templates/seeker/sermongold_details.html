@@ -1,0 +1,130 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'home' %}">Home</a>
+    &rsaquo; <a href="{% url 'search_gold' %}">Gold-Sermon List</a>
+    &rsaquo; Gold-Sermon Details
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div>
+
+    {% if authenticated %}
+      <!-- Upper part of the gold-sermon details interface -->
+      <div class="panel panel-default gold-head subform">
+        <div class="row">&nbsp;</div>
+        <div class="row">
+          <div class="col-md-1">
+            <a class="btn jumbo-1" 
+               href="{% url 'search_gold' %}"
+               title="Back to the list of gold sermons">&lt;&lt;</a>
+          </div>
+          <div class="col-md-10">
+
+            <h3>Gold sermon details</h3>
+
+            <!-- SermonGold Main information -->
+            <div id="sermongold_edit">
+              {% include 'seeker/sermongold_edit.html' %}
+            </div>
+
+            <!-- SermonGold signatures (Gryson, Clavis): zero-to-many -->
+            <div class="row">&nbsp;</div>
+            <div id="sermongold_signset" class="post-load" targeturl="{% url 'gold_signset' pk=goldForm.instance.id %}" >
+              <!-- The wait symbol will be overwritten -->
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+
+            <!-- SermonGold critical editions: zero-to-many -->
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <!-- One or more critical editions -->
+              <div class="col-md-6">
+                <div id="sermongold_ediset" class="post-load" targeturl="{% url 'gold_ediset' pk=goldForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+
+              <!-- One or more fulltext links (to critical editions) -->
+              <div class="col-md-6">
+                <div id="sermongold_ftxtset" class="post-load" targeturl="{% url 'gold_ftxtset' pk=goldForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
+            {% if goldForm.instance.id and is_passim_editor %}
+              <div id="sermongold-links-{{goldForm.instance.id}}">
+
+                <!-- Modal attempt -->
+                <div id="modal-goldlink-{{goldForm.instance.id}}" class="modal fade goldlink subform" role="dialog">
+                  <div class="modal-dialog">
+                    <!-- Modal content -->
+                    <div class="modal-content">
+                      <!-- introduction header -->
+                      <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Search and then select the gold sermon to link to</h4>
+                      </div>
+
+                      <!-- Body of the modal-->
+                      <div class="modal-body subform" id="edit-goldlink-{{goldForm.instance.id}}">
+                        <!-- This is where the current gold-to-gold link shows up -->
+                      </div>
+
+                      <!-- Footer with the save button -->
+                      <div class="modal-footer">
+                        {% if is_passim_editor %}
+                          <a class="btn jumbo-1" data-dismiss="modal"
+                             onclick="ru.passim.seeker.gold_select_save(this);">
+                            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+                          </a>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            {% endif %}
+
+            <!-- Room for the links from this gold sermon -->
+            <div class="row">&nbsp;</div>
+            <div id="sermongold_linkset" class="post-load" targeturl="{% url 'gold_linkset' pk=goldForm.instance.id %}" >
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+
+          </div>
+        </div>
+        <div class="row">&nbsp;</div>
+
+      </div>
+
+    
+    {% else %}
+      <div class="explanation">
+        <p>Dear user, you are <b>not</b> logged in.</p>
+        <p>Unfortunately this means that you will not be able to perform any searches.</p>
+        <p>Should you want to work with Passim, here are your options:
+          <ul>
+            <li><a class="btn btn-info btn-xs" href="{% url 'login' %}">Login</a> - if you already have an account</li> 
+            <li><a class="btn btn-warning btn-xs" href="{% url 'signup' %}">Sign up</a> - if you don't have an account yet</li>
+          </ul>
+        </p>
+      </div>
+    {% endif %}
+    
+  </div>
+
+
+<script>
+  ru.passim.seeker.init_events();
+</script>
+
+{% endblock content %}

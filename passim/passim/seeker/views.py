@@ -7,6 +7,7 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db import transaction
 from django.db.models import Q
 import operator
 from functools import reduce
@@ -28,9 +29,10 @@ from passim.settings import APP_PREFIX
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SelectGoldForm, SermonGoldSameForm
+                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
+                                SermonGoldEditionForm, SermonGoldFtextlinkForm
 from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink
 
 import fnmatch
 import sys
@@ -58,6 +60,16 @@ def adapt_search(val):
     val = val.strip()
     val = '^' + fnmatch.translate(val) + '$'
     return val
+
+def treat_bom(sHtml):
+    """REmove the BOM marker except at the beginning of the string"""
+
+    # Check if it is in the beginning
+    bStartsWithBom = sHtml.startswith(u'\ufeff')
+    # Remove everywhere
+    sHtml = sHtml.replace(u'\ufeff', '')
+    # Return what we have
+    return sHtml
 
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
@@ -552,19 +564,128 @@ def get_authors(request):
 def get_nicknames(request):
     """Get a list of nicknames for autocomplete"""
 
-    data = 'fail'
-    if request.is_ajax():
-        author = request.GET.get("name", "")
-        lstQ = []
-        lstQ.append(Q(name__icontains=author))
-        authors = Nickname.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in authors:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
-    else:
-        data = "Request is not ajax"
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            authors = Nickname.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in authors:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_incipits(request):
+    """Get a list of incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(incipit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("incipit").distinct().all().order_by('incipit')
+            # items = SermonGold.objects.order_by("incipit").distinct()
+            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
+            results = []
+            for idx, co in enumerate(items):
+                co_json = {'name': co['incipit'], 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_explicits(request):
+    """Get a list of explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(explicit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("explicit").distinct().all().order_by('explicit')
+            # items = SermonGold.objects.order_by("explicit").distinct()
+            # items = SermonGold.objects.filter(*lstQ).order_by('explicit').distinct()
+            results = []
+            for idx, co in enumerate(items):
+                co_json = {'name': co['explicit'], 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_signatures(request):
+    """Get a list of signature codes for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(code__icontains=author))
+            items = Signature.objects.order_by("code").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.code, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_editions(request):
+    """Get a list of edition codes for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            items = Edition.objects.order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
@@ -675,7 +796,6 @@ def import_ead(request):
     return JsonResponse(data)
 
     pass
-
 
 def import_ecodex(request):
     """Import one or more XML files that each contain one manuscript definition from e-codices, from Switzerland"""
@@ -948,6 +1068,11 @@ def import_authors(request):
 
 
 class BasicPart(View):
+    """This is my own versatile handling view.
+
+    Note: this version works with <pk> and not with <object_id>
+    """
+
     # Initialisations
     arErr = []              # errors   
     template_name = None    # The template to be used
@@ -963,16 +1088,19 @@ class BasicPart(View):
     bDebug = False          # Debugging information
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
-    def post(self, request, object_id=None):
+    def post(self, request, pk=None):
         # A POST request means we are trying to SAVE something
-        self.initializations(request, object_id)
+        self.initializations(request, pk)
 
         # Explicitly set the status to OK
         self.data['status'] = "ok"
 
         if self.checkAuthentication(request):
             # Build the context
-            context = dict(object_id = object_id, savedate=None)
+            context = dict(object_id = pk, savedate=None)
+            context['authenticated'] = user_is_authenticated(request)
+            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -1007,7 +1135,7 @@ class BasicPart(View):
                             formObj['instance'] = instance
                             # Perform actions to this form BEFORE FINAL saving
                             bNeedSaving = formObj['forminstance'].has_changed()
-                            if self.before_save(prefix, request, instance=instance): bNeedSaving = True
+                            if self.before_save(prefix, request, instance=instance, form=formObj['forminstance']): bNeedSaving = True
                             if formObj['forminstance'].instance.id == None: bNeedSaving = True
                             if bNeedSaving:
                                 # Perform the saving
@@ -1062,6 +1190,7 @@ class BasicPart(View):
                         if not formsetObj['readonly']:
                             # Is the formset valid?
                             if formset.is_valid():
+                                has_deletions = False
                                 # Make sure all changes are saved in one database-go
                                 with transaction.atomic():
                                     # Walk all the forms in the formset
@@ -1069,30 +1198,39 @@ class BasicPart(View):
                                         # At least check for validity
                                         if form.is_valid() and self.is_custom_valid(prefix, form):
                                             # Should we delete?
-                                            if form.cleaned_data['DELETE']:
+                                            if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
                                                 # Delete this one
                                                 form.instance.delete()
                                                 # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                # form.delete()
+                                                has_deletions = True
                                             else:
                                                 # Check if anything has changed so far
                                                 has_changed = form.has_changed()
                                                 # Save it preliminarily
-                                                instance = form.save(commit=False)
+                                                sub_instance = form.save(commit=False)
                                                 # Any actions before saving
-                                                if self.before_save(prefix, request, instance, form):
+                                                if self.before_save(prefix, request, sub_instance, form):
                                                     has_changed = True
                                                 # Save this construction
                                                 if has_changed: 
                                                     # Save the instance
-                                                    instance.save()
+                                                    sub_instance.save()
                                                     # Adapt the last save time
                                                     context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
                                                     # Store the instance id in the data
-                                                    self.data[prefix + '_instanceid'] = instance.id
+                                                    self.data[prefix + '_instanceid'] = sub_instance.id
                                         else:
                                             if len(form.errors) > 0:
                                                 self.arErr.append(form.errors)
+                                
+                                # Rebuild the formset if it contains deleted forms
+                                if has_deletions or not has_deletions:
+                                    # Or: ALWAYS
+                                    if qs == None:
+                                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                                    else:
+                                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                                    formsetObj['formsetinstance'] = formset
                             else:
                                 # Iterate over all errors
                                 for idx, err_this in enumerate(formset.errors):
@@ -1153,6 +1291,10 @@ class BasicPart(View):
             # Allow user to add to the context
             context = self.add_to_context(context)
 
+            # Check if 'afternewurl' needs adding
+            if 'afternewurl' in context:
+                self.data['afternewurl'] = context['afternewurl']
+
             # Make sure we have a list of any errors
             error_list = [str(item) for item in self.arErr]
             context['error_list'] = error_list
@@ -1174,9 +1316,14 @@ class BasicPart(View):
                 else:
                     self.data['error_list'] = error_list
                 self.data['html'] = ''
+            elif self.action == "delete":
+                self.data['html'] = "deleted" 
             else:
                 # In this case reset the errors - they should be shown within the template
-                self.data['html'] = render_to_string(self.template_name, context, request)
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = treat_bom(sHtml)
+                self.data['html'] = sHtml
+
             # At any rate: empty the error basket
             self.arErr = []
             error_list = []
@@ -1187,12 +1334,15 @@ class BasicPart(View):
         # Return the information
         return JsonResponse(self.data)
         
-    def get(self, request, object_id=None): 
+    def get(self, request, pk=None): 
         self.data['status'] = 'ok'
         # Perform the initializations that need to be made anyway
-        self.initializations(request, object_id)
+        self.initializations(request, pk)
         if self.checkAuthentication(request):
-            context = dict(object_id = object_id, savedate=None)
+            context = dict(object_id = pk, savedate=None)
+            context['authenticated'] = user_is_authenticated(request)
+            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
             # Walk all the form objects
             for formObj in self.form_objects:        
                 # Used to populate a NEW research project
@@ -1261,6 +1411,9 @@ class BasicPart(View):
             return False
         else:
             return True
+
+    def rebuild_formset(self, prefix, formset):
+        return formset
 
     def initializations(self, request, object_id):
         # Clear errors
@@ -1333,20 +1486,24 @@ class PassimDetails(DetailView):
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     title = ""              # The title to be passedon with the context
+    rtype = "json"          # JSON response (alternative: html)
     mForm = None            # Model form
+    add = False             # Are we adding a new record or editing an existing one?
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request, pk=None, *args, **kwargs):
         # Initialisation
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # always do this initialisation to get the object
+        self.initializations(request, pk)
         if not request.user.is_authenticated:
             # Do not allow to get a good response
-            data['html'] = "(No authorization)"
-            data['status'] = "error"
-        else:
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                self.object = None
+            if self.rtype == "json":
+                data['html'] = "(No authorization)"
+                data['status'] = "error"
+                response = JsonResponse(data)
             else:
-                self.object = self.get_object()
+                response = reverse('nlogin')
+        else:
             context = self.get_context_data(object=self.object)
 
             # Possibly indicate form errors
@@ -1355,25 +1512,26 @@ class PassimDetails(DetailView):
                 data['status'] = "error"
                 data['msg'] = context['errors']
 
-            # We render to the _name 
-            response = render_to_string(self.template_name, context, request)
-            response = response.replace("\ufeff", "")
-            data['html'] = response
+            if self.rtype == "json":
+                # We render to the _name 
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = sHtml.replace("\ufeff", "")
+                data['html'] = sHtml
+                response = JsonResponse(data)
+            else:
+                # This takes self.template_name...
+                response = self.render_to_response(context)
 
         # Return the response
-        return JsonResponse(data)
+        return response
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request, pk=None, *args, **kwargs):
         # Initialisation
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
+        # always do this initialisation to get the object
+        self.initializations(request, pk)
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW instance for this model
-                self.object = None
-            else:
-                self.object = self.get_object()
             context = self.get_context_data(object=self.object)
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:
@@ -1393,6 +1551,29 @@ class PassimDetails(DetailView):
 
         # Return the response
         return JsonResponse(data)
+
+    def initializations(self, request, pk):
+        # Copy any pk
+        self.pk = pk
+        self.add = pk is None
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+
+        # Check for action
+        if 'action' in self.qd:
+            self.action = self.qd['action']
+
+        # Find out what the Main Model instance is, if any
+        if self.add:
+            self.object = None
+        else:
+            # Get the instance of the Main Model object
+            self.object = self.get_object()
+            # NOTE: if the object doesn't exist, we will NOT get an error here
+
 
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
@@ -1416,6 +1597,9 @@ class PassimDetails(DetailView):
     def get_formset_queryset(self, prefix):
         return None
 
+    def get_form_kwargs(self, prefix):
+        return None
+
     def get_context_data(self, **kwargs):
         # Get the current context
         context = super(PassimDetails, self).get_context_data(**kwargs)
@@ -1433,9 +1617,12 @@ class PassimDetails(DetailView):
         # Get the instance
         instance = self.object
         bNew = False
-        prefix = self.prefix
         mForm = self.mForm
         oErr = ErrHandle()
+
+        # prefix = self.prefix
+        id = "n" if instance == None else instance.id
+        prefix = "{}-{}".format(self.prefix, id)
 
         # Check if this is a POST or a GET request
         if self.request.method == "POST":
@@ -1519,7 +1706,7 @@ class PassimDetails(DetailView):
                     else:
                         formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
                 # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, request, formset)
+                ordered_forms = self.process_formset(prefix, self.request, formset)
                 if ordered_forms:
                     context[prefix + "_ordered"] = ordered_forms
                 # Store the instance
@@ -1543,125 +1730,43 @@ class PassimDetails(DetailView):
         return context
 
 
-class ManuscriptDetailsView(DetailView):
+class ManuscriptEdit(BasicPart):
     """The details of one manuscript"""
 
     model = Manuscript
-    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
-    template_post = 'seeker/manuscript_info.html'       # Use this for POST requests
-    # Define a formset for the sermons that are part of a manuscript
-    # SermoFormset = modelformset_factory(SermonDescr, form=SermonForm, extra=0)
+    template_name = 'seeker/manuscript_edit.html'  
+    title = "Manuscript" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "manu"
+    form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': True}]
 
-    def get(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            # Do not allow to get a good response
-            response = nlogin(request)
-        else:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW sermon
-                self.object = None
-            else:
-                self.object = self.get_object()
-            context = self.get_context_data(object=self.object)
-            response = self.render_to_response(context)
-            #response.content = treat_bom(response.rendered_content)
-        return response
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "manu":
+            # Check if a new 'Origin' has been added
+            if 'origname_ta' in form.changed_data:
 
-    def post(self, request, *args, **kwargs):
-        # Initialisation
-        data = {'status': 'ok', 'html': '', 'statuscode': ''}
-        # Make sure only POSTS get through that are authorized
-        if request.user.is_authenticated:
-            # Determine the object and the context
-            if not 'pk' in kwargs or kwargs['pk'] == None:
-                # This is a NEW sermon
-                self.object = None
-            else:
-                self.object = self.get_object()
-            context = self.get_context_data(object=self.object)
-            # Possibly indicate form errors
-            # NOTE: errors is a dictionary itself...
-            if 'errors' in context and len(context['errors']) > 0:
-                data['status'] = "error"
-                data['msg'] = context['errors']
-            # response = self.render_to_response(self.template_post, context)
-            data['html'] = render_to_string(self.template_post, context, request)
-        else:
-            data['html'] = "(No authorization)"
-            data['status'] = "error"
+                # TODO: check if this is not already taken care of...
 
-        # Return the response
-        return JsonResponse(data)
+                # Get its value
+                sOrigin = form.cleaned_data['origname_ta']
+                # Check if it is already in the Nicknames
+                origin = Origin.find_or_create(sOrigin)
+                if instance.origin != origin:
+                    # Add it
+                    instance.origin = origin
+                    # Make sure that it is being saved
+                    bNeedSaving = True
 
-    def get_context_data(self, **kwargs):
-        # Get the current context
-        context = super(ManuscriptDetailsView, self).get_context_data(**kwargs)
+        return bNeedSaving
 
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        initial = get.copy()
-        self.qd = initial
-
-        self.bHasFormset = (len(self.qd) > 0)
-
-        # Set the title of the application
-        context['title'] = "Manuscript"
+    def add_to_context(self, context):
 
         # Get the instance
-        instance = self.object
-        bNew = False
+        instance = self.obj
 
-        # Get a form for this manuscript
-        if self.request.method == "POST":
-            # Do we have an existing object or are we creating?
-            if instance == None:
-                # Saving a new item
-                frm = ManuscriptForm(initial, prefix="manu")
-                bNew = True
-            else:
-                # Editing an existing one
-                frm = ManuscriptForm(initial, prefix="manu", instance=instance)
-
-            # Both cases: validation and saving
-            if frm.is_valid():
-                # The form is valid - do a preliminary saving
-                instance = frm.save(commit=False)
-                # Check if a new 'Origin' has been added
-                if 'origname_ta' in frm.changed_data:
-
-                    # TODO: check if this is not already taken care of...
-
-                    # Get its value
-                    sOrigin = frm.cleaned_data['origname_ta']
-                    # Check if it is already in the Nicknames
-                    origin = Origin.find_or_create(sOrigin)
-                    if instance.origin != origin:
-                        # Add it
-                        instance.origin = origin
-                # Now save it for real
-                instance.save()
-            else:
-                # We need to pass on to the user that there are errors
-                context['errors'] = frm.errors
-
-            # Check if this is a new one
-            if bNew:
-                # Put anything here that needs handling if it is a new manuscript instance
-                pass
-                
-        else:
-            # Check if this is asking for a new form
-            if instance == None:
-                # Get the form for the manuscript
-                frm = ManuscriptForm(prefix="manu")
-            else:
-                # Get the form for the manuscript
-                frm = ManuscriptForm(instance=instance, prefix="manu")
-
-        # Put the form and the formset in the context
-        context['manuForm'] = frm
-        
+        # Construct the hierarchical list
         sermon_list = []
         maxdepth = 0
         if instance != None:
@@ -1686,18 +1791,121 @@ class ManuscriptDetailsView(DetailView):
             for oSermon in sermon_list:
                 oSermon['cols'] = maxdepth - oSermon['level'] + 1
                 if oSermon['group']: oSermon['cols'] -= 1
+
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list
         context['sermon_count'] = len(sermon_list)
         context['maxdepth'] = maxdepth
-        context['isnew'] = bNew
+        # context['isnew'] = bNew
 
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['afternewurl'] = reverse('search_manuscript')
 
-        # Return the calculated context
+        return context
+
+
+class SermonEdit(BasicPart):
+    """The details of one manuscript"""
+
+    model = SermonDescr
+    template_name = 'seeker/sermon_edit.html'  
+    title = "Sermon" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "sermo"
+    form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}]
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        # Not sure if this is still needed
+        context['msitem'] = instance
+
+        # Make sure to pass on the manuscript_id
+        manuscript_id = None
+        if 'manuscript_id' in self.qd:
+            manuscript_id = self.qd['manuscript_id']
+            # Set the URL to be taken after saving
+            context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+        context['manuscript_id'] = manuscript_id
+
+
+        return context
+
+    def after_save(self, prefix, instance = None):
+
+        # Check if this is a new one
+        if self.add:
+            # This is a new one, so it should be coupled to the correct manuscript
+            if 'manuscript_id' in self.qd:
+                # It is there, so we can add it
+                manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
+                if manuscript != None:
+                    # Add to the SermonMan
+                    obj = SermonMan(sermon=instance, manuscript=manuscript)
+                    obj.save()
+                    # Calculate how many sermons there are
+                    sermon_count = manuscript.sermons.all().count()
+                    # Make sure the new sermon gets changed
+                    instance.order = sermon_count
+                    instance.save()
+        
+        # There's is no real return value needed here 
+        return True
+
+
+class ManuscriptDetails(PassimDetails):
+    """Editable manuscript details"""
+
+    model = Manuscript
+    mForm = ManuscriptForm
+    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
+    template_post = 'seeker/manuscript_details.html'    # Use this for POST requests
+    title = "Manuscript" 
+    afternewurl = ""
+    prefix = "manu"
+    rtype = "html"      # Load this as straight forward html
+
+    def add_to_context(self, context, instance):
+
+        # Get the instance
+        instance = self.object
+
+        # Construct the hierarchical list
+        sermon_list = []
+        maxdepth = 0
+        if instance != None:
+            # Create a well sorted list of sermons
+            qs = instance.sermons.filter(order__gte=0).order_by('order')
+            prev_level = 0
+            for sermon in qs:
+                oSermon = {}
+                oSermon['obj'] = sermon
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                level = sermon.getdepth()
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = (sermon.firstchild != None)
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
+
+        # Add instances to the list, noting their childof and order
+        context['sermon_list'] = sermon_list
+        context['sermon_count'] = len(sermon_list)
+        context['maxdepth'] = maxdepth
+        #context['isnew'] = bNew
+
+        context['afternewurl'] = reverse('search_manuscript')
+
         return context
 
 
@@ -1749,6 +1957,7 @@ class ManuscriptListView(ListView):
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
@@ -1795,8 +2004,13 @@ class ManuscriptListView(ListView):
                             lstThisQ.append(Q(name__iregex=val))
 
                         # Check for Manuscript [idno]
-                        if 'signature' in oFields and oFields['signature'] != "": 
-                            val = adapt_search(oFields['signature'])
+                        if 'gryson' in oFields and oFields['gryson'] != "": 
+                            val = adapt_search(oFields['gryson'])
+                            lstThisQ.append(Q(idno__iregex=val))
+
+                        # Check for Manuscript [idno]
+                        if 'clavis' in oFields and oFields['clavis'] != "": 
+                            val = adapt_search(oFields['clavis'])
                             lstThisQ.append(Q(idno__iregex=val))
 
                         # Check for country name
@@ -1933,11 +2147,6 @@ class SermonGoldListView(ListView):
                 # Process the criteria from this form 
                 oFields = goldForm.cleaned_data
 
-                # Check for SermonGold [idno]
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(signature__iregex=val))
-
                 # Check for author name -- which is in the typeahead parameter
                 if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
                     val = oFields['author']
@@ -1956,6 +2165,11 @@ class SermonGoldListView(ListView):
                     val = adapt_search(oFields['explicit'])
                     lstQ.append(Q(explicit__iregex=val))
 
+                # Check for SermonGold [signature]
+                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                    val = adapt_search(oFields['signature'])
+                    lstQ.append(Q(goldsignatures__code__iregex=val))
+
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # Just show everything
@@ -1967,22 +2181,25 @@ class SermonGoldListView(ListView):
 
 
                 # Just show everything
-                qs = SermonGold.objects.all()
+                qs = SermonGold.objects.all().distinct()
 
         else:
             # Just show everything
-            qs = SermonGold.objects.all()
+            qs = SermonGold.objects.all().distinct()
 
         # Set the sort order
-        qs = qs.order_by('author__name',
-                         Lower('signature'),
-                         'incipit', 
-                         'explicit')
+        #qs = qs.order_by('author__name',
+        #                 'signatures',
+        #                 'incipit', 
+        #                 'explicit')
+
+        # Sort the python way
+        qs = sorted(qs, key=lambda x: x.get_sermon_string())
 
         # Time measurement
         if self.bDoTime:
             print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("SermonGoldListView query: {}".format(qs.query))
+            # print("SermonGoldListView query: {}".format(qs.query))
             iStart = get_now_time()
 
         # Determine the length
@@ -1998,29 +2215,39 @@ class SermonGoldListView(ListView):
 
 class SermonGoldSelect(BasicPart):
     """Facilitate searching and selecting one gold sermon"""
+
     MainModel = SermonGold
     template_name = "seeker/sermongold_select.html"
     # One form is attached to this 
     prefix = 'gsel'
     form_objects = [{'form': SelectGoldForm, 'prefix': prefix, 'readonly': True}]
 
+    def get_instance(self, prefix):
+        instance = None
+        if prefix == "gsel":
+            # The instance is the SRC of a link
+            instance = self.obj
+        return instance
+
     def add_to_context(self, context):
         """Anything that needs adding to the context"""
 
+        # If possible add source_id
+        source_id = None
+        if 'source_id' in self.qd:
+            source_id = self.qd['source_id']
+        context['source_id'] = source_id
+        
         # Get the cleaned data
-        oFields = self.form_objects[0]['cleaned_data']
+        oFields = None
+        if 'cleaned_data' in self.form_objects[0]:
+            oFields = self.form_objects[0]['cleaned_data']
         qs = SermonGold.objects.none()
-        if oFields != None:
+        if oFields != None and self.request.method == 'POST':
             # There is valid data to search with
             lstQ = []
-            # (1) process signature
-            if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                lstQ.append(Q(signature=oFields['signature']))
-            elif 'signature_ta' in oFields and oFields['signature_ta'] != "" and oFields['signature_ta'] != None:
-                val = adapt_search(oFields['signature_ta'])
-                lstQ.append(Q(signature__iregex=val))
 
-            # (2) Check for author name -- which is in the typeahead parameter
+            # (1) Check for author name -- which is in the typeahead parameter
             if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
                 val = oFields['author']
                 lstQ.append(Q(author=val))
@@ -2028,45 +2255,45 @@ class SermonGoldSelect(BasicPart):
                 val = adapt_search(oFields['authorname'])
                 lstQ.append(Q(author__name__iregex=val))
 
-            # (3) Process incipit
+            # (2) Process incipit
             if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                lstQ.append(Q(incipit=oFields['incipit']))
-            elif 'incipit_ta' in oFields and oFields['incipit_ta'] != "" and oFields['incipit_ta'] != None:
-                val = adapt_search(oFields['incipit_ta'])
+                val = adapt_search(oFields['incipit'])
                 lstQ.append(Q(incipit__iregex=val))
 
-            # (4) Process explicit
+            # (3) Process explicit
             if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                lstQ.append(Q(explicit=oFields['explicit']))
-            elif 'explicit_ta' in oFields and oFields['explicit_ta'] != "" and oFields['explicit_ta'] != None:
-                val = adapt_search(oFields['explicit_ta'])
+                val = adapt_search(oFields['explicit'])
                 lstQ.append(Q(explicit__iregex=val))
+
+            # (4) Process signature
+            if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                val = adapt_search(oFields['signature'])
+                lstQ.append(Q(goldsignatures__code__iregex=val))
 
             # Calculate the final qs
             if len(lstQ) == 0:
-                # Just show everything
+                # Show everything excluding myself
                 qs = SermonGold.objects.all()
             else:
+                # Make sure to exclude myself, and then apply the filter
                 qs = SermonGold.objects.filter(*lstQ)
-            # Make sure sorting is done correctly
-            qs = qs.order_by('author__name', 'signature', 'incipit', 'explicit')
+
+            # Always exclude the source
+            if source_id != None:
+                qs = qs.exclude(id=source_id)
+
+            # Sort the python way
+            qs = sorted(qs, key=lambda x: x.get_sermon_string())
+            ## Make sure sorting is done correctly
+            #qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
         # Add the result to the context
         context['results'] = qs
-        
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
         # Return the updated context
         return context
-
-    #def get_queryset(self, prefix):
-
-    #    # Get parameters
-    #    name = self.qd.get("name", "")
-
-    #    # Construct the QS
-    #    lstQ = []
-    #    if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
-    #    qs = Author.objects.filter(*lstQ).order_by('name')
-
-    #    return qs
 
 
 class SermonDetailsView(DetailView):
@@ -2224,25 +2451,179 @@ class SermonDetailsView(DetailView):
         return context
 
 
-class SermonGoldSameDetailsView(PassimDetails):
+class SermonGoldSameDetailsView(BasicPart):
     """The details of one gold-to-gold link"""
 
-    model = SermonGoldSame
-    mForm = SermonGoldSameForm
+    MainModel = SermonGoldSame
     template_name = 'seeker/sermongoldlink_info.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongoldlink_info.html'
-    prefix = "glink"
     title = "SermonGoldLink"
-    afternewurl = "" 
+    form_objects = [{'form': SermonGoldSameForm, 'prefix': 'glink', 'readonly': False},
+                    {'form': SelectGoldForm, 'prefix': 'gsel', 'readonly': True}]
+
+    def get_instance(self, prefix):
+        instance = None
+        if prefix == "glink":
+            # The instance is the SermonGoldSame instance, the link description
+            instance = self.obj
+        elif prefix == "gsel":
+            # The instance is where the SermonGoldSame instance is pointing to, the dst
+            instance = self.obj.dst
+        return instance
+
+    def add_to_context(self, context):
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['results'] = []
+
+        # Is this a request for deletion?
+        if self.action == "delete":
+            # Delete the current object
+            if self.obj != None:
+                self.obj.delete()
+                deletestatus = True
+            else:
+                deletestatus = False
+            context['deleted'] = deletestatus
+
+        # Return the adapted context
+        return context
 
 
-class SermonGoldDetailsView(PassimDetails):
+class SermonGoldLinkset(BasicPart):
+    """The set of links from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_linkset.html'
+    title = "SermonGoldLinkset"
+    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+                                         form=SermonGoldSameForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+
+
+class SermonGoldSignset(BasicPart):
+    """The set of signatures from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_signset.html'
+    title = "SermonGoldSignset"
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
+    
+    def add_to_context(self, context):
+        context['edi_list'] = [{'type': 'gr', 'name': 'Gryson'},
+                               {'type': 'cl', 'name': 'Clavis'},
+                               {'type': 'ot', 'name': 'Other'}]
+        return context
+
+
+class SermonGoldEdiset(BasicPart):
+    """The set of critical text editions from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_ediset.html'
+    title = "SermonGoldEditions"
+    GediFormSet = inlineformset_factory(SermonGold, Edition,
+                                         form=SermonGoldEditionForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GediFormSet, 'prefix': 'gedi', 'readonly': False}]
+
+
+class SermonGoldFtxtset(BasicPart):
+    """The set of critical text editions from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_ftxtset.html'
+    title = "SermonGoldFulltextLinks"
+    GftextFormSet = inlineformset_factory(SermonGold, Ftextlink,
+                                         form=SermonGoldFtextlinkForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GftextFormSet, 'prefix': 'gftxt', 'readonly': False}]
+
+
+class SermonGoldDetails(PassimDetails):
     """The details of one sermon"""
 
     model = SermonGold
     mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_info.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_info.html'
+    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_details.html'
+    prefix = "gold"
+    title = "SermonGold" 
+    afternewurl = ""
+    rtype = "html"
+    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+                                         form=SermonGoldSameForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
+
+    def before_delete(self, instance):
+
+        oErr = ErrHandle()
+        try:
+            # (1) Check if there is an 'equality' link to another SermonGold
+
+            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
+
+            # (3) Remove all gold-to-gold links that include this one
+
+            # (4) Remove all links from SermonDescr to this instance of SermonGold
+
+            # All is well
+            return True, "" 
+        except:
+            msg = oErr.get_error_message()
+            return False, msg
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+        # self.afternewurl = reverse('search_gold')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start a list of related gold sermons
+        lst_related = []
+        # Do we have an instance?
+        if instance != None:
+            # There is an instance: get the list of SermonGold items to which I link
+            relations = instance.get_relations()
+            # Get a form for each of these relations
+            for instance_rel in relations:
+                linkprefix = "glink-{}".format(instance_rel.id)
+                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
+                lst_related.append(oForm)
+
+        # Add the list to the context
+        context['relations'] = lst_related
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        return context
+
+
+class SermonGoldEdit(PassimDetails):
+    """The details of one sermon"""
+
+    model = SermonGold
+    mForm = SermonGoldForm
+    template_name = 'seeker/sermongold_edit.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_edit.html'
     prefix = "gold"
     title = "SermonGold" 
     afternewurl = ""
@@ -2273,21 +2654,69 @@ class SermonGoldDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Start a list of related gold sermons
-        lst_related = []
-        linkprefix = "glink"
-        # Do we have an instance?
-        if instance != None:
-            # There is an instance: get the list of SermonGold items to which I link
-            relations = instance.get_relations()
-            # Get a form for each of these relations
-            for instance in relations:
-                oForm = SermonGoldSameForm(instance=instance, prefix=linkprefix)
-                lst_related.append(oForm)
+        # This is not longer needed, since it is handled by SermonGoldLinkset
 
-        # Add the list to the context
-        context['relations'] = lst_related
+        ## Start a list of related gold sermons
+        #lst_related = []
+        ## Do we have an instance?
+        #if instance != None:
+        #    # There is an instance: get the list of SermonGold items to which I link
+        #    relations = instance.get_relations()
+        #    # Get a form for each of these relations
+        #    for instance_rel in relations:
+        #        linkprefix = "glink-{}".format(instance_rel.id)
+        #        oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
+        #        lst_related.append(oForm)
 
+        ## Add the list to the context
+        #context['relations'] = lst_related
+
+        return context
+
+
+class AuthorDetails(PassimDetails):
+    """The details of one author"""
+
+    model = Author
+    mForm = AuthorEditForm
+    template_name = 'seeker/author_details.html'
+    template_post = 'seeker/author_details.html'
+    prefix = 'author'
+    title = "AuthorDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('author_search')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        return context
+
+
+class AuthorEdit(PassimDetails):
+    """The details of one author"""
+
+    model = Author
+    mForm = AuthorEditForm
+    template_name = 'seeker/author_edit.html'
+    template_post = 'seeker/author_edit.html'
+    prefix = 'author'
+    title = "AuthorEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('author_search')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         return context
 
 
@@ -2330,6 +2759,7 @@ class AuthorListView(ListView):
         # Check this user: is he allowed to UPLOAD data?
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context
@@ -2357,7 +2787,8 @@ class AuthorListView(ListView):
         # Check for author [name]
         if 'name' in get and get['name'] != '':
             val = adapt_search(get['name'])
-            lstQ.append(Q(name__iregex=val))
+            # Search in both the name as well as the abbr field
+            lstQ.append(Q(name__iregex=val) | Q(abbr__iregex=val))
 
         # Calculate the final qs
         qs = Author.objects.filter(*lstQ).order_by('name').distinct()
@@ -2418,6 +2849,7 @@ class LibraryListView(ListView):
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Return the calculated context
         return context

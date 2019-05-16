@@ -4,7 +4,7 @@
 {% block breadcrumbs %}
   <div class="breadcrumbs">
       <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Gold-Sermon
+      &rsaquo; Gold-Sermon List
   </div>
 {% endblock %}
 
@@ -13,7 +13,7 @@
   <div>
 
     {% if authenticated %}
-      <!-- Upper part of the search-a-manuscript interface -->
+      <!-- Upper part of the sermongold list interface -->
 
       <div id="goldsermons_top" >
 
@@ -29,8 +29,7 @@
                 <!-- Allow uploading sermongold Excel files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_goldexcel" 
-                     role="button" title="Upload Excel files"
-                     onclick="ru.passim.seeker.hide('tab_list');">
+                     role="button" title="Upload Excel files" >
                     <span class="glyphicon glyphicon-upload"></span>
                   </a>
                 {% endif %}
@@ -49,7 +48,7 @@
                   <!-- Search interface: what golden sermons to look for and what are the results -->
                   <div class="row">
                     <div id="gold_search" class="col-sm-10 col-sm-offset-1">
-                      <p>Golden sermon to look for:</p>
+                      <p>Gold sermon to look for:</p>
                       <table style="width: 100%;">
                         <tr style="width: 100%;">
                           <td>Signature</td>
@@ -95,43 +94,43 @@
         </form>
 
         {% if is_passim_uploader %}
-        <!-- Upload tab for SermonGold Excel files -->
-        <div class="inert collapse" id="tab_upload_goldexcel">
-          <div id="import_gold" class="row container">
-            <form action="{% url 'import_gold' %}" method="POST" enctype="multipart/form-data">
-              {% csrf_token %}
-              <!-- Room for the filename to appear -->
-              <div class="col-md-6 form-group" id="gold-import_info"
-                    sync-progress="{% url 'sync_progress' %}?synctype=gold"
-                    targetid="gold_data_import"
-                    targeturl="{% url 'import_gold' %}">
-                <div class="input-group">
-                  <span>Specify the Excel file(s) with the Sermon-Gold data</span>
-                  <span class="input-group-btn">
-                    <span class="btn btn-default btn-xs btn-file">
-                      Browse...
-                      <input id="id_files_field" name="files_field" required="" multiple="" type="file" oninput="ru.passim.seeker.import_data('gold');" />
+          <!-- Upload tab for SermonGold Excel files -->
+          <div class="inert collapse" id="tab_upload_goldexcel">
+            <div id="import_gold" class="row container">
+              <form action="{% url 'import_gold' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <!-- Room for the filename to appear -->
+                <div class="col-md-6 form-group" id="gold-import_info"
+                      sync-progress="{% url 'sync_progress' %}?synctype=gold"
+                      targetid="gold_data_import"
+                      targeturl="{% url 'import_gold' %}">
+                  <div class="input-group">
+                    <span>Specify the Excel file(s) with the Sermon-Gold data</span>
+                    <span class="input-group-btn">
+                      <span class="btn btn-default btn-xs btn-file">
+                        Browse...
+                        <input id="id_files_field" name="files_field" required="" multiple="" type="file" oninput="ru.passim.seeker.import_data('gold');" />
+                      </span>
                     </span>
-                  </span>
-                </div>
+                  </div>
             
-              </div>
-              <!-- Progress of upload indicator -->
-              <div class="col-md-6">
-                <progress class="hidden" style="width:100%;" id="gold-import_progress" value="0" min="0" max="100"></progress>
-              </div>
-              <!-- Any error reporting -->
-              <div id="gold-import_error"></div>
-            </form>
+                </div>
+                <!-- Progress of upload indicator -->
+                <div class="col-md-6">
+                  <progress class="hidden" style="width:100%;" id="gold-import_progress" value="0" min="0" max="100"></progress>
+                </div>
+                <!-- Any error reporting -->
+                <div id="gold-import_error"></div>
+              </form>
 
-            <!-- Import information -->
-            <div class="row">
-              <div id="gold_data_import" class="col-md-offset-1 col-md-10 project-part hidden"></div>
+              <!-- Import information -->
+              <div class="row">
+                <div id="gold_data_import" class="col-md-offset-1 col-md-10 project-part hidden"></div>
+              </div>
+
             </div>
 
           </div>
-
-        </div>
         {% endif %}
 
         <!-- List tab -->
@@ -140,28 +139,30 @@
             <form>
               <h3>
                 <span>Gold sermons</span>
-                <span id="add_sermongold" class="pull-right">
-                    {% csrf_token %}
-                    <a class="btn btn-xs jumbo-3" role="button" 
-                        targeturl="{% url 'gold_view' %}"
-                        targetid="sermongold_edit"
-                        onclick="ru.passim.seeker.manu_edit(this, 'new');">
-                      <span class="glyphicon glyphicon-plus"></span>Add a gold sermon
-                    </a>
-                </span>
+                {% if is_passim_editor %}
+                  <span id="add_sermongold" class="pull-right">
+                      {% csrf_token %}
+                      <a class="btn btn-xs jumbo-3" role="button" 
+                          targeturl="{% url 'gold_edit' %}"
+                          targetid="sermongold_new"
+                          onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                        <span class="glyphicon glyphicon-plus"></span>Add a gold sermon
+                      </a>
+                  </span>
+                {% endif %}
               </h3>
             </form>
 
-            <div class="row">
+            <div class="row subform">
               <div class="col-md-offset-1 col-md-10">
-                <div id="sermongold_edit">
+                <div id="sermongold_new">
                   <!-- Room to create a new sermongold instance-->
                 </div>
               </div>
             </div>
 
             {% if object_list %}
-
+              <!-- Top pagination -->
               <div class="row">
                   <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
                   <div class="col-sm-8">
@@ -172,50 +173,50 @@
                   </span>
                   </div>
               </div>
+
+              <!-- Table that contains a list of gold sermons -->
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
-                    <thead><tr><th class="hidden">id</th><th>Author</th><th>Signature</th><th>Incipit ... Explicit</th><th><!-- Buttons --></th></tr></thead>
+                    <thead><tr><th class="hidden">id</th><th>Author</th><th>Signature</th><th>Incipit ... Explicit</th><th>Editions</th><th>Links</th></tr></thead>
                     <tbody>
                     {% for gold in object_list %}
-                      <tr class="dict-entry">
+                      <tr class="dict-entry clickable"
+                          onclick="ru.passim.seeker.goto_url('{% url 'gold_details' gold.id %}')">
                         <td class="hidden"> {{ gold.id }}</td>
                         <!-- Author / Signature / Incipit -->
                         <td class="gold-author tdnowrap" align="left" title="{{gold.author.name}}">{{gold.author.name|truncatechars:12}}</td>
-                        <td class="gold-signature tdnowrap" align="left" title="{{gold.signature}}">{{gold.signature}}</td>
+                        <td class="gold-signature tdnowrap" align="left" title="{{gold.signatures}}">
+                          <span>{{gold.signatures|truncatechars:20}}</span>
+                        </td>
                         <td style="width: 100%;">
                           <span>{{gold.incipit}}</span>
                           <span>{% if gold.incipit %}...{% endif %}</span>
                           <span>{{gold.explicit}}</span>
                         </td>
 
-                        <!-- Buttons for more information on this gold sermon -->
-                        <td style="min-width: 80px;">
-                          <!-- information on this manuscript -->
-                          <a role="button" class="btn btn-xs jumbo-3" title="Information" 
-                             manutype="goldsermon"
-                             targetid="gold-sermon-{{forloop.counter}}"
-                             targeturl="{% url 'gold_view' gold.id %}"
-                             onclick="ru.passim.seeker.manu_edit(this, 'view');">
-                            <span class="glyphicon glyphicon-info-sign"></span>
-                          </a>
-                          <!-- Deleting can be done after selecting more information -->
+                        <!-- Editions -->
+                        <td class="gold-edition tdnowrap" style="min-width: 100px;" align="left" title="{{gold.editions}}">
+                          <span>{{gold.editions|truncatechars:20}}</span>
+                        </td>
+
+                        <!-- Give an overview of the links *from* this gold sermon to others -->
+                        <td class="tdnowrap">
+                          {% for link_def in gold.link_oview %}
+                            {% if link_def.count > 0 %}
+                            <span class="badge {{link_def.class}}" title="{{link_def.title}}">{{link_def.count}}</span>
+                            {% endif %}
+                          {% endfor %}
                         </td>
                       </tr>
 
-                      <!-- Viewing the details of one sermon-gold -->
-                      <tr class="edit-mode hidden gold-head">
-                        <td>&nbsp;</td>
-                        <td colspan="2">
-                          <div id="gold-sermon-{{forloop.counter}}"></div>
-                        </td>
-                        <td>&nbsp;</td>
-                      </tr>
                     {% endfor %}
                     </tbody>
                   </table>
                 </div>
               </div>
+
+              <!-- Bottom pagination -->
               <div class="pagination">
                   <span class="step-links">
 

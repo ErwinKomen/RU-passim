@@ -68,9 +68,13 @@ table tbody tr:hover {
   cursor: pointer;*/
   /*  */
 }
-table tbody tr td.clickable:hover, div.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover {
   cursor: pointer;
 }
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover {
+  background-color: lightgoldenrodyellow ;
+}
+
 table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }
@@ -311,8 +315,14 @@ p {
   line-height: 1.5;     /* This is the correct measure for btn-xs */
 
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}/
+  /*-moz-osx-font-smoothing: grayscale; */
+}
+
+/* If the remove glyphicon is *not* in a button, it should be aligned differently */
+a:not(.btn) span.glyphicon-remove {
+   padding-left: 5px; 
+   margin-right: -8px;
+}
 
 .glyphicon-refresh-animate {
     animation: spin .7s infinite linear;
@@ -585,7 +595,7 @@ td.editable:hover, span.editable:hover {
 a.jumbotron:visited {color:inherit;}
 a.jumbotron:hover {
     text-decoration: none;
-    cursor: pointer; cursor: hand;
+    cursor: pointer;
 }
 .jumbotron p {
     font-size: 12px;
@@ -1005,6 +1015,13 @@ table.result-list tr:hover {
   width: 100%;
 }
 
+tr .selected, tr.selected {
+  background-color: lightgreen;
+}
+tr .selected:hover, table tbody tr .selected td.clickable:hover, tr.selected td.clickable:hover {
+  background-color: greenyellow !important;
+}
+
 table.compact-table, 
 table.compact-table tr, 
 table.compact-table td,
@@ -1103,3 +1120,40 @@ div.selected {
     color: #999;
 }
 
+div > span.twitter-typeahead {
+  display: inherit !important;
+}
+
+/* Adapt the standard modal to my own */
+.modal-dialog {
+    width: 80%;
+    margin: 30px auto;
+  }
+
+td.hightlighted {
+  background-color: yellow;
+}
+
+/* Badges with background color for link types */
+span.badge.eqs-link {
+  background-color: darkblue;
+}
+span.badge.prt-link {
+  background-color: lightgreen;
+}
+span.badge.sim-link {
+  background-color: darkgreen;
+}
+span.badge.use-link {
+  background-color: mediumorchid;
+}
+
+a.nostyle:link, a.nostyle:visited {
+    text-decoration: inherit;
+    color: inherit;
+    cursor: inherit;
+}
+
+td a.nostyle {
+  display: block;
+}

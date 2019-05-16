@@ -4,15 +4,17 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <Name>passim</Name>
     <RootNamespace>passim</RootNamespace>
-    <InterpreterId>MSBuild|passim|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>{3505382d-cd29-4811-a618-c985c9459a18}</InterpreterId>
     <WebBrowserPort>6405</WebBrowserPort>
+    <WebBrowserUrl>
+    </WebBrowserUrl>
+    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>c993c58f-f324-4d95-98fd-0d2022c57566</ProjectGuid>
-    <ProjectHome>
-    </ProjectHome>
+    <ProjectHome>.</ProjectHome>
     <ProjectTypeGuids>{5F0BE9CA-D677-4A4D-8806-6076C0FAAD37};{349c5851-65df-11da-9384-00065b846f21};{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
     <StartupFile>manage.py</StartupFile>
     <SearchPath>
@@ -20,7 +22,6 @@
     <WorkingDirectory>.</WorkingDirectory>
     <LaunchProvider>Web launcher</LaunchProvider>
     <OutputPath>.</OutputPath>
-    <WebBrowserUrl>http://localhost</WebBrowserUrl>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -103,21 +104,30 @@
     <Content Include="passim\seeker\static\seeker\scripts\respond.min.js" />
     <Content Include="passim\seeker\static\seeker\scripts\typeahead.bundle.js" />
     <Content Include="passim\seeker\static\seeker\scripts\xhr2.js" />
+    <Content Include="passim\seeker\templates\seeker\author_details.html" />
+    <Content Include="passim\seeker\templates\seeker\author_edit.html" />
     <Content Include="passim\seeker\templates\seeker\collection.html" />
     <Content Include="passim\seeker\templates\seeker\author_list.html" />
     <Content Include="passim\seeker\templates\seeker\import_gold.html" />
     <Content Include="passim\seeker\templates\seeker\import_manuscripts.html" />
     <Content Include="passim\seeker\templates\seeker\import_authors.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_edit.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold.html" />
     <Content Include="passim\seeker\templates\seeker\sermongoldlink_info.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_ftxtset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_ediset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_signset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_select.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_info.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_info.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_view.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_edit.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_view.html" />
     <Content Include="passim\seeker\templates\seeker\syncentry.html" />
     <Content Include="passim\templates\about.html" />
@@ -145,13 +155,15 @@
   </ItemGroup>
   <ItemGroup>
     <Interpreter Include="D:\env\passim\">
-      <Id>passim</Id>
-      <Version>3.6</Version>
-      <Description>passim (Anaconda 5.0.1)</Description>
+      <Id>{3505382d-cd29-4811-a618-c985c9459a18}</Id>
+      <BaseInterpreter>{2af0f10d-7135-4994-9156-5d01c9c11b7e}</BaseInterpreter>
+      <Version>3.5</Version>
+      <Description>passim (Python 3.5)</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
       <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <LibraryPath>Lib\</LibraryPath>
       <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
-      <Architecture>X64</Architecture>
+      <Architecture>X86</Architecture>
     </Interpreter>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.Django.targets" />
@@ -194,5 +206,4 @@
       </FlavorProperties>
     </VisualStudio>
   </ProjectExtensions>
-  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>

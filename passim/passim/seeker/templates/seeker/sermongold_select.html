@@ -5,54 +5,71 @@
   <form>
     {% csrf_token %}
     <table style="width: 100%;">
-      <tr style="width: 100%;">
-        <td>Signature</td>
-        <td style="width: 100%;">
-          <div class="signature-key hidden">{{gselForm.signature}}</div>
-          <div>{{gselForm.signature_ta}}</div>
-        </td>
-      </tr>
       <tr>
-        <td>Author</td>
-        <td>
-          <div class="author-key hidden">{{gselForm.author}}</div>
-          <div>{{gselForm.authorname}}</div>
-        </td>
+        <td style="width: 100px;">Author</td>
+        <td style="width: 100%;"><div class="author-key hidden">{{gselForm.author}}</div><div>{{gselForm.authorname}}</div></td>
       </tr>
       <tr>
         <td>Incipit</td>
-        <td>
-          <div class="incipit-key hidden">{{gselForm.incipit}}</div>
-          <div>{{gselForm.incipit_ta}}</div>
-        </td>
+        <td><div class="incipit-key">{{gselForm.incipit}}</div></td>
       </tr>
       <tr>
         <td>Explicit</td>
-        <td>
-          <div class="explicit-key hidden">{{gselForm.explicit}}</div>
-          <div>{{gselForm.explicit_ta}}</div>
-        </td>
+        <td><div class="explicit-key">{{gselForm.explicit}}</div></td>
       </tr>
+      <tr>
+        <td>Signature</td>
+        <td><div class="incipit-key">{{gselForm.signature}}</div></td>
+      </tr>
+
+      <!-- Keep track of our source -- Is this necessary?? -->
       <tr class="hidden">
         <td>Golden source</td>
-        <td>{{source_id}}</td>
+        <td><input id="id_source_id" name="source_id" value="{{source_id}}" /></td>
       </tr>
-      <tr><td colspan="2">&nbsp;</td></tr>
+
+      <!-- Row of buttons to facilitate searching -->
+      <tr>
+        <td colspan="2" align="right">
+          <!-- Room to reset the search criteria -->
+          <span>
+            <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
+          </span>
+          <!-- Submit the search form -->
+          <span>
+            <a role="button" class="btn btn-sm jumbo-3" 
+               targeturl="{% if source_id %}{% url 'select_gold' %}?source_id={{source_id}}{% else %}{% url 'select_gold' %}{% endif %}"
+               targetid="subform"
+               title="Start searching..." 
+               onclick="ru.passim.seeker.search_start(this, 'post');">Search</a>
+          </span>
+        </td>
+      </tr>
     </table>
 
   </form>
 </div>
 
 <div id="goldselect_results">
-  <table>
+  {% if results|length == 0 %}
+    <p>There are no results. Here are your options:
+      <ul>
+        <li>press <b>Search</b> to get a list of <i>all</i> gold sermons to link to</li>
+        <li>select one or more of the criteria above, and then press <b>Search</b> to get a filtered list of gold sermons</li>
+      </ul>
+    </p>
+  {% else %}
+  <table class="" style="width: 100%;">
     <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
     <tbody>
       {% for item in results %}
-      <tr>
-        <td>{{forloop.counter}}</td>
-        <td>{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
+      <tr onclick="ru.passim.seeker.select_row(this, 'gold_link', {{item.id}});">
+        <td class="gold-id hidden">{{item.id}}</td>
+        <td class="clickable" >{{forloop.counter}}</td>
+        <td class="gold-text clickable" >{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
 </div>

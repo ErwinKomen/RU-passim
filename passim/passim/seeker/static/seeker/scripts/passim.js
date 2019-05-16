@@ -44,6 +44,14 @@ var ru = (function ($, ru) {
         loc_nicknamesL = [],
         loc_origins = [],
         loc_originsL = [],
+        loc_incipits = [],      // Use in sermongold_select.html
+        loc_incipitsL = [],
+        loc_explicits = [],     // Use in sermongold_select.html
+        loc_explicitsL = [],
+        loc_signature = [],     // Use in sermongold_select.html
+        loc_signatureL = [],
+        loc_edition = [],       // critical editions that belong to a gold sermon
+        loc_editionL = [],      
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
@@ -171,6 +179,86 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: INCIPIT
+        loc_incipits = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_incipitsL,
+          prefetch: { url: base_url + 'api/incipits/', cache: true },
+          remote: {
+            url: base_url + 'api/incipits/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: EXPLICIT
+        loc_explicits = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_explicitsL,
+          prefetch: { url: base_url + 'api/explicits/', cache: true },
+          remote: {
+            url: base_url + 'api/explicits/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: SIGNATURE
+        loc_signature = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_signatureL,
+          prefetch: { url: base_url + 'api/signatures/', cache: true },
+          remote: {
+            url: base_url + 'api/signatures/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: EDITION
+        loc_edition = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_editionL,
+          prefetch: { url: base_url + 'api/editions/', cache: true },
+          remote: {
+            url: base_url + 'api/editions/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Initialize typeahead
         ru.passim.init_typeahead();
 
@@ -189,6 +277,10 @@ var ru = (function ($, ru) {
           $(".typeahead.origins").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
           $(".typeahead.nicknames").typeahead('destroy');
+          $(".typeahead.incipits").typeahead('destroy');
+          $(".typeahead.explicits").typeahead('destroy');
+          $(".typeahead.signatures").typeahead('destroy');
+          $(".typeahead.editions").typeahead('destroy');
 
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
@@ -267,6 +359,70 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".nickname-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: INCIPIT -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.incipits, tr .typeahead.incipits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'incipits', source: loc_incipits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".incipit-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: EXPLICIT -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.explicits, tr .typeahead.explicits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'explicits', source: loc_explicits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".explicit-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: SIGNATURE -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.signatures, tr .typeahead.signatures").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'signatures', source: loc_signature, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact code</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".signature-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: EDITION -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.editions, tr .typeahead.editions").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'editions', source: loc_edition, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark an inexact wording of an edition</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".edition-key input").last().val(suggestion.id);
           });
 
           // Make sure we know which element is pressed in typeahead
