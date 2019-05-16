@@ -125,7 +125,11 @@
 
               <!-- Import information -->
               <div class="row">
-                <div id="gold_data_import" class="col-md-offset-1 col-md-10 project-part hidden"></div>
+                <div class="col-md-offset-1 col-md-10 ">
+                  <div id="gold_data_import" class="project-part hidden panel panel-default">
+                    <!-- This is where the import info comes-->
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -190,9 +194,9 @@
                           <span>{{gold.signatures|truncatechars:20}}</span>
                         </td>
                         <td style="width: 100%;">
-                          <span>{{gold.incipit}}</span>
-                          <span>{% if gold.incipit %}...{% endif %}</span>
-                          <span>{{gold.explicit}}</span>
+                          <span>{{gold.get_incipit_markdown}}</span>
+                          <span style="color: darkblue; background-color: lightgray;">{% if gold.incipit %}...{% endif %}</span>
+                          <span>{{gold.get_explicit_markdown}}</span>
                         </td>
 
                         <!-- Editions -->

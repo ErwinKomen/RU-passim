@@ -746,7 +746,7 @@ var ru = (function ($, ru) {
                     loc_progr.push(sMsg);
                   }
                   // Combine the status HTML
-                  sMsg = "<table>" + loc_progr.join("\n") + "</table>";
+                  sMsg = "<div style=\"max-height: 200px; overflow-y: scroll;\"><table>" + loc_progr.reverse().join("\n") + "</table></div>";
                   $(elTarget).html(sMsg);
                   // Make sure we check again
                   window.setTimeout(function () { ru.passim.seeker.check_progress(progrurl, sTargetDiv); }, 200);

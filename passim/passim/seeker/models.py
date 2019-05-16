@@ -12,10 +12,14 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
-import sys, os
+import sys, os, io
 import copy
 import json
 import time
+import fnmatch
+import csv
+from io import StringIO
+
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
 # import xmltodict
@@ -71,13 +75,34 @@ class HelpChoice(models.Model):
                     self.display_name, self.help_url)
         return help_text
 
+def adapt_search(val):
+    if val == None: return None
+    # First trim
+    val = val.strip()
+    val = '^' + fnmatch.translate(val) + '$'
+    return val
+
+def adapt_latin(val):
+    """Change the three dots into a unicode character"""
+
+    val = val.replace('...', u'\u2026')
+    return val
+
+def adapt_markdown(val):
+    sBack = ""
+    if val != None:
+        sBack = mark_safe(markdown(val, safe_mode='escape'))
+        sBack = sBack.replace("<p>", "")
+        sBack = sBack.replace("</p>", "")
+    return sBack
+
+
 def get_linktype_abbr(sLinkType):
     """Convert a linktype into a valid abbreviation"""
 
     options = [{'abbr': 'eqs', 'input': 'equals' },
-               {'abbr': 'prt', 'input': 'part_of' },
-               {'abbr': 'prt', 'input': 'part of' },
-               {'abbr': 'prt', 'input': 'part-of' },
+               {'abbr': 'prt', 'input': 'partially equals' },
+               {'abbr': 'prt', 'input': 'partialy equals' },
                {'abbr': 'sim', 'input': 'similar_to' },
                {'abbr': 'sim', 'input': 'similar' },
                {'abbr': 'sim', 'input': 'similar to' },
@@ -1387,10 +1412,10 @@ class SermonGold(models.Model):
         if author != None: 
             lstQ.append(Q(author=author))
         if incipit != "": 
-            incipit = "...".replace(incipit, u'\u2026')
+            incipit = adapt_latin(incipit)
             lstQ.append(Q(incipit=incipit))
         if explicit != "": 
-            explicit = "...".replace(explicit, u'\u2026')
+            explicit = adapt_latin(explicit)
             lstQ.append(Q(explicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         if obj == None:
@@ -1405,17 +1430,24 @@ class SermonGold(models.Model):
         """Find a sermongold"""
 
         lstQ = []
+        editype = "gr"  # Assume gryson
+        if "CPPM" in signature:
+            # This is a clavis number
+            signature = signature.split("CPPM")[1].strip()
+            editype = "cl"
         # Check if it is linked to a particular signature
         val = adapt_search(signature)
         lstQ.append(Q(goldsignatures__code__iregex=val))
+        lstQ.append(Q(goldsignatures__editype=editype))
         # Optionally look for other fields
         if author != None: lstQ.append(Q(author=author))
         if incipit != None: 
-            incipit = "...".replace(incipit, u'\u2026')
+            incipit = adapt_latin(incipit)
             lstQ.append(Q(incipit=incipit))
         if explicit != None: 
-            explicit = "...".replace(explicit, u'\u2026')
+            explicit = adapt_latin(explicit)
             lstQ.append(Q(explicit=explicit))
+        # Only look for the *FIRST* occurrance
         obj = SermonGold.objects.filter(*lstQ).first()
         # Return what we found
         return obj
@@ -1454,11 +1486,15 @@ class SermonGold(models.Model):
 
     def get_bibliography_markdown(self):
         """Get the contents of the bibliography field using markdown"""
+        return adapt_markdown(self.bibliography)
 
-        sBack = ""
-        if self.bibliography != None:
-            sBack = mark_safe(markdown(self.bibliography, safe_mode='escape'))
-        return sBack
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+        return adapt_markdown(self.incipit)
+
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
 
     def link_oview(self):
         """provide an overview of links from this gold sermon to others"""
@@ -1525,7 +1561,7 @@ class SermonGold(models.Model):
         # Return the whole queryset that was found
         return qs
 
-    def read_gold(username, data_file, filename, arErr, xmldoc=None, sName = None):
+    def read_gold(username, data_file, filename, arErr, objStat=None, xmldoc=None, sName = None):
         """Import an Excel file with golden sermon data and add it to the DB
         
         This approach makes use of openpyxl
@@ -1535,24 +1571,38 @@ class SermonGold(models.Model):
             oManual = {}
             oManual['type'] = type
             oManual['error'] = error
-            oManual['obj'] = oGold
+            for k in lField:
+                oManual[k] = oGold[k]
+            # oManual['obj'] = oGold
             lst.append(oManual)
             return True
 
         # Number to order all the items we read
         order = 0
         iSermCount = 0
+        count_obj = 0   # Number of objects added
+        count_rel = 0   # Number of relations added
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
 
         # Expected column names
-        lExpected = ["status", "author", "incipit", "explicit", "nr.gryson", "cppm", "edition", "link type", "linked objects"]
+        lExpected = ["status", "author", "incipit", "explicit", "nr. gryson", "cppm", "edition", "link type", "linked objects", "passim code"]
         # Names of the fields in which these need to be transformed
-        lField = ['status', 'author', 'incipit', 'explicit', 'gryson', 'clavis', 'edition', 'linktype', 'targetlist']
+        lField = ['status', 'author', 'incipit', 'explicit', 'gryson', 'clavis', 'edition', 'linktype', 'targetlist', 'passimcode']
+
+        lHeader = ['type', 'error', 'row_number']
+        for k in lField:
+            lHeader.append(k)
 
         # Keep a list of lines that need to be treated manually
         lst_manual = []
+        write_csv_output = True
 
+        # Prepare an output file name
+        dt_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        output = "{}_{}".format(dt_str, filename.replace(".xlsx", ".json"))
+        output_file_name = os.path.abspath(os.path.join(WRITABLE_DIR, output))
+        
         # Overall keeping track of sermongold items
         errHandle = ErrHandle()
 
@@ -1561,11 +1611,16 @@ class SermonGold(models.Model):
             # Convert the data into a list of objects
             bResult, lst_goldsermon, msg = excel_to_list(data_file, filename, lExpected, lField)
 
+            # Set the status
+            objStat.set("reading", msg="Excel file size={}".format(lst_goldsermon.count))
+
             # Check the result
             if bResult == False:
                 oBack['status'] = 'error'
                 oBack['msg'] = msg
                 return oBack
+
+            bBreak = False
 
             # Iterate over the objects
             for oGold in lst_goldsermon:
@@ -1574,6 +1629,8 @@ class SermonGold(models.Model):
 
                 # Get the status of this line
                 status = oGold['status'].lower()
+                # Show where we are
+                objStat.set("reading", msg="Pass #1, line={}".format(oGold['row_number']))
 
                 sAuthor = oGold['author']
                 # Check author
@@ -1581,36 +1638,48 @@ class SermonGold(models.Model):
                     # There must be a (gold) author...
                     add_to_manual_list(lst_manual, "author", "Without author, a gold sermon cannot be added", oGold)
                     # Skip the remainder of this line
-                    break
+                    continue
                 # Get the author (gold)
                 author = Author.find(sAuthor)
                 if author == None:
                     # Could not find this author, so indicate to the user
                     add_to_manual_list(lst_manual, "author", "Could not find golden Author [{}]".format(oGold['author']), oGold)
                     # Skip the remainder of this line
-                    break
+                    continue
 
                 # Get or create this golden sermon (the ... symbol is treated there)
                 bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
 
+                # Keep track of created gold
+                if bCreated: count_obj += 1
+
                 # Process Gryson ('+' means ... ), Clavis and possible Other
                 signature_lst = [{'lst': 'gryson', 'editype': 'gr'}, {'lst': 'clavis', 'editype': 'cl'}, {'lst': 'other', 'editype': 'ot'}]
                 for item in signature_lst:
-                    code_lst = oGold[item['lst']]
-                    editype = item['editype']
-                    if code_lst != None and code_lst != "":
-                        for code in code_lst.split("+"):
-                            code = code_lst.strip()
-                            # Add this code to the signatures
-                            obj = Signature.find(code, editype)
-                            if obj == None:
-                                obj = Signature(code=code, editype=editype, gold=gold)
-                                obj.save()
-                            elif not bCreated:
-                                # Pass a message that something is wrong here?
-                                oBack['status'] = 'error'
-                                oBack['msg'] = "The signature [{}] of this line is already linked to a gold sermon".format(code)
-                                return oBack
+                    if item['lst'] in oGold:
+                        code_lst = oGold[item['lst']]
+                        editype = item['editype']
+                        if code_lst != None and code_lst != "":
+                            for code in code_lst.split("+"):
+                                code = code_lst.strip()
+                                # Add this code to the signatures
+                                obj = Signature.find(code, editype)
+                                if obj == None:
+                                    obj = Signature(code=code, editype=editype, gold=gold)
+                                    obj.save()
+                                elif bCreated:
+                                    # There is an existing signature, but we're deailng with the *first* instance of a sermongold
+                                    add_to_manual_list(lst_manual, "signature", 
+                                                       "First instance of a gold sermon is attempted to be linked with existing signature [{} - {}]".format(editype, code), oGold)
+                                    # Skip the remainder of this line
+                                    bBreak = True
+                                    break
+                    if bBreak:
+                        # Break to a higher level
+                        break
+                if bBreak:
+                    # Break from the higher gold loop
+                    continue
 
                 # Process Editions (separated by ';')
                 edition_lst = oGold['edition'].split(";")
@@ -1620,54 +1689,100 @@ class SermonGold(models.Model):
                     if edition == None:
                         edition = Edition(name=item, gold=gold)
                         edition.save()
-                    else:
-                        # Pass a message that something is wrong here?
-                        oBack['status'] = 'error'
-                        oBack['msg'] = "The edition specification [{}] of this line is already linked to a gold sermon".format(name)
-                        return oBack
+                    elif bCreated:
+                        # This edition already exists
+                        add_to_manual_list(lst_manual, "edition", 
+                                           "First instance of a gold sermon is attempted to be linked with existing edition [{}]".format(item), oGold)
+                        # Skip the remainder of this line
+                        bBreak = True
+                        break
+
+                if bBreak:
+                    # Break from the higher gold loop
+                    continue
 
                 oGold['obj'] = gold
                 iSermCount += 1
  
             # Iterate over the objects again, and add relations
             for oGold in lst_goldsermon:
-                obj = oGold['obj']
-                # Check if any relation has been specified
-                if 'target' in oGold and oGold['target'] != "":
-                    # Determine the linktype
-                    if 'linktype' in oGold:
-                        linktype = "eqs" if oGold['linktype'] == "" else oGold['linktype']
-                        # Double check valid linktype
-                        linktype = get_linktype_abbr(linktype)
-                    else:
-                        linktype = "eqs"
+                # Show where we are
+                objStat.set("reading", msg="Pass #2, line={}".format(oGold['row_number']))
 
-                    # ==========================================================================
-                    # TODO: ['target'] is een signature, en die staat niet meer in de SermonGold
-                    #       Controleer dus of dit wel gaat werken: 
-                    #           ik zoek nu naar gold sermons die een link hebben naar signature
-                    # ==========================================================================
-                    # Get the target sermongold
-                    target = SermonGold.find_first(oGold['target'])
-                    if target == None:
-                        # Could not find this author, so indicate to the user
-                        oBack['status'] = 'error'
-                        lMsg = []
-                        lMsg.append("Cannot find a target (a gold-sermon with signature [{}]).")
-                        lMsg.append("<br />Please add this separately and then perform import once more so as to lay the correct links.")
-                        lMsg.append("<br />(Sermons will <i>not</i> be added twice, so no worries about that.)")
-                        sMsg = "\n".join(lMsg)
-                        oBack['msg'] = sMsg.format(oGold['target'])
-                        return oBack
+                if 'obj' in oGold:
+                    obj = oGold['obj']
+                    # Check if any relation has been specified
+                    if 'targetlist' in oGold and oGold['targetlist'] != "":
+                        target_list = oGold['targetlist'].split(";")
+                        for target_item in target_list:
+                            # Determine the linktype
+                            if 'linktype' in oGold:
+                                linktype = "eqs" if oGold['linktype'] == "" else oGold['linktype']
+                                # Double check valid linktype
+                                linktype = get_linktype_abbr(linktype)
+                            else:
+                                linktype = "eqs"
 
-                    # Check if this relation is already there
-                    if not obj.has_relation(target, linktype):
-                        obj.add_relation(target, linktype)
+                            # Get the target sermongold
+                            target = SermonGold.find_first(target_item)
+                            if target == None:
+                                # Could not find the target sermon gold, so cannot process this
+                                lMsg = []
+                                lMsg.append("Cannot find a target (a gold-sermon with signature [{}]).")
+                                lMsg.append("<br />Please add this separately and then perform import once more so as to lay the correct links.")
+                                lMsg.append("<br />(Sermons will <i>not</i> be added twice, so no worries about that.)")
+                                sMsg = "\n".join(lMsg)
+                                add_to_manual_list(lst_manual, "goldlink", sMsg.format(target_item), oGold)
+                                # Skip the remainder of this line
+                                break
+                            else:
+                                # This is being recognized...
+                                pass
+
+                            # Check if this relation is already there
+                            if not obj.has_relation(target, linktype):
+                                # This is a new relation, so create it
+                                obj.add_relation(target, linktype)
+                                # Keep track of relation statistics
+                                count_rel += 1
+                            # Check if the reverse relation needs adding
+                            if linktype == "eqs" and not target.has_relation(obj, linktype):
+                                # This is a new relation, so create it
+                                target.add_relation(obj, linktype)
+                                # Keep track of relation statistics
+                                count_rel += 1
 
             # Make sure the requester knows how many have been added
-            oBack['count'] = 1              # Only one manuscript is added here
-            oBack['sermons'] = iSermCount   # The number of sermons (=msitems) reviewed
+            oBack['count'] = count_obj      # Number of gold objects created
+            oBack['count_rel'] = count_rel  # Number of relations added
+            oBack['sermons'] = count_obj    # The number of sermons (=msitems) reviewed
             oBack['filename'] = filename
+            # Add the list of items that need to be treated manually
+            oBack['manual'] = lst_manual
+
+            if write_csv_output:
+                # Write a CSV output file
+                output = StringIO()
+                delimiter = "\t"
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Headers
+                csvwriter.writerow(lHeader)
+                # Loop
+                for item in lst_manual:
+                    row = []
+                    for k in lHeader:
+                        if k in item:
+                            row.append(item[k])
+                        else:
+                            row.append("")
+                    csvwriter.writerow(row)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+
+                with io.open(output_file_name, "wb") as f:
+                    f.write(sData)
 
         except:
             sError = errHandle.get_error_message()
@@ -1713,11 +1828,11 @@ class Edition(models.Model):
     def short(self):
         return self.name
 
-    def find(self, name):
+    def find(name):
         obj = Edition.objects.filter(Q(name__iexact=name)).first()
         return obj
 
-    def find_or_create(self, name):
+    def find_or_create(name):
         obj = self.find(name)
         if obj == None:
             obj = Edition(name=name)
@@ -1757,7 +1872,7 @@ class Signature(models.Model):
     def short(self):
         return self.code
 
-    def find(self, code, editype):
+    def find(code, editype):
         obj = Signature.objects.filter(code=code, editype=editype).first()
         return obj
 

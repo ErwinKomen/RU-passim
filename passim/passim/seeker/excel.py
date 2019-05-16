@@ -26,7 +26,7 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
             f.write(sData)
 
         # Read string file
-        wb = openpyxl.load_workbook(tmp_path, read_only=False)
+        wb = openpyxl.load_workbook(tmp_path, read_only=True)
         ws = wb.active
 
         # Iterate through rows
@@ -43,7 +43,7 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
             if bFirst:
                 # Expect header
                 for cell in row:
-                    sValue = cell.value.strip().lower()                    
+                    sValue = cell.value.strip("\t").lower()                    
                     sKey = ""
                     for idx, item in enumerate(lExpected):
                         if item in sValue:
@@ -60,8 +60,11 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
                 oRow = {}
                 for idx, key in enumerate(lHeader):
                     cell = row[idx]
-                    # Get the value
-                    oRow[key] = cell.value.strip()
+                    # Get the value as a string
+                    cv = "" if cell.value == None else "{}".format(cell.value).strip()
+                    oRow[key] = cv
+                # Also add the row number
+                oRow['row_number'] = row[0].row
                 lData.append(oRow)
         # Close the workbook
         wb.close()

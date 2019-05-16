@@ -31,7 +31,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm
-from passim.seeker.models import process_lib_entries, Status, Library, get_now_time, Country, City, Author, Manuscript, \
+from passim.seeker.models import process_lib_entries, adapt_search, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink
 
 import fnmatch
@@ -53,13 +53,6 @@ paginateValues = (100, 50, 20, 10, 5, 2, 1, )
 bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
-
-def adapt_search(val):
-    if val == None: return None
-    # First trim
-    val = val.strip()
-    val = '^' + fnmatch.translate(val) + '$'
-    return val
 
 def treat_bom(sHtml):
     """REmove the BOM marker except at the beginning of the string"""
@@ -951,7 +944,7 @@ def import_gold(request):
                         oResult = None
                         if extension == "xlsx":
                             # This is an Excel XLSX file
-                            oResult = SermonGold.read_gold(username, data_file, filename, arErr)
+                            oResult = SermonGold.read_gold(username, data_file, filename, arErr, oStatus)
 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
@@ -2133,6 +2126,8 @@ class SermonGoldListView(ListView):
 
         self.bHasFormset = (len(get) > 0)
 
+        sort_type = "exclude_signature"
+
         # Fix the sort-order
         get['sortOrder'] = 'name'
 
@@ -2187,14 +2182,13 @@ class SermonGoldListView(ListView):
             # Just show everything
             qs = SermonGold.objects.all().distinct()
 
-        # Set the sort order
-        #qs = qs.order_by('author__name',
-        #                 'signatures',
-        #                 'incipit', 
-        #                 'explicit')
-
-        # Sort the python way
-        qs = sorted(qs, key=lambda x: x.get_sermon_string())
+        # Do sorting
+        if sort_type == "exclude_signature":
+            # Sort the 'normal' way on author/incipit/explicit
+            qs = qs.order_by('author__name', 'incipit', 'explicit')
+        else:
+            # Sort the python way
+            qs = sorted(qs, key=lambda x: x.get_sermon_string())
 
         # Time measurement
         if self.bDoTime:
