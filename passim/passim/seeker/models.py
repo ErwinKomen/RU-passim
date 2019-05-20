@@ -92,6 +92,7 @@ def adapt_latin(val):
 def adapt_markdown(val):
     sBack = ""
     if val != None:
+        val = val.replace("***", "\*\*\*")
         sBack = mark_safe(markdown(val, safe_mode='escape'))
         sBack = sBack.replace("<p>", "")
         sBack = sBack.replace("</p>", "")
@@ -183,9 +184,9 @@ def getText(nodeStart):
 
 def get_searchable(sText):
     sText = sText.lower()
-    sText = "<".replace(sText, "")
-    sText = ">".replace(sText, "")
-    sText = "_".replace(sText, "")
+    sText = sText.replace("<", "")
+    sText = sText.replace(">", "")
+    sText = sText.replace("_", "")
     return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
@@ -1416,8 +1417,10 @@ class SermonGold(models.Model):
     author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
     # [0-1] We would like to know the INCIPIT (first line in Latin)
     incipit = models.TextField("Incipit", null=True, blank=True)
+    srchincipit = models.TextField("Incipit (searchable)", null=True, blank=True)
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
+    srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
 
     # [0-1] Every gold sermon must have room for a bibliography
     bibliography = models.TextField("Bibliography", null=True, blank=True)
@@ -1482,13 +1485,23 @@ class SermonGold(models.Model):
         # Return what we found
         return obj
 
+    def init_latin():
+        """ One time ad-hoc function"""
+
+        with transaction.atomic():
+            for obj in SermonGold.objects.all():
+                obj.srchincipit = get_searchable(obj.incipit)
+                obj.srchexplicit = get_searchable(obj.explicit)
+                obj.save()
+        return True
+
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
-        return get_searchable(self.incipit)
+        return self.srchincipit
 
     def get_explicit(self):
         """Return the *searchable* explicit, without any additional formatting"""
-        return get_searchable(self.explicit)
+        return self.srchexplicit
 
     def signatures(self):
         """Combine all signatures into one string"""
@@ -1601,9 +1614,10 @@ class SermonGold(models.Model):
             oManual = {}
             oManual['type'] = type
             oManual['error'] = error
+            if 'row_number' in oGold:
+                oManual['row_number'] = oGold['row_number']
             for k in lField:
                 oManual[k] = oGold[k]
-            # oManual['obj'] = oGold
             lst.append(oManual)
             return True
 
@@ -1628,6 +1642,9 @@ class SermonGold(models.Model):
         lst_manual = []
         write_csv_output = True
 
+        # Specify which status is acceptable
+        status_ok = ['completed', 'splitted sermongold']
+
         # Prepare an output file name
         dt_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         output = "{}_{}".format(dt_str, filename.replace(".xlsx", ".json"))
@@ -1650,89 +1667,114 @@ class SermonGold(models.Model):
                 oBack['msg'] = msg
                 return oBack
 
-            bBreak = False
-
             # Iterate over the objects
             for oGold in lst_goldsermon:
                 # Prepare a possible manual object
                 oManual = {}
 
+                # Reset breaking
+                bBreak = False
+
+                # ============================================================
+                lStop = ['210'] # lStop = ['194', '210']
+                if oGold['row_number'] in lStop:
+                    iStopHere = 1
+                # ============================================================
+
                 # Get the status of this line
                 status = oGold['status'].lower()
-                # Show where we are
-                objStat.set("reading", msg="Pass #1, line={}".format(oGold['row_number']))
+                if status in status_ok:
+                    # Show where we are
+                    objStat.set("reading", msg="Pass #1, line={}".format(oGold['row_number']))
 
-                sAuthor = oGold['author']
-                # Check author
-                if sAuthor == "":
-                    # There must be a (gold) author...
-                    add_to_manual_list(lst_manual, "author", "Without author, a gold sermon cannot be added", oGold)
-                    # Skip the remainder of this line
-                    continue
-                # Get the author (gold)
-                author = Author.find(sAuthor)
-                if author == None:
-                    # Could not find this author, so indicate to the user
-                    add_to_manual_list(lst_manual, "author", "Could not find golden Author [{}]".format(oGold['author']), oGold)
-                    # Skip the remainder of this line
-                    continue
-
-                # Get or create this golden sermon (the ... symbol is treated there)
-                bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
-
-                # Keep track of created gold
-                if bCreated: count_obj += 1
-
-                # Process Gryson ('+' means ... ), Clavis and possible Other
-                signature_lst = [{'lst': 'gryson', 'editype': 'gr'}, {'lst': 'clavis', 'editype': 'cl'}, {'lst': 'other', 'editype': 'ot'}]
-                for item in signature_lst:
-                    if item['lst'] in oGold:
-                        code_lst = oGold[item['lst']]
-                        editype = item['editype']
-                        if code_lst != None and code_lst != "":
-                            for code in code_lst.split("+"):
-                                code = code_lst.strip()
-                                # Add this code to the signatures
-                                obj = Signature.find(code, editype)
-                                if obj == None:
-                                    obj = Signature(code=code, editype=editype, gold=gold)
-                                    obj.save()
-                                elif bCreated:
-                                    # There is an existing signature, but we're deailng with the *first* instance of a sermongold
-                                    add_to_manual_list(lst_manual, "signature", 
-                                                       "First instance of a gold sermon is attempted to be linked with existing signature [{} - {}]".format(editype, code), oGold)
-                                    # Skip the remainder of this line
-                                    bBreak = True
-                                    break
-                    if bBreak:
-                        # Break to a higher level
-                        break
-                if bBreak:
-                    # Break from the higher gold loop
-                    continue
-
-                # Process Editions (separated by ';')
-                edition_lst = oGold['edition'].split(";")
-                for item in edition_lst:
-                    item = item.strip()
-                    edition = Edition.find(item)
-                    if edition == None:
-                        edition = Edition(name=item, gold=gold)
-                        edition.save()
-                    elif bCreated:
-                        # This edition already exists
-                        add_to_manual_list(lst_manual, "edition", 
-                                           "First instance of a gold sermon is attempted to be linked with existing edition [{}]".format(item), oGold)
+                    sAuthor = oGold['author']
+                    # Check author
+                    if sAuthor == "":
+                        # There must be a (gold) author...
+                        add_to_manual_list(lst_manual, "author", "Without author, a gold sermon cannot be added", oGold)
                         # Skip the remainder of this line
-                        bBreak = True
-                        break
+                        continue
+                    # Get the author (gold)
+                    author = Author.find(sAuthor)
+                    if author == None:
+                        # Could not find this author, so indicate to the user
+                        add_to_manual_list(lst_manual, "author", "Could not find golden Author [{}]".format(oGold['author']), oGold)
+                        # Skip the remainder of this line
+                        continue
 
-                if bBreak:
-                    # Break from the higher gold loop
-                    continue
+                    # Get or create this golden sermon (the ... symbol is treated there)
+                    bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
 
-                oGold['obj'] = gold
-                iSermCount += 1
+                    # Keep track of created gold
+                    if bCreated: count_obj += 1
+
+                    # Process Gryson ('+' means: link to multiple gryson codes ), Clavis and possible Other
+                    signature_lst = [{'lst': 'gryson', 'editype': 'gr'}, {'lst': 'clavis', 'editype': 'cl'}, {'lst': 'other', 'editype': 'ot'}]
+                    for item in signature_lst:
+                        if item['lst'] in oGold:
+                            code_lst = oGold[item['lst']]
+                            editype = item['editype']
+                            if code_lst != None and code_lst != "":
+                                if '+' in code_lst:
+                                    iStopHere = 1
+                                    pass
+                                for code in code_lst.split("+"):
+                                    code = code.strip()
+                                    # Add this code to the signatures
+                                    obj = Signature.find(code, editype)
+                                    if obj == None:
+                                        obj = Signature(code=code, editype=editype, gold=gold)
+                                        obj.save()
+                                    else:
+                                        # Check if an attempt is made to attach an existing signature to a *different* gold sermon
+                                        iOthers = Signature.objects.filter(code=code, editype=editype).exclude(gold=gold).count()
+                                        if iOthers > 0:
+                                            # There is an existing signature, but we're deailng with the *first* instance of a sermongold
+                                            add_to_manual_list(lst_manual, "signature", 
+                                                               "Attempt to add existing signature [{} - {}] to a different gold sermon".format(editype, code), oGold)
+                                            # Skip the remainder of this line
+                                            bBreak = True
+                                            break
+                        if bBreak:
+                            # Break to a higher level
+                            break
+                    if bBreak:
+                        # Break from the higher gold loop
+                        continue
+
+                    # Process Editions (separated by ';')
+                    edition_lst = oGold['edition'].split(";")
+                    for item in edition_lst:
+                        item = item.strip()
+
+                        ## ========== DEBUG ============
+                        #if "CC 38"  in item:
+                        #    iStopRightHere = 1
+                        ## =============================
+
+                        # NOTE: An edition should be unique for a gold sermon; not in general!
+                        edition = Edition.find(item, gold)
+                        if edition == None:
+                            edition = Edition(name=item, gold=gold)
+                            edition.save()
+                        elif bCreated:
+                            # This edition already exists
+                            add_to_manual_list(lst_manual, "edition", 
+                                               "First instance of a gold sermon is attempted to be linked with existing edition [{}]".format(item), oGold)
+                            # Skip the remainder of this line
+                            bBreak = True
+                            break
+
+                    if bBreak:
+                        # Break from the higher gold loop
+                        continue
+
+                    oGold['obj'] = gold
+                    iSermCount += 1
+                else:
+                    # Show where we are
+                    objStat.set("skipping", msg="Pass #1, line={} status={}".format(oGold['row_number'], status))
+
  
             # Iterate over the objects again, and add relations
             for oGold in lst_goldsermon:
@@ -1790,7 +1832,8 @@ class SermonGold(models.Model):
 
             # Create a report and add it to what we return
             oContents = {'headers': lHeader, 'list': lst_manual}
-            oBack['report'] = Report.make(username, "ig", json.dumps(oContents))
+            oReport = Report.make(username, "ig", json.dumps(oContents))
+            oBack['report_id'] = oReport.id
 
         except:
             sError = errHandle.get_error_message()
@@ -1836,8 +1879,12 @@ class Edition(models.Model):
     def short(self):
         return self.name
 
-    def find(name):
-        obj = Edition.objects.filter(Q(name__iexact=name)).first()
+    def find(name, gold=None):
+        lstQ = []
+        lstQ.append(Q(name__iexact=name))
+        if gold != None:
+            lstQ.append(Q(gold=gold))
+        obj = Edition.objects.filter(*lstQ).first()
         return obj
 
     def find_or_create(name):

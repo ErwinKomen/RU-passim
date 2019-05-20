@@ -52,7 +52,7 @@ urlpatterns = [
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
-    url(r'^report/download', ReportDownload.as_view(), name='report_results'),
+    url(r'^report/download(?:/(?P<pk>\d+))?/$', ReportDownload.as_view(), name='report_results'),
 
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
@@ -62,6 +62,8 @@ urlpatterns = [
 
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
+
+    url(r'^report/list', ReportListView.as_view(), name='report_list'),
 
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),

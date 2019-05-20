@@ -31,7 +31,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm
-from passim.seeker.models import process_lib_entries, adapt_search, Status, Library, get_now_time, Country, City, Author, Manuscript, \
+from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
     Report
 
@@ -138,6 +138,7 @@ def home(request):
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
 
     # Create the list of news-items
     lstQ = []
@@ -590,12 +591,13 @@ def get_incipits(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(incipit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("incipit").distinct().all().order_by('incipit')
+            items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('incipit')
             # items = SermonGold.objects.order_by("incipit").distinct()
             # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
             results = []
             for idx, co in enumerate(items):
-                co_json = {'name': co['incipit'], 'id': idx }
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
                 results.append(co_json)
             data = json.dumps(results)
         else:
@@ -617,12 +619,11 @@ def get_explicits(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(explicit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("explicit").distinct().all().order_by('explicit')
-            # items = SermonGold.objects.order_by("explicit").distinct()
-            # items = SermonGold.objects.filter(*lstQ).order_by('explicit').distinct()
+            items = SermonGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('explicit')
             results = []
             for idx, co in enumerate(items):
-                co_json = {'name': co['explicit'], 'id': idx }
+                val = co['srchexplicit']
+                co_json = {'name': val, 'id': idx }
                 results.append(co_json)
             data = json.dumps(results)
         else:
@@ -1080,6 +1081,7 @@ class BasicPart(View):
     MainModel = None        # The model that is mainly used for this form
     form_objects = []       # List of forms to be processed
     formset_objects = []    # List of formsets to be processed
+    previous = None         # Return to this
     bDebug = False          # Debugging information
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
@@ -1093,6 +1095,7 @@ class BasicPart(View):
         if self.checkAuthentication(request):
             # Build the context
             context = dict(object_id = pk, savedate=None)
+            context['prevpage'] = self.previous
             context['authenticated'] = user_is_authenticated(request)
             context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
             context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
@@ -1259,7 +1262,9 @@ class BasicPart(View):
 
                     # Create name for download
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
-                    sDbName = "passim_libraries.{}".format(self.dtype)
+                    modelname = self.MainModel.__name__
+                    obj_id = "n" if self.obj == None else self.obj.id
+                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, self.dtype)
                     sContentType = ""
                     if self.dtype == "csv":
                         sContentType = "text/tab-separated-values"
@@ -1335,6 +1340,7 @@ class BasicPart(View):
         self.initializations(request, pk)
         if self.checkAuthentication(request):
             context = dict(object_id = pk, savedate=None)
+            context['prevpage'] = self.previous
             context['authenticated'] = user_is_authenticated(request)
             context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
             context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
@@ -1411,6 +1417,8 @@ class BasicPart(View):
         return formset
 
     def initializations(self, request, object_id):
+        # Store the previous page
+        self.previous = request.META.get('HTTP_REFERER') #  request.path
         # Clear errors
         self.arErr = []
         # COpy the request
@@ -1480,6 +1488,7 @@ class PassimDetails(DetailView):
     formset_objects = []    # List of formsets to be processed
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
+    previous = None         # Start with empty previous page
     title = ""              # The title to be passedon with the context
     rtype = "json"          # JSON response (alternative: html)
     mForm = None            # Model form
@@ -1548,6 +1557,9 @@ class PassimDetails(DetailView):
         return JsonResponse(data)
 
     def initializations(self, request, pk):
+        # Store the previous page
+        self.previous = request.META.get('HTTP_REFERER') #  request.path
+
         # Copy any pk
         self.pk = pk
         self.add = pk is None
@@ -1717,6 +1729,7 @@ class PassimDetails(DetailView):
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['prevpage'] = self.previous
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
@@ -2083,6 +2096,8 @@ class SermonGoldListView(ListView):
         # Get parameters for the search
         initial = self.request.GET
 
+        # ONE-TIME adhoc = SermonGold.init_latin()
+
         # Add a files upload form
         context['goldForm'] = SermonGoldForm(prefix='gold')
 
@@ -2155,12 +2170,12 @@ class SermonGoldListView(ListView):
                 # Check for incipit string
                 if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
                     val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(incipit__iregex=val))
+                    lstQ.append(Q(srchincipit__iregex=val))
 
                 # Check for explicit string
                 if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
                     val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(explicit__iregex=val))
+                    lstQ.append(Q(srchexplicit__iregex=val))
 
                 # Check for SermonGold [signature]
                 if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
@@ -2608,7 +2623,6 @@ class SermonGoldDetails(PassimDetails):
 
         # Add the list to the context
         context['relations'] = lst_related
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         return context
 
@@ -3042,6 +3056,73 @@ class AuthorListDownload(BasicPart):
             output.close()
 
         return sData
+
+
+class ReportListView(ListView):
+    """Listview of reports"""
+
+    model = Report
+    paginate_by = 20
+    template_name = 'seeker/report_list.html'
+    entrycount = 0
+    bDoTime = True
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(ReportListView, self).get_context_data(**kwargs)
+
+        # Get parameters
+        initial = self.request.GET
+
+        # Prepare searching
+        #search_form = ReportSearchForm(initial)
+        #context['searchform'] = search_form
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim reports"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Calculate the final qs
+        qs = Report.objects.all().order_by('-created')
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
 
 
 class ReportDownload(BasicPart):

@@ -167,8 +167,10 @@ class SermonGoldForm(forms.ModelForm):
         model = SermonGold
         fields = ['author', 'incipit', 'explicit', 'bibliography' ]
         widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+                 #'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 #'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'})
                  }
 

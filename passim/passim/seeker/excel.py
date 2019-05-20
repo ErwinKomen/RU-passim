@@ -63,8 +63,8 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
                     # Get the value as a string
                     cv = "" if cell.value == None else "{}".format(cell.value).strip()
                     oRow[key] = cv
-                # Also add the row number
-                oRow['row_number'] = row[0].row
+                # Also add the row number (as string)
+                oRow['row_number'] = "{}".format(row[0].row)
                 lData.append(oRow)
         # Close the workbook
         wb.close()

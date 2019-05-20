@@ -20,16 +20,16 @@
   </div>
 
   <div class="col-md-12 collapse" id="man-list">
-    <table>
-      <thead><tr><th>#</th><th>File</th><th>Sermons</th><th>Action</th></tr></thead>
+    <table class="func-view">
+      <thead><tr><th>#</th><th>File</th><th>Sermons added</th><th><!-- action --></th></tr></thead>
       <tbody>
         {% for item in results %}
           <tr>
             <td>{{forloop.counter}}</td>
             <td>{{item.filename}}</td>
-            <td>{{item.sermons}}</td>
+            <td align="center">{{item.sermons}}</td>
             <!-- Allow downloading a report -->
-            <td>
+            <td align="right" style="min-width: 200px;">
               <form>
                 <!-- Be sure to add csrf -->
                 {% csrf_token %}
@@ -42,10 +42,10 @@
                     Download<span class="caret"></span>
                   </a>
                   <ul class="dropdown-menu" aria-labelledby="downloadmenu">
-                    <li><a href="#" downloadtype="xlsx" ajaxurl="{% url 'report_results' item.report.id %}" onclick="ru.passim.post_download(this);">Excel</a></li>
+                    <li><a href="#" downloadtype="xlsx" ajaxurl="{% url 'report_results' item.report_id %}" onclick="ru.passim.post_download(this);">Excel</a></li>
                     <li class="divider" role="separator"></li>
-                    <li><a href="#" downloadtype="csv" ajaxurl="{% url 'report_results' item.report.id %}" onclick="ru.passim.post_download(this);">csv (tab-separated)</a></li>
-                    <li><a href="#" downloadtype="json" ajaxurl="{% url 'report_results' item.report.id %}" onclick="ru.passim.post_download(this);">json</a></li>
+                    <li><a href="#" downloadtype="csv"  ajaxurl="{% url 'report_results' item.report_id %}" onclick="ru.passim.post_download(this);">csv (tab-separated)</a></li>
+                    <li><a href="#" downloadtype="json" ajaxurl="{% url 'report_results' item.report_id %}" onclick="ru.passim.post_download(this);">json</a></li>
                   </ul>
                 </div>
               </form>

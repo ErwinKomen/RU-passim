@@ -194,9 +194,9 @@
                           <span>{{gold.signatures|truncatechars:20}}</span>
                         </td>
                         <td style="width: 100%;">
-                          <span>{{gold.get_incipit_markdown}}</span>
-                          <span style="color: darkblue; background-color: lightgray;">{% if gold.incipit %}...{% endif %}</span>
-                          <span>{{gold.get_explicit_markdown}}</span>
+                          <span>{{gold.get_incipit_markdown|safe}}</span>
+                          <span style="color: blue;">{% if gold.incipit %}...{% endif %}</span>
+                          <span>{{gold.get_explicit_markdown|safe}}</span>
                         </td>
 
                         <!-- Editions -->
@@ -256,7 +256,7 @@
   </div>
 
 <script>
-  ru.passim.seeker.init_events("{% url 'search_gold' %}");
+  ru.passim.seeker.init_events();
 </script>
 
 {% endblock content %}

@@ -5,6 +5,7 @@
   <div class="breadcrumbs">
     <a href="{% url 'home' %}">Home</a>
     &rsaquo; <a href="{% url 'search_gold' %}">Gold-Sermon List</a>
+    &rsaquo; <a href="{{prevpage}}">Gold-Sermon page</a>
     &rsaquo; Gold-Sermon Details
   </div>
 {% endblock %}
@@ -19,7 +20,7 @@
         <div class="row">
           <div class="col-md-1">
             <a class="btn jumbo-1" 
-               href="{% url 'search_gold' %}"
+               href="{{prevpage}}"
                title="Back to the list of gold sermons">&lt;&lt;</a>
           </div>
           <div class="col-md-10">
