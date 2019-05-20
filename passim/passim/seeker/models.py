@@ -1437,6 +1437,15 @@ class SermonGold(models.Model):
             name = "RU_sg_{}".format(self.id)
         return name
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the incipit and explicit
+        istop = 1
+        self.srchincipit = get_searchable(self.incipit)
+        self.srchexplicit = get_searchable(self.explicit)
+        # Do the saving initially
+        response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+        return response
+
     def find_or_create(author, incipit, explicit):
         """Find or create a SermonGold"""
 
@@ -1446,14 +1455,17 @@ class SermonGold(models.Model):
             lstQ.append(Q(author=author))
         if incipit != "": 
             incipit = adapt_latin(incipit)
-            lstQ.append(Q(incipit=incipit))
+            lstQ.append(Q(incipit=incipit)|Q(srchincipit=incipit))
         if explicit != "": 
             explicit = adapt_latin(explicit)
-            lstQ.append(Q(explicit=explicit))
+            lstQ.append(Q(explicit=explicit)|Q(srchexplicit=explicit))
         obj = SermonGold.objects.filter(*lstQ).first()
         if obj == None:
             # Create a new
             obj = SermonGold(author=author, incipit=incipit, explicit=explicit)
+            # Create searchable fields
+            obj.srchincipit = get_searchable(incipit)
+            obj.srchexplicit = get_searchable(explicit)
             obj.save()
             bCreated = True
         # Return this object
