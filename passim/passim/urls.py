@@ -52,6 +52,7 @@ urlpatterns = [
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
+    url(r'^report/download', ReportDownload.as_view(), name='report_results'),
 
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),

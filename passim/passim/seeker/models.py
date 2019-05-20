@@ -31,6 +31,7 @@ MAX_TEXT_LEN = 200
 
 VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
+REPORT_TYPE = "seeker.reptype"
 LINK_TYPE = "seeker.linktype"
 EDI_TYPE = "seeker.editype"
 
@@ -389,6 +390,35 @@ class Status(models.Model):
         if msg != None:
             self.msg = msg
         self.save()
+
+
+class Report(models.Model):
+    """Report of an upload action or something like that"""
+
+    # [1] Every report must be connected to a user and a date
+    user = models.ForeignKey(User)
+    # [1] And a date: the date of saving this report
+    created = models.DateTimeField(default=datetime.now)
+    # [1] A report should have a type to know what we are reporting about
+    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), 
+                            max_length=5)
+    # [0-1] A report should have some contents: stringified JSON
+    contents = models.TextField("Contents", default="{}")
+
+    def __str__(self):
+        sType = self.reptype
+        sDate = get_crpp_date(self.created)
+        return "{}: {}".format(sType, sDate)
+
+    def make(username, rtype, contents):
+        """Create a report"""
+
+        # Retrieve the user
+        user = User.objects.filter(username=username).first()
+        obj = Report(user=user, reptype=rtype, contents=contents)
+        obj.save()
+        return obj
+
 
 
 class Country(models.Model):
@@ -1757,32 +1787,10 @@ class SermonGold(models.Model):
             oBack['count_rel'] = count_rel  # Number of relations added
             oBack['sermons'] = count_obj    # The number of sermons (=msitems) reviewed
             oBack['filename'] = filename
-            # Add the list of items that need to be treated manually
-            oBack['manual'] = lst_manual
 
-            if write_csv_output:
-                # Write a CSV output file
-                output = StringIO()
-                delimiter = "\t"
-                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-                # Headers
-                csvwriter.writerow(lHeader)
-                # Loop
-                for item in lst_manual:
-                    row = []
-                    for k in lHeader:
-                        if k in item:
-                            row.append(item[k])
-                        else:
-                            row.append("")
-                    csvwriter.writerow(row)
-
-                # Convert to string
-                sData = output.getvalue()
-                output.close()
-
-                with io.open(output_file_name, "wb") as f:
-                    f.write(sData)
+            # Create a report and add it to what we return
+            oContents = {'headers': lHeader, 'list': lst_manual}
+            oBack['report'] = Report.make(username, "ig", json.dumps(oContents))
 
         except:
             sError = errHandle.get_error_message()

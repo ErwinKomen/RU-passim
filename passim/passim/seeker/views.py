@@ -32,7 +32,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm
 from passim.seeker.models import process_lib_entries, adapt_search, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink
+    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
+    Report
 
 import fnmatch
 import sys
@@ -945,6 +946,7 @@ def import_gold(request):
                         if extension == "xlsx":
                             # This is an Excel XLSX file
                             oResult = SermonGold.read_gold(username, data_file, filename, arErr, oStatus)
+                            # Note: the [oResult] also contains a 'report' part
 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
@@ -3041,3 +3043,57 @@ class AuthorListDownload(BasicPart):
 
         return sData
 
+
+class ReportDownload(BasicPart):
+    MainModel = Report
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # Download Type
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+
+        # Unpack the report contents
+        sData = self.obj.contents
+
+        if dtype == "json":
+            # no need to do anything: the information is already in sData
+            pass
+        else:
+            # Convert the JSON to a Python object
+            oContents = json.loads(sData)
+            # Get the headers and the list
+            headers = oContents['headers']
+            lst_report = oContents['list']
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+
+            # Write Headers
+            csvwriter.writerow(headers)
+            # Loop
+            for item in lst_report:
+                row = []
+                for key in headers:
+                    if key in item:
+                        row.append(item[key])
+                    else:
+                        row.append("")
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
