@@ -1427,6 +1427,8 @@ class SermonGold(models.Model):
     # [1] Every gold sermon may have 0 or more URI links to critical editions
     critlinks = models.TextField("Critical edition full text links", default="[]")
 
+    # [1] Every gold sermon has a list of signatures that are automatically created
+    siglist = models.TextField("List of signatures", default="[]")
 
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
@@ -1522,6 +1524,17 @@ class SermonGold(models.Model):
         for item in self.goldsignatures.all():
             lSign.append(item.short())
         return " | ".join(lSign)
+
+    def do_signatures(self):
+        """Create or re-make a JSON list of signatures"""
+
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        siglist = json.dumps(lSign)
+        self.siglist = siglist
+        # And save myself
+        self.save()
 
     def editions(self):
         """Combine all editions into one string"""
@@ -1943,7 +1956,15 @@ class Signature(models.Model):
         obj = Signature.objects.filter(code=code, editype=editype).first()
         return obj
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Do the saving initially
+        response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+        # Adapt list of signatures for the related GOLD
+        self.gold.do_signatures()
+        # Then return the super-response
+        return response
 
+    
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 

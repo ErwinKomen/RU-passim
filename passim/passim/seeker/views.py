@@ -2057,6 +2057,15 @@ class ManuscriptListView(ListView):
         # Set the title of the application
         context['title'] = "Manuscripts"
 
+        # ============= DEBUG ===============
+        #one_time_signature_list = False
+        #if one_time_signature_list:
+        #    with transaction.atomic():
+        #        for gold in SermonGold.objects.all():
+        #            gold.do_signatures()
+        #    iSuccess = True
+        # ===================================
+
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
@@ -2183,6 +2192,12 @@ class SermonGoldListView(ListView):
     template_name = 'seeker/sermongold.html'
     entrycount = 0
     bDoTime = True
+    order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '']
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
+                   {'name': 'Editions', 'order': '', 'type': 'str'},
+                   {'name': 'Links', 'order': '', 'type': 'str'}]
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -2213,6 +2228,8 @@ class SermonGoldListView(ListView):
         # Set the title of the application
         context['title'] = "Gold-Sermons"
 
+        context['order_heads'] = self.order_heads
+
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
@@ -2239,6 +2256,7 @@ class SermonGoldListView(ListView):
         self.bHasFormset = (len(get) > 0)
 
         sort_type = "exclude_signature"
+        sort_type = "ordered_columns"
 
         # Fix the sort-order
         get['sortOrder'] = 'name'
@@ -2297,7 +2315,32 @@ class SermonGoldListView(ListView):
         # Do sorting
         if sort_type == "exclude_signature":
             # Sort the 'normal' way on author/incipit/explicit
-            qs = qs.order_by('author__name', 'incipit', 'explicit')
+            qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
+        elif sort_type == "ordered_columns":
+            # Start with an initial order
+            order = ['author__name', 'siglist', 'incipit', 'explicit']
+            bAscending = True
+            sType = 'str'
+            if 'o' in self.qd:
+                order = []
+                iOrderCol = int(self.qd['o'])
+                bAscending = (iOrderCol>0)
+                iOrderCol = abs(iOrderCol)
+                for order_item in self.order_cols[iOrderCol-1].split(";"):
+                    order.append(Lower(order_item))
+                sType = self.order_heads[iOrderCol-1]['type']
+                if bAscending:
+                    self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
+                else:
+                    # order = "-" + order
+                    self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+            if sType == 'str':
+                qs = qs.order_by(*order)
+            else:
+                qs = qs.order_by(*order)
+            # Possibly reverse the order
+            if not bAscending:
+                qs = qs.reverse()
         else:
             # Sort the python way
             qs = sorted(qs, key=lambda x: x.get_sermon_string())
@@ -2437,7 +2480,7 @@ class SermonGoldSelect(BasicPart):
                     qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
                 elif sort_type == "fast_and_easy":
                     # Sort fast and easy
-                    qs = qs.order_by('author__name', 'incipit', 'explicit')
+                    qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
             
             self.entrycount = qs.count()
             self.qs = qs
