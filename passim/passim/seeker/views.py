@@ -2054,6 +2054,12 @@ class ManuscriptListView(ListView):
         else:
             context['paginateSize'] = paginateSize
 
+        # Make sure we pass on our current list of breadcrumbs
+        breadcrumbs = []
+        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        breadcrumbs.append({'name': 'Manuscripts', 'url': reverse('search_manuscript')})
+        context['breadcrumbs'] = breadcrumbs
+
         # Set the title of the application
         context['title'] = "Manuscripts"
 
@@ -2228,7 +2234,14 @@ class SermonGoldListView(ListView):
         # Set the title of the application
         context['title'] = "Gold-Sermons"
 
+        # Make sure we pass on the ordered heads
         context['order_heads'] = self.order_heads
+
+        # Make sure we pass on our current list of breadcrumbs
+        breadcrumbs = []
+        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        breadcrumbs.append({'name': 'Gold-Sermon List', 'url': reverse('search_sermon')})
+        context['breadcrumbs'] = breadcrumbs
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
@@ -2649,6 +2662,13 @@ class SermonGoldDetails(PassimDetails):
 
         # Add the list to the context
         context['relations'] = lst_related
+
+        # Make sure we pass on our current list of breadcrumbs
+        breadcrumbs = []
+        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        breadcrumbs.append({'name': 'Gold-Sermon List', 'url': self.previous})
+        breadcrumbs.append({'name': 'Gold-Sermon Details', 'url': self.request.path})
+        context['breadcrumbs'] = breadcrumbs
 
         return context
 

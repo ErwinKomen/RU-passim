@@ -2,10 +2,7 @@
 {% load i18n %}
 
 {% block breadcrumbs %}
-  <div class="breadcrumbs">
-      <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Search Manuscript
-  </div>
+  {% include 'breadcrumb_list.html' %}
 {% endblock %}
 
 {% block content %}

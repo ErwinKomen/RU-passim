@@ -2,12 +2,7 @@
 {% load i18n %}
 
 {% block breadcrumbs %}
-  <div class="breadcrumbs">
-    <a href="{% url 'home' %}">Home</a>
-    &rsaquo; <a href="{% url 'search_gold' %}">Gold-Sermon List</a>
-    &rsaquo; <a href="{{prevpage}}">Gold-Sermon page</a>
-    &rsaquo; Gold-Sermon Details
-  </div>
+  {% include 'breadcrumb_list.html' %}
 {% endblock %}
 
 {% block content %}
