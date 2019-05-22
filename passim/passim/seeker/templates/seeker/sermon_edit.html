@@ -3,74 +3,184 @@
 <!-- Sermon information -->
 <form>
   {% csrf_token %}
-    <table>
-      <tr>
-        <td colspan="2"  class="ms editable table">
-          <!-- Provide the necessary buttons: edit, cancel and save -->
-          <a mode="edit" class="view-mode btn btn-xs jumbo-1 hidden">
-            <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
-          </a>
-          <a mode="cancel" class="edit-mode btn btn-xs jumbo-2">
-            <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
-          </a>
-          <a mode="save" class="edit-mode btn btn-xs jumbo-1" targetid="sermon_edit"
-             targeturl="{% if sermoForm.instance.id %}{% url 'sermon_edit' sermoForm.instance.id %}{% else %}{% url 'sermon_edit' %}{% endif %}" >
-            <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
-          </a>
+    <table class="sermon-details">
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" oldtargetid="sermon_edit"
+               targeturl="{% if sermoForm.instance.id %}{% url 'sermon_edit' sermoForm.instance.id %}{% else %}{% url 'sermon_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
 
-          <!-- The sermon's number (if known) -->
-          <span id="sermon_number"></span>
+            <!-- The sermon's number (if known) -->
+            <span id="sermon_number"></span>
 
-          <!-- Waiting symbol-->
-          <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
 
-          <!-- Little error message room -->
-          <span id="sermon_err_msg" class="err-msg"></span>
+            <!-- Little error message room -->
+            <span id="sermon_err_msg" class="err-msg"></span>
 
-          <!-- Put the delete button completely to the right-->
-          <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" targetid="sermon_edit"
-             targeturl="{% if sermoForm.instance.id %}{% url 'sermon_edit' sermoForm.instance.id %}{% endif %}">
-            <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
-          </a>
-        </td>
-      </tr>
+            <!-- Put the delete button completely to the right-->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" targetid="" oldtargetid="sermon_edit"
+               targeturl="{% if sermoForm.instance.id %}{% url 'sermon_edit' sermoForm.instance.id %}{% endif %}">
+              <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
+            </a>
+          </td>
+        </tr>
+      {% endif %}
 
-      <!-- Make sure we pass on the manuscript_id -->
+      <!-- Make sure we pass on the manuscript_id to which this sermon belongs -->
       <tr class="hidden">
         <td colspan="2">
           <input id="id_manuscript_id" name="manuscript_id" type="text" value="{{manuscript_id}}" />
         </td>
       </tr>
 
-      <tr>
+      <tr class="form-row">
         <td class="hoverable" style="min-width: 150px;">Locus</td>
-        <td  style="width: 100%;">{{sermoForm.locus}}</td>
+        <td  style="width: 100%;">
+          <div class="view-mode">{{sermoForm.locus.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.locus}}</div>
+          {% endif %}
+        </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td class="hoverable">Author (gold standard)</td>
         <td>
-          <div class="author-key hidden">{{sermoForm.author}}</div>
-          <div>{{sermoForm.authorname}}</div>
+          <div class="view-mode">{% if sermoForm.instance.author %}{{sermoForm.instance.author.name}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="author-key hidden">{{sermoForm.author}}</div>
+            <div class="edit-mode hidden">{{sermoForm.authorname}}</div>
+          {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td class="hoverable">Author (if not above)</td>
         <td>
-          <div class="nickname-key hidden">{{sermoForm.nickname}}</div>
-          <div>{{sermoForm.nickname_ta}}</div>
+          <div class="view-mode">{% if sermoForm.instance.nickname %}{{sermoForm.instance.nickname.name}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="nickname-key hidden">{{sermoForm.nickname}}</div>
+            <div class="edit-mode hidden">{{sermoForm.nickname_ta}}</div>
+          {% endif %}
         </td>
       </tr>
-      <tr><td class="hoverable">Title</td><td >{{sermoForm.title}}</td></tr>
-      <tr><td class="hoverable">Incipit</td><td >{{sermoForm.incipit}}</td></tr>
-      <tr><td class="hoverable">Explicit</td><td >{{sermoForm.explicit}}</td></tr>
-      <tr><td class="hoverable">Quote</td><td >{{sermoForm.quote}}</td></tr>
-      <tr><td class="hoverable">Clavis</td><td >{{sermoForm.clavis}}</td></tr>
-      <tr><td class="hoverable">Gryson</td><td >{{sermoForm.gryson}}</td></tr>
-      <tr><td class="hoverable">Edition</td><td >{{sermoForm.edition}}</td></tr>
-      <tr><td class="hoverable">Feast</td><td >{{sermoForm.feast}}</td></tr>
-      <tr><td class="hoverable">Bible reference(s)</td><td >{{sermoForm.bibleref}}</td></tr>
-      <tr><td class="hoverable">Additional</td><td >{{sermoForm.additional}}</td></tr>
-      <tr><td class="hoverable">Keyword</td><td >{{sermoForm.keyword}}</td></tr>
-      <tr><td class="hoverable">Note</td><td >{{sermoForm.note}}</td></tr>
+      <tr class="form-row">
+        <td class="hoverable">Title</td>
+        <td>
+          <div class="view-mode">{% if sermoForm.title.value %}{{sermoForm.title.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.title}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Incipit</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.incipit.value %}{{sermoForm.incipit.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.incipit}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Explicit</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.explicit.value %}{{sermoForm.explicit.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.explicit}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Quote</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.quote.value %}{{sermoForm.quote.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.quote}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Clavis</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.clavis.value %}{{sermoForm.clavis.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.clavis}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Gryson</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.gryson.value %}{{sermoForm.gryson.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.gryson}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Edition</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.edition.value %}{{sermoForm.edition.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.edition}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Feast</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.feast.value %}{{sermoForm.feast.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.feast}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Bible reference(s)</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.bibleref.value %}{{sermoForm.bibleref.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.bibleref}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Additional</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.additional.value %}{{sermoForm.additional.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.additional}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Keyword</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.keyword.value %}{{sermoForm.keyword.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.keyword}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable">Note</td>
+        <td >
+          <div class="view-mode">{% if sermoForm.note.value %}{{sermoForm.note.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.note}}</div>
+          {% endif %}
+        </td>
+      </tr>
     </table>
 </form>

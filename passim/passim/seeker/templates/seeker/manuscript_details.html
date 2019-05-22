@@ -94,19 +94,14 @@
                     <td class="hoverable">{{forloop.counter}}</td>
                     <td class="tdnowrap hoverable">{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</td>
                     <td id="sermon-number-{{forloop.counter}}" colspan="{{sermon.cols}}" 
+                        class="clickable"
                         style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
-                      <!-- View mode is visible by default-->
-                      <div class="view-mode clickable" 
-                           {% if is_passim_editor %}onclick="ru.passim.seeker.sermo_edit(this);"{% endif %}>
-                        {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
-                      </div>
-
-                      {% if is_passim_editor %}
-                        <!-- Edit mode is only visible for passim editors -->
-                        <div class="edit-mode hidden selected">
-                          <!-- One possibility for editable to appear -->
+                      <a href="{% url 'sermon_details' sermon.obj.id %}" class="nostyle">
+                        <div>
+                          {% include 'seeker/sermon_view.html' with msitem=sermon.obj %}
                         </div>
-                      {% endif %}
+                      </a>
+
                     </td>
                     <td class="tdnowrap">{{sermon.obj.id}}</td>
                   </tr>

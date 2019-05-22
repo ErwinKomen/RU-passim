@@ -37,7 +37,7 @@
           </span>
           <!-- Submit the search form -->
           <span>
-            <a role="button" class="btn btn-sm jumbo-3" 
+            <a role="button" class="btn btn-sm jumbo-3" id="select_gold_button"
                targeturl="{% if source_id %}{% url 'select_gold' %}?source_id={{source_id}}{% else %}{% url 'select_gold' %}{% endif %}"
                targetid="subform"
                title="Start searching..." 
@@ -59,17 +59,28 @@
       </ul>
     </p>
   {% else %}
-  <table class="" style="width: 100%;">
-    <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
-    <tbody>
-      {% for item in results %}
-      <tr onclick="ru.passim.seeker.select_row(this, 'gold_link', {{item.id}});">
-        <td class="gold-id hidden">{{item.id}}</td>
-        <td class="clickable" >{{forloop.counter}}</td>
-        <td class="gold-text clickable" >{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <!-- Top pagination -->
+    <div class="row">
+        <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
+        <div class="col-sm-8">
+          <span class="step-links pull-right">{% include 'paginationpost.html' %}</span>
+        </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-12">
+        <table class="" style="width: 100%;">
+          <thead><tr><th>#</th><th>Gold Sermon</th></tr></thead>
+          <tbody>
+            {% for item in object_list %}
+            <tr onclick="ru.passim.seeker.select_row(this, 'gold_link', {{item.id}});">
+              <td valign="top" class="gold-id hidden">{{item.id}}</td>
+              <td valign="top" class="clickable" >{{forloop.counter}}</td>
+              <td valign="top" class="gold-text clickable" >{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   {% endif %}
 </div>

@@ -75,7 +75,7 @@
         <td class="hoverable" valign="top">Bibliography</td>
         <td valign="top">
           <div class="edit-mode hidden">{{goldForm.bibliography}}</div>
-          <div class="view-mode">{{goldForm.instance.get_bibliography_markdown}}</div>
+          <div class="view-mode">{{goldForm.instance.get_bibliography_markdown|safe}}</div>
         </td>
       </tr>
 

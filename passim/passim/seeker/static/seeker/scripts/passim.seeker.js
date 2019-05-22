@@ -22,6 +22,7 @@ var ru = (function ($, ru) {
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
@@ -548,7 +549,7 @@ var ru = (function ($, ru) {
        *    Clear the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method) {
+      search_start: function (elStart, method, iPage) {
         var frm = null,
             url = "",
             targetid = null,
@@ -587,6 +588,11 @@ var ru = (function ($, ru) {
               }
               // Get the targeturl
               targeturl = $(elStart).attr("targeturl");
+
+              // Get the page we need to go to
+              if (iPage === undefined) { iPage = 1; }
+              data.push({ 'name': 'page', 'value': iPage });
+
               // Issue a post
               $.post(targeturl, data, function (response) {
                 // Action depends on the response
@@ -701,6 +707,24 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("gold_select_save", ex);
+        }
+      },
+
+      /**
+       * gold_page
+       *    Make sure we go to the indicated page
+       * 
+       * @param {type} iPage
+       * @param {type} sFormDiv
+       */
+      gold_page: function (iPage, sFormDiv) {
+        var elStart = null;
+
+        try {
+          elStart = $("#" + sFormDiv);
+          ru.passim.seeker.search_start(elStart, "post", iPage);
+        } catch (ex) {
+          private_methods.errMsg("gold_page", ex);
         }
       },
 

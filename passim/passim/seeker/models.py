@@ -2007,8 +2007,8 @@ class SermonDescr(models.Model):
         return sSignature
 
     def target(self):
-        # Get the URL to edit/view this sermon
-        sUrl = "" if self.id == None else reverse("sermon_view", kwargs={'pk': self.id})
+        # Get the URL to edit this sermon
+        sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
         return sUrl
 
     def getdepth(self):
