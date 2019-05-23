@@ -421,6 +421,122 @@ class Report(models.Model):
         return obj
 
 
+class Profile(models.Model):
+    """Information about the user"""
+
+    # [1] Every profile is linked to a user
+    user = models.ForeignKey(User)
+    # [1] Every user has a stack: a list of visit objects
+    stack = models.TextField("Stack", default = "[]")
+
+    def __str__(self):
+        sStack = self.stack
+        return sStack
+
+    def add_visit(self, name, path, is_menu):
+        """Process one visit in an adaptation of the stack"""
+
+        oErr = ErrHandle()
+        bNeedSaving = False
+        try:
+            # Check if this is a menu choice
+            if is_menu:
+                # Rebuild the stack
+                path_home = reverse("home")
+                oStack = []
+                oStack.append({'name': "Home", 'url': path_home })
+                if path != path_home:
+                    oStack.append({'name': name, 'url': path })
+                self.stack = json.dumps(oStack)
+                bNeedSaving = True
+            else:
+                # Unpack the current stack
+                lst_stack = json.loads(self.stack)
+                # Check if this path is already on the stack
+                bNew = True
+                for idx, item in enumerate(lst_stack):
+                    # Check if this item is on it already
+                    if item['url'] == path:
+                        # The url is on the stack, so cut off the stack from here
+                        lst_stack = lst_stack[0:idx+1]
+                        bNew = False
+                        break
+                    elif item['name'] == name:
+                        # Replace the url
+                        item['url'] = path
+                        bNew = False
+                        break
+                if bNew:
+                    # Add item to the stack
+                    lst_stack.append({'name': name, 'url': path })
+                # Add changes
+                self.stack = json.dumps(lst_stack)
+                bNeedSaving = True
+            # All should have been done by now...
+            if bNeedSaving:
+                self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("profile/add_visit")
+
+    def get_stack(username):
+        """Get the stack as a list from the current user"""
+
+        # Get the user
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        profile = Profile.objects.filter(user=user).first()
+        if profile == None:
+            # Return an empty list
+            return []
+        else:
+            # Return the stack as object (list)
+            return json.loads(profile.stack)
+
+
+class Visit(models.Model):
+    """One visit to part of the application"""
+
+    # [1] Every visit is made by a user
+    user = models.ForeignKey(User)
+    # [1] Every visit is done at a certain moment
+    when = models.DateTimeField(default=datetime.now)
+    # [1] Every visit is to a 'named' point
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] Every visit needs to have a URL
+    path = models.URLField("URL")
+
+    def __str__(self):
+        msg = "{} ({})".format(self.name, self.path)
+        return msg
+
+    def add(username, name, path, is_menu = False):
+        """Add a visit from user [username]"""
+
+        oErr = ErrHandle
+        try:
+            # Get the user
+            user = User.objects.filter(username=username).first()
+            # Add an item
+            obj = Visit(user=user, name=name, path=path)
+            obj.save()
+            # Get to the stack of this user
+            profile = Profile.objects.filter(user=user).first()
+            if profile == None:
+                # There is no profile yet, so make it
+                profile = Profile(user=user)
+                profile.save()
+            # Process this visit in the profile
+            profile.add_visit(name, path, is_menu)
+            # Return success
+            result = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("visit/add")
+            result = False
+        # Return the result
+        return result
+
 
 class Country(models.Model):
     """Countries in which there are library cities"""

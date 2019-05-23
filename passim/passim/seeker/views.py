@@ -33,7 +33,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
-    Report, SermonDescrGold
+    Report, SermonDescrGold, Visit, Profile
 
 import fnmatch
 import sys
@@ -127,6 +127,29 @@ def user_is_ingroup(request, sGroup):
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
 
+def add_visit(request, name, is_menu):
+    """Add the visit to the current path"""
+
+    username = "anonymous" if request.user == None else request.user.username
+    if username != "anonymous":
+        Visit.add(username, name, request.path, is_menu)
+
+def process_visit(request, name, is_menu):
+    """Process one visit and return updated breadcrumbs"""
+
+    username = "anonymous" if request.user == None else request.user.username
+    if username != "anonymous":
+        # Add the visit
+        Visit.add(username, name, request.get_full_path(), is_menu)
+        # Get the updated path list
+        p_list = Profile.get_stack(username)
+    else:
+        p_list = []
+        p_list.append({'name': 'Home', 'url': reverse('home')})
+    # Return the breadcrumbs
+    # return json.dumps(p_list)
+    return p_list
+
 def home(request):
     """Renders the home page."""
 
@@ -140,6 +163,9 @@ def home(request):
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "Home", True)
 
     # Create the list of news-items
     lstQ = []
@@ -163,6 +189,10 @@ def contact(request):
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "Contact", True)
+
     return render(request,'contact.html', context)
 
 def more(request):
@@ -173,6 +203,10 @@ def more(request):
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "More", True)
+
     return render(request,'more.html', context)
 
 def bibliography(request):
@@ -183,6 +217,10 @@ def bibliography(request):
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] =  process_visit(request, "Bibliography", True)
+
     return render(request,'bibliography.html', context)
 
 def about(request):
@@ -194,6 +232,10 @@ def about(request):
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "About", True)
+
     return render(request,'about.html', context)
 
 def short(request):
@@ -1861,21 +1903,8 @@ class SermonDetails(PassimDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        ## Start a list of related gold sermons
-        #lst_related = []
-        ## Do we have an instance?
-        #if instance != None:
-        #    # There is an instance: get the list of SermonGold items to which I link
-        #    relations = instance.get_relations()
-        #    # Get a form for each of these relations
-        #    for instance_rel in relations:
-        #        linkprefix = "glink-{}".format(instance_rel.id)
-        #        oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
-        #        lst_related.append(oForm)
-
-        ## Add the list to the context
-        #context['relations'] = lst_related
-
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Sermon details", False)
         # Make sure we add the existing manuscript_id to the context if possible
         qs_manu = instance.manuscripts_sermons.all()
         if qs_manu.count() == 0:
@@ -2007,6 +2036,9 @@ class ManuscriptDetails(PassimDetails):
         context['maxdepth'] = maxdepth
         #context['isnew'] = bNew
 
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Manuscript details", False)
+
         context['afternewurl'] = reverse('search_manuscript')
 
         return context
@@ -2054,11 +2086,14 @@ class ManuscriptListView(ListView):
         else:
             context['paginateSize'] = paginateSize
 
-        # Make sure we pass on our current list of breadcrumbs
-        breadcrumbs = []
-        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
-        breadcrumbs.append({'name': 'Manuscripts', 'url': reverse('search_manuscript')})
-        context['breadcrumbs'] = breadcrumbs
+        ## Make sure we pass on our current list of breadcrumbs
+        #breadcrumbs = []
+        #breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        #breadcrumbs.append({'name': 'Manuscripts', 'url': reverse('search_manuscript')})
+        #context['breadcrumbs'] = breadcrumbs
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Manuscripts", True)
 
         # Set the title of the application
         context['title'] = "Manuscripts"
@@ -2237,11 +2272,14 @@ class SermonGoldListView(ListView):
         # Make sure we pass on the ordered heads
         context['order_heads'] = self.order_heads
 
-        # Make sure we pass on our current list of breadcrumbs
-        breadcrumbs = []
-        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
-        breadcrumbs.append({'name': 'Gold-Sermon List', 'url': reverse('search_sermon')})
-        context['breadcrumbs'] = breadcrumbs
+        ## Make sure we pass on our current list of breadcrumbs
+        #breadcrumbs = []
+        #breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        #breadcrumbs.append({'name': 'Gold-Sermon List', 'url': reverse('search_sermon')})
+        #context['breadcrumbs'] = breadcrumbs
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Gold sermons", False)
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
@@ -2663,12 +2701,15 @@ class SermonGoldDetails(PassimDetails):
         # Add the list to the context
         context['relations'] = lst_related
 
-        # Make sure we pass on our current list of breadcrumbs
-        breadcrumbs = []
-        breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
-        breadcrumbs.append({'name': 'Gold-Sermon List', 'url': self.previous})
-        breadcrumbs.append({'name': 'Gold-Sermon Details', 'url': self.request.path})
-        context['breadcrumbs'] = breadcrumbs
+        ## Make sure we pass on our current list of breadcrumbs
+        #breadcrumbs = []
+        #breadcrumbs.append({'name': 'Home', 'url': reverse('home')})
+        #breadcrumbs.append({'name': 'Gold-Sermon List', 'url': self.previous})
+        #breadcrumbs.append({'name': 'Gold-Sermon Details', 'url': self.request.path})
+        #context['breadcrumbs'] = breadcrumbs
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon details", False)
 
         return context
 
@@ -2727,6 +2768,9 @@ class SermonGoldEdit(PassimDetails):
         ## Add the list to the context
         #context['relations'] = lst_related
 
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon edit", False)
+
         return context
 
 
@@ -2750,6 +2794,8 @@ class AuthorDetails(PassimDetails):
 
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Author details", False)
         return context
 
 
@@ -2773,6 +2819,8 @@ class AuthorEdit(PassimDetails):
 
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
         return context
 
 
@@ -2816,6 +2864,9 @@ class AuthorListView(ListView):
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Authors", True)
 
         # Return the calculated context
         return context
@@ -2906,6 +2957,9 @@ class LibraryListView(ListView):
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+         # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Libraries", True)
 
         # Return the calculated context
         return context
@@ -3146,6 +3200,9 @@ class ReportListView(ListView):
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Upload reports", True)
+
         # Return the calculated context
         return context
 
@@ -3226,156 +3283,3 @@ class ReportDownload(BasicPart):
         return sData
 
 
-#class SermonDetailsView(DetailView):
-#    """The details of one sermon"""
-
-#    model = SermonDescr
-#    template_name = 'seeker/sermon_info.html'    # Use this for GET and for POST requests
-#    template_post = 'seeker/sermon_view.html'
-
-#    def get(self, request, *args, **kwargs):
-#        if not request.user.is_authenticated:
-#            # Do not allow to get a good response
-#            response = nlogin(request)
-#        else:
-#            if not 'pk' in kwargs or kwargs['pk'] == None:
-#                self.object = None
-#            else:
-#                self.object = self.get_object()
-#            context = self.get_context_data(object=self.object)
-#            response = self.render_to_response(context)
-#            #response.content = treat_bom(response.rendered_content)
-#        return response
-
-#    def post(self, request, *args, **kwargs):
-#        # Initialisation
-#        data = {'status': 'ok', 'html': '', 'statuscode': ''}
-#        # Make sure only POSTS get through that are authorized
-#        if request.user.is_authenticated:
-#            # Determine the object and the context
-#            if not 'pk' in kwargs or kwargs['pk'] == None:
-#                # This is a NEW sermon
-#                self.object = None
-#            else:
-#                self.object = self.get_object()
-#            context = self.get_context_data(object=self.object)
-#            # Possibly indicate form errors
-#            # NOTE: errors is a dictionary itself...
-#            if 'errors' in context and len(context['errors']) > 0:
-#                data['status'] = "error"
-#                data['msg'] = context['errors']
-#            # response = self.render_to_response(self.template_post, context)
-#            data['html'] = render_to_string(self.template_post, context, request)
-#        else:
-#            data['html'] = "(No authorization)"
-#            data['status'] = "error"
-
-#        # Return the response
-#        return JsonResponse(data)
-
-#    def get_context_data(self, **kwargs):
-#        # Get the current context
-#        context = super(SermonDetailsView, self).get_context_data(**kwargs)
-
-#        # Get the parameters passed on with the GET or the POST request
-#        get = self.request.GET if self.request.method == "GET" else self.request.POST
-#        initial = get.copy()
-#        self.qd = initial
-
-#        self.bHasFormInfo = (len(self.qd) > 0)
-
-#        # Set the title of the application
-#        context['title'] = "Sermon"
-
-#        # Get the instance
-#        instance = self.object
-#        bNew = False
-
-#        # Check if this is a POST or a GET request
-#        if self.request.method == "POST":
-#            # Determine what the action is (if specified)
-#            action = ""
-#            if 'action' in initial: action = initial['action']
-#            if action == "delete":
-#                # The user wants to delete this item
-#                if 'manuscript_id' in initial:
-#                    # It is there, so we can add it
-#                    manuscript = Manuscript.objects.filter(id=initial['manuscript_id']).first()
-#                    if manuscript != None:
-#                        # Remove from the SermonMan
-#                        obj = SermonMan.objects.filter(sermon=instance, manuscript=manuscript).first()
-#                        if obj != None:
-#                            obj.delete()
-#                    # Now remove the sermon itself
-#                    instance.delete()
-#                else:
-#                    # Create an errors object
-#                    context['errors'] = [ "Trying to remove a sermon that is not tied to a manuscript" ]
-#                # And return the complied context
-#                return context
-            
-#            # All other actions just mean: edit or new and send back
-
-#            # Do we have an existing object or are we creating?
-#            if instance == None:
-#                # Saving a new item
-#                frm = SermonForm(initial, prefix="sermo")
-#                bNew = True
-#            else:
-#                # Editing an existing one
-#                frm = SermonForm(initial, prefix="sermo", instance=instance)
-#            # Both cases: validation and saving
-#            if frm.is_valid():
-#                # The form is valid - do a preliminary saving
-#                instance = frm.save(commit=False)
-
-#                # Check what has been added
-#                if 'nickname_ta' in frm.changed_data:
-#                    # Get its value
-#                    sNickname = frm.cleaned_data['nickname_ta']
-#                    # Check if it is already in the Nicknames
-#                    nickname = Nickname.find_or_create(sNickname)
-#                    if instance.nickname != nickname:
-#                        # Add it
-#                        instance.nickname = nickname
-#                # Now save it for real
-#                instance.save()
-#            else:
-#                # We need to pass on to the user that there are errors
-#                context['errors'] = frm.errors
-#            # Check if this is a new one
-#            if bNew:
-#                # This is a new one, so it should be coupled to the correct manuscript
-#                if 'manuscript_id' in initial:
-#                    # It is there, so we can add it
-#                    manuscript = Manuscript.objects.filter(id=initial['manuscript_id']).first()
-#                    if manuscript != None:
-#                        # Add to the SermonMan
-#                        obj = SermonMan(sermon=instance, manuscript=manuscript)
-#                        obj.save()
-#                        # Calculate how many sermons there are
-#                        sermon_count = manuscript.sermons.all().count()
-#                        # Make sure the new sermon gets changed
-#                        instance.order = sermon_count
-#                        instance.save()
-                
-#        else:
-#            # Check if this is asking for a new form
-#            if instance == None:
-#                # Get the form for the sermon
-#                frm = SermonForm(prefix="sermo")
-#            else:
-#                # Get the form for the sermon
-#                frm = SermonForm(instance=instance, prefix="sermo")
-
-#        # Put the form and the formset in the context
-#        context['sermoForm'] = frm
-#        context['msitem'] = instance
-
-#        # Check this user: is he allowed to UPLOAD data?
-#        context['authenticated'] = user_is_authenticated(self.request)
-#        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-#        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-#        # Return the calculated context
-#        return context
