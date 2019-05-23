@@ -2083,7 +2083,7 @@ class Signature(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Do the saving initially
-        response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+        response = super(Signature, self).save(force_insert, force_update, using, update_fields)
         # Adapt list of signatures for the related GOLD
         self.gold.do_signatures()
         # Then return the super-response

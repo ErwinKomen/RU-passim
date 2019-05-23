@@ -39,7 +39,7 @@ import fnmatch
 import sys
 import base64
 import json
-import csv
+import csv, re
 import requests
 import demjson
 import openpyxl
@@ -461,6 +461,24 @@ def signup(request):
     else:
         form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
+
+def do_clavis(request):
+    # Create a regular expression
+    r_number = re.compile( r'^[[]?(\d+)[]]?')
+
+    # Walk the whole signature list
+    with transaction.atomic():
+        for obj in Signature.objects.all():
+            # Check the type
+            if obj.editype == "cl":
+                # This is clavis -- get the code
+                code = obj.code
+                if r_number.match(code):
+                    # This is only a number
+                    obj.code = "CPPM {}".format(code)
+                    obj.save()
+    # Return an appropriate page
+    return home(request)
 
 @csrf_exempt
 def get_countries(request):
@@ -1122,6 +1140,31 @@ def import_authors(request):
     # Return the information
     return JsonResponse(data)
 
+def search_ecodex(request):
+    arErr = []
+    error_list = []
+    data = {'status': 'ok', 'html': ''}
+    username = request.user.username
+
+    # Check if the user is authenticated and if it is POST
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
+        # Get the parameters
+        if request.POST:
+            qd = request.POST
+        else:
+            qd = request.GET
+        if 'search_url' in qd:
+            # Get the parameter
+            s_url = qd['search_url']
+            # Make a search request and get the result into a string
+
+        pass
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
 
 class BasicPart(View):
     """This is my own versatile handling view.

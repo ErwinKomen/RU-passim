@@ -31,6 +31,14 @@
                     <span class="glyphicon glyphicon-upload"></span>
                   </a>
                 {% endif %}
+                <!-- Search results from e-codex -->
+                {% if is_passim_uploader %}
+                  <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_search_ecodex" 
+                     role="button" title="Convert e-codices search results into a list"
+                     onclick="ru.passim.seeker.hide('tab_list');">
+                    <span class="glyphicon glyphicon-music"></span>
+                  </a>
+                {% endif %}
                 <!-- Allow uploading EAD XML files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload_ead" 
@@ -79,6 +87,42 @@
 
           </div>
 
+        </div>
+        {% endif %}
+
+
+        {% if is_passim_editor %}
+        <!-- Possibility to get a list of e-codices -->
+        <div class="inert collapse" id="tab_search_ecodex">
+          <form>
+            {% csrf_token %}
+            <div class="row">
+              <div class="col-md-2"><b>E-codices URL:</b></div>
+              <div class="col-md-9">
+                <input id="id_search_url" name="search_url" 
+                       style="width: 100%;"
+                       type="text" 
+                       placeholder="Copy/paste the e-codices search URL here..." />
+              </div>
+            </div>
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <div class="col-md-12">
+                <a class="btn jumbo-1" title="Extract a list of files from this search result"
+                    onclick="ru.passim.seeker.formset_update(this);"
+                    targetid="ecodices_results"
+                    targeturl="{% url 'search_ecodex' %}">
+                  <span class="glyphicon glyphicon-ok"></span>
+                </a>
+              </div>
+            </div>
+            <div class="row">&nbsp;</div>
+
+            <!-- Room to show the list we found-->
+            <div class="row" id="ecodices_results">
+              <!-- This is where the results come -->
+            </div>
+          </form>
         </div>
         {% endif %}
 

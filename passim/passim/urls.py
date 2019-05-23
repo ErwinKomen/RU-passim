@@ -43,6 +43,7 @@ urlpatterns = [
     url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
     url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
 
+    url(r'tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -93,6 +94,7 @@ urlpatterns = [
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
+    url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
