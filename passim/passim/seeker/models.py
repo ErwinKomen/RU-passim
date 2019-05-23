@@ -482,6 +482,13 @@ class Profile(models.Model):
     def get_stack(username):
         """Get the stack as a list from the current user"""
 
+        # Sanity check
+        if username == "":
+            # Rebuild the stack
+            path_home = reverse("home")
+            oStack = []
+            oStack.append({'name': "Home", 'url': path_home })
+            return oStack
         # Get the user
         user = User.objects.filter(username=username).first()
         # Get to the profile of this user
@@ -515,6 +522,8 @@ class Visit(models.Model):
 
         oErr = ErrHandle
         try:
+            # Sanity check
+            if username == "": return True
             # Get the user
             user = User.objects.filter(username=username).first()
             # Add an item

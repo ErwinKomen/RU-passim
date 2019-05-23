@@ -96,6 +96,15 @@ class NewsItemAdmin(admin.ModelAdmin):
         }
 
 
+class VisitAdmin(admin.ModelAdmin):
+    """Display and edit Visit moments"""
+
+    list_display = ['user', 'when', 'name', 'path']
+    list_filter = ['user', 'name']
+    search_fields = ['user']
+    fields = ['user', 'when', 'name', 'path']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -108,6 +117,7 @@ admin.site.register(Library, LibraryAdmin)
 
 # Logbook of activities
 admin.site.register(LogEntry, LogEntryAdmin)
+admin.site.register(Visit, VisitAdmin)
 
 # How to display user information
 admin.site.unregister(User)
