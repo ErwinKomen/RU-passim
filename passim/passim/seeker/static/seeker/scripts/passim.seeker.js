@@ -1366,6 +1366,7 @@ var ru = (function ($, ru) {
             lHtml = [],
             data = null,
             key = "",
+            i=0,
             frm = null,
             bOkay = true,
             bReloading = false,
@@ -1607,6 +1608,9 @@ var ru = (function ($, ru) {
               // Show waiting symbol
               $(elTr).find(".waiting").removeClass("hidden");
 
+              // Make sure we know where the error message should come
+              if ($(err).length === 0) { err = $(".err-msg").first();}
+
               // Get any possible targeturl
               targeturl = $(el).attr("targeturl");
               targetid = $(el).attr("targetid");
@@ -1639,36 +1643,50 @@ var ru = (function ($, ru) {
                     private_methods.errMsg("No status returned");
                   } else {
                     switch (response.status) {
+                      case "error":
+                        // Indicate there is an error
+                        bOkay = false;
+                        // Show the error in an appropriate place
+                        if ("msg" in response) {
+                          if (typeof response['msg'] === "object") {
+                            lHtml = [];
+                            lHtml.push("Errors:");
+                            $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                            $(err).html(lHtml.join("<br />"));
+                          } else {
+                            $(err).html("Error: " + response['msg']);
+                          }
+                        } else if ("errors" in response) {
+                          lHtml = [];
+                          lHtml.push("<h4>Errors</h4>");
+                          for (i = 0; i < response['errors'].length; i++) {
+                            $.each(response['errors'][i], function (key, value) {
+                              lHtml.push("<b>"+ key + "</b>: </i>" + value + "</i>");
+                            });
+                          }
+                          $(err).html(lHtml.join("<br />"));
+                        } else if ("error_list" in response) {
+                          lHtml = [];
+                          lHtml.push("Errors:");
+                          $.each(response['error_list'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("<code>There is an error</code>");
+                        }
+                        break;
                       case "ready":
                       case "ok":
-                      case "error":
                         if ("html" in response) {
                           // Show the HTML in the targetid
                           $(targetid).html(response['html']);
                           // Signal globally that something has been saved
                           loc_bManuSaved = true;
-                          // If there is an error, indicate this
-                          if (response.status === "error") {
-                            if ("msg" in response) {
-                              if (typeof response['msg'] === "object") {
-                                lHtml = []
-                                lHtml.push("Errors:");
-                                $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
-                                $(err).html(lHtml.join("<br />"));
-                              } else {
-                                $(err).html("Error: " + response['msg']);
-                              }
-                            } else {
-                              $(err).html("<code>There is an error</code>");
-                            }
+                          // If an 'afternewurl' is specified, go there
+                          if ('afternewurl' in response && response['afternewurl'] !== "") {
+                            window.location = response['afternewurl'];
+                            bReloading = true;
                           } else {
-                            // If an 'afternewurl' is specified, go there
-                            if ('afternewurl' in response && response['afternewurl'] !== "") {
-                              window.location = response['afternewurl'];
-                              bReloading = true;
-                            } else {
-                              // Otherwise: we need to re-load the 
-                            }
+                            // Otherwise: we need to re-load the 
                           }
                         } else {
                           // Send a message
@@ -1681,7 +1699,7 @@ var ru = (function ($, ru) {
                         break;
                     }
                   }
-                  if (!bReloading) {
+                  if (!bReloading && bOkay) {
                     // Return to view mode
                     $(elTr).find(".view-mode").removeClass("hidden");
                     $(elTr).find(".edit-mode").addClass("hidden");

@@ -1342,7 +1342,7 @@ class BasicPart(View):
             # Make sure we have a list of any errors
             error_list = [str(item) for item in self.arErr]
             context['error_list'] = error_list
-            context['errors'] = self.arErr
+            context['errors'] = json.dumps( self.arErr)
             if len(self.arErr) > 0:
                 # Indicate that we have errors
                 self.data['has_errors'] = True
@@ -1359,6 +1359,7 @@ class BasicPart(View):
                     self.data['err_view'] = render_to_string(self.template_err_view, context, request)
                 else:
                     self.data['error_list'] = error_list
+                    self.data['errors'] = self.arErr
                 self.data['html'] = ''
             elif self.action == "delete":
                 self.data['html'] = "deleted" 

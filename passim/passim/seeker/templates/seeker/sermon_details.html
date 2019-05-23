@@ -3,9 +3,7 @@
 
 {% block breadcrumbs %}
   <div class="breadcrumbs">
-    <a href="{% url 'home' %}">Home</a>
-    &rsaquo; <a href="{% url 'search_sermon' %}">Sermon List</a>
-    &rsaquo; Sermon Details
+  {% include 'breadcrumb_list.html' %}
   </div>
 {% endblock %}
 

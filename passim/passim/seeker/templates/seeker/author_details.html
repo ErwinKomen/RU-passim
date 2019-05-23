@@ -3,9 +3,7 @@
 
 {% block breadcrumbs %}
   <div class="breadcrumbs">
-    <a href="{% url 'home' %}">Home</a>
-    &rsaquo; <a href="{% url 'author_search' %}">Author List</a>
-    &rsaquo; Author Details
+    {% include 'breadcrumb_list.html' %}
   </div>
 {% endblock %}
 
@@ -19,7 +17,7 @@
         <div class="row">
           <div class="col-md-1">
             <a class="btn jumbo-1" 
-               href="{% url 'author_search' %}"
+               href="{{prevpage}}"
                title="Back to the list of authors">&lt;&lt;</a>
           </div>
           <div class="col-md-10">

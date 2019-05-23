@@ -17,6 +17,10 @@
     {% endif %}
   </h3>
 
+  <!-- Little error message room -->
+  <div id="little_err_msg" class="err-msg"></div>
+
+
   <table style="width: 90%;" class="manuscript-details">
     <tbody>
       <!-- Row to indicate editing, if possible -->
@@ -38,9 +42,6 @@
 
             <!-- Waiting symbol-->
             <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
-
-            <!-- Little error message room -->
-            <span id="little_err_msg" class="err-msg"></span>
 
             <!-- Delete button completely to the right -->
             <a mode="delete" class="edit-mode btn btn-xs jumbo-3 hidden pull-right" 

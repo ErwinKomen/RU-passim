@@ -3,8 +3,7 @@
 
 {% block breadcrumbs %}
   <div class="breadcrumbs">
-      <a href="{% url 'home' %}">Home</a>
-      &rsaquo; Search Library
+    {% include 'breadcrumb_list.html' %}
   </div>
 {% endblock %}
 
