@@ -32,7 +32,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
+    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
     Report, SermonDescrGold, Visit, Profile
 
 import fnmatch
@@ -720,10 +720,13 @@ def get_signatures(request):
     try:
         data = 'fail'
         if request.is_ajax():
-            author = request.GET.get("name", "")
+            codename = request.GET.get("name", "")
+            editype = request.GET.get("type", "")
             lstQ = []
-            lstQ.append(Q(code__icontains=author))
-            items = Signature.objects.order_by("code").distinct()
+            lstQ.append(Q(code__icontains=codename))
+            if editype != "":
+                lstQ.append(Q(editype=editype))
+            items = Signature.objects.filter(*lstQ).order_by("code").distinct()
             results = []
             for co in items:
                 co_json = {'name': co.code, 'id': co.id }
@@ -1941,7 +1944,7 @@ class ManuscriptEdit(BasicPart):
         maxdepth = 0
         if instance != None:
             # Create a well sorted list of sermons
-            qs = instance.sermons.filter(order__gte=0).order_by('order')
+            qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for sermon in qs:
                 oSermon = {}
@@ -2021,13 +2024,12 @@ class SermonDetails(PassimDetails):
         context['breadcrumbs'] = process_visit(self.request, "Sermon details", False)
         context['prevpage'] = get_previous_page(self.request)
 
-        # Make sure we add the existing manuscript_id to the context if possible
-        qs_manu = instance.manuscripts_sermons.all()
-        if qs_manu.count() == 0:
+        # New:
+        if instance.manu == None:
             context['manuscript_id'] = None
         else:
-            sman = qs_manu.first()
-            context['manuscript_id'] = sman.manuscript_id
+            context['manuscript_id'] = instance.manu.id
+
 
         return context
 
@@ -2069,6 +2071,8 @@ class SermonEdit(BasicPart):
 
     def after_save(self, prefix, instance = None):
 
+        using_system = "sermondescr"
+
         # Check if this is a new one
         if self.add:
             # This is a new one, so it should be coupled to the correct manuscript
@@ -2076,17 +2080,200 @@ class SermonEdit(BasicPart):
                 # It is there, so we can add it
                 manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
                 if manuscript != None:
-                    # Add to the SermonMan
-                    obj = SermonMan(sermon=instance, manuscript=manuscript)
-                    obj.save()
-                    # Calculate how many sermons there are
-                    sermon_count = manuscript.sermons.all().count()
-                    # Make sure the new sermon gets changed
-                    instance.order = sermon_count
-                    instance.save()
+                    if using_system == "sermonman":
+                        # Add to the SermonMan
+                        obj = SermonMan(sermon=instance, manuscript=manuscript)
+                        obj.save()
+                        # Calculate how many sermons there are
+                        sermon_count = manuscript.sermons.all().count()
+                        # Make sure the new sermon gets changed
+                        instance.order = sermon_count
+                        instance.save()
+                    elif using_system == "sermondescr":
+                        # Adapt the SermonDescr instance
+                        instance.manu = manuscript
+                        # Calculate how many sermons there are
+                        sermon_count = manuscript.manusermons.all().count()
+                        # Make sure the new sermon gets changed
+                        instance.order = sermon_count
+                        instance.save()
+                        
         
         # There's is no real return value needed here 
         return True
+
+
+class SermonListView(ListView):
+    """Search and list manuscripts"""
+    
+    model = SermonDescr
+    paginate_by = 20
+    template_name = 'seeker/sermon_list.html'
+    entrycount = 0
+    bDoTime = True
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', '', '']
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
+                   {'name': 'Manuscript', 'order': '', 'type': 'str'},
+                   {'name': 'Locus', 'order': '', 'type': 'str'},
+                   {'name': 'Links', 'order': '', 'type': 'str'}]
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(SermonListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        initial = self.request.GET
+
+        # ONE-TIME adhoc = SermonGold.init_latin()
+
+        # Add a files upload form
+        context['sermoForm'] = SermonForm(prefix='sermo')
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Sermons"
+
+        # Make sure we pass on the ordered heads
+        context['order_heads'] = self.order_heads
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Sermons", False)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in querystring, or use default class property value.
+        """
+        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+    def get_queryset(self):
+        # Measure how long it takes
+        if self.bDoTime: iStart = get_now_time()
+
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasFormset = (len(get) > 0)
+
+        # Fix the sort-order
+        get['sortOrder'] = 'name'
+
+        if self.bHasFormset:
+            # Get the formset from the input
+            lstQ = []
+
+            sermoForm = SermonForm(self.qd, prefix='sermo')
+
+            if sermoForm.is_valid():
+
+                # Process the criteria from this form 
+                oFields = sermoForm.cleaned_data
+
+                # Check for author name -- which is in the typeahead parameter
+                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+                    val = oFields['author']
+                    lstQ.append(Q(author=val))
+                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
+                    val = adapt_search(oFields['authorname'])
+                    lstQ.append(Q(author__name__iregex=val))
+
+                # Check for incipit string
+                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
+                    val = adapt_search(oFields['incipit'])
+                    lstQ.append(Q(srchincipit__iregex=val))
+
+                # Check for explicit string
+                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
+                    val = adapt_search(oFields['explicit'])
+                    lstQ.append(Q(srchexplicit__iregex=val))
+
+                # Check for SermonGold [signature]
+                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+                    val = adapt_search(oFields['signature'])
+                    lstQ.append(Q(goldsignatures__code__iregex=val))
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # Just show everything
+                    qs = SermonDescr.objects.all()
+                else:
+                    qs = SermonDescr.objects.filter(*lstQ).distinct()
+            else:
+                # TODO: communicate the error to the user???
+
+
+                # Just show everything
+                qs = SermonDescr.objects.all().distinct()
+
+        else:
+            # Just show everything
+            qs = SermonDescr.objects.all().distinct()
+
+        # Do sorting: Start with an initial order
+        order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
+        bAscending = True
+        sType = 'str'
+        if 'o' in self.qd:
+            order = []
+            iOrderCol = int(self.qd['o'])
+            bAscending = (iOrderCol>0)
+            iOrderCol = abs(iOrderCol)
+            for order_item in self.order_cols[iOrderCol-1].split(";"):
+                order.append(Lower(order_item))
+            sType = self.order_heads[iOrderCol-1]['type']
+            if bAscending:
+                self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
+            else:
+                # order = "-" + order
+                self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+        if sType == 'str':
+            qs = qs.order_by(*order)
+        else:
+            qs = qs.order_by(*order)
+        # Possibly reverse the order
+        if not bAscending:
+            qs = qs.reverse()
+
+        # Time measurement
+        if self.bDoTime:
+            print("SermonListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+            # print("SermonGoldListView query: {}".format(qs.query))
+            iStart = get_now_time()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Time measurement
+        if self.bDoTime:
+            print("SermonListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+        # Return the resulting filtered and sorted queryset
+        return qs
 
 
 class SermonLinkset(BasicPart):
@@ -2125,7 +2312,7 @@ class ManuscriptDetails(PassimDetails):
         maxdepth = 0
         if instance != None:
             # Create a well sorted list of sermons
-            qs = instance.sermons.filter(order__gte=0).order_by('order')
+            qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for sermon in qs:
                 oSermon = {}

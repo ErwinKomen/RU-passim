@@ -62,6 +62,7 @@ urlpatterns = [
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
     url(r'^sermon/linkset(?:/(?P<pk>\d+))?/$', SermonLinkset.as_view(), name='sermon_linkset'),
+    url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
 
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),

@@ -114,6 +114,12 @@ class SermonForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
     libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    siggryson = forms.CharField(label=_("Signature"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}))
+    sigclavis = forms.CharField(label=_("Signature"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -131,8 +137,8 @@ class SermonForm(forms.ModelForm):
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
-                 'incipit':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'explicit':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -177,7 +183,6 @@ class SermonDescrGoldForm(forms.ModelForm):
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
                 pass
-
 
 
 class SermonGoldForm(forms.ModelForm):

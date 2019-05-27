@@ -839,8 +839,6 @@ class Manuscript(models.Model):
     # Where do we get our information from? And when was it added?
     source = models.ForeignKey(SourceInfo, null=True, blank=True)
 
-    # [m] Many-to-many: all the sermons of this manuscr
-    sermons = models.ManyToManyField("SermonDescr", through="SermonMan")
     # [m] Many-to-many: all the provenances of this manuscript
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
 
@@ -864,7 +862,7 @@ class Manuscript(models.Model):
             if 'quote' in oDescr: lstQ.append(Q(quote__iexact=oDescr['quote']))
 
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
-            sermon = self.sermons.filter(*lstQ).first()
+            sermon = self.manusermons.filter(*lstQ).first()
 
             # Return the sermon instance
             return sermon
@@ -1571,6 +1569,10 @@ class SermonGold(models.Model):
         istop = 1
         self.srchincipit = get_searchable(self.incipit)
         self.srchexplicit = get_searchable(self.explicit)
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        self.siglist = json.dumps(lSign)
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
         return response
@@ -1658,8 +1660,7 @@ class SermonGold(models.Model):
         lSign = []
         for item in self.goldsignatures.all():
             lSign.append(item.short())
-        siglist = json.dumps(lSign)
-        self.siglist = siglist
+        self.siglist = json.dumps(lSign)
         # And save myself
         self.save()
 
@@ -1685,6 +1686,7 @@ class SermonGold(models.Model):
 
     def get_incipit_markdown(self):
         """Get the contents of the incipit field using markdown"""
+        # Perform
         return adapt_markdown(self.incipit)
 
     def get_explicit_markdown(self):
@@ -2078,6 +2080,213 @@ class Ftextlink(models.Model):
         return self.url
 
 
+class SermonDescr(models.Model):
+    """A sermon is part of a manuscript"""
+
+    # [0-1] Not every sermon might have a title ...
+    title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
+
+    # ======= OPTIONAL FIELDS describing the sermon ============
+    # [0-1] We would very much like to know the *REAL* author
+    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_sermons")
+    # [0-1] But most often we only start out with having just a nickname of the author
+    nickname = models.ForeignKey(Nickname, null=True, blank=True, related_name="nickname_sermons")
+    # [0-1] Optional location of this sermon on the manuscript
+    locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] We would like to know the INCIPIT (first line in Latin)
+    incipit = models.TextField("Incipit", null=True, blank=True)
+    srchincipit = models.TextField("Incipit (searchable)", null=True, blank=True)
+    # [0-1] We would like to know the EXPLICIT (last line in Latin)
+    explicit = models.TextField("Explicit", null=True, blank=True)
+    srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+    # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
+    quote = models.TextField("Quote", null=True, blank=True)
+    # [0-1] We would like to know the Clavis number (if available)
+    clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] We would like to know the Gryson number (if available)
+    gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] The FEAST??
+    feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Edition
+    edition = models.TextField("Edition", null=True, blank=True)
+    # [0-1] Any notes for this sermon
+    note = models.TextField("Note", null=True, blank=True)
+    # [0-1] Additional information 
+    additional = models.TextField("Additional", null=True, blank=True)
+    # [0-1] Any number of bible references (as stringified JSON list)
+    bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
+    # [0-1] One keyword or more??
+    keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
+
+    # ========================================================================
+    # [1] Every sermondescr belongs to exactly one manuscript
+    manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
+
+    # Automatically created and processed fields
+    # [1] Every gold sermon has a list of signatures that are automatically created
+    siglist = models.TextField("List of signatures", default="[]")
+
+    # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
+    # [0-1] Parent sermon, if applicable
+    parent = models.ForeignKey('self', null=True, blank=True, related_name="sermon_parent")
+    # [0-1] Parent sermon, if applicable
+    firstchild = models.ForeignKey('self', null=True, blank=True, related_name="sermon_child")
+    # [0-1] Parent sermon, if applicable
+    next = models.ForeignKey('self', null=True, blank=True, related_name="sermon_next")
+    # [1]
+    order = models.IntegerField("Order", default = -1)
+
+    # [0-n] Link to one or more golden standard sermons
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [0-1] Method
+    method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
+
+    def __str__(self):
+        if self.author:
+            sAuthor = self.author.name
+        elif self.nickname:
+            sAuthor = self.nickname.name
+        else:
+            sAuthor = "-"
+        sSignature = "{}/{}".formate(sAuthor,self.locus)
+        return sSignature
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the incipit and explicit
+        istop = 1
+        if self.incipit: self.srchincipit = get_searchable(self.incipit)
+        if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        lSign = []
+        bNeedSave = False
+        for item in self.sermonsignatures.all():
+            lSign.append(item.short())
+            bNeedSave = True
+        if bNeedSave: self.siglist = json.dumps(lSign)
+        # Do the saving initially
+        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        return response
+
+    def init_latin():
+        """ One time ad-hoc function"""
+
+        with transaction.atomic():
+            for obj in SermonDescr.objects.all():
+                bNeedSave = False
+                if obj.incipit: 
+                    bNeedSave = True
+                if obj.explicit: 
+                    bNeedSave = True
+                lSign = []
+                for item in obj.sermonsignatures.all():
+                    bNeedSave = True
+                if bNeedSave:
+                    obj.save()
+        return True
+
+    def target(self):
+        # Get the URL to edit this sermon
+        sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
+        return sUrl
+
+    def getdepth(self):
+        depth = 1
+        node = self
+        while node.parent:
+            depth += 1
+            node = node.parent
+        return depth
+
+    def get_manuscript(self):
+        """Get the first manuscript that links to this sermondescr"""
+
+        obj = SermonMan.objects.filter(sermon=self).first()
+        if obj == None:
+            return None
+        else:
+            return obj.manuscript
+
+    def signatures(self):
+        """Combine all signatures into one string"""
+
+        lSign = []
+        for item in self.sermonsignatures.all():
+            lSign.append(item.short())
+        return " | ".join(lSign)
+
+    def do_signatures(self):
+        """Create or re-make a JSON list of signatures"""
+
+        lSign = []
+        for item in self.sermonsignatures.all():
+            lSign.append(item.short())
+        self.siglist = json.dumps(lSign)
+        # And save myself
+        self.save()
+
+    def get_incipit(self):
+        """Return the *searchable* incipit, without any additional formatting"""
+        return self.srchincipit
+
+    def get_explicit(self):
+        """Return the *searchable* explicit, without any additional formatting"""
+        return self.srchexplicit
+
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+
+        # Sanity check
+        if self.incipit != None and self.incipit != "":
+            if self.srchincipit == None or self.srchincipit == "":
+                SermonDescr.init_latin()
+
+        ## Manuscript linking check
+        #if self.manu == None:
+        #    # Review all links between SermonDescr and Manuscript
+        #    with transaction.atomic():
+        #        for obj in SermonMan.objects.all():
+        #            obj.sermon.manu = obj.manuscript
+        #            obj.sermon.save()
+        #        x = 1
+
+        return adapt_markdown(self.incipit)
+
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
+
+
+class SermonDescrGold(models.Model):
+    """Link from sermon description to gold standard"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
+    # [1] The gold sermon
+    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
+    # [1] Each sermon-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default="eq")
+
+    def __str__(self):
+        # Temporary fix: sermon.id
+        # Should be changed to something more significant in the future
+        # E.G: manuscript+locus?? (assuming each sermon has a locus)
+        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
+        return combi
+
+
+#class SermonMan(models.Model):
+#    """A particular sermon is located in a particular manuscript"""
+
+#    # [1] The sermon we are talking about
+#    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts_sermons")
+#    # [1] The manuscript this sermon is written on 
+#    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_sermons")
+
+#    def __str__(self):
+#        combi = "{}: {}".format(self.manuscript.name, self.sermon.title)
+
+
 class Signature(models.Model):
     """One Gryson, Clavis or other code as taken up in an edition"""
 
@@ -2108,113 +2317,36 @@ class Signature(models.Model):
         return response
 
     
-class SermonDescr(models.Model):
-    """A sermon is part of a manuscript"""
+class SermonSignature(models.Model):
+    """One Gryson, Clavis or other code as taken up in an edition"""
 
-    # [0-1] Not every sermon might have a title ...
-    title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
-
-    # ======= OPTIONAL FIELDS describing the sermon ============
-    # [0-1] We would very much like to know the *REAL* author
-    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_sermons")
-    # [0-1] But most often we only start out with having just a nickname of the author
-    nickname = models.ForeignKey(Nickname, null=True, blank=True, related_name="nickname_sermons")
-    # [0-1] Optional location of this sermon on the manuscript
-    locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] We would like to know the INCIPIT (first line in Latin)
-    incipit = models.TextField("Incipit", null=True, blank=True)
-    # [0-1] We would like to know the EXPLICIT (last line in Latin)
-    explicit = models.TextField("Explicit", null=True, blank=True)
-    # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
-    quote = models.TextField("Quote", null=True, blank=True)
-    # [0-1] We would like to know the Clavis number (if available)
-    clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] We would like to know the Gryson number (if available)
-    gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] The FEAST??
-    feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] Edition
-    edition = models.TextField("Edition", null=True, blank=True)
-    # [0-1] Any notes for this sermon
-    note = models.TextField("Note", null=True, blank=True)
-    # [0-1] Additional information 
-    additional = models.TextField("Additional", null=True, blank=True)
-    # [0-1] Any number of bible references (as stringified JSON list)
-    bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
-    # [0-1] One keyword or more??
-    keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
-
-    # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
-    # [0-1] Parent sermon, if applicable
-    parent = models.ForeignKey('self', null=True, blank=True, related_name="sermon_parent")
-    # [0-1] Parent sermon, if applicable
-    firstchild = models.ForeignKey('self', null=True, blank=True, related_name="sermon_child")
-    # [0-1] Parent sermon, if applicable
-    next = models.ForeignKey('self', null=True, blank=True, related_name="sermon_next")
-    # [1]
-    order = models.IntegerField("Order", default = -1)
-
-    # [0-n] Link to one or more golden standard sermons
-    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
-
-    # [0-1] Method
-    method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
+    # [1] It must have a code = gryson code or clavis number
+    code = models.CharField("Code", max_length=LONG_STRING)
+    # [1] Every edition must be of a limited number of types
+    editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
+                            max_length=5, default="gr")
+    # [1] Every signature belongs to exactly one gold-sermon
+    sermon = models.ForeignKey(SermonDescr, null=False, blank=False, related_name="sermonsignatures")
 
     def __str__(self):
-        if self.author:
-            sAuthor = self.author.name
-        elif self.nickname:
-            sAuthor = self.nickname.name
-        else:
-            sAuthor = "-"
-        sSignature = "{}/{}".formate(sAuthor,self.locus)
-        return sSignature
+        return "{}: {}".format(self.editype, self.code)
 
-    def target(self):
-        # Get the URL to edit this sermon
-        sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
-        return sUrl
+    def short(self):
+        return self.code
 
-    def getdepth(self):
-        depth = 1
-        node = self
-        while node.parent:
-            depth += 1
-            node = node.parent
-        return depth
+    def find(code, editype):
+        obj = SermonSignature.objects.filter(code=code, editype=editype).first()
+        return obj
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Do the saving initially
+        response = super(SermonSignature, self).save(force_insert, force_update, using, update_fields)
+        # Adapt list of signatures for the related GOLD
+        self.sermon.do_signatures()
+        # Then return the super-response
+        return response
 
-class SermonDescrGold(models.Model):
-    """Link from sermon description to gold standard"""
-
-    # [1] The sermondescr
-    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
-    # [1] The gold sermon
-    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
-    # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
-                            max_length=5, default="eq")
-
-    def __str__(self):
-        # Temporary fix: sermon.id
-        # Should be changed to something more significant in the future
-        # E.G: manuscript+locus?? (assuming each sermon has a locus)
-        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
-        return combi
-
-
-class SermonMan(models.Model):
-    """A particular sermon is located in a particular manuscript"""
-
-    # [1] The sermon we are talking about
-    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts_sermons")
-    # [1] The manuscript this sermon is written on 
-    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_sermons")
-
-    def __str__(self):
-        combi = "{}: {}".format(self.manuscript.name, self.sermon.title)
-
-
+    
 class ProvenanceMan(models.Model):
 
     # [1] The provenance

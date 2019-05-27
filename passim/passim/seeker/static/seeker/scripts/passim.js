@@ -50,6 +50,10 @@ var ru = (function ($, ru) {
         loc_explicitsL = [],
         loc_signature = [],     // Use in sermongold_select.html
         loc_signatureL = [],
+        loc_siggryson = [],     // Use in sermon_list.html
+        loc_siggrysonL = [],
+        loc_sigclavis = [],     // Use in sermon_list.html
+        loc_sigclavisL = [],
         loc_edition = [],       // critical editions that belong to a gold sermon
         loc_editionL = [],      
         loc_elInput = null,
@@ -239,6 +243,35 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: SIGGRYSON
+        loc_siggryson = new Bloodhound({
+          datumTokenizer: function (myObj) {return myObj;},
+          queryTokenizer: function (myObj) {return myObj;},
+          // loc_countries will be an array of countries
+          local: loc_siggrysonL,
+          prefetch: { url:  base_url + 'api/signatures/', cache: true },
+          remote: {url:     base_url + 'api/signatures/?type=gr&name=',
+                   replace: function (url, uriEncodedQuery) {
+                      url += encodeURIComponent(uriEncodedQuery);
+                      return url; } }
+        });
+
+        // Bloodhound: SIGCLAVIS
+        loc_sigclavis = new Bloodhound({
+          datumTokenizer: function (myObj) { return myObj; },
+          queryTokenizer: function (myObj) { return myObj; },
+          // loc_countries will be an array of countries
+          local: loc_sigclavisL,
+          prefetch: { url: base_url + 'api/signatures/', cache: true },
+          remote: {
+            url: base_url + 'api/signatures/?type=cl&name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Bloodhound: EDITION
         loc_edition = new Bloodhound({
           datumTokenizer: function (myObj) {
@@ -407,6 +440,38 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".signature-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: Gryson Signature
+          $(".row .typeahead.siggrysons, tr .typeahead.siggrysons").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'siggrysons', source: loc_siggryson, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact code</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".siggryson-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: Clavis Signature
+          $(".row .typeahead.sigclavises, tr .typeahead.siggrysons").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'sigclavises', source: loc_sigclavis, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact code</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".siggryson-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: EDITION -- NOTE: not in a form-row, but in a normal 'row'
