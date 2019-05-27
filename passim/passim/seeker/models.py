@@ -12,7 +12,7 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
-import sys, os, io
+import sys, os, io, re
 import copy
 import json
 import time
@@ -98,6 +98,8 @@ def adapt_markdown(val):
         sBack = sBack.replace("</p>", "")
     return sBack
 
+def is_number(s_input):
+    return re.match(r'^[[]?(\d+)[]]?', s_input)
 
 def get_linktype_abbr(sLinkType):
     """Convert a linktype into a valid abbreviation"""
@@ -1771,6 +1773,15 @@ class SermonGold(models.Model):
             lst.append(oManual)
             return True
 
+        def add_to_read_list(lst, oGold):
+            oRead = {}
+            if 'row_number' in oGold:
+                oRead['row_number'] = oGold['row_number']
+            for k in lField:
+                oRead[k] = oGold[k]
+            lst.append(oRead)
+            return True
+
         # Number to order all the items we read
         order = 0
         iSermCount = 0
@@ -1790,6 +1801,7 @@ class SermonGold(models.Model):
 
         # Keep a list of lines that need to be treated manually
         lst_manual = []
+        lst_read = []
         write_csv_output = True
 
         # Specify which status is acceptable
@@ -1826,9 +1838,9 @@ class SermonGold(models.Model):
                 bBreak = False
 
                 # ============================================================
-                lStop = ['210'] # lStop = ['194', '210']
-                if oGold['row_number'] in lStop:
-                    iStopHere = 1
+                #lStop = ['210'] # lStop = ['194', '210']
+                #if oGold['row_number'] in lStop:
+                #    iStopHere = 1
                 # ============================================================
 
                 # Get the status of this line
@@ -1870,6 +1882,9 @@ class SermonGold(models.Model):
                                     pass
                                 for code in code_lst.split("+"):
                                     code = code.strip()
+                                    # Insert 'CPPM' if needed
+                                    if editype == "cl" and is_number(code):
+                                        code = "CPPM {}".format(code)
                                     # Add this code to the signatures
                                     obj = Signature.find(code, editype)
                                     if obj == None:
@@ -1919,6 +1934,9 @@ class SermonGold(models.Model):
                         # Break from the higher gold loop
                         continue
 
+                    # Getting here means that the item is read completely well
+                    add_to_read_list(lst_read, oGold)
+
                     oGold['obj'] = gold
                     iSermCount += 1
                 else:
@@ -1958,7 +1976,7 @@ class SermonGold(models.Model):
                                 # Skip the remainder of this line
                                 break
                             else:
-                                # This is being recognized...
+                                # Don;t add links
                                 pass
 
                             # Check if this relation is already there
@@ -1981,7 +1999,7 @@ class SermonGold(models.Model):
             oBack['filename'] = filename
 
             # Create a report and add it to what we return
-            oContents = {'headers': lHeader, 'list': lst_manual}
+            oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
             oReport = Report.make(username, "ig", json.dumps(oContents))
             oBack['report_id'] = oReport.id
 
