@@ -1943,6 +1943,12 @@ var ru = (function ($, ru) {
                 // Set the delete value of the checkbox
                 $(elStart).closest("td").find("input[type=checkbox]").first().prop("checked", true);
                 break;
+              case "wait":
+                // Set a waiting thing at the targetid
+                $("#" + targetid).html(loc_sWaiting);
+                // Make sure the caller is inactivated
+                $(elStart).addClass("hidden");
+                break;
             }
           }
 
@@ -1987,6 +1993,14 @@ var ru = (function ($, ru) {
                     } else {
                       // Show the HTML in the targetid
                       $("#" + targetid).html(response['html']);
+                      // Action...
+                      if (sAction !== undefined && sAction !== "") {
+                        switch (sAction) {
+                          case "wait":
+                            $(elStart.removeClass("hidden"));
+                            break;
+                        }
+                      }
                     }
                     // But make sure events are back on again
                     ru.passim.seeker.init_events();

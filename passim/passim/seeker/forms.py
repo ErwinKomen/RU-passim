@@ -372,4 +372,8 @@ class UploadFilesForm(forms.Form):
                                   widget=forms.ClearableFileInput(attrs={'multiple': True}))
 
 
+class SearchUrlForm(forms.Form):
+    """Specify an URL"""
 
+    search_url = forms.URLField(label="Give the URL",
+                                widget=forms.URLInput(attrs={'placeholder': 'Enter the search URL...', 'style': 'width: 100%;'}))

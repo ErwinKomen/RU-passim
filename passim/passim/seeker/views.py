@@ -30,7 +30,7 @@ from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
-                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm
+                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonMan, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
     Report, SermonDescrGold, Visit, Profile
@@ -1145,9 +1145,12 @@ def search_ecodex(request):
     error_list = []
     data = {'status': 'ok', 'html': ''}
     username = request.user.username
+    errHandle = ErrHandle()
 
     # Check if the user is authenticated and if it is POST
     if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
+        # Create a regular expression
+        r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
         # Get the parameters
         if request.POST:
             qd = request.POST
@@ -1157,8 +1160,58 @@ def search_ecodex(request):
             # Get the parameter
             s_url = qd['search_url']
             # Make a search request and get the result into a string
+            try:
+                r = requests.get(s_url)
+            except:
+                sMsg = errHandle.get_error_message()
+                errHandle.DoError("Request problem")
+                return False
+            if r.status_code == 200:
+                # Get the text into a list
+                l_text = r.text.split('\n')
+                lHtml = []
+                iMatches = 0
+                lHtml.append("<table><thead><tr><th>#</th><th>Part</th><th>Text</th><th>Version</th><th>XML</th></tr></thead>")
+                lHtml.append("<tbody>")
+                # Walk the text
+                for line in l_text:
+                    # Check if this line contains information
+                    if ">Description<" in line:
+                        # Extract the information from this line
+                        match = r_href.search(line)
+                        if match:
+                            iMatches += 1
+                            # Get the HREF 
+                            href = match.group(2)
+                            # Split into parts
+                            parts = href.split("/")
+                            # Find the 'description' part
+                            for idx,part in enumerate(parts):
+                                if part == "description":
+                                    # Take array from one further
+                                    idx += 1
+                                    mparts = parts[idx:]
+                                    break
+                            # Reconstruct:
+                            xml_name = "{}-{}".format(mparts[0], mparts[1])
+                            version = ""
+                            if len(mparts) > 2 and mparts[2] != "":
+                                xml_name = "{}_{}".format(xml_name, mparts[2])
+                                version = mparts[2]
+                            xml_url = "{}/{}.xml".format("https://www.e-codices.unifr.ch/xml/tei_published", xml_name)
 
-        pass
+                            # Add to the HTML table
+                            lHtml.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(iMatches,mparts[0], mparts[1],version,xml_url))
+                # We had all lines, now we need to return it in a good way
+                lHtml.append("</tbody></table>")
+                data['html'] = "\n".join(lHtml)
+                data['status'] = "ok"
+            else:
+                data['html'] = "Website returns status code {}".format(r.status_code)
+                data['status'] = "error"
+        else:
+            data['html'] = "Did not receive parameter search_url"
+            data['status'] = "error"
     else:
         data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
         data['status'] = "error"
@@ -2135,6 +2188,9 @@ class ManuscriptListView(ListView):
 
         # Add a files upload form
         context['uploadform'] = UploadFilesForm()
+
+        # Add a form to enter a URL
+        context['searchurlform'] = SearchUrlForm()
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()

@@ -98,21 +98,17 @@
             {% csrf_token %}
             <div class="row">
               <div class="col-md-2"><b>E-codices URL:</b></div>
-              <div class="col-md-9">
-                <input id="id_search_url" name="search_url" 
-                       style="width: 100%;"
-                       type="text" 
-                       placeholder="Copy/paste the e-codices search URL here..." />
-              </div>
+              <div class="col-md-9">{{searchurlform.search_url}}</div>
             </div>
             <div class="row">&nbsp;</div>
             <div class="row">
               <div class="col-md-12">
                 <a class="btn jumbo-1" title="Extract a list of files from this search result"
-                    onclick="ru.passim.seeker.formset_update(this);"
+                    onclick="ru.passim.seeker.formset_update(this, 'wait');"
                     targetid="ecodices_results"
                     targeturl="{% url 'search_ecodex' %}">
                   <span class="glyphicon glyphicon-ok"></span>
+                  Extract a list of e-Codices texts
                 </a>
               </div>
             </div>

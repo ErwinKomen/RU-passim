@@ -34,7 +34,8 @@
 
 /* Set font for heading */
 h1, h2, h3, h4, h5, h6 {
-	font-family: 'Raleway', sans-serif;
+	/* font-family: 'Raleway', sans-serif; */
+  font-family: Calibri, sans-serif !important;
 }
 
 a, a:active, a:visited {
@@ -257,7 +258,7 @@ p {
   padding: 0;
   line-height: 140%;
 	font-family: Calibri, sans-serif !important;
-	font-size: 20px;
+	font-size: 18px;
   margin-top: 20px;
 }
 
@@ -703,6 +704,10 @@ ol li, .page-content ul li {
 	/* min-width: 325px; /* */
 }
 
+.prjcol-1 {
+  color: #d96f3b;
+}
+
 .display-lg .banner h1, .display-lg .banner h3, .display-lg .banner h4 {
 	width: auto;
 }
@@ -750,10 +755,10 @@ body > div > footer a {
 
 /* FOOTER information that moves up and down */
 .footinfo {
-	background-color: #ead7ef; /* #cbc7bc; #d96f3b; /* #b82b22; */
+	background-color: #eae7df; /*#ead7ef #cbc7bc; #d96f3b; /* #b82b22; */
   opacity: 1.5;
 	min-height: 200px;
-	color: white;
+	color: black;
   font-family: Calibri, sans-serif ;
   font-size: large;
   font-weight: 700;
