@@ -61,6 +61,7 @@ urlpatterns = [
     # url(r'^sermon/view(?:/(?P<pk>\d+))?/$', SermonDetailsView.as_view(), name='sermon_view'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
+    url(r'^sermon/signset(?:/(?P<pk>\d+))?/$', SermonSignset.as_view(), name='sermon_signset'),
     url(r'^sermon/linkset(?:/(?P<pk>\d+))?/$', SermonLinkset.as_view(), name='sermon_linkset'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
 
@@ -90,7 +91,8 @@ urlpatterns = [
     url(r'^api/gldexplicits/$', passim.seeker.views.get_gldexplicits, name='api_gldexplicits'),
     url(r'^api/srmincipits/$', passim.seeker.views.get_srmincipits, name='api_srmincipits'),
     url(r'^api/srmexplicits/$', passim.seeker.views.get_srmexplicits, name='api_srmexplicits'),
-    url(r'^api/signatures/$', passim.seeker.views.get_signatures, name='api_signatures'),
+    url(r'^api/gldsignatures/$', passim.seeker.views.get_gldsignatures, name='api_gldsignatures'),
+    url(r'^api/srmsignatures/$', passim.seeker.views.get_srmsignatures, name='api_srmsignatures'),
     url(r'^api/editions/$', passim.seeker.views.get_editions, name='api_editions'),
     url(r'^api/manuidnos/$', passim.seeker.views.get_manuidnos, name='api_manuidnos'),
 

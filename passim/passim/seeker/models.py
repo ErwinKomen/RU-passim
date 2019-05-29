@@ -2247,15 +2247,6 @@ class SermonDescr(models.Model):
             if self.srchincipit == None or self.srchincipit == "":
                 SermonDescr.init_latin()
 
-        ## Manuscript linking check
-        #if self.manu == None:
-        #    # Review all links between SermonDescr and Manuscript
-        #    with transaction.atomic():
-        #        for obj in SermonMan.objects.all():
-        #            obj.sermon.manu = obj.manuscript
-        #            obj.sermon.save()
-        #        x = 1
-
         return adapt_markdown(self.incipit)
 
     def get_explicit_markdown(self):
@@ -2280,18 +2271,6 @@ class SermonDescrGold(models.Model):
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
         combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
         return combi
-
-
-#class SermonMan(models.Model):
-#    """A particular sermon is located in a particular manuscript"""
-
-#    # [1] The sermon we are talking about
-#    sermon = models.ForeignKey(SermonDescr, related_name="manuscripts_sermons")
-#    # [1] The manuscript this sermon is written on 
-#    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_sermons")
-
-#    def __str__(self):
-#        combi = "{}: {}".format(self.manuscript.name, self.sermon.title)
 
 
 class Signature(models.Model):

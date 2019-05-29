@@ -165,6 +165,22 @@ class SermonForm(forms.ModelForm):
             self.fields['nickname_ta'].required = False
 
 
+class SermonDescrSignatureForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonSignature
+        fields = ['code', 'editype', 'sermon']
+        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonDescrSignatureForm, self).__init__(*args, **kwargs)
+        # Initialize choices for editype
+        init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+
+
 class SermonDescrGoldForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

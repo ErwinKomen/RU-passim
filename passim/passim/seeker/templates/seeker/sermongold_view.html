@@ -1,7 +1,7 @@
 ﻿{% load i18n %}
 
     {% if msitem.goldsignatures.all|length > 0 %}
-      <b>{{msitem.signatures}}</b>
+      <span class="signature">{{msitem.signatures}}</span>
     {% else %}
       [-]
     {% endif %}

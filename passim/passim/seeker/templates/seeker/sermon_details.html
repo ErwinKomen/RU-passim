@@ -66,6 +66,13 @@
               </div>
             {% endif %}
 
+            <!-- SermonDescr signatures (Gryson, Clavis): zero-to-many -->
+            <div class="row">&nbsp;</div>
+            <div id="sermondescr_signset" class="post-load" targeturl="{% url 'sermon_signset' pk=sermoForm.instance.id %}" >
+              <!-- The wait symbol will be overwritten -->
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+
             <!-- Room for the links from this gold sermon -->
             <div class="row">&nbsp;</div>
             <div id="sermon_linkset" class="post-load" targeturl="{% url 'sermon_linkset' pk=sermoForm.instance.id %}" >

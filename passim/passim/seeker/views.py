@@ -30,10 +30,11 @@ from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
-                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm
+                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
+                                SermonDescrSignatureForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
-    Report, SermonDescrGold, Visit, Profile
+    Report, SermonDescrGold, Visit, Profile, SermonSignature
 
 import fnmatch
 import sys
@@ -803,8 +804,8 @@ def get_srmexplicits(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
-def get_signatures(request):
-    """Get a list of signature codes for autocomplete"""
+def get_gldsignatures(request):
+    """Get a list of signature codes (SermonDescr) for autocomplete"""
 
     oErr = ErrHandle
     try:
@@ -817,6 +818,34 @@ def get_signatures(request):
             if editype != "":
                 lstQ.append(Q(editype=editype))
             items = Signature.objects.filter(*lstQ).order_by("code").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.code, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_srmsignatures(request):
+    """Get a list of signature codes (for SermonDescr) for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            codename = request.GET.get("name", "")
+            editype = request.GET.get("type", "")
+            lstQ = []
+            lstQ.append(Q(code__icontains=codename))
+            if editype != "":
+                lstQ.append(Q(editype=editype))
+            items = SermonSignature.objects.filter(*lstQ).order_by("code").distinct()
             results = []
             for co in items:
                 co_json = {'name': co.code, 'id': co.id }
@@ -2274,10 +2303,6 @@ class SermonListView(ListView):
         for k,v in initial.items():
             if v != None and v != "" and k.lower() != "csrfmiddlewaretoken":
                 kwargs[k] = v
-        #if 'page' in initial and initial['page'] != "": kwargs['page'] = initial['page']
-        #for k,v in context['sermoForm'].cleaned_data.items():
-        #    if v != None and v != "":
-        #        kwargs[k] = v
 
         context['breadcrumbs'] = process_visit(self.request, "Sermons", False, **kwargs)
         context['prevpage'] = get_previous_page(self.request)
@@ -2432,6 +2457,25 @@ class SermonLinkset(BasicPart):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+
+
+class SermonSignset(BasicPart):
+    """The set of signatures from one sermon (manifestation)"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_signset.html'
+    title = "SermonSignset"
+    SrmsignFormSet = inlineformset_factory(SermonDescr, SermonSignature,
+                                         form=SermonDescrSignatureForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SrmsignFormSet, 'prefix': 'srmsign', 'readonly': False}]
+    
+    def add_to_context(self, context):
+        context['edi_list'] = [{'type': 'gr', 'name': 'Gryson'},
+                               {'type': 'cl', 'name': 'Clavis'},
+                               {'type': 'ot', 'name': 'Other'}]
+        return context
 
 
 class ManuscriptDetails(PassimDetails):

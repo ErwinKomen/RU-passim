@@ -467,6 +467,7 @@ svg g.lithium-node:hover > text {
   color: darkblue;
 }
 
+
 .arg-type select {
     font-size: 11px;
     height: 25px;
@@ -1156,4 +1157,10 @@ a.nostyle:link, a.nostyle:visited {
 
 td a.nostyle {
   display: block;
+}
+
+.signature {
+  /* font-family: monospace; */
+  font-size: smaller;
+  color: darkblue;
 }

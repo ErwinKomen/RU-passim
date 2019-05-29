@@ -44,23 +44,25 @@ var ru = (function ($, ru) {
         loc_nicknamesL = [],
         loc_origins = [],
         loc_originsL = [],
-        loc_gldincipits = [],      // Use in sermongold_select.html
-        loc_gldincipitsL = [],
-        loc_gldexplicits = [],     // Use in sermongold_select.html
+        loc_gldincipits = [],       // Use in sermongold_select.html
+        loc_gldincipitsL = [],  
+        loc_gldexplicits = [],      // Use in sermongold_select.html
         loc_gldexplicitsL = [],
-        loc_srmincipits = [],      // Use in sermon_list.html
+        loc_srmincipits = [],       // Use in sermon_list.html
         loc_srmincipitsL = [],
-        loc_srmexplicits = [],     // Use in sermon_list.html
+        loc_srmexplicits = [],      // Use in sermon_list.html
         loc_srmexplicitsL = [],
-        loc_signature = [],     // Use in sermongold_select.html
+        loc_signature = [],         // Use in sermongold_select.html
         loc_signatureL = [],
-        loc_siggryson = [],     // Use in sermon_list.html
+        loc_srmsignature = [],      // Use in ???
+        loc_srmsignatureL = [],
+        loc_siggryson = [],         // Use in sermon_list.html
         loc_siggrysonL = [],
-        loc_sigclavis = [],     // Use in sermon_list.html
+        loc_sigclavis = [],         // Use in sermon_list.html
         loc_sigclavisL = [],
-        loc_manuidno = [],      // use in sermon_list.html
+        loc_manuidno = [],          // use in sermon_list.html
         loc_manuidnoL = [],
-        loc_edition = [],       // critical editions that belong to a gold sermon
+        loc_edition = [],           // critical editions that belong to a gold sermon
         loc_editionL = [],      
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
@@ -269,7 +271,7 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Bloodhound: SIGNATURE
+        // Bloodhound: SIGNATURE - SermonGold
         loc_signature = new Bloodhound({
           datumTokenizer: function (myObj) {
             return myObj;
@@ -279,9 +281,9 @@ var ru = (function ($, ru) {
           },
           // loc_countries will be an array of countries
           local: loc_signatureL,
-          prefetch: { url: base_url + 'api/signatures/', cache: true },
+          prefetch: { url: base_url + 'api/gldsignatures/', cache: true },
           remote: {
-            url: base_url + 'api/signatures/?name=',
+            url: base_url + 'api/gldsignatures/?name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;
@@ -289,28 +291,48 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Bloodhound: SIGGRYSON
+        // Bloodhound: SRMSIGNATURE - SermonGold
+        loc_srmsignature = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_srmsignatureL,
+          prefetch: { url: base_url + 'api/srmsignatures/', cache: true },
+          remote: {
+            url: base_url + 'api/srmsignatures/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: SIGGRYSON - SermonDescr
         loc_siggryson = new Bloodhound({
           datumTokenizer: function (myObj) {return myObj;},
           queryTokenizer: function (myObj) {return myObj;},
           // loc_countries will be an array of countries
           local: loc_siggrysonL,
-          prefetch: { url:  base_url + 'api/signatures/', cache: true },
-          remote: {url:     base_url + 'api/signatures/?type=gr&name=',
+          prefetch: { url:  base_url + 'api/srmsignatures/', cache: true },
+          remote: {url:     base_url + 'api/srmsignatures/?type=gr&name=',
                    replace: function (url, uriEncodedQuery) {
                       url += encodeURIComponent(uriEncodedQuery);
                       return url; } }
         });
 
-        // Bloodhound: SIGCLAVIS
+        // Bloodhound: SIGCLAVIS - SermonDescr
         loc_sigclavis = new Bloodhound({
           datumTokenizer: function (myObj) { return myObj; },
           queryTokenizer: function (myObj) { return myObj; },
           // loc_countries will be an array of countries
           local: loc_sigclavisL,
-          prefetch: { url: base_url + 'api/signatures/', cache: true },
+          prefetch: { url: base_url + 'api/srmsignatures/', cache: true },
           remote: {
-            url: base_url + 'api/signatures/?type=cl&name=',
+            url: base_url + 'api/srmsignatures/?type=cl&name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;
@@ -377,6 +399,7 @@ var ru = (function ($, ru) {
           $(".typeahead.srmincipits").typeahead('destroy');
           $(".typeahead.srmexplicits").typeahead('destroy');
           $(".typeahead.signatures").typeahead('destroy');
+          $(".typeahead.srmsignatures").typeahead('destroy');
           $(".typeahead.siggrysons").typeahead('destroy');
           $(".typeahead.sigclavises").typeahead('destroy');
           $(".typeahead.editions").typeahead('destroy');
@@ -525,7 +548,7 @@ var ru = (function ($, ru) {
             $(this).closest("td").find(".srmexplicit-key input").last().val(suggestion.id);
           });
 
-          // Type-ahead: SIGNATURE -- NOTE: not in a form-row, but in a normal 'row'
+          // Type-ahead: SIGNATURE (SermonGold) -- NOTE: not in a form-row, but in a normal 'row'
           $(".row .typeahead.signatures, tr .typeahead.signatures").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
@@ -539,6 +562,22 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".signature-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: SRMSIGNATURE (SermonDescr) -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.srmsignatures, tr .typeahead.srmsignatures").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'srmsignatures', source: loc_srmsignature, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact code</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".srmsignature-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: Gryson Signature

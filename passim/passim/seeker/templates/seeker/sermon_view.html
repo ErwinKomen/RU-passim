@@ -1,10 +1,17 @@
 ﻿{% load i18n %}
 
+    {% if msitem.sermonsignatures.all|length > 0 %}
+      <span class="signature">{{msitem.signatures}}</span>
+    {% else %}
+      [-]
+    {% endif %}
     {% if msitem.title %}<b>{{msitem.title}}</b>{% endif %}
     {% if msitem.author %}
       (by <span class="sermon-author">{{msitem.author.name}}</span>)
     {% elif msitem.nickname %}
       (by <span class="sermon-nickname">{{msitem.nickname.name}}</span>)
+    {% else %}
+      (by <i>Unkown Author</i>)
     {% endif %}
     {% if msitem.incipit %}<i>{{msitem.incipit}}</i>{% endif %}
     {% if msitem.incipit or msitem.explicit %}...-...{% endif %}
