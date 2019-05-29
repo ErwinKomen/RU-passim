@@ -1954,6 +1954,7 @@ class SermonGold(models.Model):
 
  
             # Iterate over the objects again, and add relations
+            reverse_set = ['eqs', 'prt', 'sim']
             for oGold in lst_goldsermon:
                 # Show where we are
                 objStat.set("reading", msg="Pass #2, line={}".format(oGold['row_number']))
@@ -1995,11 +1996,22 @@ class SermonGold(models.Model):
                                 # Keep track of relation statistics
                                 count_rel += 1
                             # Check if the reverse relation needs adding
-                            if linktype == "eqs" and not target.has_relation(obj, linktype):
+                            if linktype in reverse_set and not target.has_relation(obj, linktype):
                                 # This is a new relation, so create it
                                 target.add_relation(obj, linktype)
                                 # Keep track of relation statistics
                                 count_rel += 1
+                            # Get all the gold sermons that have a particular relation to me, excluding target
+                            qs = obj.get_relations('eqs').exclude(dst=target)
+                            for relobj in qs:
+                                # Check the relation from obj - relobj
+                                if not obj.has_relation(relobj, linktype):
+                                    obj.add_relation(relobj, linktype)
+                                    count_rel += 1
+                                # Check the reverse relations from relobj - obj
+                                if not relobj.has_relation(obj, linktype):
+                                    relobj.add_relation(obj, linktype)
+                                    count_rel += 1
 
             # Make sure the requester knows how many have been added
             oBack['count'] = count_obj      # Number of gold objects created
