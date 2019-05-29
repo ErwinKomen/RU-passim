@@ -29,16 +29,21 @@
         </div>
 
         <!-- The form spans the list + pagination information -->
-        <form id="goldsermons_search" method='get' action="{% url 'search_gold' %}" >
+        <form id="sermon_search" method='post' action="{% url 'sermon_list' %}" >
+          {% csrf_token %}
+          <!-- entrypoint for search_paged_start -->
+          <div class="hidden search_paged_start">
+            <input name="page" type="text" />
+          </div>
           <!-- Search tab -->
-          <div class="inert collapse" id="tab_search">
+          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_search">
             <div class="panel panel-default">
                 <div>
 
-                  <!-- Search interface: what golden sermons to look for and what are the results -->
+                  <!-- Search interface: what sermons to look for and what are the results -->
                   <div class="row">
-                    <div id="gold_search" class="col-sm-10 col-sm-offset-1">
-                      <p>Gold sermon to look for:</p>
+                    <div id="sermon_search" class="col-sm-10 col-sm-offset-1">
+                      <p>Manifestation sermon to look for:</p>
                       <table style="width: 100%;">
                         <tr><td>Author</td>
                           <td style="width: 100%;">
@@ -49,12 +54,20 @@
                         <tr><td>Incipit</td><td>{{sermoForm.incipit}}</td></tr>
                         <tr><td>Explicit</td><td>{{sermoForm.explicit}}</td></tr>
                         <tr><td>Title</td><td>{{sermoForm.title}}</td></tr>
-                        <tr><td colspan="2">&nbsp;</td></tr>
+
+                        <!-- Empty row 
+                        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>-->
+
                         <tr><td>Gryson</td><td style="width: 100%;">{{sermoForm.siggryson}}</td></tr>
                         <tr><td>Clavis</td><td style="width: 100%;">{{sermoForm.sigclavis}}</td></tr>
                         <tr><td>Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
                         <tr><td>Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
-                        <tr><td colspan="2">&nbsp;</td></tr>
+
+                        <!-- My own idea -->
+                        <tr><td>Manuscript</td><td>{{sermoForm.manuidno}}</td></tr>
+
+                        <!-- Empty row -->
+                        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
                       </table>
                     </div>
                   </div>
@@ -65,11 +78,11 @@
                   <div class="col-md-2 col-md-offset-10 text-right">
                     <!-- Room to reset the search criteria -->
                     <span>
-                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
+                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
                     </span>
                     <!-- Submit the search form -->
                     <span>
-                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
+                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);" >Search</a>
                     </span>
                   </div>
                 </div>
@@ -94,7 +107,7 @@
                   <div class="col-sm-8">
                   <span class="step-links pull-right">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
                   </div>
@@ -125,7 +138,10 @@
                           onclick="ru.passim.seeker.goto_url('{% url 'sermon_details' sermon.id %}')">
                         <td class="hidden"> {{ sermon.id }}</td>
                         <!-- Author / Signature / Incipit -->
-                        <td class="sermon-author tdnowrap" align="left" title="{{sermon.author.name}}">
+                        <td class="sermon-author tdnowrap" align="left" 
+                            title="{% if sermon.author %}{{sermon.author.name}}
+                                   {% elif sermon.nickname %}{{sermon.nickname.name}}
+                                   {% else %}(unknown){% endif %}">
                           {% if sermon.author %}
                             <span style="color: darkgreen;">{{sermon.author.name|truncatechars:12}}</span>
                           {% elif sermon.nickname %}
@@ -152,7 +168,7 @@
                         
                         <!-- Locus in manuscript -->
                         <td class="sermon-locus tdnowrap">
-                          <span>{{sermon.manu.locus}}</span>
+                          <span>{{sermon.locus}}</span>
                         </td>
 
                         <!-- Give an overview of the links *from* this sermon to others -->
@@ -175,7 +191,7 @@
               <div class="pagination">
                   <span class="step-links">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
               </div>

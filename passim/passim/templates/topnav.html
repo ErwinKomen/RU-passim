@@ -23,7 +23,8 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                            aria-haspopup="true" aria-expanded="false">Search<span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                          <li><a href="{% url 'search_sermon' %}">Sermon</a></li>
+                          <!-- Used to be 'search_sermon' -->
+                          <li><a href="{% url 'sermon_list' %}">Sermon</a></li>
                           <li><a href="{% url 'search_manuscript' %}">Manuscript</a></li>
                           <li><a href="{% url 'search_collection' %}">Collection</a></li>
                           <li><a href="{% url 'library_search' %}">Library</a></li>
@@ -44,8 +45,6 @@
                             <li><a href="" title="Upload XML files from e-codices (ch)">Import e-codices XML</a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
-                            <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'do_clavis' %}" title="Correct Clavis by adding CPPM to number-only">Clavis correct</a></li>
                           {% endif %}
 
                           {% if is_passim_editor %}

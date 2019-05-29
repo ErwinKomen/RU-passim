@@ -546,7 +546,7 @@ var ru = (function ($, ru) {
 
       /**
        * search_start
-       *    Clear the information in the form's fields and then do a submit
+       *    Gather the information in the form's fields and then do a submit
        *
        */
       search_start: function (elStart, method, iPage) {
@@ -575,6 +575,12 @@ var ru = (function ($, ru) {
               $("#waitingsign").removeClass("hidden");
               // Store the current URL
               loc_urlStore = url;
+              // If there is a page number, we need to process it
+              if (iPage !== undefined) {
+                $(elStart).find("input[name=page]").each(function (el) {
+                  $(this).val(iPage);
+                });
+              }
               // Now submit the form
               frm.submit();
               break;
@@ -628,6 +634,23 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("search_start", ex);
+        }
+      },
+
+      /**
+       * search_paged_start
+       *    Perform a simple 'submit' call to search_start
+       *
+       */
+      search_paged_start: function(iPage) {
+        var elStart = null;
+
+        try {
+          // And then go to the first element within the form that is of any use
+          elStart = $(".search_paged_start").first();
+          ru.passim.seeker.search_start(elStart, 'submit', iPage)
+        } catch (ex) {
+          private_methods.errMsg("search_paged_start", ex);
         }
       },
 
@@ -1732,7 +1755,7 @@ var ru = (function ($, ru) {
               afterurl = $(el).attr("afterurl");
 
               // Check if we are under a delete-confirm
-              if ($(el).closest("div[delete-confirm]").lenght === 0) {
+              if ($(el).closest("div[delete-confirm]").length === 0) {
                 // Ask for confirmation
                 // NOTE: we cannot be more specific than "item", since this can be manuscript or sermongold
                 if (!confirm("Do you really want to remove this item?")) {
@@ -1773,7 +1796,10 @@ var ru = (function ($, ru) {
                       case "ready":
                       case "ok":
                         // Do we have an afterurl?
-                        if (afterurl === undefined || afterurl === "") {
+                        // If an 'afternewurl' is specified, go there
+                        if ('afterdelurl' in response && response['afterdelurl'] !== "") {
+                          window.location = response['afterdelurl'];
+                        } else if (afterurl === undefined || afterurl === "") {
                           // Delete visually
                           $(targetid).remove();
                           $(targethead).remove();

@@ -435,7 +435,7 @@ class Profile(models.Model):
         sStack = self.stack
         return sStack
 
-    def add_visit(self, name, path, is_menu):
+    def add_visit(self, name, path, is_menu, **kwargs):
         """Process one visit in an adaptation of the stack"""
 
         oErr = ErrHandle()
@@ -461,11 +461,17 @@ class Profile(models.Model):
                     if item['url'] == path:
                         # The url is on the stack, so cut off the stack from here
                         lst_stack = lst_stack[0:idx+1]
+                        # But make sure to add any kwargs
+                        if kwargs != None:
+                            item['kwargs'] = kwargs
                         bNew = False
                         break
                     elif item['name'] == name:
                         # Replace the url
                         item['url'] = path
+                        # But make sure to add any kwargs
+                        if kwargs != None:
+                            item['kwargs'] = kwargs
                         bNew = False
                         break
                 if bNew:
@@ -519,7 +525,7 @@ class Visit(models.Model):
         msg = "{} ({})".format(self.name, self.path)
         return msg
 
-    def add(username, name, path, is_menu = False):
+    def add(username, name, path, is_menu = False, **kwargs):
         """Add a visit from user [username]"""
 
         oErr = ErrHandle
@@ -528,6 +534,7 @@ class Visit(models.Model):
             if username == "": return True
             # Get the user
             user = User.objects.filter(username=username).first()
+            # Adapt the path if there are kwargs
             # Add an item
             obj = Visit(user=user, name=name, path=path)
             obj.save()
@@ -538,7 +545,7 @@ class Visit(models.Model):
                 profile = Profile(user=user)
                 profile.save()
             # Process this visit in the profile
-            profile.add_visit(name, path, is_menu)
+            profile.add_visit(name, path, is_menu, **kwargs)
             # Return success
             result = True
         except:

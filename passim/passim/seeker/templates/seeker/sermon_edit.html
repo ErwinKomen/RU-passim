@@ -30,7 +30,8 @@
             <span id="sermon_err_msg" class="err-msg"></span>
 
             <!-- Put the delete button completely to the right-->
-            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" targetid="" oldtargetid="sermon_edit"
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" 
+               targetid="" oldtargetid="sermon_edit"
                targeturl="{% if sermoForm.instance.id %}{% url 'sermon_edit' sermoForm.instance.id %}{% endif %}">
               <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
             </a>

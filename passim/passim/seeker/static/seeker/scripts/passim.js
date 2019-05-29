@@ -44,16 +44,22 @@ var ru = (function ($, ru) {
         loc_nicknamesL = [],
         loc_origins = [],
         loc_originsL = [],
-        loc_incipits = [],      // Use in sermongold_select.html
-        loc_incipitsL = [],
-        loc_explicits = [],     // Use in sermongold_select.html
-        loc_explicitsL = [],
+        loc_gldincipits = [],      // Use in sermongold_select.html
+        loc_gldincipitsL = [],
+        loc_gldexplicits = [],     // Use in sermongold_select.html
+        loc_gldexplicitsL = [],
+        loc_srmincipits = [],      // Use in sermon_list.html
+        loc_srmincipitsL = [],
+        loc_srmexplicits = [],     // Use in sermon_list.html
+        loc_srmexplicitsL = [],
         loc_signature = [],     // Use in sermongold_select.html
         loc_signatureL = [],
         loc_siggryson = [],     // Use in sermon_list.html
         loc_siggrysonL = [],
         loc_sigclavis = [],     // Use in sermon_list.html
         loc_sigclavisL = [],
+        loc_manuidno = [],      // use in sermon_list.html
+        loc_manuidnoL = [],
         loc_edition = [],       // critical editions that belong to a gold sermon
         loc_editionL = [],      
         loc_elInput = null,
@@ -183,8 +189,8 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Bloodhound: INCIPIT
-        loc_incipits = new Bloodhound({
+        // Bloodhound: gldincipit
+        loc_gldincipits = new Bloodhound({
           datumTokenizer: function (myObj) {
             return myObj;
           },
@@ -192,10 +198,10 @@ var ru = (function ($, ru) {
             return myObj;
           },
           // loc_countries will be an array of countries
-          local: loc_incipitsL,
-          prefetch: { url: base_url + 'api/incipits/', cache: true },
+          local: loc_gldincipitsL,
+          prefetch: { url: base_url + 'api/gldincipits/', cache: true },
           remote: {
-            url: base_url + 'api/incipits/?name=',
+            url: base_url + 'api/gldincipits/?name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;
@@ -203,8 +209,8 @@ var ru = (function ($, ru) {
           }
         });
 
-        // Bloodhound: EXPLICIT
-        loc_explicits = new Bloodhound({
+        // Bloodhound: srmincipit
+        loc_srmincipits = new Bloodhound({
           datumTokenizer: function (myObj) {
             return myObj;
           },
@@ -212,10 +218,50 @@ var ru = (function ($, ru) {
             return myObj;
           },
           // loc_countries will be an array of countries
-          local: loc_explicitsL,
-          prefetch: { url: base_url + 'api/explicits/', cache: true },
+          local: loc_srmincipitsL,
+          prefetch: { url: base_url + 'api/srmincipits/', cache: true },
           remote: {
-            url: base_url + 'api/explicits/?name=',
+            url: base_url + 'api/srmincipits/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: gldexplicit
+        loc_gldexplicits = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_gldexplicitsL,
+          prefetch: { url: base_url + 'api/gldexplicits/', cache: true },
+          remote: {
+            url: base_url + 'api/gldexplicits/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
+        // Bloodhound: srmexplicit
+        loc_srmexplicits = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_srmexplicitsL,
+          prefetch: { url: base_url + 'api/srmexplicits/', cache: true },
+          remote: {
+            url: base_url + 'api/srmexplicits/?name=',
             replace: function (url, uriEncodedQuery) {
               url += encodeURIComponent(uriEncodedQuery);
               return url;
@@ -272,6 +318,22 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: manuidno
+        loc_manuidno = new Bloodhound({
+          datumTokenizer: function (myObj) { return myObj; },
+          queryTokenizer: function (myObj) { return myObj; },
+          // loc_countries will be an array of countries
+          local: loc_manuidnoL,
+          prefetch: { url: base_url + 'api/manuidnos/', cache: true },
+          remote: {
+            url: base_url + 'api/manuidnos/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Bloodhound: EDITION
         loc_edition = new Bloodhound({
           datumTokenizer: function (myObj) {
@@ -310,10 +372,15 @@ var ru = (function ($, ru) {
           $(".typeahead.origins").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
           $(".typeahead.nicknames").typeahead('destroy');
-          $(".typeahead.incipits").typeahead('destroy');
-          $(".typeahead.explicits").typeahead('destroy');
+          $(".typeahead.gldincipits").typeahead('destroy');
+          $(".typeahead.gldexplicits").typeahead('destroy');
+          $(".typeahead.srmincipits").typeahead('destroy');
+          $(".typeahead.srmexplicits").typeahead('destroy');
           $(".typeahead.signatures").typeahead('destroy');
+          $(".typeahead.siggrysons").typeahead('destroy');
+          $(".typeahead.sigclavises").typeahead('destroy');
           $(".typeahead.editions").typeahead('destroy');
+          $(".typeahead.manuidnos").typeahead('destroy');
 
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
@@ -394,11 +461,11 @@ var ru = (function ($, ru) {
             $(this).closest("td").find(".nickname-key input").last().val(suggestion.id);
           });
 
-          // Type-ahead: INCIPIT -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.incipits, tr .typeahead.incipits").typeahead(
+          // Type-ahead: gldincipit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.gldincipits, tr .typeahead.gldincipits").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
-              name: 'incipits', source: loc_incipits, limit: 25, displayKey: "name",
+              name: 'gldincipits', source: loc_gldincipits, limit: 25, displayKey: "name",
               templates: {
                 empty: '<p>Use the wildcard * to mark inexact wording</p>',
                 suggestion: function (item) {
@@ -407,14 +474,14 @@ var ru = (function ($, ru) {
               }
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
-            $(this).closest("td").find(".incipit-key input").last().val(suggestion.id);
+            $(this).closest("td").find(".gldincipit-key input").last().val(suggestion.id);
           });
 
-          // Type-ahead: EXPLICIT -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.explicits, tr .typeahead.explicits").typeahead(
+          // Type-ahead: srmincipit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.srmincipits, tr .typeahead.srmincipits").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
-              name: 'explicits', source: loc_explicits, limit: 25, displayKey: "name",
+              name: 'srmincipits', source: loc_srmincipits, limit: 25, displayKey: "name",
               templates: {
                 empty: '<p>Use the wildcard * to mark inexact wording</p>',
                 suggestion: function (item) {
@@ -423,7 +490,39 @@ var ru = (function ($, ru) {
               }
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
-            $(this).closest("td").find(".explicit-key input").last().val(suggestion.id);
+            $(this).closest("td").find(".srmincipit-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: gldexplicit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.gldexplicits, tr .typeahead.gldexplicits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'gldexplicits', source: loc_gldexplicits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".gldexplicit-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: srmexplicit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.srmexplicits, tr .typeahead.srmexplicits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'srmexplicits', source: loc_srmexplicits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".srmexplicit-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: SIGNATURE -- NOTE: not in a form-row, but in a normal 'row'
@@ -459,7 +558,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: Clavis Signature
-          $(".row .typeahead.sigclavises, tr .typeahead.siggrysons").typeahead(
+          $(".row .typeahead.sigclavises, tr .typeahead.sigclavises").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'sigclavises', source: loc_sigclavis, limit: 25, displayKey: "name",
@@ -471,7 +570,7 @@ var ru = (function ($, ru) {
               }
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
-            $(this).closest("td").find(".siggryson-key input").last().val(suggestion.id);
+            $(this).closest("td").find(".sigclavis-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: EDITION -- NOTE: not in a form-row, but in a normal 'row'
@@ -488,6 +587,22 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".edition-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: manuidno -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.manuidnos, tr .typeahead.manuidnos").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'manuidnos', source: loc_manuidno, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark an inexact wording of an manuidno</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".manuidno-key input").last().val(suggestion.id);
           });
 
           // Make sure we know which element is pressed in typeahead

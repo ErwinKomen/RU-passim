@@ -105,6 +105,13 @@ class VisitAdmin(admin.ModelAdmin):
     fields = ['user', 'when', 'name', 'path']
 
 
+class ProfileAdmin(admin.ModelAdmin):
+    """Display user profiles"""
+
+    list_display = ['user', 'stack']
+    fields = ['user', 'stack']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -118,6 +125,7 @@ admin.site.register(Library, LibraryAdmin)
 # Logbook of activities
 admin.site.register(LogEntry, LogEntryAdmin)
 admin.site.register(Visit, VisitAdmin)
+admin.site.register(Profile, ProfileAdmin)
 
 # How to display user information
 admin.site.unregister(User)

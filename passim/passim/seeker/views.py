@@ -134,13 +134,13 @@ def add_visit(request, name, is_menu):
     if username != "anonymous":
         Visit.add(username, name, request.path, is_menu)
 
-def process_visit(request, name, is_menu):
+def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
     username = "anonymous" if request.user == None else request.user.username
     if username != "anonymous" and request.user.username != "":
         # Add the visit
-        Visit.add(username, name, request.get_full_path(), is_menu)
+        Visit.add(username, name, request.get_full_path(), is_menu, **kwargs)
         # Get the updated path list
         p_list = Profile.get_stack(username)
     else:
@@ -162,6 +162,19 @@ def get_previous_page(request):
         else:
             p_item = p_list[len(p_list)-2]
             prevpage = p_item['url']
+            # Possibly add arguments
+            if 'kwargs' in p_item:
+                # First strip off any arguments (anything after ?) in the url
+                if "?" in prevpage:
+                    prevpage = prevpage.split("?")[0]
+                bFirst = True
+                for k,v in p_item['kwargs'].items():
+                    if bFirst:
+                        addsign = "?"
+                        bFirst = False
+                    else:
+                        addsign = "&"
+                    prevpage = "{}{}{}={}".format(prevpage, addsign, k, v)
     else:
         prevpage = request.META.get('HTTP_REFERER') 
     # Return the path
@@ -614,6 +627,31 @@ def get_manuscripts(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_manuidnos(request):
+    """Get a list of manuscript identifiers for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            idno = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(idno__icontains=idno))
+            items = Manuscript.objects.filter(*lstQ).order_by("idno").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.idno, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_authors(request):
     """Get a list of authors for autocomplete"""
 
@@ -659,8 +697,8 @@ def get_nicknames(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
-def get_incipits(request):
-    """Get a list of incipits for autocomplete"""
+def get_gldincipits(request):
+    """Get a list of Gold-sermon incipits for autocomplete"""
 
     oErr = ErrHandle()
     try:
@@ -668,8 +706,8 @@ def get_incipits(request):
         if request.is_ajax():
             author = request.GET.get("name", "")
             lstQ = []
-            lstQ.append(Q(incipit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('incipit')
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
             # items = SermonGold.objects.order_by("incipit").distinct()
             # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
             results = []
@@ -687,8 +725,8 @@ def get_incipits(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
-def get_explicits(request):
-    """Get a list of explicits for autocomplete"""
+def get_srmincipits(request):
+    """Get a list of manifestation-sermon incipits for autocomplete"""
 
     oErr = ErrHandle()
     try:
@@ -696,8 +734,60 @@ def get_explicits(request):
         if request.is_ajax():
             author = request.GET.get("name", "")
             lstQ = []
-            lstQ.append(Q(explicit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('explicit')
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = SermonDescr.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_gldexplicits(request):
+    """Get a list of Gold-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchexplicit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_srmexplicits(request):
+    """Get a list of Manifestation-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = SermonDescr.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
             results = []
             for idx, co in enumerate(items):
                 val = co['srchexplicit']
@@ -751,7 +841,7 @@ def get_editions(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(name__icontains=author))
-            items = Edition.objects.order_by("name").distinct()
+            items = Edition.objects.filter(*lstQ).order_by("name").distinct()
             results = []
             for co in items:
                 co_json = {'name': co.name, 'id': co.id }
@@ -1446,6 +1536,12 @@ class BasicPart(View):
                         
                     # return gzip_middleware.process_response(request, response)
                     return response
+            elif self.action == "delete":
+                # The user requests this to be deleted
+                if self.before_delete():
+                    # We have permission to delete the instance
+                    self.obj.delete()
+                    context['deleted'] = True
 
             # Allow user to add to the context
             context = self.add_to_context(context)
@@ -1454,6 +1550,8 @@ class BasicPart(View):
             # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
             if 'afternewurl' in context and self.add:
                 self.data['afternewurl'] = context['afternewurl']
+            if 'afterdelurl' in context:
+                self.data['afterdelurl'] = context['afterdelurl']
 
             # Make sure we have a list of any errors
             error_list = [str(item) for item in self.arErr]
@@ -1624,6 +1722,9 @@ class BasicPart(View):
 
     def before_save(self, prefix, request, instance=None, form=None):
         return False
+
+    def before_delete(self):
+        return True
 
     def after_save(self, prefix, instance=None):
         return True
@@ -2066,6 +2167,9 @@ class SermonEdit(BasicPart):
             context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
         context['manuscript_id'] = manuscript_id
 
+        # Define where to go to after deletion
+        # context['afterdelurl'] = reverse("sermon_list")
+        context['afterdelurl'] = get_previous_page(self.request)
 
         return context
 
@@ -2111,11 +2215,13 @@ class SermonListView(ListView):
     template_name = 'seeker/sermon_list.html'
     entrycount = 0
     bDoTime = True
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', '', '']
+    bFilter = False     # Status of the filter
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
                    {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
-                   {'name': 'Manuscript', 'order': '', 'type': 'str'},
+                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str'},
                    {'name': 'Locus', 'order': '', 'type': 'str'},
                    {'name': 'Links', 'order': '', 'type': 'str'}]
 
@@ -2124,12 +2230,14 @@ class SermonListView(ListView):
         context = super(SermonListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.GET
+        initial = self.request.POST if self.request.POST else self.request.GET
 
-        # ONE-TIME adhoc = SermonGold.init_latin()
-
-        # Add a files upload form
-        context['sermoForm'] = SermonForm(prefix='sermo')
+        # Add a form that defines search criteria for a sermon
+        # If there was a previous form, then its values are in 'initial', and they are taken over
+        prefix='sermo'
+        context['sermoForm'] = SermonForm(initial, prefix=prefix)
+        # Make sure we evaluate the form, to get cleaned_data
+        bFormOkay = context['sermoForm'].is_valid()
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
@@ -2145,6 +2253,16 @@ class SermonListView(ListView):
         else:
             context['paginateSize'] = paginateSize
 
+        # Need to pass on a pagination function
+        context['page_function'] = self.page_function
+        # Set the page number if needed
+        if 'page_obj' in context and 'page' in initial and initial['page'] != "":
+            # context['page_obj'].number = initial['page']
+            page_num = int(initial['page'])
+            context['page_obj'] = context['paginator'].page( page_num)
+        context['has_filter'] = self.bFilter
+
+
         # Set the title of the application
         context['title'] = "Sermons"
 
@@ -2152,7 +2270,16 @@ class SermonListView(ListView):
         context['order_heads'] = self.order_heads
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Sermons", False)
+        kwargs = {}
+        for k,v in initial.items():
+            if v != None and v != "" and k.lower() != "csrfmiddlewaretoken":
+                kwargs[k] = v
+        #if 'page' in initial and initial['page'] != "": kwargs['page'] = initial['page']
+        #for k,v in context['sermoForm'].cleaned_data.items():
+        #    if v != None and v != "":
+        #        kwargs[k] = v
+
+        context['breadcrumbs'] = process_visit(self.request, "Sermons", False, **kwargs)
         context['prevpage'] = get_previous_page(self.request)
 
         # Check this user: is he allowed to UPLOAD data?
@@ -2212,17 +2339,33 @@ class SermonListView(ListView):
                     val = adapt_search(oFields['explicit'])
                     lstQ.append(Q(srchexplicit__iregex=val))
 
-                # Check for SermonGold [signature]
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(goldsignatures__code__iregex=val))
+                # Check for explicit string
+                if 'manuidno' in oFields and oFields['manuidno'] != "" and oFields['manuidno'] != None: 
+                    val = adapt_search(oFields['manuidno'])
+                    lstQ.append(Q(manu__idno__iregex=val))
+
+                # Check for Sermon Clavis [signature]
+                if 'sigclavis' in oFields and oFields['sigclavis'] != "" and oFields['sigclavis'] != None: 
+                    val = adapt_search(oFields['sigclavis'])
+                    lstQ.append(Q(sermonsignatures__code__iregex=val))
+                    editype = "cl"
+                    lstQ.append(Q(sermonsignatures__editype=editype))
+
+                # Check for Sermon Gryson [signature]
+                if 'siggryson' in oFields and oFields['siggryson'] != "" and oFields['siggryson'] != None: 
+                    val = adapt_search(oFields['siggryson'])
+                    lstQ.append(Q(sermonsignatures__code__iregex=val))
+                    editype = "gr"
+                    lstQ.append(Q(sermonsignatures__editype=editype))
 
                 # Calculate the final qs
                 if len(lstQ) == 0:
-                    # Just show everything
+                    # No filter: Just show everything
                     qs = SermonDescr.objects.all()
                 else:
+                    # There is a filter: apply it
                     qs = SermonDescr.objects.filter(*lstQ).distinct()
+                    self.bFilter = True
             else:
                 # TODO: communicate the error to the user???
 
@@ -2275,6 +2418,8 @@ class SermonListView(ListView):
         # Return the resulting filtered and sorted queryset
         return qs
 
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""

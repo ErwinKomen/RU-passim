@@ -69,8 +69,8 @@ class SelectGoldForm(forms.ModelForm):
         fields = ['author', 'incipit', 'explicit' ]
         widgets={
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -120,6 +120,8 @@ class SermonForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}))
     sigclavis = forms.CharField(label=_("Signature"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}))
+    manuidno = forms.CharField(label=_("Manuscript"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifier...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -131,14 +133,16 @@ class SermonForm(forms.ModelForm):
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'clavis':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'gryson':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'clavis':      forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
+                 'gryson':      forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
                  'edition':     forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
-                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+
+                 # larger areas
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -197,10 +201,8 @@ class SermonGoldForm(forms.ModelForm):
         model = SermonGold
         fields = ['author', 'incipit', 'explicit', 'bibliography' ]
         widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching incipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching explicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
-                 #'incipit':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 #'explicit':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'})
                  }
 
