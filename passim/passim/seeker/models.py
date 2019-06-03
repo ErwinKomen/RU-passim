@@ -398,7 +398,7 @@ class Status(models.Model):
 class Report(models.Model):
     """Report of an upload action or something like that"""
 
-    # [1] Every report must be connected to a user and a date
+    # [1] Every report must be connected to a user and a date (when a user is deleted, the Report is deleted too)
     user = models.ForeignKey(User)
     # [1] And a date: the date of saving this report
     created = models.DateTimeField(default=datetime.now)
@@ -591,6 +591,7 @@ class City(models.Model):
     # [1] Name of the city
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [0-1] Name of the country this is in
+    #       Note: when a country is deleted, its cities are automatically deleted too
     country = models.ForeignKey(Country, null=True, blank=True, related_name="country_cities")
 
     def __str__(self):
@@ -643,6 +644,7 @@ class Library(models.Model):
     libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), 
                             max_length=5)
     # [1] Name of the city this is in
+    #     Note: when a city is deleted, its libraries are deleted automatically
     city = models.ForeignKey(City, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
@@ -824,12 +826,13 @@ class Manuscript(models.Model):
     yearstart = models.IntegerField("Year from", null=False)
     # [1] Date estimate: finishing with this year
     yearfinish = models.IntegerField("Year until", null=False)
-    # [1] One manuscript can only belong to one particular library
-    library = models.ForeignKey(Library, related_name="library_manuscripts")
+    # [0-1] One manuscript can only belong to one particular library
+    #     Note: deleting a library sets the Manuscript.library to NULL
+    library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
     # [1] Each manuscript has an identification number
     idno = models.CharField("Identifier", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] If possible we need to know the original location of the manuscript
-    origin = models.ForeignKey(Origin, null=True, blank=True, related_name="origin_manuscripts")
+    origin = models.ForeignKey(Origin, null=True, blank=True, on_delete = models.SET_NULL, related_name="origin_manuscripts")
     # [0-1] Optional filename to indicate where we got this from
     filename = models.CharField("Filename", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Optional link to a website with (more) information on this manuscript
@@ -844,7 +847,8 @@ class Manuscript(models.Model):
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
     # Where do we get our information from? And when was it added?
-    source = models.ForeignKey(SourceInfo, null=True, blank=True)
+    # Note: deletion of a sourceinfo sets the manuscript.source to NULL
+    source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
 
     # [m] Many-to-many: all the provenances of this manuscript
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
@@ -1522,7 +1526,7 @@ class Nickname(models.Model):
     # [1] Nickname 
     name = models.CharField("Name", max_length=LONG_STRING)
     # [0-1] We should try to link this nickname to an actual author
-    author = models.ForeignKey("Author", null=True, blank=True, related_name="author_nicknames")
+    author = models.ForeignKey("Author", null=True, blank=True, on_delete = models.SET_NULL, related_name="author_nicknames")
 
     def __str__(self):
         return self.name
@@ -1546,7 +1550,7 @@ class SermonGold(models.Model):
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
-    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_goldensermons")
+    author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_goldensermons")
     # [0-1] We would like to know the INCIPIT (first line in Latin)
     incipit = models.TextField("Incipit", null=True, blank=True)
     srchincipit = models.TextField("Incipit (searchable)", null=True, blank=True)
@@ -2037,6 +2041,7 @@ class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
 
     # [1] Starting from sermon [src]
+    #     Note: when a SermonGold is deleted, then the SermonGoldSame instance that refers to it is removed too
     src = models.ForeignKey(SermonGold, related_name="sermongold_src")
     # [1] It equals sermon [dst]
     dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
@@ -2060,6 +2065,8 @@ class Edition(models.Model):
     # [1] It must have a name - that is the Gryson book or the Clavis book or something
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every edition belongs to exactly one gold-sermon
+    #     Note: when a SermonGold is removed, the edition that uses it is also removed
+    #     This is because each Edition instance is uniquely associated with one SermonGold
     gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
 
     def __str__(self):
@@ -2090,6 +2097,7 @@ class Ftextlink(models.Model):
     # [1] It must have a name - that is the Gryson book or the Clavis book or something
     url = models.URLField("Full text URL", max_length=LONG_STRING)
     # [1] Every edition belongs to exactly one gold-sermon
+    #     Note: when a SermonGold is removed, this FtextLink also gets removed
     gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldftxtlinks")
 
     def __str__(self):
@@ -2107,9 +2115,9 @@ class SermonDescr(models.Model):
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
-    author = models.ForeignKey(Author, null=True, blank=True, related_name="author_sermons")
+    author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
     # [0-1] But most often we only start out with having just a nickname of the author
-    nickname = models.ForeignKey(Nickname, null=True, blank=True, related_name="nickname_sermons")
+    nickname = models.ForeignKey(Nickname, null=True, blank=True, on_delete = models.SET_NULL, related_name="nickname_sermons")
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] We would like to know the INCIPIT (first line in Latin)
@@ -2139,6 +2147,7 @@ class SermonDescr(models.Model):
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
+    #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
     manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
 
     # Automatically created and processed fields
@@ -2147,11 +2156,11 @@ class SermonDescr(models.Model):
 
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
     # [0-1] Parent sermon, if applicable
-    parent = models.ForeignKey('self', null=True, blank=True, related_name="sermon_parent")
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_parent")
     # [0-1] Parent sermon, if applicable
-    firstchild = models.ForeignKey('self', null=True, blank=True, related_name="sermon_child")
+    firstchild = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_child")
     # [0-1] Parent sermon, if applicable
-    next = models.ForeignKey('self', null=True, blank=True, related_name="sermon_next")
+    next = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_next")
     # [1]
     order = models.IntegerField("Order", default = -1)
 
@@ -2294,6 +2303,7 @@ class Signature(models.Model):
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
     # [1] Every signature belongs to exactly one gold-sermon
+    #     Note: when a SermonGold is removed, then its associated Signature gets removed too
     gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures")
 
     def __str__(self):
@@ -2324,6 +2334,7 @@ class SermonSignature(models.Model):
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
     # [1] Every signature belongs to exactly one gold-sermon
+    #     Note: when a SermonDescr gets removed, then its associated SermonSignature gets removed too
     sermon = models.ForeignKey(SermonDescr, null=False, blank=False, related_name="sermonsignatures")
 
     def __str__(self):
