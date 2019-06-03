@@ -365,6 +365,85 @@ def import_data_file(sContents, arErr):
         arErr.DoError("import_data_file error:")
         return {}
 
+def add_gold2gold(src, dst, ltype):
+    """Add a gold-to-gold relation from src to dst of type ltype"""
+
+    # Create a list into which the items to be added are put
+    lst_add = []
+
+    def add_one_rel(inst_src, inst_dst, link_type, path):
+        added_one = 0
+        # Add the current link
+        added_one += append_one_rel(inst_src, inst_dst, link_type, path)
+        # Add the reverse
+        added_one += append_one_rel(inst_dst, inst_src, link_type, path)
+        # walk relations of the source
+        for related in SermonGoldSame.objects.filter(src=inst_src):
+            if not has_one_rel(related.dst, inst_dst) or not has_one_rel(inst_dst, related.dst):
+                # Determine the type to be
+                if related.linktype == link_type:
+                    new_link_type = link_type
+                else:
+                    new_link_type = "prt"
+                # Add from related.dst to dst
+                new_path = "{}-[{}]".format(path, related.src.siglist)
+                added_one += add_one_rel(related.dst, inst_dst, new_link_type, new_path)
+        return added_one
+
+    def has_one_rel(inst_src, inst_dst):
+        # Look if the relation is already there
+        bAdd = False
+        for rel in lst_add:
+            if rel['src'].id == inst_src.id and rel['dst'].id == inst_dst.id:
+                # Since the relation is there: leave the loop
+                bAdd = True
+                break
+        return bAdd
+
+    # Local procedure to add one link
+    def append_one_rel(inst_src, inst_dst, link_type, path):
+        """Add one gold-to-gold to the list if it is not in there already"""
+
+        added_append = 0
+        # Do we need to add it?
+        if not has_one_rel(inst_src, inst_dst):
+            # Yes: add it
+            lst_add.append({'src': inst_src, 'dst': inst_dst, 'type': link_type, 'path': path})
+            added_append += 1
+        # Return positively
+        return added_append
+
+    # Main body of add_gold2gold()
+    added = add_one_rel(src, dst, ltype, "")
+
+    lst_report = []
+    # Process all the relations in lst_add
+    added_actual = 0
+    with transaction.atomic():
+        for newrel in lst_add:
+            # Check if it is already there or not
+            src = newrel['src']
+            dst = newrel['dst']
+            linktype = newrel['type'] 
+            path = newrel['path']
+            if src.id != dst.id:
+                obj = SermonGoldSame.objects.filter(src=src, dst=dst).first()
+                if obj == None:
+                    obj = SermonGoldSame(src=src, dst=dst, linktype=linktype)
+                    obj.save()
+                    added_actual += 1
+                    lst_report.append({'src': src.siglist, 'dst': dst.siglist, 'linktype': linktype, 'type': 'add', 'path': path})
+                elif obj.linktype != linktype and linktype == "eqs":
+                    # Equal should replace existing one
+                    obj.linktype = linktype
+                    obj.save()
+                    lst_report.append({'src': src.siglist, 'dst': dst.siglist, 'linktype': linktype, 'type': 'replace', 'path': path})
+
+    # Return the number of added relations
+    return added_actual, lst_report
+
+
+
 
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
@@ -1993,29 +2072,31 @@ class SermonGold(models.Model):
                                 # Don;t add links
                                 pass
 
-                            # Check if this relation is already there
-                            if not obj.has_relation(target, linktype):
-                                # This is a new relation, so create it
-                                obj.add_relation(target, linktype)
-                                # Keep track of relation statistics
-                                count_rel += 1
-                            # Check if the reverse relation needs adding
-                            if linktype in reverse_set and not target.has_relation(obj, linktype):
-                                # This is a new relation, so create it
-                                target.add_relation(obj, linktype)
-                                # Keep track of relation statistics
-                                count_rel += 1
-                            # Get all the gold sermons that have a particular relation to me, excluding target
-                            qs = obj.get_relations('eqs').exclude(dst=target)
-                            for relobj in qs:
-                                # Check the relation from obj - relobj
-                                if not obj.has_relation(relobj, linktype):
-                                    obj.add_relation(relobj, linktype)
-                                    count_rel += 1
-                                # Check the reverse relations from relobj - obj
-                                if not relobj.has_relation(obj, linktype):
-                                    relobj.add_relation(obj, linktype)
-                                    count_rel += 1
+                            # Check and add relation(s), if these are not yet there
+                            count_rel += add_gold2gold(obj, target, linktype)
+                            ## Check if this relation is already there
+                            #if not obj.has_relation(target, linktype):
+                            #    # This is a new relation, so create it
+                            #    obj.add_relation(target, linktype)
+                            #    # Keep track of relation statistics
+                            #    count_rel += 1
+                            ## Check if the reverse relation needs adding
+                            #if linktype in reverse_set and not target.has_relation(obj, linktype):
+                            #    # This is a new relation, so create it
+                            #    target.add_relation(obj, linktype)
+                            #    # Keep track of relation statistics
+                            #    count_rel += 1
+                            ## Get all the gold sermons that have a particular relation to me, excluding target
+                            #qs = obj.get_relations('eqs').exclude(dst=target)
+                            #for relobj in qs:
+                            #    # Check the relation from obj - relobj
+                            #    if not obj.has_relation(relobj, linktype):
+                            #        obj.add_relation(relobj, linktype)
+                            #        count_rel += 1
+                            #    # Check the reverse relations from relobj - obj
+                            #    if not relobj.has_relation(obj, linktype):
+                            #        relobj.add_relation(obj, linktype)
+                            #        count_rel += 1
 
             # Make sure the requester knows how many have been added
             oBack['count'] = count_obj      # Number of gold objects created

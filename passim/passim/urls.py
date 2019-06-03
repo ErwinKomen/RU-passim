@@ -43,7 +43,8 @@ urlpatterns = [
     url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
     url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
 
-    url(r'tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
+    url(r'^tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
+    url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),

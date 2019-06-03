@@ -32,9 +32,9 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm
-from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, Status, Library, get_now_time, Country, City, Author, Manuscript, \
+from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
-    Report, SermonDescrGold, Visit, Profile, SermonSignature
+    Report, SermonDescrGold, Visit, Profile, SermonSignature, Status, Library
 
 import fnmatch
 import sys
@@ -493,6 +493,67 @@ def do_clavis(request):
                     obj.save()
     # Return an appropriate page
     return home(request)
+
+def do_goldtogold(request):
+    """Perform gold-to-gold relation repair"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':datetime.now().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Repair gold-to-gold links"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "GoldToGold", True)
+
+        added = 0
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th><th>Path</th></tr>")
+        lst_total.append("<tbody>")
+        # Walk all gold sermons
+        qs = SermonGoldSame.objects.all().order_by('dst__siglist')
+        for idx, relation in enumerate(qs):
+        
+            # Ask for the reverse relation, and see what happens
+            added_here, lst_added = add_gold2gold(relation.dst, relation.src, relation.linktype)
+            added += added_here
+            for item in lst_added:
+                # lst_total.append({'item': idx+1, 'src': item['src'], 'dst': item['dst'] , 'linktype': item['linktype'], 'type': item['type']})
+                path = "-"
+                if 'path' in item:
+                    path = item['path']
+                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( (idx+1), item['src'], item['dst'], item['linktype'], item['type'], path ))
+
+            # Print where we are
+            msg = "{}: {} in {} added: {} (total {})".format(idx, relation.linktype, relation.src.siglist, added_here, added)
+            oErr.Status(msg)
+
+        lst_total.append("</tbody></table>")
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of added relations', 'result': added})
+        # result_list.append({'part': 'All additions', 'result': json.dumps(lst_total)})
+        result_list.append({'part': 'All additions', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("goldtogold")
+        return reverse('home')
 
 @csrf_exempt
 def get_countries(request):

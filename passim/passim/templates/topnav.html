@@ -45,6 +45,11 @@
                             <li><a href="" title="Upload XML files from e-codices (ch)">Import e-codices XML</a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
+
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#" href_was="{% url 'do_clavis' %}" title="Correct Clavis by adding CPPM to number-only">Clavis correct</a></li>
+                            <li><a href="{% url 'do_goldtogold' %}" title="Correct all gold-to-gold relations">Gold to gold Relations correct</a></li>
+
                           {% endif %}
 
                           {% if is_passim_editor %}
