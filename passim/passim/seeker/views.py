@@ -521,6 +521,8 @@ def do_goldtogold(request):
         lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th><th>Path</th></tr>")
         lst_total.append("<tbody>")
 
+        method = "goldspread" 
+
         # Step #1: remove all unnecessary links
         oErr.Status("{} step #1".format(method))
         qs = SermonGoldSame.objects.all()
