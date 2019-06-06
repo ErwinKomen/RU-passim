@@ -34,7 +34,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
-    Report, SermonDescrGold, Visit, Profile, SermonSignature, Status, Library
+    Report, SermonDescrGold, Visit, Profile, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys
@@ -520,23 +520,115 @@ def do_goldtogold(request):
         lst_total = []
         lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th><th>Path</th></tr>")
         lst_total.append("<tbody>")
-        # Walk all gold sermons
-        qs = SermonGoldSame.objects.all().order_by('dst__siglist')
-        for idx, relation in enumerate(qs):
-        
-            # Ask for the reverse relation, and see what happens
-            added_here, lst_added = add_gold2gold(relation.dst, relation.src, relation.linktype)
-            added += added_here
-            for item in lst_added:
-                # lst_total.append({'item': idx+1, 'src': item['src'], 'dst': item['dst'] , 'linktype': item['linktype'], 'type': item['type']})
-                path = "-"
-                if 'path' in item:
-                    path = item['path']
-                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( (idx+1), item['src'], item['dst'], item['linktype'], item['type'], path ))
 
-            # Print where we are
-            msg = "{}: {} in {} added: {} (total {})".format(idx, relation.linktype, relation.src.siglist, added_here, added)
-            oErr.Status(msg)
+        # Step #1: remove all unnecessary links
+        oErr.Status("{} step #1".format(method))
+        qs = SermonGoldSame.objects.all()
+        lst_delete = []
+        for relation in qs:
+            if relation.src == relation.dst:
+                lst_delete.append(relation.id)
+        oErr.Status("Step 1: removing {} links".format(len(lst_delete)))
+        if len(lst_delete) > 0:
+            SermonGoldSame.objects.filter(Q(id__in=lst_delete)).delete()
+
+        # Step #2: create groups of equals
+        oErr.Status("{} step #2".format(method))
+        lst_group = []      # List of groups, where each group is a list of equal-related gold-sermons
+        qs_eqs = SermonGoldSame.objects.filter(linktype=LINK_EQUAL ).order_by('src')
+        for idx, relation in enumerate(qs_eqs):
+            src = relation.src
+            dst = relation.dst
+            # Find out in which group this one fits
+            bGroup = False
+            for group in lst_group:
+                # Find a connection within this group
+                for obj in group:
+                    id = obj.id
+                    if id == src.id or id == dst.id:
+                        # We found the group
+                        bGroup = True
+                        break
+                if bGroup:
+                    # Add them if needed
+                    if relation.src not in group: group.append(relation.src)
+                    if relation.dst not in group: group.append(relation.dst)
+                    # And then break from the larger one
+                    break
+            # Did we fit this into a group?
+            if not bGroup:
+                # Create a new group with two members
+                group = [relation.src, relation.dst]
+                lst_group.append(group)
+        # Create a list of objects that have been done
+        lst_done = []
+        for group in lst_group:
+            for obj in group:
+                lst_done.append(obj.id)
+        # Add individuals to the list of groups if they have not yet been 'done'
+        for obj in SermonGold.objects.exclude(id__in=lst_done):
+            lst_group.append([obj])
+                    
+        # Step #3: spread 'equals' within each group
+        oErr.Status("{} step #3".format(method))
+        lst_add = []    # List of equals relations to be added
+        for group in lst_group:
+            # Consider each id in group
+            for src in group:
+                # Check for all possible destination id's
+                for dst in group:
+                    # Make sure they're not equal
+                    if src.id != dst.id:
+                        # Check if this relation exists
+                        obj = qs.filter(src=src, dst=dst).first()
+                        if obj == None:
+                            lst_add.append({'src': src, 'dst': dst})
+        with transaction.atomic():
+            for idx, item in enumerate(lst_add):
+                obj = SermonGoldSame(linktype=LINK_EQUAL, src=item['src'], dst=item['dst'])
+                obj.save()
+                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                    (idx+1), item['src'].siglist, item['dst'].siglist, LINK_EQUAL, "add", "" ))
+
+        # Step #4: spread 'partial' links within groups of equals
+        oErr.Status("{} step #4".format(method))
+        for linktype in LINK_PRT:
+            lst_prt_add = []    # List of partially equals relations to be added
+            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
+            for group in lst_group:
+                # DEBUGGING - check the length of this group
+                if len(group) == 1:
+                    iStop = True
+
+                # Get a list of existing 'partially equals' destination links from the current group
+                qs_grp_prt = qs_prt.filter(Q(src__in=group))
+                if len(qs_grp_prt) > 0:
+                    # Make a list of unique destination gold objects
+                    lst_dst = []
+                    for obj in qs_grp_prt:
+                        dst = obj.dst
+                        if dst not in lst_dst: lst_dst.append(dst)
+                    # Make a list of relations that need to be added
+                    for src in group:
+                        for dst in lst_dst:
+                            # Make sure relations are not equal
+                            if src.id != dst.id:
+                                # Check if the relation already is there
+                                obj = qs_prt.filter(src=src, dst=dst).first()
+                                if obj == None:
+                                    lst_prt_add.append({'src': src, 'dst': dst})
+                                # Check if the reverse relation is already there
+                                obj = qs_prt.filter(src=dst, dst=src).first()
+                                if obj == None:
+                                    lst_prt_add.append({'src': dst, 'dst': src})
+            # Add all the relations in lst_prt_add
+            with transaction.atomic():
+                for idx, item in enumerate(lst_prt_add):
+                    obj = SermonGoldSame(linktype=linktype, src=item['src'], dst=item['dst'])
+                    obj.save()
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        (idx+1), item['src'].siglist, item['dst'].siglist, linktype, "add", "" ))
+
 
         lst_total.append("</tbody></table>")
 

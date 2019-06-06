@@ -35,6 +35,8 @@ REPORT_TYPE = "seeker.reptype"
 LINK_TYPE = "seeker.linktype"
 EDI_TYPE = "seeker.editype"
 
+LINK_EQUAL = 'eqs'
+LINK_PRT = ['prt', 'neq']
 
 class FieldChoice(models.Model):
 
@@ -104,12 +106,13 @@ def is_number(s_input):
 def get_linktype_abbr(sLinkType):
     """Convert a linktype into a valid abbreviation"""
 
-    options = [{'abbr': 'eqs', 'input': 'equals' },
+    options = [{'abbr': LINK_EQUAL, 'input': 'equals' },
                {'abbr': 'prt', 'input': 'partially equals' },
                {'abbr': 'prt', 'input': 'partialy equals' },
                {'abbr': 'sim', 'input': 'similar_to' },
                {'abbr': 'sim', 'input': 'similar' },
                {'abbr': 'sim', 'input': 'similar to' },
+               {'abbr': 'neq', 'input': 'nearly equals' },
                {'abbr': 'use', 'input': 'uses' },
                {'abbr': 'use', 'input': 'makes_use_of' },
                ]
@@ -119,7 +122,7 @@ def get_linktype_abbr(sLinkType):
         elif sLinkType == opt['input']:
             return opt['abbr']
     # Return default
-    return 'eqs'
+    return LINK_EQUAL
 
 def get_help(field):
     """Create the 'help_text' for this element"""
@@ -368,81 +371,124 @@ def import_data_file(sContents, arErr):
 def add_gold2gold(src, dst, ltype):
     """Add a gold-to-gold relation from src to dst of type ltype"""
 
+    # Initialisations
+
     # Create a list into which the items to be added are put
     lst_add = []
+    added = 0
 
-    def add_one_rel(inst_src, inst_dst, link_type, path):
-        added_one = 0
-        # Add the current link
-        added_one += append_one_rel(inst_src, inst_dst, link_type, path)
-        # Add the reverse
-        added_one += append_one_rel(inst_dst, inst_src, link_type, path)
-        # walk relations of the source
-        for related in SermonGoldSame.objects.filter(src=inst_src):
-            if not has_one_rel(related.dst, inst_dst) or not has_one_rel(inst_dst, related.dst):
-                # Determine the type to be
-                if related.linktype == link_type:
-                    new_link_type = link_type
-                else:
-                    new_link_type = "prt"
-                # Add from related.dst to dst
-                new_path = "{}-[{}]".format(path, related.src.siglist)
-                added_one += add_one_rel(related.dst, inst_dst, new_link_type, new_path)
-        return added_one
+    def spread_partial(group):
+        """Make sure all members of the equality group have the same partial relations"""
 
-    def has_one_rel(inst_src, inst_dst):
-        # Look if the relation is already there
-        bAdd = False
-        for rel in lst_add:
-            if rel['src'].id == inst_src.id and rel['dst'].id == inst_dst.id:
-                # Since the relation is there: leave the loop
-                bAdd = True
-                break
-        return bAdd
+        lst_back = []
+        added = 0
+        for linktype in LINK_PRT:
+            lst_prt_add = []    # List of partially equals relations to be added
+            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
 
-    # Local procedure to add one link
-    def append_one_rel(inst_src, inst_dst, link_type, path):
-        """Add one gold-to-gold to the list if it is not in there already"""
-
-        added_append = 0
-        # Do we need to add it?
-        if not has_one_rel(inst_src, inst_dst):
-            # Yes: add it
-            lst_add.append({'src': inst_src, 'dst': inst_dst, 'type': link_type, 'path': path})
-            added_append += 1
-        # Return positively
-        return added_append
+            # Get a list of existing 'partially equals' destination links from the current group
+            qs_grp_prt = qs_prt.filter(Q(src__in=group))
+            if len(qs_grp_prt) > 0:
+                # Make a list of unique destination gold objects
+                lst_dst = []
+                for obj in qs_grp_prt:
+                    dst = obj.dst
+                    if dst not in lst_dst: lst_dst.append(dst)
+                # Make a list of relations that need to be added
+                for src in group:
+                    for dst in lst_dst:
+                        # Make sure relations are not equal
+                        if src.id != dst.id:
+                            # Check if the relation already is there
+                            obj = qs_prt.filter(src=src, dst=dst).first()
+                            if obj == None:
+                                lst_prt_add.append({'src': src, 'dst': dst})
+                            # Check if the reverse relation is already there
+                            obj = qs_prt.filter(src=dst, dst=src).first()
+                            if obj == None:
+                                lst_prt_add.append({'src': dst, 'dst': src})
+            # Add all the relations in lst_prt_add
+            with transaction.atomic():
+                for idx, item in enumerate(lst_prt_add):
+                    obj = SermonGoldSame(linktype=linktype, src=item['src'], dst=item['dst'])
+                    obj.save()
+                    added += 1
+                    lst_back.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        (idx+1), item['src'].siglist, item['dst'].siglist, linktype, "add" ))
+        # Return the results
+        return added, lst_back
 
     # Main body of add_gold2gold()
-    added = add_one_rel(src, dst, ltype, "")
+    lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+    lst_total.append("<tbody>")
 
-    lst_report = []
-    # Process all the relations in lst_add
-    added_actual = 0
-    with transaction.atomic():
-        for newrel in lst_add:
-            # Check if it is already there or not
-            src = newrel['src']
-            dst = newrel['dst']
-            linktype = newrel['type'] 
-            path = newrel['path']
-            if src.id != dst.id:
-                obj = SermonGoldSame.objects.filter(src=src, dst=dst).first()
-                if obj == None:
-                    obj = SermonGoldSame(src=src, dst=dst, linktype=linktype)
-                    obj.save()
-                    added_actual += 1
-                    lst_report.append({'src': src.siglist, 'dst': dst.siglist, 'linktype': linktype, 'type': 'add', 'path': path})
-                elif obj.linktype != linktype and linktype == "eqs":
-                    # Equal should replace existing one
-                    obj.linktype = linktype
-                    obj.save()
-                    lst_report.append({'src': src.siglist, 'dst': dst.siglist, 'linktype': linktype, 'type': 'replace', 'path': path})
+    # Action depends on the kind of relationship that is added
+    if ltype == LINK_EQUAL:
+        # 1: Get the group of related gold-sermons in which the src resides
+        grp_src = [x.dst for x in SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=src)]
+        grp_src.append(src)
+        # 2: Get the group of related gold-sermons in which the dst resides
+        grp_dst = [x.dst for x in SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=dst)]
+        grp_dst.append(dst)
+        # 3: Double check all EQUAL relations that should be there
+        lst_add = []
+        for inst_src in grp_src:
+            for inst_dst in grp_dst:
+                # Make sure they are not equal
+                if inst_src.id != inst_dst.id:
+                    obj = SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=inst_src, dst=inst_dst).first()
+                    if obj == None:
+                        # Add the relation to the ones that should be added
+                        lst_add.append({'src': inst_src, 'dst': inst_dst})
+        # 4: Add those that need adding in one go
+        with transaction.atomic():
+            for idx, item in enumerate(lst_add):
+                obj = SermonGoldSame(linktype=LINK_EQUAL, src=item['src'], dst=item['dst'])
+                obj.save()
+                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                    (idx+1), item['src'].siglist, item['dst'].siglist, LINK_EQUAL, "add" ))
+                added += 1
+        # 5: Create a new group, consisting of the two groups
+        group = [x for x in grp_src]
+        for item in grp_dst: group.append(item)
+        # 6: Spread the partial links over the new group
+        prt_added, lst_partial = spread_partial(group)
+        for item in lst_partial: lst_total.append(item)
+        added += prt_added
+    else:
+        # What is added is a partially equals link
+
+        # 1: Get the group of related gold-sermons in which the src resides
+        grp_src = [x.dst for x in SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=src)]
+        grp_src.append(src)
+        # 2: Get the group of related gold-sermons in which the dst resides
+        grp_dst = [x.dst for x in SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=dst)]
+        grp_dst.append(dst)
+        # 3: make linktype-links from all in src to all in dst
+        lst_add = []
+        for inst_src in grp_src:
+            for inst_dst in grp_dst:
+                # Make sure they are not equal
+                if inst_src.id != inst_dst.id:
+                    obj = SermonGoldSame.objects.filter(linktype=linktype, src=inst_src, dst=inst_dst).first()
+                    if obj == None:
+                        # Add the relation to the ones that should be added
+                        lst_add.append({'src': inst_src, 'dst': inst_dst})
+        # 4: Add those that need adding in one go
+        with transaction.atomic():
+            for idx, item in enumerate(lst_add):
+                obj = SermonGoldSame(linktype=LINK_EQUAL, src=item['src'], dst=item['dst'])
+                obj.save()
+                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                    (idx+1), item['src'].siglist, item['dst'].siglist, LINK_EQUAL, "add" ))
+                added += 1
+        
+
+    # Finish the report list
+    lst_total.append("</tbody></table>")
 
     # Return the number of added relations
-    return added_actual, lst_report
-
-
+    return added, lst_report
 
 
 class Status(models.Model):
@@ -1789,6 +1835,7 @@ class SermonGold(models.Model):
         link_list = [
             {'abbr': 'eqs', 'class': 'eqs-link', 'count': 0, 'title': 'Is equal to' },
             {'abbr': 'prt', 'class': 'prt-link', 'count': 0, 'title': 'Is part of' },
+            {'abbr': 'neq', 'class': 'neq-link', 'count': 0, 'title': 'Is nearly equal to' },
             {'abbr': 'sim', 'class': 'sim-link', 'count': 0, 'title': 'Is similar to' },
             {'abbr': 'use', 'class': 'use-link', 'count': 0, 'title': 'Makes us of' },
             ]
@@ -1929,12 +1976,6 @@ class SermonGold(models.Model):
                 # Reset breaking
                 bBreak = False
 
-                # ============================================================
-                #lStop = ['210'] # lStop = ['194', '210']
-                #if oGold['row_number'] in lStop:
-                #    iStopHere = 1
-                # ============================================================
-
                 # Get the status of this line
                 status = oGold['status'].lower()
                 if status in status_ok:
@@ -1996,18 +2037,15 @@ class SermonGold(models.Model):
                             # Break to a higher level
                             break
                     if bBreak:
-                        # Break from the higher gold loop
-                        continue
+                        # # Break from the higher gold loop
+                        # continue
+                        # NOTE: don't break completely. Continue with editions
+                        pass
 
                     # Process Editions (separated by ';')
                     edition_lst = oGold['edition'].split(";")
                     for item in edition_lst:
                         item = item.strip()
-
-                        ## ========== DEBUG ============
-                        #if "CC 38"  in item:
-                        #    iStopRightHere = 1
-                        ## =============================
 
                         # NOTE: An edition should be unique for a gold sermon; not in general!
                         edition = Edition.find(item, gold)
@@ -2023,10 +2061,12 @@ class SermonGold(models.Model):
                             break
 
                     if bBreak:
-                        # Break from the higher gold loop
-                        continue
+                        # # Break from the higher gold loop
+                        # continue
+                        # NOTE: don't break completely. Continue with editions
+                        pass
 
-                    # Getting here means that the item is read completely well
+                    # Getting here means that the item is read TO SOME EXTENT
                     add_to_read_list(lst_read, oGold)
 
                     oGold['obj'] = gold
@@ -2037,7 +2077,6 @@ class SermonGold(models.Model):
 
  
             # Iterate over the objects again, and add relations
-            reverse_set = ['eqs', 'prt', 'sim']
             for oGold in lst_goldsermon:
                 # Show where we are
                 objStat.set("reading", msg="Pass #2, line={}".format(oGold['row_number']))
@@ -2050,11 +2089,11 @@ class SermonGold(models.Model):
                         for target_item in target_list:
                             # Determine the linktype
                             if 'linktype' in oGold:
-                                linktype = "eqs" if oGold['linktype'] == "" else oGold['linktype']
+                                linktype = LINK_EQUAL if oGold['linktype'] == "" else oGold['linktype']
                                 # Double check valid linktype
                                 linktype = get_linktype_abbr(linktype)
                             else:
-                                linktype = "eqs"
+                                linktype = LINK_EQUAL
 
                             # Get the target sermongold
                             target = SermonGold.find_first(target_item)
@@ -2073,30 +2112,8 @@ class SermonGold(models.Model):
                                 pass
 
                             # Check and add relation(s), if these are not yet there
-                            count_rel += add_gold2gold(obj, target, linktype)
-                            ## Check if this relation is already there
-                            #if not obj.has_relation(target, linktype):
-                            #    # This is a new relation, so create it
-                            #    obj.add_relation(target, linktype)
-                            #    # Keep track of relation statistics
-                            #    count_rel += 1
-                            ## Check if the reverse relation needs adding
-                            #if linktype in reverse_set and not target.has_relation(obj, linktype):
-                            #    # This is a new relation, so create it
-                            #    target.add_relation(obj, linktype)
-                            #    # Keep track of relation statistics
-                            #    count_rel += 1
-                            ## Get all the gold sermons that have a particular relation to me, excluding target
-                            #qs = obj.get_relations('eqs').exclude(dst=target)
-                            #for relobj in qs:
-                            #    # Check the relation from obj - relobj
-                            #    if not obj.has_relation(relobj, linktype):
-                            #        obj.add_relation(relobj, linktype)
-                            #        count_rel += 1
-                            #    # Check the reverse relations from relobj - obj
-                            #    if not relobj.has_relation(obj, linktype):
-                            #        relobj.add_relation(obj, linktype)
-                            #        count_rel += 1
+                            count_links, lst_added = add_gold2gold(obj, target, linktype)
+                            count_rel += count_links
 
             # Make sure the requester knows how many have been added
             oBack['count'] = count_obj      # Number of gold objects created
@@ -2128,7 +2145,7 @@ class SermonGoldSame(models.Model):
     dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
-                            max_length=5, default="eqs")
+                            max_length=5, default=LINK_EQUAL)
 
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)

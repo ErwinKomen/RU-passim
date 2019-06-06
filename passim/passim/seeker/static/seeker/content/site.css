@@ -1142,6 +1142,9 @@ span.badge.eqs-link {
 span.badge.prt-link {
   background-color: lightgreen;
 }
+span.badge.neq-link {
+  background-color: darkgoldenrod;
+}
 span.badge.sim-link {
   background-color: darkgreen;
 }
