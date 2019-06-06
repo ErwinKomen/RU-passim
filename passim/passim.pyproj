@@ -114,6 +114,7 @@
     <Content Include="passim\seeker\templates\seeker\report_list.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_signset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_list.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold.html" />
     <Content Include="passim\seeker\templates\seeker\sermongoldlink_info.html" />
@@ -136,6 +137,7 @@
     <Content Include="passim\seeker\templates\seeker\syncentry.html" />
     <Content Include="passim\templates\about.html" />
     <Content Include="passim\templates\admin\base.html" />
+    <Content Include="passim\templates\tools.html" />
     <Content Include="passim\templates\breadcrumb_list.html" />
     <Content Include="passim\templates\contact.html" />
     <Content Include="passim\templates\index.html" />

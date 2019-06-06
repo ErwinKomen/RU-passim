@@ -1648,6 +1648,8 @@ class BasicPart(View):
                                                     context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
                                                     # Store the instance id in the data
                                                     self.data[prefix + '_instanceid'] = sub_instance.id
+                                                    # Any action after saving this form
+                                                    self.after_save(prefix, sub_instance)
                                         else:
                                             if len(form.errors) > 0:
                                                 self.arErr.append(form.errors)
@@ -3221,6 +3223,11 @@ class SermonGoldLinkset(BasicPart):
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+
+    def after_save(self, prefix, instance = None):
+        # Now make sure all related material is updated
+        added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
+        return True
 
 
 class SermonGoldSignset(BasicPart):
