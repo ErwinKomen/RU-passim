@@ -370,6 +370,7 @@ class ManuscriptForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
+            # Make sure to copy the initial values of all 
 
 
 class SearchCollectionForm(forms.Form):
