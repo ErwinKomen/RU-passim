@@ -986,14 +986,16 @@ class Manuscript(models.Model):
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
+    # [0-1] Bibliography used for the manuscript
+    bibliolit = models.TextField("Literature", null=True, blank=True)
+
     # Where do we get our information from? And when was it added?
     # Note: deletion of a sourceinfo sets the manuscript.source to NULL
     source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
 
     # [m] Many-to-many: all the provenances of this manuscript
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
-
-
+       
     def __str__(self):
         return self.name
 

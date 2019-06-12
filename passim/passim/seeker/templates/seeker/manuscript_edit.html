@@ -154,6 +154,16 @@
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.url}}</div>{% endif %}
         </td>
       </tr>
+        <!-- Bibliography and link to Bibliography page -->  
+      <tr>
+        <td valign="top"><a href="{% url 'bibliography' %}" title="Bibliography">Bibliography literature</a>
+        <td class="manuscript-bibliolit" align="left">
+          <div class="view-mode">{% if object.bibliolit %}{{manuForm.bibliolit.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.bibliolit}}</div>{% endif %}
+        </td>
+      </tr>
+
+
 
       <!-- The remainder is only visible by passim editors, and only in EDIT mode, and only as visualisation... -->
       {% if is_passim_editor %}
