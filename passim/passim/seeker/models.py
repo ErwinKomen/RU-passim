@@ -91,13 +91,15 @@ def adapt_latin(val):
     val = val.replace('...', u'\u2026')
     return val
 
-def adapt_markdown(val):
+def adapt_markdown(val, lowercase=True):
     sBack = ""
     if val != None:
         val = val.replace("***", "\*\*\*")
         sBack = mark_safe(markdown(val, safe_mode='escape'))
         sBack = sBack.replace("<p>", "")
         sBack = sBack.replace("</p>", "")
+        if lowercase:
+            sBack = sBack.lower()
     return sBack
 
 def is_number(s_input):
@@ -1685,12 +1687,22 @@ class Nickname(models.Model):
         return hit
 
 
+class Keyword(models.Model):
+    """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
+
+    # [1] Obligatory text of a keyword
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+    
+
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
-    author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_goldensermons")
+    author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_goldsermons")
     # [0-1] We would like to know the INCIPIT (first line in Latin)
     incipit = models.TextField("Incipit", null=True, blank=True)
     srchincipit = models.TextField("Incipit (searchable)", null=True, blank=True)
@@ -1708,6 +1720,9 @@ class SermonGold(models.Model):
 
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
+
+    # [0-n] Many-to-many: keywords per SermonGold
+    keywords = models.ManyToManyField(Keyword, through="SermonGoldKeyword", related_name="keywords_gold")
 
     def __str__(self):
         name = self.signatures()
@@ -1833,7 +1848,7 @@ class SermonGold(models.Model):
 
     def get_bibliography_markdown(self):
         """Get the contents of the bibliography field using markdown"""
-        return adapt_markdown(self.bibliography)
+        return adapt_markdown(self.bibliography, False)
 
     def get_incipit_markdown(self):
         """Get the contents of the incipit field using markdown"""
@@ -2166,10 +2181,16 @@ class SermonGoldSame(models.Model):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
 
-    def target(self):
-        # Get the URL to edit/view this sermon
-        sUrl = "" if self.id == None else reverse("goldlink_view", kwargs={'pk': self.id})
-        return sUrl
+
+class SermonGoldKeyword(models.Model):
+    """Relation between a SermonGold and a Keyword"""
+
+    # [1] The link is between a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, related_name="sermongold_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermongold_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=datetime.now)
 
 
 class Edition(models.Model):

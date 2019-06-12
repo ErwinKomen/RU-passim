@@ -31,10 +31,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
-                                SermonDescrSignatureForm
+                                SermonDescrSignatureForm, SermonGoldKeywordForm
 from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, Signature, Edition, Ftextlink, \
-    Report, SermonDescrGold, Visit, Profile, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
+    Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys
@@ -1026,6 +1026,31 @@ def get_editions(request):
             lstQ = []
             lstQ.append(Q(name__icontains=author))
             items = Edition.objects.filter(*lstQ).order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_keywords(request):
+    """Get a list of keywords for autocomplete"""
+
+    oErr = ErrHandle
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            kw = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=kw))
+            items = Keyword.objects.filter(*lstQ).order_by("name").distinct()
             results = []
             for co in items:
                 co_json = {'name': co.name, 'id': co.id }
@@ -2603,6 +2628,7 @@ class SermonListView(ListView):
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
 
+
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
 
@@ -2980,6 +3006,11 @@ class SermonGoldListView(ListView):
                     val = adapt_search(oFields['signature'])
                     lstQ.append(Q(goldsignatures__code__iregex=val))
 
+                # Check for SermonGold [signature]
+                if 'keyword' in oFields and oFields['keyword'] != "" and oFields['keyword'] != None: 
+                    val = adapt_search(oFields['keyword'])
+                    lstQ.append(Q(keywords__name__iregex=val))
+
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # Just show everything
@@ -3173,47 +3204,6 @@ class SermonGoldSelect(BasicPart):
         return qs
 
     
-class SermonGoldSameDetailsView(BasicPart):
-    """The details of one gold-to-gold link"""
-
-    MainModel = SermonGoldSame
-    template_name = 'seeker/sermongoldlink_info.html'    # Use this for GET and for POST requests
-    title = "SermonGoldLink"
-    form_objects = [{'form': SermonGoldSameForm, 'prefix': 'glink', 'readonly': False},
-                    {'form': SelectGoldForm, 'prefix': 'gsel', 'readonly': True}]
-
-    def get_instance(self, prefix):
-        instance = None
-        if prefix == "glink":
-            # The instance is the SermonGoldSame instance, the link description
-            instance = self.obj
-        elif prefix == "gsel":
-            # The instance is where the SermonGoldSame instance is pointing to, the dst
-            instance = self.obj.dst
-        return instance
-
-    def add_to_context(self, context):
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        context['results'] = []
-
-        # Is this a request for deletion?
-        if self.action == "delete":
-            # Delete the current object
-            if self.obj != None:
-                self.obj.delete()
-                deletestatus = True
-            else:
-                deletestatus = False
-            context['deleted'] = deletestatus
-
-        # Return the adapted context
-        return context
-
-
 class SermonGoldLinkset(BasicPart):
     """The set of links from one gold sermon"""
 
@@ -3262,6 +3252,39 @@ class SermonGoldEdiset(BasicPart):
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GediFormSet, 'prefix': 'gedi', 'readonly': False}]
+
+
+class SermonGoldKwset(BasicPart):
+    """The set of keywords from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_kwset.html'
+    title = "SermonGoldKeywords"
+    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
+                                         form=SermonGoldKeywordForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GkwFormSet, 'prefix': 'gkw', 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "gkw":
+            # Get the chosen keyword
+            obj = form.cleaned_data['keyword']
+            if obj == None:
+                # Get the value entered for the keyword
+                kw = form['name'].data
+                # Check if this is an existing Keyword
+                obj = Keyword.objects.filter(name__iexact=kw).first()
+                if obj == None:
+                    # Create it
+                    obj = Keyword(name=kw.lower())
+                    obj.save()
+                # Now set the instance value correctly
+                instance.keyword = obj
+                has_changed = True
+
+        return has_changed
 
 
 class SermonGoldFtxtset(BasicPart):

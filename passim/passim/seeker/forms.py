@@ -210,6 +210,8 @@ class SermonGoldForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    keyword = forms.CharField(label=_("Keyword"), required=False,
+        widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -282,6 +284,30 @@ class SermonGoldEditionForm(forms.ModelForm):
         fields = ['name', 'gold']
         widgets={'name':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Critical text edition...', 'style': 'width: 100%;'})
                  }
+
+
+class SermonGoldKeywordForm(forms.ModelForm):
+    name = forms.CharField(label=_("Keyword"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonGoldKeyword
+        fields = ['gold', 'keyword']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldKeywordForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['keyword'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.keyword != None:
+                kw = instance.keyword.name
+                self.fields['name'].initial = kw
 
 
 class SermonGoldFtextlinkForm(forms.ModelForm):
