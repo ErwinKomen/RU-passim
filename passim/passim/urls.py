@@ -79,7 +79,7 @@ urlpatterns = [
     url(r'^gold/signset(?:/(?P<pk>\d+))?/$', SermonGoldSignset.as_view(), name='gold_signset'),
     url(r'^gold/ediset(?:/(?P<pk>\d+))?/$', SermonGoldEdiset.as_view(), name='gold_ediset'),
     url(r'^gold/ftxtset(?:/(?P<pk>\d+))?/$', SermonGoldFtxtset.as_view(), name='gold_ftxtset'),
-    url(r'^goldlink/view(?:/(?P<pk>\d+))?/$', SermonGoldSameDetailsView.as_view(), name='goldlink_view'),
+    url(r'^gold/kwset(?:/(?P<pk>\d+))?/$', SermonGoldKwset.as_view(), name='gold_kwset'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
@@ -95,6 +95,7 @@ urlpatterns = [
     url(r'^api/gldsignatures/$', passim.seeker.views.get_gldsignatures, name='api_gldsignatures'),
     url(r'^api/srmsignatures/$', passim.seeker.views.get_srmsignatures, name='api_srmsignatures'),
     url(r'^api/editions/$', passim.seeker.views.get_editions, name='api_editions'),
+    url(r'^api/keywords/$', passim.seeker.views.get_keywords, name='api_keywords'),
     url(r'^api/manuidnos/$', passim.seeker.views.get_manuidnos, name='api_manuidnos'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),

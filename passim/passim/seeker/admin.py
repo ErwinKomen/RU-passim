@@ -112,6 +112,13 @@ class ProfileAdmin(admin.ModelAdmin):
     fields = ['user', 'stack']
 
 
+class SermonGoldKeywordAdmin(admin.ModelAdmin):
+    """Display keywords"""
+
+    list_display = ['name', 'created']
+    fields = ['name', 'created']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -121,6 +128,7 @@ admin.site.register(NewsItem, NewsItemAdmin)
 admin.site.register(Country, CountryAdmin)
 admin.site.register(City, CityAdmin)
 admin.site.register(Library, LibraryAdmin)
+admin.site.register(Keyword)
 
 # Logbook of activities
 admin.site.register(LogEntry, LogEntryAdmin)

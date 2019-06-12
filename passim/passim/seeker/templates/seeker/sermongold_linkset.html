@@ -52,7 +52,9 @@
                 <td style="width: 100%;">
                   <div class="hidden"><input id="id_glink-{{forloop.counter0}}-dst" name="glink-{{forloop.counter0}}-dst" value="{{linkform.instance.dst.id}}" /></div>
                   <div class="view-mode">
-                    {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                    <a href="{% url 'gold_details' linkform.instance.dst.id %}" target="_blank">
+                      {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst %}
+                    </a>
                   </div>
                   <div class="edit-mode hidden selected clickable"
                        data-toggle="modal" 

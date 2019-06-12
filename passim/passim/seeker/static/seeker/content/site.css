@@ -1167,3 +1167,8 @@ td a.nostyle {
   font-size: smaller;
   color: darkblue;
 }
+
+div.view-mode a {
+  text-decoration: none;
+  color: inherit;
+}

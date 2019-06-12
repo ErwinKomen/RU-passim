@@ -87,7 +87,7 @@
       <tr class="form-row">
         <td class="hoverable">Incipit</td>
         <td >
-          <div class="view-mode">{% if sermoForm.incipit.value %}{{sermoForm.incipit.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if sermoForm.incipit.value %}{{sermoForm.instance.get_incipit_markdown|safe}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sermoForm.incipit}}</div>
           {% endif %}
@@ -96,7 +96,7 @@
       <tr class="form-row">
         <td class="hoverable">Explicit</td>
         <td >
-          <div class="view-mode">{% if sermoForm.explicit.value %}{{sermoForm.explicit.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if sermoForm.explicit.value %}{{sermoForm.instance.get_explicit_markdown|safe}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sermoForm.explicit}}</div>
           {% endif %}

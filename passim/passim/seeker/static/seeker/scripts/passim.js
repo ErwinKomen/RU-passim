@@ -63,7 +63,9 @@ var ru = (function ($, ru) {
         loc_manuidno = [],          // use in sermon_list.html
         loc_manuidnoL = [],
         loc_edition = [],           // critical editions that belong to a gold sermon
-        loc_editionL = [],      
+        loc_editionL = [],
+        loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
+        loc_keywordL = [],
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
@@ -376,6 +378,26 @@ var ru = (function ($, ru) {
           }
         });
 
+        // Bloodhound: KEYWORD
+        loc_keyword = new Bloodhound({
+          datumTokenizer: function (myObj) {
+            return myObj;
+          },
+          queryTokenizer: function (myObj) {
+            return myObj;
+          },
+          // loc_countries will be an array of countries
+          local: loc_keywordL,
+          prefetch: { url: base_url + 'api/keywords/', cache: true },
+          remote: {
+            url: base_url + 'api/keywords/?name=',
+            replace: function (url, uriEncodedQuery) {
+              url += encodeURIComponent(uriEncodedQuery);
+              return url;
+            }
+          }
+        });
+
         // Initialize typeahead
         ru.passim.init_typeahead();
 
@@ -403,6 +425,7 @@ var ru = (function ($, ru) {
           $(".typeahead.siggrysons").typeahead('destroy');
           $(".typeahead.sigclavises").typeahead('destroy');
           $(".typeahead.editions").typeahead('destroy');
+          $(".typeahead.keywords").typeahead('destroy');
           $(".typeahead.manuidnos").typeahead('destroy');
 
           // Type-ahead: COUNTRY
@@ -626,6 +649,22 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".edition-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: KEYWORD -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.keywords, tr .typeahead.keywords").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'keywords', source: loc_keyword, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark an inexact wording of a keyword</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".keyword-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: manuidno -- NOTE: not in a form-row, but in a normal 'row'
