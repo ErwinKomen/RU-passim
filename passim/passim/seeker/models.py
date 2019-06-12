@@ -989,7 +989,7 @@ class Manuscript(models.Model):
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
     # [0-1] Bibliography used for the manuscript
-    bibliolit = models.TextField("Literature", null=True, blank=True)
+    literature = models.TextField("Literature", null=True, blank=True)
 
     # Where do we get our information from? And when was it added?
     # Note: deletion of a sourceinfo sets the manuscript.source to NULL

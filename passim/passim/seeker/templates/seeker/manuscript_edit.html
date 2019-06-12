@@ -100,7 +100,7 @@
       <tr class="form-row">
         <td valign="top"><b>Origin</b></td>
         <td class="manuscript-support" align="left">
-          <div class="view-mode">{% if object.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if manuForm.instance.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="origin-key hidden">{{manuForm.origin}}</div>
             <div class="edit-mode hidden">{{manuForm.origname_ta}}</div>
@@ -121,21 +121,21 @@
       <tr>
         <td valign="top"><b>Support</b></td>
         <td class="manuscript-support" align="left">
-          <div class="view-mode">{% if object.support %}{{manuForm.support.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if manuForm.instance.support %}{{manuForm.support.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.support}}</div>{% endif %}
         </td>
       </tr>
       <tr>
         <td valign="top"><b>Extent</b></td>
         <td class="manuscript-extent" align="left">
-          <div class="view-mode">{% if object.extent %}{{manuForm.extent.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if manuForm.instance.extent %}{{manuForm.extent.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.extent}}</div>{% endif %}
         </td>
       </tr>
       <tr>
         <td valign="top"><b>Format</b></td>
         <td class="manuscript-format" align="left">
-          <div class="view-mode">{% if object.format %}{{manuForm.format.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if manuForm.instance.format %}{{manuForm.format.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.format}}</div>{% endif %}
         </td>
       </tr>
@@ -145,8 +145,8 @@
         <td valign="top"><b>External</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">
-          {% if object.url %}
-            <a title="External link" href="{{object.url}}" target="_blank" >{{object.url}}</a>
+          {% if manuForm.instance.url %}
+            <a title="External link" href="{{manuForm.instance.url}}" target="_blank" >{{manuForm.instance.url}}</a>
           {% else %}
             -
           {% endif %}
@@ -156,10 +156,10 @@
       </tr>
         <!-- Bibliography and link to Bibliography page -->  
       <tr>
-        <td valign="top"><a href="{% url 'bibliography' %}" title="Bibliography">Bibliography literature</a>
-        <td class="manuscript-bibliolit" align="left">
-          <div class="view-mode">{% if object.bibliolit %}{{manuForm.bibliolit.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.bibliolit}}</div>{% endif %}
+        <td valign="top"><a href="{% url 'bibliography' %}" title="Bibliography">Literature</a>
+        <td class="manuscript-literature" align="left">
+          <div class="view-mode">{% if manuForm.instance.literature %}{{manuForm.literature.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.literature}}</div>{% endif %}
         </td>
       </tr>
 

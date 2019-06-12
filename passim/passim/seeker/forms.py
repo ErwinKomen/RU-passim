@@ -334,7 +334,7 @@ class ManuscriptForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ('name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format')
+        fields = ('name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'literature')
         widgets={'library': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'name': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart': forms.TextInput(attrs={'style': 'width: 40%;'}),
@@ -344,7 +344,7 @@ class ManuscriptForm(forms.ModelForm):
                  'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format': forms.TextInput(attrs={'style': 'width: 100%;'}),
-
+                 'literature': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
