@@ -313,7 +313,7 @@
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
-                    <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th><!-- Buttons --></th></tr></thead>
+                    <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th>Status</th><th><!-- Buttons --></th></tr></thead>
                     <tbody>
                     {% for man in object_list %}
                       <tr class="dict-entry">
@@ -334,6 +334,9 @@
                         <!-- Dates for this manuscript -->
                         <td class="manuscript-date" align="right">{{man.yearstart}}</td>
                         <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
+                        
+                        <!-- Show the status of this item -->
+                        <td class="tdnowrap"><span class="badge" title="{{man.get_stype_display}}">{{man.stype|slice:":1"}}</span></td>
 
                         <!-- Buttons for more information on this manuscript -->
                         <td style="min-width: {% if make_use_of_buttons %}80px;{% else %}40px;{% endif %}">

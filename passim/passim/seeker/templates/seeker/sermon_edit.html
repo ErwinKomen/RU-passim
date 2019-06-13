@@ -47,6 +47,15 @@
       </tr>
 
       <tr class="form-row">
+        <td valign="top">Status</td>
+        <td class="sermon-status" align="left">
+          <div class="view-mode">{{sermoForm.instance.get_stype_display}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.stype}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
         <td class="hoverable" style="min-width: 150px;">Locus</td>
         <td  style="width: 100%;">
           <div class="view-mode">{{sermoForm.locus.value}}</div>

@@ -128,7 +128,7 @@ class SermonForm(forms.ModelForm):
 
         model = SermonDescr
         fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
-                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword']
+                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword', 'stype']
         widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -141,6 +141,7 @@ class SermonForm(forms.ModelForm):
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -152,6 +153,8 @@ class SermonForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['stype'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -217,16 +220,19 @@ class SermonGoldForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['author', 'incipit', 'explicit', 'bibliography' ]
+        fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype' ]
         widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
-                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'})
+                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'}),
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonGoldForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['stype'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -334,23 +340,26 @@ class ManuscriptForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ('name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'literature')
-        widgets={'library': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'name': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'yearstart': forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'yearfinish': forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'idno': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'origin': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'url': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'extent': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'format': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'literature': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'support': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'literature', 'stype']
+        widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 'idno':        forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'origin':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'extent':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ManuscriptForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['stype'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

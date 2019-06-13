@@ -34,6 +34,7 @@ LIBRARY_TYPE = "seeker.libtype"
 REPORT_TYPE = "seeker.reptype"
 LINK_TYPE = "seeker.linktype"
 EDI_TYPE = "seeker.editype"
+STATUS_TYPE = "seeker.stype"
 
 LINK_EQUAL = 'eqs'
 LINK_PRT = ['prt', 'neq']
@@ -404,11 +405,15 @@ def add_gold2gold(src, dst, ltype):
                             # Check if the relation already is there
                             obj = qs_prt.filter(src=src, dst=dst).first()
                             if obj == None:
-                                lst_prt_add.append({'src': src, 'dst': dst})
+                                oAdd = {'src': src, 'dst': dst}
+                                if oAdd not in lst_prt_add:
+                                    lst_prt_add.append(oAdd)
                             # Check if the reverse relation is already there
                             obj = qs_prt.filter(src=dst, dst=src).first()
                             if obj == None:
-                                lst_prt_add.append({'src': dst, 'dst': src})
+                                oAdd = {'src': dst, 'dst': src}
+                                if oAdd not in lst_prt_add:
+                                    lst_prt_add.append(oAdd)
             # Add all the relations in lst_prt_add
             with transaction.atomic():
                 for idx, item in enumerate(lst_prt_add):
@@ -444,12 +449,16 @@ def add_gold2gold(src, dst, ltype):
                         obj = SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=inst_src, dst=inst_dst).first()
                         if obj == None:
                             # Add the relation to the ones that should be added
-                            lst_add.append({'src': inst_src, 'dst': inst_dst})
+                            oAdd = {'src': inst_src, 'dst': inst_dst}
+                            if oAdd not in lst_add:
+                                lst_add.append(oAdd)
                         # Also try and add the reverse relation
                         obj = SermonGoldSame.objects.filter(linktype=LINK_EQUAL, src=inst_dst, dst=inst_src).first()
                         if obj == None:
                             # Add the relation to the ones that should be added
-                            lst_add.append({'src': inst_dst, 'dst': inst_src})
+                            oAdd = {'src': inst_dst, 'dst': inst_src}
+                            if oAdd not in lst_add:
+                                lst_add.append(oAdd)
             # 4: Add those that need adding in one go
             with transaction.atomic():
                 for idx, item in enumerate(lst_add):
@@ -988,6 +997,10 @@ class Manuscript(models.Model):
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
+    # [1] Every manuscript has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
+                            max_length=5, default="man")
+
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
 
@@ -1027,7 +1040,7 @@ class Manuscript(models.Model):
             return None
 
     def find_or_create(name,yearstart, yearfinish, library, idno="", 
-                       filename=None, url="", support = "", extent = "", format = "", source=None):
+                       filename=None, url="", support = "", extent = "", format = "", source=None, stype="imp"):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -1050,6 +1063,7 @@ class Manuscript(models.Model):
                 if format != "": manuscript.format = format
                 if url != "": manuscript.url = url
                 if source != None: manuscript.source=source
+                manuscript.stype = stype
                 manuscript.save()
             else:
                 manuscript = qs[0]
@@ -1199,6 +1213,9 @@ class Manuscript(models.Model):
                             sermon.nickname = nickname
                         else:
                             sermon.author = author
+
+                    # Set the default status type
+                    sermon.stype = "imp"    # Imported
 
                     # Now save it
                     sermon.save()
@@ -1720,6 +1737,10 @@ class SermonGold(models.Model):
     # [1] Every gold sermon has a list of signatures that are automatically created
     siglist = models.TextField("List of signatures", default="[]")
 
+    # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
+                            max_length=5, default="man")
+
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
 
@@ -1745,7 +1766,7 @@ class SermonGold(models.Model):
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def find_or_create(author, incipit, explicit):
+    def find_or_create(author, incipit, explicit, stype="imp"):
         """Find or create a SermonGold"""
 
         lstQ = []
@@ -1765,6 +1786,7 @@ class SermonGold(models.Model):
             # Create searchable fields
             obj.srchincipit = get_searchable(incipit)
             obj.srchexplicit = get_searchable(explicit)
+            obj.stype = stype       # Default status is 'imported'
             obj.save()
             bCreated = True
         # Return this object
@@ -2280,6 +2302,10 @@ class SermonDescr(models.Model):
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
     # [0-1] One keyword or more??
     keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
+
+    # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
+                            max_length=5, default="man")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript

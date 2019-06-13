@@ -212,6 +212,9 @@
                             {% endif %}
                           {% endfor %}
                         </td>
+
+                        <!-- Show the status of this item -->
+                        <td class="tdnowrap"><span class="badge" title="{{gold.get_stype_display}}">{{gold.stype|slice:":1"}}</span></td>
                       </tr>
 
                     {% endfor %}

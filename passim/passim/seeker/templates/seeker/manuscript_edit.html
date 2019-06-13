@@ -54,6 +54,15 @@
       {% endif %}
 
       <tr class="form-row">
+        <td valign="top"><b>Status</b></td>
+        <td class="manuscript-status" align="left">
+          <div class="view-mode">{{manuForm.instance.get_stype_display}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{manuForm.stype}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
         <td valign="top" style="width: 100px;"><b>Country</b></td>
         <td class="manuscript-country" align="left">
           <div class="view-mode">{% if manuForm.country_ta %}{{manuForm.country_ta.value}}{% endif %}</div>

@@ -179,6 +179,9 @@
                             {% endif %}
                           {% endfor %}
                         </td>
+
+                        <!-- Show the status of this item -->
+                        <td class="tdnowrap"><span class="badge" title="{{sermon.get_stype_display}}">{{sermon.stype|slice:":1"}}</span></td>
                       </tr>
 
                     {% endfor %}

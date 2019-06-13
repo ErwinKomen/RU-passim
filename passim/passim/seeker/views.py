@@ -494,6 +494,73 @@ def do_clavis(request):
     # Return an appropriate page
     return home(request)
 
+def do_stype(request):
+    """Add stype on the appropriate places"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':datetime.now().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Repair Stype definitions"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Stype", True)
+
+        # Create list to be returned
+        result_list = []
+
+        # Phase 1: Manuscript
+        with transaction.atomic():
+            added = 0
+            for item in Manuscript.objects.all():
+                if item.stype == "-":
+                    item.stype = "imp"
+                    item.save()
+                    added += 1
+            result_list.append({'part': 'Manuscript changed stype', 'result': added})
+
+        # Phase 2: SermonDescr
+        with transaction.atomic():
+            added = 0
+            for item in SermonDescr.objects.all():
+                if item.stype == "-":
+                    item.stype = "imp"
+                    item.save()
+                    added += 1
+            result_list.append({'part': 'SermonDescr changed stype', 'result': added})
+
+        # Phase 3: SermonGold
+        with transaction.atomic():
+            added = 0
+            for item in SermonGold.objects.all():
+                if item.stype == "-":
+                    item.stype = "imp"
+                    item.save()
+                    added += 1
+            result_list.append({'part': 'SermonGold changed stype', 'result': added})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("goldtogold")
+        return reverse('home')
+
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair"""
 
@@ -509,6 +576,9 @@ def do_goldtogold(request):
                     'site_url': admin.site.site_url}
         context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair gold-to-gold links"
@@ -2428,13 +2498,14 @@ class SermonListView(ListView):
     bDoTime = True
     bFilter = False     # Status of the filter
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
                    {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
                    {'name': 'Manuscript', 'order': 'o=4', 'type': 'str'},
                    {'name': 'Locus', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'}]
+                   {'name': 'Links', 'order': '', 'type': 'str'},
+                   {'name': 'Status', 'order': '', 'type': 'str'}]
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -2898,12 +2969,13 @@ class SermonGoldListView(ListView):
     template_name = 'seeker/sermongold.html'
     entrycount = 0
     bDoTime = True
-    order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '']
+    order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
                    {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
                    {'name': 'Editions', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'}]
+                   {'name': 'Links', 'order': '', 'type': 'str'},
+                   {'name': 'Status', 'order': '', 'type': 'str'}]
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
