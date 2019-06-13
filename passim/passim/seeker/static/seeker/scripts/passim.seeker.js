@@ -1576,8 +1576,9 @@ var ru = (function ($, ru) {
                             $("#" + targetid).find(".edit-mode").removeClass("hidden");
                             $("#" + targetid).find(".view-mode").addClass("hidden");
                             // This is 'new', so don't show buttons cancel and delete
-                            // $("#" + targetid).find("a[mode='delete']").addClass("hidden");
                             $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
+                            // Since this is new, don't show fields that may not be shown for new
+                            $("#" + targetid).find(".edit-notnew").addClass("hidden");
                           } else {
                             // Just viewing means we can also delete...
                             // What about CANCEL??
