@@ -1579,6 +1579,7 @@ var ru = (function ($, ru) {
                             $("#" + targetid).find("a[mode='cancel'], a[mode='delete']").addClass("hidden");
                             // Since this is new, don't show fields that may not be shown for new
                             $("#" + targetid).find(".edit-notnew").addClass("hidden");
+                            $("#" + targetid).find(".edit-new").removeClass("hidden");
                           } else {
                             // Just viewing means we can also delete...
                             // What about CANCEL??

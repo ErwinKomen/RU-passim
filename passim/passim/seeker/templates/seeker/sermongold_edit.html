@@ -42,7 +42,8 @@
         </td>
       </tr>
 
-      <tr class="form-row edit-notnew">
+      <!-- This field is *NOT* shown for a 'new' gold-sermon, because it needs to be automatically set to 'manual' -->
+      <tr class="edit-notnew">
         <td valign="top">Status</td>
         <td class="sermon-status" align="left">
           <div class="view-mode">{{goldForm.instance.get_stype_display}}</div>
@@ -53,6 +54,7 @@
       </tr>
 
       <!-- Room for the standard fields -->
+      <!-- Author (provided it is found in the gold standard) -->
       <tr>
         <td class="hoverable" style="min-width: 150px;">Author (gold standard)</td>
         <td style="width: 100%">
@@ -77,6 +79,24 @@
         <td>
           <div class="edit-mode hidden">{{goldForm.explicit}}</div>
           <div class="view-mode">{{goldForm.instance.get_explicit_markdown|safe}}</div>
+        </td>
+      </tr>
+
+      <!-- Signatures (Gryson/Clavis) - ONLY shown for new items -->
+      <tr class="edit-new hidden">
+        <td class="hoverable" title="List all Gryson and Clavis numbers (CPPM or CPL-preceded) separated by semicolons">Gryson/Clavis</td>
+        <td>
+          <div class="edit-mode hidden">{{goldForm.signature}}</div>
+          <div class="view-mode">{{goldForm.instance.signatures}}</div>
+        </td>
+      </tr>
+
+      <!-- Keywords - ONLY shown for new items -->
+      <tr class="edit-new hidden">
+        <td class="hoverable" title="List keywords separated by semicolons">Keyword(s)</td>
+        <td>
+          <div class="edit-mode hidden">{{goldForm.keyword}}</div>
+          <div class="view-mode">{{goldForm.instance.get_keywords}}</div>
         </td>
       </tr>
 

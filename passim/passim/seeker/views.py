@@ -856,7 +856,7 @@ def get_manuscripts(request):
 def get_manuidnos(request):
     """Get a list of manuscript identifiers for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
@@ -901,7 +901,7 @@ def get_authors(request):
 def get_nicknames(request):
     """Get a list of nicknames for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
@@ -1032,12 +1032,16 @@ def get_srmexplicits(request):
 def get_gldsignatures(request):
     """Get a list of signature codes (SermonDescr) for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
-            codename = request.GET.get("name", "")
+            # Get the editype, if that is specified
             editype = request.GET.get("type", "")
+            # Get the complete code line, which could use semicolon-separation
+            codeline = request.GET.get("name", "")
+            codelist = codeline.split(";")
+            codename = "" if len(codelist) == 0 else codelist[-1].strip()
             lstQ = []
             lstQ.append(Q(code__icontains=codename))
             if editype != "":
@@ -1060,7 +1064,7 @@ def get_gldsignatures(request):
 def get_srmsignatures(request):
     """Get a list of signature codes (for SermonDescr) for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
@@ -1088,7 +1092,7 @@ def get_srmsignatures(request):
 def get_editions(request):
     """Get a list of edition codes for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
@@ -1113,11 +1117,14 @@ def get_editions(request):
 def get_keywords(request):
     """Get a list of keywords for autocomplete"""
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     try:
         data = 'fail'
         if request.is_ajax():
-            kw = request.GET.get("name", "")
+            # Get the complete code line, which could use semicolon-separation
+            kwline = request.GET.get("name", "")
+            kwlist = kwline.split(";")
+            kw = "" if len(kwlist) == 0 else kwlist[-1].strip()
             lstQ = []
             lstQ.append(Q(name__icontains=kw))
             items = Keyword.objects.filter(*lstQ).order_by("name").distinct()
@@ -2084,6 +2091,9 @@ class PassimDetails(DetailView):
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:
                 data['afternewurl'] = context['afternewurl']
+            # Check if 'afterdelurl' needs adding
+            if 'afterdelurl' in context:
+                data['afterdelurl'] = context['afterdelurl']
             # Possibly indicate form errors
             # NOTE: errors is a dictionary itself...
             if 'errors' in context and len(context['errors']) > 0:
@@ -2122,15 +2132,14 @@ class PassimDetails(DetailView):
             self.object = None
         else:
             # Get the instance of the Main Model object
-            self.object = self.get_object()
             # NOTE: if the object doesn't exist, we will NOT get an error here
-
+            self.object = self.get_object()
 
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
         return True, "" 
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         return True, "" 
 
@@ -2154,6 +2163,15 @@ class PassimDetails(DetailView):
     def get_context_data(self, **kwargs):
         # Get the current context
         context = super(PassimDetails, self).get_context_data(**kwargs)
+
+        # Check this user: is he allowed to UPLOAD data?
+        context['authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['prevpage'] = self.previous
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
@@ -2227,7 +2245,7 @@ class PassimDetails(DetailView):
             # Check if this is a new one
             if bNew:
                 # Any code that should be added when creating a new [SermonGold] instance
-                bResult, msg = self.after_new(instance)
+                bResult, msg = self.after_new(frm, instance)
                 if not bResult:
                     # Removing is not possible
                     context['errors'] = {'new': msg }
@@ -2271,12 +2289,6 @@ class PassimDetails(DetailView):
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
         context['instance'] = instance
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        context['prevpage'] = self.previous
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
@@ -2394,7 +2406,7 @@ class SermonDetails(PassimDetails):
             msg = oErr.get_error_message()
             return False, msg
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         # self.afternewurl = reverse('search_gold')
         return True, "" 
@@ -3412,7 +3424,7 @@ class SermonGoldDetails(PassimDetails):
             msg = oErr.get_error_message()
             return False, msg
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         # self.afternewurl = reverse('search_gold')
         return True, "" 
@@ -3471,9 +3483,44 @@ class SermonGoldEdit(PassimDetails):
             msg = oErr.get_error_message()
             return False, msg
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
+
+        # Set the 'afternew' URL
         self.afternewurl = reverse('search_gold')
+
+        # Get the list of signatures
+        signatures = form.cleaned_data['signature'].strip()
+        if signatures != "":
+            siglist = signatures.split(";")
+            # Add a signature for each item
+            for sigcode in siglist:
+                # Make sure starting and tailing spaces are removed
+                sigcode = sigcode.strip()
+                editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
+                # Add signature
+                obj = Signature(code=sigcode, editype=editype, gold=instance)
+                obj.save()
+
+        # Get the list of keywords
+        keywords = form.cleaned_data['keyword'].strip()
+        if keywords != "":
+            kwlist = keywords.split(";")
+            # Add a signature for each item
+            for kw in kwlist:
+                # Make sure starting and tailing spaces are removed
+                kw = kw.strip().lower()
+                # Check if it is already there
+                obj = Keyword.objects.filter(name=kw).first()
+                if obj == None:
+                    # Add Keyword
+                    obj = Keyword(name=kw)
+                    obj.save()
+                # This is a new instance: add the association with the gold sermon
+                objlink = SermonGoldKeyword(gold=instance, keyword=obj)
+                objlink.save()
+
+        # Return positively
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -3498,7 +3545,7 @@ class AuthorDetails(PassimDetails):
     afternewurl = ""
     rtype = "html"  # GET provides a HTML form straight away
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
 
         self.afternewurl = reverse('author_search')
@@ -3524,7 +3571,7 @@ class AuthorEdit(PassimDetails):
     afternewurl = ""
     rtype = "json"
 
-    def after_new(self, instance):
+    def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
 
         self.afternewurl = reverse('author_search')
