@@ -31,9 +31,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
-                                SermonDescrSignatureForm, SermonGoldKeywordForm
-from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, Country, City, Author, Manuscript, \
+                                SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm
+from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
+    EqualGold, EqualGoldLink, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -562,6 +563,148 @@ def do_stype(request):
         return reverse('home')
 
 def do_goldtogold(request):
+    """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':datetime.now().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Repair gold-to-gold links"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "GoldToGold", True)
+
+        added = 0
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th><th>Path</th></tr>")
+        lst_total.append("<tbody>")
+
+        method = "goldspread" 
+
+        # Step #1: remove all unnecessary links
+        oErr.Status("{} step #1".format(method))
+        qs = SermonGoldSame.objects.all()
+        lst_delete = []
+        for relation in qs:
+            if relation.src == relation.dst:
+                lst_delete.append(relation.id)
+        oErr.Status("Step 1: removing {} links".format(len(lst_delete)))
+        if len(lst_delete) > 0:
+            SermonGoldSame.objects.filter(Q(id__in=lst_delete)).delete()
+
+        # Step #2: create groups of equals
+        oErr.Status("{} step #2".format(method))
+        lst_group = []      # List of groups, where each group is a list of equal-related gold-sermons
+        qs_eqs = SermonGoldSame.objects.filter(linktype=LINK_EQUAL ).order_by('src')
+        for idx, relation in enumerate(qs_eqs):
+            src = relation.src
+            dst = relation.dst
+            # Find out in which group this one fits
+            bGroup = False
+            for group in lst_group:
+                # Find a connection within this group
+                for obj in group:
+                    id = obj.id
+                    if id == src.id or id == dst.id:
+                        # We found the group
+                        bGroup = True
+                        break
+                if bGroup:
+                    # Add them if needed
+                    if relation.src not in group: group.append(relation.src)
+                    if relation.dst not in group: group.append(relation.dst)
+                    # And then break from the larger one
+                    break
+            # Did we fit this into a group?
+            if not bGroup:
+                # Create a new group with two members
+                group = [relation.src, relation.dst]
+                lst_group.append(group)
+
+        # Make sure the members of the groups get into the same EqualGold, if that is not the case yet
+        # Step #2b: add equal groups
+        for group in lst_group:
+            if len(group) > 0:
+                # Check the first item from the group
+                first = group[0]
+                if first.equal == None:
+                    # Create a new equality group and add them all to it
+                    eqg = EqualGold()
+                    eqg.save()
+                    with transaction.atomic():
+                        for item in group:
+                            item.equal = eqg
+                            item.save()
+
+        # Step #3: add individual equals
+        oErr.Status("{} step #3".format(method))
+        # Visit all SermonGold instances and create eqg's for those that don't have one yet
+        for gold in SermonGold.objects.all():
+            if gold.equal == None:
+                eqg = EqualGold()
+                eqg.save()
+                gold.equal = eqg
+                gold.save()
+
+        # -- or can a SermonGold be left without an equality group, if he is not equal to anything (yet)?
+
+        # Step #4 (new): copy 'partial' and other near links to linke between groups
+        oErr.Status("{} step #4a".format(method))
+        for linktype in LINK_PRT:
+            lst_prt_add = []    # List of partially equals relations to be added
+            # Get all links of the indicated type
+            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
+            # Walk these links
+            for obj_prt in qs_prt:
+                # Get the equal groups of the link
+                src_eqg = obj_prt.src.equal
+                dst_eqg = obj_prt.dst.equal
+                # Translate the link to one between equal-groups
+                oLink = {'src': src_eqg, 'dst': dst_eqg}
+                if oLink not in lst_prt_add: lst_prt_add.append(oLink)
+                # And the reverse link
+                oLink = {'src': dst_eqg, 'dst': src_eqg}
+                if oLink not in lst_prt_add: lst_prt_add.append(oLink)
+            # Add all the relations in lst_prt_add
+            with transaction.atomic():
+                for idx, item in enumerate(lst_prt_add):
+                    # Make sure it doesn't yet exist
+                    obj = EqualGoldLink.objects.filter(linktype=linktype, src=item['src'], dst=item['dst']).first()
+                    if obj == None:
+                        obj = EqualGoldLink(linktype=linktype, src=item['src'], dst=item['dst'])
+                        obj.save()
+        
+        lst_total.append("</tbody></table>")
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of added relations', 'result': added})
+        # result_list.append({'part': 'All additions', 'result': json.dumps(lst_total)})
+        result_list.append({'part': 'All additions', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("goldtogold")
+        return reverse('home')
+
+def do_goldtogold_ORIGINAL(request):
     """Perform gold-to-gold relation repair"""
 
     oErr = ErrHandle()
@@ -3287,9 +3430,70 @@ class SermonGoldSelect(BasicPart):
         # Return the resulting filtered and sorted queryset
         return qs
 
+
+class SermonGoldEqualset(BasicPart):
+    """The set of equality links from one gold sermon"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_eqset.html'
+    title = "SermonGoldLinkset"
+    GeqFormSet = inlineformset_factory(EqualGold, SermonGold, 
+                                         form=EqualGoldForm, min_num=0,
+                                         fk_name = "equal",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GeqFormSet, 'prefix': 'geq', 'readonly': False}]
+
+    def custom_init(self):
+        x = 1
+
+    def get_instance(self, prefix):
+        if prefix == "geq" or "geq" in prefix:
+            return self.obj.equal
+        else:
+            return self.obj
+
+    def after_save(self, prefix, instance = None):
+        # The instance here is the geq-instance, so an instance of SermonGold
+        # Now make sure all related material is updated
+
+        # TODO: create function add_gold2equal(instance, self.obj)
+        added, lst_res = add_gold2equal(instance, self.obj)
+        return True
+
     
 class SermonGoldLinkset(BasicPart):
-    """The set of links from one gold sermon"""
+    """The set of other links from one SermonEqual item"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_linkset.html'
+    title = "SermonGoldLinkset"
+    GlinkFormSet = inlineformset_factory(EqualGold, EqualGoldLink,
+                                         form=EqualGoldLinkForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+
+    def custom_init(self):
+        x = 1
+
+    def get_instance(self, prefix):
+        if prefix == "glink" or "glink" in prefix:
+            return self.obj.equal
+        else:
+            return self.obj
+
+    def after_save(self, prefix, instance = None):
+        # The instance here is the glink-instance, so an instance of EqualGoldLink
+        # Now make sure all related material is updated
+
+        # WAS: added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
+
+        added, lst_res = add_equal2equal(self.obj, instance.dst, instance.linktype)
+        return True
+
+
+class SermonGoldLinksetORG(BasicPart):
+    """The set of other links from one SermonGold item"""
 
     MainModel = SermonGold
     template_name = 'seeker/sermongold_linkset.html'
@@ -3301,6 +3505,7 @@ class SermonGoldLinkset(BasicPart):
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
     def after_save(self, prefix, instance = None):
+        # The instance here is the glink-instance, so an instance of SermonGoldSame
         # Now make sure all related material is updated
         added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
         return True

@@ -1,21 +1,21 @@
 ﻿{% load i18n %}
 
-<div id="glink_formset" class="row">
+<div id="geq_formset" class="row">
   <form action="">
     {% csrf_token %}
-    <!-- Need to have the management stuff for 'glink' -->
-    {{ glink_formset.management_form }}
+    <!-- Need to have the management stuff for 'geq' -->
+    {{ geq_formset.management_form }}
 
     <div class="col-md-12">
-      {% if not is_passim_editor and glink_formset|length == 0 %}
-        <p>No links to other gold sermons defined for this gold sermon</p>
+      {% if not is_passim_editor and geq_formset|length == 0 %}
+        <p>No equality links to other gold sermons defined for this gold sermon</p>
       {% else %}
         <table class="func-view" style="width: 100%;">
           <thead>
-            <tr><th colspan="2">#</th><th class="tdnowrap">Link type</th><th>Target gold sermon</th><th>&nbsp;</th></tr>
+            <tr><th colspan="2">#</th><th>Is equal to gold sermon</th><th>&nbsp;</th></tr>
           </thead>
           <tbody>
-            {% for linkform in glink_formset %}
+            {% for linkform in geq_formset %}
               <tr class="form-row">
                 <!-- A 1-based counter for the forms in this set-->
                 <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
@@ -27,38 +27,28 @@
                 <td valign="top" class="clickable"  style="min-width: 20px;">
                   {% if is_passim_editor %}
                     <div class="view-mode">
-                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this equalitylink">
                         <span class="glyphicon glyphicon-pencil"></span>
                       </a>
                     </div>
                     <div class="edit-mode hidden">
                       <a title="Save changes to this link"
                          onclick="ru.passim.seeker.formset_update(this);"
-                         targetid="sermongold_linkset"
-                         targeturl="{% url 'gold_linkset' pk=object_id %}">
+                         targetid="sermongold_eqset"
+                         targeturl="{% url 'gold_eqset' pk=object_id %}">
                         <span class="glyphicon glyphicon-ok"></span>
                       </a>
                     </div>
                   {% endif %}
                 </td>
 
-                <!-- The linktype -->
-                <td  style="min-width: 150px;">
-                  <div class="view-mode">{{linkform.instance.get_linktype_display}}</div>
-                  <div class="edit-mode hidden">{{linkform.linktype}}</div>
-                </td>
-
                 <!-- The contents of the destination gold sermon -->
                 <td style="width: 100%;">
-                  <div class="hidden"><input id="id_glink-{{forloop.counter0}}-dst" name="glink-{{forloop.counter0}}-dst" value="{{linkform.instance.dst.id}}" /></div>
+                  <div class="hidden"><input id="id_geq-{{forloop.counter0}}-dst" name="geq-{{forloop.counter0}}-dst" value="{{linkform.instance.id}}" /></div>
                   <div class="view-mode">
-                    {% for link in linkform.instance.dst.equal_goldsermons.all %}
-                      <div>
-                        <a href="{% url 'gold_details' link.id %}" target="_blank">
-                          {% include 'seeker/sermongold_view.html' with msitem=link %}
-                        </a>
-                      </div>
-                    {% endfor %}
+                    <a href="{% url 'gold_details' linkform.instance.id %}" target="_blank">
+                      {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
+                    </a>
                   </div>
                   <div class="edit-mode hidden selected clickable"
                        data-toggle="modal" 
@@ -66,13 +56,13 @@
                        onclick="ru.passim.seeker.gold_search_prepare(this);"
                        targeturl="{% if object_id %}{% url 'select_gold' %}?source_id={{object_id}}{% else %}{% url 'select_gold' %}{% endif %}"
                        targetid="edit-goldlink-{{object_id}}">
-                    {% include 'seeker/sermongold_view.html' with msitem=linkform.instance.dst.equal_goldsermons.first %}
+                    {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
                   </div>
 
                   <!-- Confirmation of delete -->
                   {% if is_passim_editor %}
                     <div class="delete-confirm hidden">
-                      <span>Do you really want to delete this link?</span>
+                      <span>Do you really want to delete this equality link?</span>
                       <span>
                         <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                       </span>
@@ -80,8 +70,8 @@
                       <span>
                         <a class="btn btn-xs jumbo-4" 
                            onclick="ru.passim.seeker.formset_update(this, 'delete');"
-                           targetid="sermongold_linkset"
-                           targeturl="{% url 'gold_linkset' pk=object_id %}">Delete</a>
+                           targetid="sermongold_eqset"
+                           targeturl="{% url 'gold_eqset' pk=object_id %}">Delete</a>
                       </span>
                     </div>
                   {% endif %}
@@ -106,32 +96,26 @@
                 <!-- A button to edit or save this link -->
                 <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
                   <div class="view-mode hidden">
-                    <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                    <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this equality link">
                       <span class="glyphicon glyphicon-pencil"></span>
                     </a>
                   </div>
                   <div class="edit-mode">
                     <a title="Save changes to this link"
                         onclick="ru.passim.seeker.formset_update(this);"
-                        targetid="sermongold_linkset"
-                        targeturl="{% url 'gold_linkset' pk=object_id %}">
+                        targetid="sermongold_eqset"
+                        targeturl="{% url 'gold_eqset' pk=object_id %}">
                       <span class="glyphicon glyphicon-ok"></span>
                     </a>
                   </div>
                 </td>
 
-                <!-- The linktype -->
-                <td  style="min-width: 150px;">
-                  <div class="view-mode hidden">{{glink_formset.empty_form.instance.get_linktype_display}}</div>
-                  <div class="edit-mode">{{glink_formset.empty_form.linktype}}</div>
-                </td>
-
                 <!-- The contents of the destination gold sermon -->
                 <td style="width: 100%;">
-                  <div class="hidden"><input id="id_glink-__counter__-dst" name="glink-__counter__-dst" 
-                                              value="{{glink_formset.empty_form.instance.dst.id}}" /></div>
+                  <div class="hidden"><input id="id_geq-__counter__-dst" name="geq-__counter__-dst" 
+                                              value="{{geq_formset.empty_form.instance.dst.id}}" /></div>
                   <div class="view-mode hidden">
-                    {% include 'seeker/sermongold_view.html' with msitem=glink_formset.empty_form.instance.dst %}
+                    {% include 'seeker/sermongold_view.html' with msitem=geq_formset.empty_form.instance %}
                   </div>
                   <div class="edit-mode selected clickable" 
                        data-toggle="modal" 
@@ -148,7 +132,7 @@
                       <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                     </span>
                     <span>
-                      <a class="btn btn-xs jumbo-4 delete-row" extra="glink">Delete</a>
+                      <a class="btn btn-xs jumbo-4 delete-row" extra="geq">Delete</a>
                     </span>
                   </div>
                 </td>
@@ -163,7 +147,7 @@
               <tr class="add-row">
                 <td colspan="5">
                   <span id="add_gold_link">
-                    <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a link from this gold sermon to another one</a>
+                    <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an equality link from this gold sermon to another one</a>
                   </span>
                 </td>
               </tr>

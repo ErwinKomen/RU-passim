@@ -37,7 +37,9 @@ EDI_TYPE = "seeker.editype"
 STATUS_TYPE = "seeker.stype"
 
 LINK_EQUAL = 'eqs'
-LINK_PRT = ['prt', 'neq']
+LINK_PARTIAL = 'prt'
+LINK_NEAR = 'neq'
+LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 
 class FieldChoice(models.Model):
 
@@ -371,7 +373,257 @@ def import_data_file(sContents, arErr):
         arErr.DoError("import_data_file error:")
         return {}
 
+def add_gold2equal(src, dst_eq):
+    """Add a gold sermon to an equality set"""
+
+    # Initialisations
+    lst_add = []
+    lst_total = []
+    added = 0
+    oErr = ErrHandle()
+
+    try:
+
+        # Main body of add_gold2gold()
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Action depends on the kind of relationship that is added
+        if ltype == LINK_EQUAL:
+            # Does this link already exist?
+            if src.equal != dst_eq:
+                # It's different groups, so we need to make changes
+                prt_added = 0
+
+                # (1) save the source group
+                grp_src = src.equal
+                grp_dst = dst_eq
+
+                # (2) Change (!) the eq-to-eq links from src to dst
+                link_remove = []
+                with transaction.atomic():
+                    qs = EqualGoldLink.objects.filter(src=grp_src)
+                    for link in qs:
+                        # Does this changed link exist already?
+                        obj = EqualGoldLink.objects.filter(src=grp_dst, dst=link.dst, linktype=link.linktype).first()
+                        if obj == None:
+                            link.src = grp_dst
+                            link.save()
+                            prt_added += 1
+                        else:
+                            # Add this link to those that need be removed
+                            link_remove.append(link.id)
+                    qs_rev = EqualGoldLink.objects.filter(dst=grp_src)
+                    for link in qs_rev:
+                        # Does this changed link exist already?
+                        obj = EqualGoldLink.objects.filter(src=link.src, dst=grp_src, linktype=link.linktype).first()
+                        if obj == None:
+                            link.dst = grp_src
+                            link.save()
+                            prt_added += 1
+                        else:
+                            # Add this link to those that need be removed
+                            link_remove.append(link.id)
+                # (3) remove superfluous links
+                EqualGoldLink.objects.filter(id__in=link_remove).delete()
+
+                # (4) Change the gold-sermons in the source group
+                with transaction.atomic():
+                    for gold in grp_src.equal_goldsermons.all():
+                        gold.equal = grp_dst
+                        gold.save()
+
+                # (5) Remove the source group
+                grp_src.delete()
+
+                # (6) Bookkeeping
+                added += prt_added
+
+        # Finish the report list
+        lst_total.append("</tbody></table>")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_gold2equal")
+
+    # Return the number of added relations
+    return added, lst_total
+
 def add_gold2gold(src, dst, ltype):
+    """Add a gold-to-gold relation from src to dst of type ltype"""
+
+    # Initialisations
+    lst_add = []
+    lst_total = []
+    added = 0
+    oErr = ErrHandle()
+
+    def spread_partial(group):
+        """Make sure all members of the equality group have the same partial relations"""
+
+        lst_back = []
+        added = 0
+        for linktype in LINK_PRT:
+            lst_prt_add = []    # List of partially equals relations to be added
+            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
+
+            # Get a list of existing 'partially equals' destination links from the current group
+            qs_grp_prt = qs_prt.filter(Q(src__in=group))
+            if len(qs_grp_prt) > 0:
+                # Make a list of unique destination gold objects
+                lst_dst = []
+                for obj in qs_grp_prt:
+                    dst = obj.dst
+                    if dst not in lst_dst: lst_dst.append(dst)
+                # Make a list of relations that need to be added
+                for src in group:
+                    for dst in lst_dst:
+                        # Make sure relations are not equal
+                        if src.id != dst.id:
+                            # Check if the relation already is there
+                            obj = qs_prt.filter(src=src, dst=dst).first()
+                            if obj == None:
+                                oAdd = {'src': src, 'dst': dst}
+                                if oAdd not in lst_prt_add:
+                                    lst_prt_add.append(oAdd)
+                            # Check if the reverse relation is already there
+                            obj = qs_prt.filter(src=dst, dst=src).first()
+                            if obj == None:
+                                oAdd = {'src': dst, 'dst': src}
+                                if oAdd not in lst_prt_add:
+                                    lst_prt_add.append(oAdd)
+            # Add all the relations in lst_prt_add
+            with transaction.atomic():
+                for idx, item in enumerate(lst_prt_add):
+                    obj = SermonGoldSame(linktype=linktype, src=item['src'], dst=item['dst'])
+                    obj.save()
+                    added += 1
+                    lst_back.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        (idx+1), item['src'].siglist, item['dst'].siglist, linktype, "add" ))
+        # Return the results
+        return added, lst_back
+
+    try:
+
+        # Main body of add_gold2gold()
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Action depends on the kind of relationship that is added
+        if ltype == LINK_EQUAL:
+            eq_added, eq_list = add_gold2equal(src, dst.equal)
+
+            for item in eq_list: lst_total.append(item)
+
+            # (6) Bookkeeping
+            added += eq_added
+        elif src.equal == dst.equal:
+            # Trying to add a non-equal link to two gold-sermons that are in the same equality group
+            pass
+        else:
+            # What is added is a partially equals link - between equality groups
+            prt_added = 0
+
+            # (1) save the source group
+            grp_src = src.equal
+            grp_dst = dst.equal
+
+            # (2) Check existing link(s) between the groups
+            obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+            if obj == None:
+                # (3a) there is no link yet: add it
+                obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                obj.save()
+                # Bookkeeping
+                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                    added+1, obj.src.siglist, obj.dst.siglist, ltype, "add" ))
+                prt_added += 1
+            else:
+                # (3b) There is a link, but possibly of a different type
+                obj.linktype = ltype
+                obj.save()
+
+            # (3) Bookkeeping
+            added += prt_added
+
+        # Finish the report list
+        lst_total.append("</tbody></table>")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_gold2gold")
+
+    # Return the number of added relations
+    return added, lst_total
+
+def add_equal2equal(src, dst_eq, ltype):
+    """Add a EqualGold-to-EqualGold relation from src to dst of type ltype"""
+
+    # Initialisations
+    lst_add = []
+    lst_total = []
+    added = 0
+    oErr = ErrHandle()
+
+    try:
+        # Main body of add_equal2equal()
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Action depends on the kind of relationship that is added
+        if ltype == LINK_EQUAL:
+            eq_added, eq_list = add_gold2equal(src, dst_eq)
+
+            for item in eq_list: lst_total.append(item)
+
+            # (6) Bookkeeping
+            added += eq_added
+        elif src.equal == dst_eq:
+            # Trying to add a non-equal link to two gold-sermons that are in the same equality group
+            pass
+        else:
+            # What is added is a partially equals link - between equality groups
+            prt_added = 0
+
+            # (1) save the source group
+            groups = []
+            groups.append({'grp_src': src.equal, 'grp_dst': dst_eq})
+            groups.append({'grp_src': dst_eq, 'grp_dst': src.equal})
+            #grp_src = src.equal
+            #grp_dst = dst_eq
+
+            for group in groups:
+                grp_src = group['grp_src']
+                grp_dst = group['grp_dst']
+                # (2) Check existing link(s) between the groups
+                obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+                if obj == None:
+                    # (3a) there is no link yet: add it
+                    obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                    obj.save()
+                    # Bookkeeping
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
+                    prt_added += 1
+                else:
+                    # (3b) There is a link, but possibly of a different type
+                    obj.linktype = ltype
+                    obj.save()
+
+            # (3) Bookkeeping
+            added += prt_added
+
+        # Finish the report list
+        lst_total.append("</tbody></table>")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_equal2equal")
+
+    # Return the number of added relations
+    return added, lst_total
+
+def add_gold2gold_ORIGINAL(src, dst, ltype):
     """Add a gold-to-gold relation from src to dst of type ltype"""
 
     # Initialisations
@@ -1714,6 +1966,18 @@ class Keyword(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class EqualGold(models.Model):
+    """This combines all SermonGold instance belonging to the same group"""
+
+    # [m] Many-to-many: all the gold sermons linked to me
+    relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
+
+
+    def __str__(self):
+        name = "" if self.id == None else "eqg_{}".format(self.id)
+        return name
     
 
 class SermonGold(models.Model):
@@ -1740,6 +2004,9 @@ class SermonGold(models.Model):
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
+
+    # [0-1] Each SermonGold should belong to exactly one equality group
+    equal = models.ForeignKey(EqualGold, null=True, blank=True, on_delete=models.SET_NULL, related_name="equal_goldsermons")
 
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="SermonGoldSame", symmetrical=False, related_name="related_to")
@@ -2196,6 +2463,23 @@ class SermonGold(models.Model):
 
         # Return the object that has been created
         return oBack
+
+
+class EqualGoldLink(models.Model):
+    """Link to identical sermons that have a different signature"""
+
+    # [1] Starting from equalgold group [src]
+    #     Note: when a EqualGold is deleted, then the EqualGoldLink instance that refers to it is removed too
+    src = models.ForeignKey(EqualGold, related_name="equalgold_src")
+    # [1] It equals equalgoldgroup [dst]
+    dst = models.ForeignKey(EqualGold, related_name="equalgold_dst")
+    # [1] Each gold-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+                            max_length=5, default=LINK_EQUAL)
+
+    def __str__(self):
+        combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
+        return combi
     
 
 class SermonGoldSame(models.Model):

@@ -715,15 +715,18 @@ var ru = (function ($, ru) {
         var elResults = "#goldselect_results",
             elSelect = null,
             gold_html = "",
+            gold_equal = "",
             gold_id = "";
 
         try {
           // Find out which one has been selected
           elSelect = $(elResults).find("tr.selected").first();
-          gold_id = $(elSelect).find("td.gold-id").text();
+          // gold_id = $(elSelect).find("td.gold-id").text();
+          gold_equal = $(elSelect).find("td.gold-equal").text();
           gold_html = $(elSelect).find("td.gold-text").html();
           // Set the items correctly in loc_goldlink_td
-          $(loc_goldlink_td).find("input").val(gold_id);
+          // $(loc_goldlink_td).find("input").val(gold_id);
+          $(loc_goldlink_td).find("input").val(gold_equal);
           $(loc_goldlink_td).find(".view-mode").first().html(gold_html);
           $(loc_goldlink_td).find(".edit-mode").first().html(gold_html);
 

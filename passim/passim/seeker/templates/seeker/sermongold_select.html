@@ -74,6 +74,7 @@
             {% for item in object_list %}
             <tr onclick="ru.passim.seeker.select_row(this, 'gold_link', {{item.id}});">
               <td valign="top" class="gold-id hidden">{{item.id}}</td>
+              <td valign="top" class="gold-equal hidden">{{item.equal.id}}</td>
               <td valign="top" class="clickable" >{{forloop.counter}}</td>
               <td valign="top" class="gold-text clickable" >{% include 'seeker/sermongold_view.html' with msitem=item %}</td>
             </tr>
