@@ -389,56 +389,54 @@ def add_gold2equal(src, dst_eq):
         lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
         lst_total.append("<tbody>")
 
-        # Action depends on the kind of relationship that is added
-        if ltype == LINK_EQUAL:
-            # Does this link already exist?
-            if src.equal != dst_eq:
-                # It's different groups, so we need to make changes
-                prt_added = 0
+        # Does this link already exist?
+        if src.equal != dst_eq:
+            # It's different groups, so we need to make changes
+            prt_added = 0
 
-                # (1) save the source group
-                grp_src = src.equal
-                grp_dst = dst_eq
+            # (1) save the source group
+            grp_src = src.equal
+            grp_dst = dst_eq
 
-                # (2) Change (!) the eq-to-eq links from src to dst
-                link_remove = []
-                with transaction.atomic():
-                    qs = EqualGoldLink.objects.filter(src=grp_src)
-                    for link in qs:
-                        # Does this changed link exist already?
-                        obj = EqualGoldLink.objects.filter(src=grp_dst, dst=link.dst, linktype=link.linktype).first()
-                        if obj == None:
-                            link.src = grp_dst
-                            link.save()
-                            prt_added += 1
-                        else:
-                            # Add this link to those that need be removed
-                            link_remove.append(link.id)
-                    qs_rev = EqualGoldLink.objects.filter(dst=grp_src)
-                    for link in qs_rev:
-                        # Does this changed link exist already?
-                        obj = EqualGoldLink.objects.filter(src=link.src, dst=grp_src, linktype=link.linktype).first()
-                        if obj == None:
-                            link.dst = grp_src
-                            link.save()
-                            prt_added += 1
-                        else:
-                            # Add this link to those that need be removed
-                            link_remove.append(link.id)
-                # (3) remove superfluous links
-                EqualGoldLink.objects.filter(id__in=link_remove).delete()
+            # (2) Change (!) the eq-to-eq links from src to dst
+            link_remove = []
+            with transaction.atomic():
+                qs = EqualGoldLink.objects.filter(src=grp_src)
+                for link in qs:
+                    # Does this changed link exist already?
+                    obj = EqualGoldLink.objects.filter(src=grp_dst, dst=link.dst, linktype=link.linktype).first()
+                    if obj == None:
+                        link.src = grp_dst
+                        link.save()
+                        prt_added += 1
+                    else:
+                        # Add this link to those that need be removed
+                        link_remove.append(link.id)
+                qs_rev = EqualGoldLink.objects.filter(dst=grp_src)
+                for link in qs_rev:
+                    # Does this changed link exist already?
+                    obj = EqualGoldLink.objects.filter(src=link.src, dst=grp_src, linktype=link.linktype).first()
+                    if obj == None:
+                        link.dst = grp_src
+                        link.save()
+                        prt_added += 1
+                    else:
+                        # Add this link to those that need be removed
+                        link_remove.append(link.id)
+            # (3) remove superfluous links
+            EqualGoldLink.objects.filter(id__in=link_remove).delete()
 
-                # (4) Change the gold-sermons in the source group
-                with transaction.atomic():
-                    for gold in grp_src.equal_goldsermons.all():
-                        gold.equal = grp_dst
-                        gold.save()
+            # (4) Change the gold-sermons in the source group
+            with transaction.atomic():
+                for gold in grp_src.equal_goldsermons.all():
+                    gold.equal = grp_dst
+                    gold.save()
 
-                # (5) Remove the source group
-                grp_src.delete()
+            # (5) Remove the source group
+            grp_src.delete()
 
-                # (6) Bookkeeping
-                added += prt_added
+            # (6) Bookkeeping
+            added += prt_added
 
         # Finish the report list
         lst_total.append("</tbody></table>")
@@ -567,7 +565,6 @@ def add_equal2equal(src, dst_eq, ltype):
 
     try:
         # Main body of add_equal2equal()
-        lst_total = []
         lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
         lst_total.append("<tbody>")
 
@@ -580,7 +577,7 @@ def add_equal2equal(src, dst_eq, ltype):
             # (6) Bookkeeping
             added += eq_added
         elif src.equal == dst_eq:
-            # Trying to add a non-equal link to two gold-sermons that are in the same equality group
+            # Trying to add an equal link to two gold-sermons that already are in the same equality group
             pass
         else:
             # What is added is a partially equals link - between equality groups

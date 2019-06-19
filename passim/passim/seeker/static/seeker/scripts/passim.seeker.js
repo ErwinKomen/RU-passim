@@ -22,6 +22,7 @@ var ru = (function ($, ru) {
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
@@ -497,6 +498,61 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_get
+       *    Perform a $.get() based on the information in DOM element with id sId
+       *
+       */
+      do_get: function (sId, func_after) {
+        var elStart = null,
+            data = [],
+            targeturl = "",
+            targetid = null;
+
+        try {
+          // Retrieve the information
+          elStart = $("#" + sId);
+          targeturl = $(elStart).attr("targeturl");
+          targetid = $(elStart).attr("targetid");
+          if (targetid === undefined || targetid === "") {targetid = sId;}
+          if (targetid !== "") { targetid = "#" + targetid;}
+
+          // Load this one with a GET action
+          $.get(targeturl, data, function (response) {
+            // Perform any function defined after receiving the response from the host
+            if (func_after !== undefined) {
+              func_after();
+            }
+
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ok":
+                  // Show the result
+                  $(targetid).html(response['html']);
+                  // Call initialisation again
+                  ru.passim.seeker.init_events(sUrlShow);
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_get", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *
@@ -721,12 +777,10 @@ var ru = (function ($, ru) {
         try {
           // Find out which one has been selected
           elSelect = $(elResults).find("tr.selected").first();
-          // gold_id = $(elSelect).find("td.gold-id").text();
-          gold_equal = $(elSelect).find("td.gold-equal").text();
+          gold_id = $(elSelect).find("td.gold-id").text();
           gold_html = $(elSelect).find("td.gold-text").html();
           // Set the items correctly in loc_goldlink_td
-          // $(loc_goldlink_td).find("input").val(gold_id);
-          $(loc_goldlink_td).find("input").val(gold_equal);
+          $(loc_goldlink_td).find("input").val(gold_id);
           $(loc_goldlink_td).find(".view-mode").first().html(gold_html);
           $(loc_goldlink_td).find(".edit-mode").first().html(gold_html);
 
@@ -1716,7 +1770,7 @@ var ru = (function ($, ru) {
                             window.location = response['afternewurl'];
                             bReloading = true;
                           } else {
-                            // Otherwise: we need to re-load the 
+                            // nothing else yet
                           }
                         } else {
                           // Send a message
@@ -1944,6 +1998,21 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * formset_setdel
+       *   Set the delete checkbox of me
+       *
+       */
+      formset_setdel: function (elStart) {
+
+        try {
+          // Set the delete value of the checkbox
+          $(elStart).closest("td").find("input[type=checkbox]").first().prop("checked", true);
+        } catch (ex) {
+          private_methods.errMsg("formset_setdel", ex);
+        }
+      },
+
+      /**
        * formset_update
        *   Send an Ajax POST request and process the response in a standard way
        *
@@ -2033,6 +2102,13 @@ var ru = (function ($, ru) {
                             $(elStart.removeClass("hidden"));
                             break;
                         }
+                      }
+                      // Check for other specific matters
+                      switch (targetid) {
+                        case "sermongold_eqset":
+                          // We need to update 'sermongold_linkset'
+                          ru.passim.seeker.do_get("sermongold_linkset");
+                          break;
                       }
                     }
                     // But make sure events are back on again

@@ -267,6 +267,8 @@ class SermonGoldSameForm(forms.ModelForm):
 
 
 class EqualGoldForm(forms.ModelForm):
+    gold = forms.CharField(label=_("Destination gold sermon"), required=True)
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -275,6 +277,8 @@ class EqualGoldForm(forms.ModelForm):
 
 
 class EqualGoldLinkForm(forms.ModelForm):
+    gold = forms.CharField(label=_("Destination gold sermon"), required=False)
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -288,6 +292,8 @@ class EqualGoldLinkForm(forms.ModelForm):
         super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
         init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+        # Make sure to set required and optional fields
+        self.fields['dst'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

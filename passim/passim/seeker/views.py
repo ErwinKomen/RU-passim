@@ -32,7 +32,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm
-from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2gold, add_equal2equal, Country, City, Author, Manuscript, \
+from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
     EqualGold, EqualGoldLink, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
@@ -1769,7 +1769,7 @@ class BasicPart(View):
 
         # Explicitly set the status to OK
         self.data['status'] = "ok"
-
+        
         if self.checkAuthentication(request):
             # Build the context
             context = dict(object_id = pk, savedate=None)
@@ -1875,10 +1875,12 @@ class BasicPart(View):
                                         if form.is_valid() and self.is_custom_valid(prefix, form):
                                             # Should we delete?
                                             if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
-                                                # Delete this one
-                                                form.instance.delete()
-                                                # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                has_deletions = True
+                                                # Check if deletion should be done
+                                                if self.before_delete(prefix, form.instance):
+                                                    # Delete this one
+                                                    form.instance.delete()
+                                                    # NOTE: the template knows this one is deleted by looking at form.DELETE
+                                                    has_deletions = True
                                             else:
                                                 # Check if anything has changed so far
                                                 has_changed = form.has_changed()
@@ -2154,7 +2156,7 @@ class BasicPart(View):
     def before_save(self, prefix, request, instance=None, form=None):
         return False
 
-    def before_delete(self):
+    def before_delete(self, prefix=None, instance=None):
         return True
 
     def after_save(self, prefix, instance=None):
@@ -3446,19 +3448,64 @@ class SermonGoldEqualset(BasicPart):
     def custom_init(self):
         x = 1
 
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "geq":
+            # Get all SermonGold instances with the same EqualGold
+            equal = self.obj.equal
+            qs = SermonGold.objects.filter(equal=equal).exclude(id=self.obj.id)
+        return qs
+
     def get_instance(self, prefix):
         if prefix == "geq" or "geq" in prefix:
             return self.obj.equal
         else:
             return self.obj
 
+    def process_formset(self, prefix, request, formset):
+        if prefix == "geq":
+            for form in formset:
+                # Check if this has an instance
+                if form.instance == None or form.instance.id == None:
+                    # This has no SermonGold instance: retrieve it from the 'gold' value
+                    if 'gold' in form.fields:
+                        gold_id = form['gold'].data
+                        if gold_id != "":
+                            gold = SermonGold.objects.filter(id=gold_id).first()
+                            form.instance = gold
+        # No return value needed
+        return True
+
+    def before_delete(self, prefix = None, instance = None):
+        bDoDelete = True
+        if prefix != None and prefix == "geq":
+            # No actual deletion should take place!!
+            bDoDelete = False
+            # Check if we need to retain any partial or other links
+            gkeep = [x for x in self.qd if "gkeep-" in x]
+            for copy_link in gkeep:
+                pass
+        return bDoDelete
+
     def after_save(self, prefix, instance = None):
         # The instance here is the geq-instance, so an instance of SermonGold
         # Now make sure all related material is updated
 
-        # TODO: create function add_gold2equal(instance, self.obj)
-        added, lst_res = add_gold2equal(instance, self.obj)
+        # Add this gold sermon to the equality group of the target
+        added, lst_res = add_gold2equal(instance, self.obj.equal)
         return True
+
+    def add_to_context(self, context):
+        # Get the EqualGold instances to which I am associated
+        qsa = self.obj.equal.equalgold_src.all()
+        # Create a template with them
+        template_name = "seeker/sermongold_del.html"
+        c = dict(associations=qsa)
+        sHtml = render_to_string(template_name, c, self.request)
+        sHtml = treat_bom(sHtml)
+        context['del_verify']  = sHtml
+
+        return context
 
     
 class SermonGoldLinkset(BasicPart):
@@ -3482,6 +3529,21 @@ class SermonGoldLinkset(BasicPart):
         else:
             return self.obj
 
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "glink":
+            if 'gold' in form.cleaned_data:
+                # Get the form's 'gold' value
+                gold_id = form.cleaned_data['gold']
+                if gold_id != "":
+                    # Find the gold to attach to
+                    gold = SermonGold.objects.filter(id=gold_id).first()
+                    if gold != None:
+                        # The destination must be an EqualGold instance
+                        instance.dst = gold.equal
+                        bNeedSaving = True
+        return bNeedSaving
+
     def after_save(self, prefix, instance = None):
         # The instance here is the glink-instance, so an instance of EqualGoldLink
         # Now make sure all related material is updated
@@ -3492,23 +3554,23 @@ class SermonGoldLinkset(BasicPart):
         return True
 
 
-class SermonGoldLinksetORG(BasicPart):
-    """The set of other links from one SermonGold item"""
+#class SermonGoldLinksetORG(BasicPart):
+#    """The set of other links from one SermonGold item"""
 
-    MainModel = SermonGold
-    template_name = 'seeker/sermongold_linkset.html'
-    title = "SermonGoldLinkset"
-    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
-                                         form=SermonGoldSameForm, min_num=0,
-                                         fk_name = "src",
-                                         extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+#    MainModel = SermonGold
+#    template_name = 'seeker/sermongold_linkset.html'
+#    title = "SermonGoldLinkset"
+#    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+#                                         form=SermonGoldSameForm, min_num=0,
+#                                         fk_name = "src",
+#                                         extra=0, can_delete=True, can_order=False)
+#    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
 
-    def after_save(self, prefix, instance = None):
-        # The instance here is the glink-instance, so an instance of SermonGoldSame
-        # Now make sure all related material is updated
-        added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
-        return True
+#    def after_save(self, prefix, instance = None):
+#        # The instance here is the glink-instance, so an instance of SermonGoldSame
+#        # Now make sure all related material is updated
+#        added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
+#        return True
 
 
 class SermonGoldSignset(BasicPart):

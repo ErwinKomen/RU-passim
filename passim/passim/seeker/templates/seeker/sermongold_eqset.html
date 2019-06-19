@@ -6,6 +6,41 @@
     <!-- Need to have the management stuff for 'geq' -->
     {{ geq_formset.management_form }}
 
+
+    <!-- Modal form for delete confirmation -->
+    {% if is_passim_editor %}
+      <div id="modal-golddel" class="modal fade subform" role="dialog">
+        <!-- main part: dialog -->
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <!-- Header -->
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal">&times;</button>
+              <h4 class="modal-title">Select the links that should remain associated with the gold-sermon</h4>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body subform" id="edit-golddel">
+              {{del_verify|safe}}
+            </div>
+
+            <!-- Footer with Delete button -->
+            <div class="modal-footer">
+              {% if is_passim_editor %}
+                <a class="btn jumbo-1" data-dismiss="modal"
+                  onclick="ru.passim.seeker.formset_update(this);"
+                  targetid="sermongold_eqset"
+                  targeturl="{% url 'gold_eqset' pk=object_id %}" >
+                  <span class="glyphicon glyphicon-ok" title="Delete the gold-sermon from the current equality set">&nbsp;Delete</span>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>  
+      </div>
+    {% endif %}
+
+
     <div class="col-md-12">
       {% if not is_passim_editor and geq_formset|length == 0 %}
         <p>No equality links to other gold sermons defined for this gold sermon</p>
@@ -44,7 +79,7 @@
 
                 <!-- The contents of the destination gold sermon -->
                 <td style="width: 100%;">
-                  <div class="hidden"><input id="id_geq-{{forloop.counter0}}-dst" name="geq-{{forloop.counter0}}-dst" value="{{linkform.instance.id}}" /></div>
+                  <div class="hidden"><input id="id_geq-{{forloop.counter0}}-gold" name="geq-{{forloop.counter0}}-gold" value="{{linkform.instance.id}}" /></div>
                   <div class="view-mode">
                     <a href="{% url 'gold_details' linkform.instance.id %}" target="_blank">
                       {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
@@ -59,28 +94,19 @@
                     {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
                   </div>
 
-                  <!-- Confirmation of delete -->
-                  {% if is_passim_editor %}
-                    <div class="delete-confirm hidden">
-                      <span>Do you really want to delete this equality link?</span>
-                      <span>
-                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
-                      </span>
-                      <span class="hidden">{{linkform.DELETE}}</span>
-                      <span>
-                        <a class="btn btn-xs jumbo-4" 
-                           onclick="ru.passim.seeker.formset_update(this, 'delete');"
-                           targetid="sermongold_eqset"
-                           targeturl="{% url 'gold_eqset' pk=object_id %}">Delete</a>
-                      </span>
-                    </div>
-                  {% endif %}
                 </td>
 
                 <!-- A delete button -->
                 <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
                   {% if is_passim_editor %}
-                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    <span class="hidden">{{linkform.DELETE}}</span>
+                    <span>
+                    <a data-toggle="modal"
+                       data-target="#modal-golddel"
+                       onclick="ru.passim.seeker.formset_setdel(this);">
+                      <span class="glyphicon glyphicon-remove">&nbsp;</span>
+                    </a>
+                    </span>
                   {% endif %}
                 </td>
               </tr>
@@ -112,8 +138,7 @@
 
                 <!-- The contents of the destination gold sermon -->
                 <td style="width: 100%;">
-                  <div class="hidden"><input id="id_geq-__counter__-dst" name="geq-__counter__-dst" 
-                                              value="{{geq_formset.empty_form.instance.dst.id}}" /></div>
+                  <div class="hidden"><input id="id_geq-__counter__-gold" name="geq-__counter__-gold" value="" /></div>
                   <div class="view-mode hidden">
                     {% include 'seeker/sermongold_view.html' with msitem=geq_formset.empty_form.instance %}
                   </div>
@@ -127,7 +152,7 @@
                   </div>
                   <!-- Confirmation of delete -->
                   <div class="delete-confirm hidden">
-                    <span>Do you really want to delete this link?</span>
+                    <span>Do you really want to remove this gold-sermon from the current set of equals?</span>
                     <span>
                       <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                     </span>

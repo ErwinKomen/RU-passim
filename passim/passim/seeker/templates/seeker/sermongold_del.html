@@ -1,0 +1,21 @@
+﻿{% load i18n %}
+
+<div>Select the links that should remain associated with the gold-sermon:</div>
+<div>
+  <table class="func-view">
+    {% for link in associations %}
+      <tr>
+        <td>{{forloop.counter}}</td>
+        <td>
+          <span><input name="gdkeep-{{forloop.counter}}" type="checkbox" value="{{link.id}}" checked /></span>
+        </td>
+        <td>{{link.get_linktype_display}}</td>
+        <td>
+          {% for sg in link.dst.equal_goldsermons.all %}
+            <span class="badge" >{{sg.signatures}}</span>{% if not forloop.last %}<span> </span>{% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
