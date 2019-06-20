@@ -119,10 +119,18 @@ class SermonGoldKeywordAdmin(admin.ModelAdmin):
     fields = ['name', 'created']
 
 
+class InformationAdmin(admin.ModelAdmin):
+    """Information k/v pairs"""
+
+    list_display = ['name', 'kvalue']
+    fields = ['name', 'kvalue']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
 admin.site.register(NewsItem, NewsItemAdmin)
+admin.site.register(Information, InformationAdmin)
 
 # Main program models
 admin.site.register(Country, CountryAdmin)

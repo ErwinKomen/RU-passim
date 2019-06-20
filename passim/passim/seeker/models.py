@@ -823,6 +823,18 @@ class Report(models.Model):
         return obj
 
 
+class Information(models.Model):
+    """Specific information that needs to be kept in the database"""
+
+    # [1] The key under which this piece of information resides
+    name = models.CharField("Key name", max_length=255)
+    # [0-1] The value for this piece of information
+    kvalue = models.TextField("Key value", default = "", null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Profile(models.Model):
     """Information about the user"""
 

@@ -50,7 +50,8 @@
 
                 <!-- The contents of the destination gold sermon -->
                 <td style="width: 100%;">
-                  <div class="hidden"><input id="id_glink-{{forloop.counter0}}-dst" name="glink-{{forloop.counter0}}-dst" value="{{linkform.instance.dst.id}}" /></div>
+                  <div class="hidden"><input id="id_glink-{{forloop.counter0}}-gold" name="glink-{{forloop.counter0}}-gold" value="{{linkform.instance.equal_goldsermons.first.id}}" /></div>
+                  <div class="hidden">{{linkform.dst}}</div>
                   <div class="view-mode">
                     {% for link in linkform.instance.dst.equal_goldsermons.all %}
                       <div>

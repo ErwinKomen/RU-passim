@@ -7,8 +7,8 @@
     {{ geq_formset.management_form }}
 
 
-    <!-- Modal form for delete confirmation -->
     {% if is_passim_editor %}
+      <!-- Modal form for delete confirmation -->
       <div id="modal-golddel" class="modal fade subform" role="dialog">
         <!-- main part: dialog -->
         <div class="modal-dialog">
@@ -21,7 +21,26 @@
 
             <!-- Body -->
             <div class="modal-body subform" id="edit-golddel">
-              {{del_verify|safe}}
+              <div>Select the links that should remain associated with the gold-sermon:</div>
+              <div>
+                <table class="func-view">
+                  {% for link in associations %}
+                    <tr>
+                      <td>{{forloop.counter}}</td>
+                      <td>
+                        <!-- Checking this means that the partial/neq link should be copied -->
+                        <span><input name="gdkeep-{{forloop.counter}}" type="checkbox" value="{{link.id}}" checked /></span>
+                      </td>
+                      <td>{{link.get_linktype_display}}</td>
+                      <td>
+                        {% for sg in link.dst.equal_goldsermons.all %}
+                          <span class="badge" >{{sg.signatures}}</span>{% if not forloop.last %}<span> </span>{% endif %}
+                        {% endfor %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </table>
+              </div>
             </div>
 
             <!-- Footer with Delete button -->
@@ -31,7 +50,57 @@
                   onclick="ru.passim.seeker.formset_update(this);"
                   targetid="sermongold_eqset"
                   targeturl="{% url 'gold_eqset' pk=object_id %}" >
-                  <span class="glyphicon glyphicon-ok" title="Delete the gold-sermon from the current equality set">&nbsp;Delete</span>
+                  <span class="glyphicon glyphicon-ok" title="Remove the gold-sermon from the current equality set">&nbsp;Continue</span>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>  
+      </div>
+
+      <!-- Modal form to indicate which non-equal links should be kept when an equality-set member changes -->
+      <div id="modal-goldchange" class="modal fade subform" role="dialog">
+        <!-- main part: dialog -->
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <!-- Header -->
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal">&times;</button>
+              <h4 class="modal-title">Select the links that should remain associated with the gold-sermon that is now removed from this equality set</h4>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body subform" id="edit-golddel">
+              <div>Select the links that should remain associated with the gold-sermon:</div>
+              <div>
+                <table class="func-view">
+                  {% for link in associations %}
+                    <tr>
+                      <td>{{forloop.counter}}</td>
+                      <td>
+                        <!-- Checking this means that the partial/neq link should be copied -->
+                        <span><input name="gdkeep-{{forloop.counter}}" type="checkbox" value="{{link.id}}" checked /></span>
+                      </td>
+                      <td>{{link.get_linktype_display}}</td>
+                      <td>
+                        {% for sg in link.dst.equal_goldsermons.all %}
+                          <span class="badge" >{{sg.signatures}}</span>{% if not forloop.last %}<span> </span>{% endif %}
+                        {% endfor %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </table>
+              </div>
+            </div>
+
+            <!-- Footer with Delete button -->
+            <div class="modal-footer">
+              {% if is_passim_editor %}
+                <a class="btn jumbo-1" data-dismiss="modal"
+                  onclick="ru.passim.seeker.formset_update(this);"
+                  targetid="sermongold_eqset"
+                  targeturl="{% url 'gold_eqset' pk=object_id %}" >
+                  <span class="glyphicon glyphicon-ok" title="Implement changes to the current equality set">&nbsp;Continue</span>
                 </a>
               {% endif %}
             </div>
@@ -68,9 +137,8 @@
                     </div>
                     <div class="edit-mode hidden">
                       <a title="Save changes to this link"
-                         onclick="ru.passim.seeker.formset_update(this);"
-                         targetid="sermongold_eqset"
-                         targeturl="{% url 'gold_eqset' pk=object_id %}">
+                         data-toggle="modal"
+                         data-target="#modal-goldchange">
                         <span class="glyphicon glyphicon-ok"></span>
                       </a>
                     </div>
