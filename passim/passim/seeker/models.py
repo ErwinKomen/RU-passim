@@ -1738,7 +1738,7 @@ class Manuscript(models.Model):
             # (1) Get the country from the city
             city = City.objects.filter(name__iexact=oInfo['city']).first()
             country = None 
-            if city != None: country = city.country.name
+            if city != None and city.country != None: country = city.country.name
 
             # (2) Get the library from the info object
             library = Library.find_or_create(oInfo['city'], oInfo['library'], country)
