@@ -126,6 +126,13 @@ class InformationAdmin(admin.ModelAdmin):
     fields = ['name', 'kvalue']
 
 
+class ReportAdmin(admin.ModelAdmin):
+    """Information k/v pairs"""
+
+    list_display = ['user', 'created', 'reptype', 'contents']
+    fields = ['user', 'created', 'reptype', 'contents']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -137,6 +144,8 @@ admin.site.register(Country, CountryAdmin)
 admin.site.register(City, CityAdmin)
 admin.site.register(Library, LibraryAdmin)
 admin.site.register(Keyword)
+
+admin.site.register(Report, ReportAdmin)
 
 # Logbook of activities
 admin.site.register(LogEntry, LogEntryAdmin)

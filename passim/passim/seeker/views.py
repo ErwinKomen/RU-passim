@@ -25,7 +25,7 @@ from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime
 from time import sleep
 
-from passim.settings import APP_PREFIX
+from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
@@ -38,7 +38,7 @@ from passim.seeker.models import process_lib_entries, adapt_search, get_searchab
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
-import sys
+import sys, os
 import base64
 import json
 import csv, re
@@ -995,6 +995,39 @@ def get_manuscripts(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
+def download_file(url):
+    """Download a file from the indicated URL"""
+
+    bResult = True
+    sResult = ""
+    errHandle = ErrHandle()
+    # Get the filename from the url
+    name = url.split("/")[-1]
+    # Set the output directory
+    outdir = os.path.abspath(os.path.join(MEDIA_DIR, "e-codices"))
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    # Create a filename where we can store it
+    filename = os.path.abspath(os.path.join(outdir, name))
+    try:
+        r = requests.get(url)
+    except:
+        sMsg = errHandle.get_error_message()
+        errHandle.DoError("Request problem")
+        return False, sMsg
+    if r.status_code == 200:
+        # Read the response
+        sText = r.text
+        # Write away
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(sText)
+        sResult = filename
+    else:
+        bResult = False
+        sResult = "download_file received status {} for {}".format(r.status_code, url)
+    # Return the result
+    return bResult, sResult
+
 @csrf_exempt
 def get_manuidnos(request):
     """Get a list of manuscript identifiers for autocomplete"""
@@ -1416,70 +1449,167 @@ def import_ecodex(request):
         oStatus = Status(user=username, type="ecodex", status="preparing")
         oStatus.save()
 
+        def add_manu(lst_manual, lst_read, status="", msg="", user="", name="", url="", yearstart="", yearfinish="",
+                     library="", idno="", filename=""):
+            oInfo = {}
+            oInfo['status'] = status
+            oInfo['msg'] = msg
+            oInfo['user'] = user
+            oInfo['name'] = name
+            oInfo['url'] = url
+            oInfo['yearstart'] = yearstart
+            oInfo['yearfinish'] = yearfinish
+            oInfo['library'] = library
+            oInfo['idno'] = idno
+            oInfo['filename'] = filename
+            if status == "error":
+                lst_manual.append(oInfo)
+            else:
+                lst_read.append(oInfo)
+            return True
 
         form = UploadFilesForm(request.POST, request.FILES)
         lResults = []
         if form.is_valid():
             # NOTE: from here a breakpoint may be inserted!
             print('import_ecodex: valid form')
+            oErr = ErrHandle()
+            try:
+                # The list of headers to be shown
+                lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
-            # Create a SourceInfo object for this extraction
-            source = SourceInfo(url="http://e-codices.unifr.ch", collector=username)
-            source.save()
-            file_list = []
+                # Create a SourceInfo object for this extraction
+                source = SourceInfo(url="http://e-codices.unifr.ch", collector=username)
+                source.save()
+                file_list = []
 
-            # Get the contents of the imported file
-            files = request.FILES.getlist('files_field')
-            if files != None:
-                for data_file in files:
-                    filename = data_file.name
-                    file_list.append(filename)
+                # Get the contents of the imported file
+                files = request.FILES.getlist('files_field')
+                if files != None:
+                    for data_file in files:
+                        filename = data_file.name
+                        file_list.append(filename)
 
-                    # Set the status
-                    oStatus.set("reading", msg="file={}".format(filename))
+                        # Set the status
+                        oStatus.set("reading", msg="file={}".format(filename))
 
-                    # Get the source file
-                    if data_file == None or data_file == "":
-                        arErr.append("No source file specified for the selected project")
-                    else:
-                        # Check the extension
-                        arFile = filename.split(".")
-                        extension = arFile[len(arFile)-1]
-
-                        # Further processing depends on the extension
-                        oResult = None
-                        if extension == "xml":
-                            # This is an XML file
-                            oResult = Manuscript.read_ecodex(username, data_file, filename, arErr, source=source)
-
-                        # Determine a status code
-                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
-                        if oResult == None:
-                            arErr.append("There was an error. No manuscripts have been added")
+                        # Get the source file
+                        if data_file == None or data_file == "":
+                            arErr.append("No source file specified for the selected project")
                         else:
-                            lResults.append(oResult)
+                            # Check the extension
+                            arFile = filename.split(".")
+                            extension = arFile[len(arFile)-1]
 
-            # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
-            source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
-            source.save()
-            # Indicate we are ready
-            oStatus.set("ready")
-            # Get a list of errors
-            error_list = [str(item) for item in arErr]
+                            lst_manual = []
+                            lst_read = []
 
-            # Create the context
-            context = dict(
-                statuscode=statuscode,
-                results=lResults,
-                error_list=error_list
-                )
+                            # Further processing depends on the extension
+                            oResult = None
+                            if extension == "xml":
+                                # This is an XML file
+                                oResult = Manuscript.read_ecodex(username, data_file, filename, arErr, source=source)
 
-            if len(arErr) == 0:
-                # Get the HTML response
-                data['html'] = render_to_string(template_name, context, request)
-            else:
-                data['html'] = "Please log in before continuing"
+                                if oResult == None or oResult['status'] == "error":
+                                    # Process results
+                                    add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                                 filename=oResult['filename'])
+                                else:
+                                    # Get the results from oResult
+                                    obj = oResult['obj']
+                                    # Process results
+                                    add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                 name=oResult['name'], yearstart=obj.yearstart,
+                                                 yearfinish=obj.yearfinish,library=obj.library.name,
+                                                 idno=obj.idno,filename=oResult['filename'])
 
+                            elif extension == "txt":
+                                # Set the status
+                                oStatus.set("reading list", msg="file={}".format(filename))
+                                # (1) Read the TXT file
+                                lines = []
+                                bFirst = True
+                                for line in data_file:
+                                    # Get a good view of the line
+                                    sLine = line.decode("utf-8").strip()
+                                    if bFirst:
+                                        if "\ufeff" in sLine:
+                                            sLine = sLine.replace("\ufeff", "")
+                                        bFirst = False
+                                    lines.append(sLine)
+                                # (2) Walk through the list of XML file names
+                                for idx, xml_url in enumerate(lines):
+                                    xml_url = xml_url.strip()
+                                    if xml_url != "" and ".xml" in xml_url:
+                                        # Set the status
+                                        oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
+                                        # (3) Download the file from the internet and save it 
+                                        bOkay, sResult = download_file(xml_url)
+                                        if bOkay:
+                                            # We have the filename
+                                            xml_file = sResult
+                                            name = xml_url.split("/")[-1]
+                                            # (4) Read the e-codex manuscript
+                                            oResult = Manuscript.read_ecodex(username, xml_file, name, arErr, source=source)
+                                            # (5) Check before continuing
+                                            if oResult == None or oResult['status'] == "error":
+                                                msg = "unknown"  
+                                                if 'msg' in oResult: 
+                                                    msg = oResult['msg']
+                                                elif 'status' in oResult:
+                                                    msg = oResult['status']
+                                                arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
+                                                # Process results
+                                                add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                                             filename=oResult['filename'])
+                                            else:
+                                                # Get the results from oResult
+                                                obj = oResult['obj']
+                                                # Process results
+                                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                             name=oResult['name'], yearstart=obj.yearstart,
+                                                             yearfinish=obj.yearfinish,library=obj.library.name,
+                                                             idno=obj.idno,filename=oResult['filename'])
+
+                                        else:
+                                            aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
+
+                            # Create a report and add it to what we return
+                            oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                            oReport = Report.make(username, "iecod", json.dumps(oContents))
+                                
+                            # Determine a status code
+                            statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                            if oResult == None:
+                                arErr.append("There was an error. No manuscripts have been added")
+                            else:
+                                lResults.append(oResult)
+
+                # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
+                source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
+                source.save()
+                # Indicate we are ready
+                oStatus.set("ready")
+                # Get a list of errors
+                error_list = [str(item) for item in arErr]
+
+                # Create the context
+                context = dict(
+                    statuscode=statuscode,
+                    results=lResults,
+                    error_list=error_list
+                    )
+
+                if len(arErr) == 0:
+                    # Get the HTML response
+                    data['html'] = render_to_string(template_name, context, request)
+                else:
+                    data['html'] = "Please log in before continuing"
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("import_ecodex")
+                data['html'] = msg
+                data['status'] = "error"
 
         else:
             data['html'] = 'invalid form: {}'.format(form.errors)
@@ -2613,8 +2743,6 @@ class SermonEdit(BasicPart):
 
     def after_save(self, prefix, instance = None):
 
-        using_system = "sermondescr"
-
         # Check if this is a new one
         if self.add:
             # This is a new one, so it should be coupled to the correct manuscript
@@ -2622,23 +2750,13 @@ class SermonEdit(BasicPart):
                 # It is there, so we can add it
                 manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
                 if manuscript != None:
-                    if using_system == "sermonman":
-                        # Add to the SermonMan
-                        obj = SermonMan(sermon=instance, manuscript=manuscript)
-                        obj.save()
-                        # Calculate how many sermons there are
-                        sermon_count = manuscript.sermons.all().count()
-                        # Make sure the new sermon gets changed
-                        instance.order = sermon_count
-                        instance.save()
-                    elif using_system == "sermondescr":
-                        # Adapt the SermonDescr instance
-                        instance.manu = manuscript
-                        # Calculate how many sermons there are
-                        sermon_count = manuscript.manusermons.all().count()
-                        # Make sure the new sermon gets changed
-                        instance.order = sermon_count
-                        instance.save()
+                    # Adapt the SermonDescr instance
+                    instance.manu = manuscript
+                    # Calculate how many sermons there are
+                    sermon_count = manuscript.manusermons.all().count()
+                    # Make sure the new sermon gets changed
+                    instance.order = sermon_count
+                    instance.save()
                         
         
         # There's is no real return value needed here 
@@ -4325,7 +4443,7 @@ class ReportDownload(BasicPart):
             oContents = json.loads(sData)
             # Get the headers and the list
             headers = oContents['headers']
-            lst_report = oContents['list']
+
             # Create CSV string writer
             output = StringIO()
             delimiter = "\t" if dtype == "csv" else ","
@@ -4333,15 +4451,20 @@ class ReportDownload(BasicPart):
 
             # Write Headers
             csvwriter.writerow(headers)
-            # Loop
-            for item in lst_report:
-                row = []
-                for key in headers:
-                    if key in item:
-                        row.append(item[key])
-                    else:
-                        row.append("")
-                csvwriter.writerow(row)
+
+            # Two lists
+            todo = [oContents['list'], oContents['read'] ]
+            for lst_report in todo:
+
+                # Loop
+                for item in lst_report:
+                    row = []
+                    for key in headers:
+                        if key in item:
+                            row.append(item[key])
+                        else:
+                            row.append("")
+                    csvwriter.writerow(row)
 
             # Convert to string
             sData = output.getvalue()

@@ -1382,17 +1382,6 @@ class Manuscript(models.Model):
                         if 'title' in parent.childNodes:
                             oMsItem['title'] = getText(parent.childNodes['title'])
 
-                # NOTE: this would give the wrong information
-                #
-                ## Try to find the author within msItem
-                #authors = msItem.getElementsByTagName("persName")
-                #for person in authors:
-                #    # Check if this is linked as author
-                #    if 'role' in person.attributes and person.attributes['role'].value == "author":
-                #        oMsItem['author'] = getText(person)
-                #        # Don't look further: the first author is the *best*
-                #        break
-
                 # If there is no author, then supply the default author (if that exists)
                 if not 'author' in oMsItem and 'author' in oParent:
                     oMsItem['author'] = oParent['author']
@@ -1478,11 +1467,12 @@ class Manuscript(models.Model):
                     # Set the default status type
                     sermon.stype = "imp"    # Imported
 
+                    # Set my parent manuscript
+                    sermon.manu = manuscript
+
                     # Now save it
                     sermon.save()
-                    # Make a link using the SermonMan
-                    sermonman = SermonMan(sermon=sermon, manuscript=manuscript)
-                    sermonman.save()
+
                     # Keep track of the number of sermons added
                     iSermCount += 1
                 else:
@@ -1725,18 +1715,30 @@ class Manuscript(models.Model):
                         # Get the tag name of this item
                         sTag = item.tagName
                         if sTag == "provenance":
+                            orgName = ""
                             org = item.getElementsByTagName("orgName")
                             if org.length>0:
                                 orgName = getText(org[0])
-                            oProv = {'name': orgName, 'note': getText(item)}
-                            lProvenances.append(oProv)
+                            if orgName != "":
+                                oProv = {'name': orgName, 'note': getText(item)}
+                                lProvenances.append(oProv)
+                        elif sTag == "origin":
+                            orgText = getText(item)
+                            for subitem in item.childNodes:
+                                if subitem.nodeType == minidom.Node.ELEMENT_NODE:
+                                    # places = item.childNodes[0].getElementsByTagName("placeName")
+                                    places = subitem.getElementsByTagName("placeName")
+                                    for place in places:
+                                        oProv = {'name': getText(place), 'note': orgText}
+                                        lProvenances.append(oProv)
                         elif sTag == "acquisition":
                             pass
 
             # Now [oInfo] has a full description of the contents to be added to the database
             # (1) Get the country from the city
             city = City.objects.filter(name__iexact=oInfo['city']).first()
-            country = None if city == None else city.country.name
+            country = None 
+            if city != None: country = city.country.name
 
             # (2) Get the library from the info object
             library = Library.find_or_create(oInfo['city'], oInfo['library'], country)
@@ -1790,9 +1792,11 @@ class Manuscript(models.Model):
             oBack['sermons'] = iSermCount   # The number of sermons (=msitems) added
             oBack['name'] = oInfo['name']
             oBack['filename'] = filename
+            oBack['obj'] = manuscript
 
         except:
             sError = errHandle.get_error_message()
+            oBack['filename'] = filename
             oBack['status'] = 'error'
             oBack['msg'] = sError
 
@@ -2690,13 +2694,9 @@ class SermonDescr(models.Model):
         return depth
 
     def get_manuscript(self):
-        """Get the first manuscript that links to this sermondescr"""
+        """Get the manuscript that links to this sermondescr"""
 
-        obj = SermonMan.objects.filter(sermon=self).first()
-        if obj == None:
-            return None
-        else:
-            return obj.manuscript
+        return obj.manu
 
     def signatures(self):
         """Combine all signatures into one string"""
