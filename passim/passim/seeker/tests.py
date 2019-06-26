@@ -8,6 +8,7 @@ Replace this with more appropriate tests for your application.
 import django
 django.setup()                      # This is needed apparently
 from django.test import TestCase
+from django.urls import reverse
 from passim.seeker.models import City, Country
 
 
@@ -76,3 +77,17 @@ class CityTestCase(TestCase):
         self.assertEqual(c2.name.lower(), "zelfbedacht")
         self.assertNotEqual(c2.country, None)
         self.assertEqual(c2.country.name.lower(), "netherlands")
+
+class HomePageTests(TestCase):
+
+    def test_home_page_status_code(self):
+        response = self.client.get(reverse("home"))
+        self.assertEquals(response.status_code, 200)
+
+    def test_home_page_template(self):
+        with self.settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}}):
+            response = self.client.get(reverse("home"), follow=True)
+            self.assertEquals(response.status_code, 200)
+            self.assertTemplateUsed(response, 'index.html')
+            self.assertTemplateUsed(response, 'layout.html')
+            self.assertTemplateUsed(response, 'topnav.html')
