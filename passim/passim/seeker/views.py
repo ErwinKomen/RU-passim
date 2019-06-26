@@ -31,8 +31,9 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
-                                SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm
-from passim.seeker.models import process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
+                                SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
+                                ReportEditForm
+from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
     EqualGold, EqualGoldLink, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
@@ -190,7 +191,7 @@ def home(request):
     template_name = 'index.html'
     # Define the initial context
     context =  {'title':'RU-passim',
-                'year':datetime.now().year,
+                'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -217,7 +218,7 @@ def contact(request):
     assert isinstance(request, HttpRequest)
     context =  {'title':'Contact',
                 'message':'Shari Boodts',
-                'year':datetime.now().year,
+                'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -231,7 +232,7 @@ def more(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)
     context =  {'title':'More',
-                'year':datetime.now().year,
+                'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -245,7 +246,7 @@ def bibliography(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)
     context =  {'title':'Bibliography',
-                'year':datetime.now().year,
+                'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -260,7 +261,7 @@ def about(request):
     assert isinstance(request, HttpRequest)
     context =  {'title':'About',
                 'message':'Radboud University passim utility.',
-                'year':datetime.now().year,
+                'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -277,7 +278,7 @@ def short(request):
     template = 'short.html'
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
-               'year': datetime.now().year}
+               'year': get_current_datetime().year}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     return render(request, template, context)
 
@@ -286,7 +287,7 @@ def nlogin(request):
     assert isinstance(request, HttpRequest)
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
-                    'year':datetime.now().year,}
+                    'year':get_current_datetime().year,}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
     return render(request,'nlogin.html', context)
 
@@ -505,7 +506,7 @@ def do_stype(request):
         template_name = 'tools.html'
         # Define the initial context
         context =  {'title':'RU-passim-tools',
-                    'year':datetime.now().year,
+                    'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
         context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -572,7 +573,7 @@ def do_goldtogold(request):
         template_name = 'tools.html'
         # Define the initial context
         context =  {'title':'RU-passim-tools',
-                    'year':datetime.now().year,
+                    'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
         context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -714,7 +715,7 @@ def do_goldtogold_ORIGINAL(request):
         template_name = 'tools.html'
         # Define the initial context
         context =  {'title':'RU-passim-tools',
-                    'year':datetime.now().year,
+                    'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
         context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
@@ -1926,7 +1927,7 @@ class BasicPart(View):
                         formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
 
                 # Initially we are assuming this just is a review
-                context['savedate']="reviewed at {}".format(datetime.now().strftime("%X"))
+                context['savedate']="reviewed at {}".format(get_current_datetime().strftime("%X"))
 
                 # Iterate again
                 for formObj in self.form_objects:
@@ -1947,7 +1948,7 @@ class BasicPart(View):
                                 # Perform the saving
                                 instance.save()
                                 # Set the context
-                                context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
                                 formObj['instance'] = instance
                                 # Store the instance id in the data
@@ -2024,7 +2025,7 @@ class BasicPart(View):
                                                     # Save the instance
                                                     sub_instance.save()
                                                     # Adapt the last save time
-                                                    context['savedate']="saved at {}".format(datetime.now().strftime("%X"))
+                                                    context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                                     # Store the instance id in the data
                                                     self.data[prefix + '_instanceid'] = sub_instance.id
                                                     # Any action after saving this form
@@ -2443,7 +2444,7 @@ class PassimDetails(DetailView):
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        context['prevpage'] = self.previous
+        # context['prevpage'] = get_previous_page(self.request) # self.previous
 
         # Define where to go to after deletion
         context['afterdelurl'] = get_previous_page(self.request)
@@ -3161,6 +3162,11 @@ class ManuscriptListView(ListView):
                         # Process the criteria from this form 
                         oFields = sform.cleaned_data
                         lstThisQ = []
+
+                        # Check for Manuscript [name]
+                        if 'idno' in oFields and oFields['idno'] != "": 
+                            val = adapt_search(oFields['idno'])
+                            lstThisQ.append(Q(idno__iregex=val))
 
                         # Check for Manuscript [name]
                         if 'name' in oFields and oFields['name'] != "": 
@@ -4253,6 +4259,10 @@ class LibraryListDownload(BasicPart):
         if dtype == "json":
             # Loop
             for lib in self.get_queryset(prefix):
+                country = ""
+                city = ""
+                if lib.country: country = lib.country.name
+                if lib.city: city = lib.city.name
                 row = {"id": lib.id, "country": lib.country.name, "city": lib.city.name, "library": lib.name, "libtype": lib.libtype}
                 lData.append(row)
             # convert to string
@@ -4411,6 +4421,22 @@ class ReportListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class ReportDetailsView(PassimDetails):
+    model = Report
+    mForm = ReportEditForm
+    template_name = 'seeker/report_details.html'
+    prefix = 'report'
+    title = "ReportDetails"
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
 
 
 class ReportDownload(BasicPart):

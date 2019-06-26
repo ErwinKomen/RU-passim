@@ -103,7 +103,9 @@ class SearchManuscriptForm(forms.Form):
     signature = forms.CharField(label=_("Signature"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Title"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
+    idno = forms.CharField(label=_("Idno"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}))
 
 
 class SermonForm(forms.ModelForm):
@@ -406,9 +408,9 @@ class ManuscriptForm(forms.ModelForm):
             if library != None:
                 # In this case: get the city and the country
                 city = library.city.name
-                country = library.country.name
-                if country == None and city != None and city != "":
-                    country = library.city.country.name
+                country = ""  if library.country == None else library.country.name
+                if (country == None or country == "") and city != None and city != "":
+                    country = "" if library.city.country == None else library.city.country.name
                 # Put them in the fields
                 self.fields['city_ta'].initial = city
                 self.fields['country_ta'].initial = country
@@ -434,6 +436,18 @@ class LibrarySearchForm(forms.ModelForm):
 
         model = Library
         fields = ('country', 'city', 'libtype', 'name')
+
+
+class ReportEditForm(forms.ModelForm):
+
+    class Meta:
+        model = Report
+        fields = ['user', 'created', 'reptype', 'contents']
+        widgets={'user':         forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'created':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'reptype':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'contents':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
+                 }
 
 
 class AuthorEditForm(forms.ModelForm):

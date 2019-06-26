@@ -34,7 +34,9 @@
                   <td class="hidden"> {{ report.id }}</td>
                   <td><span class="report-date tdnowrap">{{report.created|date:"j/b/o G:i"}}</span></td>
                   <td><span class="report-name tdnowrap">{{report.user.username}}</span></td>
-                  <td style="width: 100%;"><span class="report-type">{{report.get_reptype_display}}</span></td>
+                  <td style="width: 100%;">
+                    <span class="report-type"><a href="{% url 'report_details' report.id %}">{{report.get_reptype_display}}</a></span>
+                  </td>
                   <!-- Buttons for this report-->
                   <td class="tdnowrap">
                     <form>

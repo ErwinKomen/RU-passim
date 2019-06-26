@@ -6,6 +6,8 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.html import mark_safe
+from django.utils import timezone
+import pytz
 from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
@@ -80,6 +82,9 @@ class HelpChoice(models.Model):
                 help_text = "{} ({})".format(
                     self.display_name, self.help_url)
         return help_text
+
+def get_current_datetime():
+    return timezone.now()
 
 def adapt_search(val):
     if val == None: return None
@@ -801,7 +806,7 @@ class Report(models.Model):
     # [1] Every report must be connected to a user and a date (when a user is deleted, the Report is deleted too)
     user = models.ForeignKey(User)
     # [1] And a date: the date of saving this report
-    created = models.DateTimeField(default=datetime.now)
+    created = models.DateTimeField(default=get_current_datetime)
     # [1] A report should have a type to know what we are reporting about
     reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), 
                             max_length=5)
@@ -927,7 +932,7 @@ class Visit(models.Model):
     # [1] Every visit is made by a user
     user = models.ForeignKey(User)
     # [1] Every visit is done at a certain moment
-    when = models.DateTimeField(default=datetime.now)
+    when = models.DateTimeField(default=get_current_datetime)
     # [1] Every visit is to a 'named' point
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [1] Every visit needs to have a URL
@@ -1220,7 +1225,7 @@ class SourceInfo(models.Model):
     """Details of the source from which we get information"""
 
     # [1] Obligatory time of extraction
-    created = models.DateTimeField(default=datetime.now)
+    created = models.DateTimeField(default=get_current_datetime)
     # [0-1] Code used to collect information
     code = models.TextField("Code", null=True, blank=True)
     # [0-1] URL that was used
@@ -2520,7 +2525,7 @@ class SermonGoldKeyword(models.Model):
     # [1] ...and a keyword instance
     keyword = models.ForeignKey(Keyword, related_name="sermongold_kw")
     # [1] And a date: the date of saving this relation
-    created = models.DateTimeField(default=datetime.now)
+    created = models.DateTimeField(default=get_current_datetime)
 
 
 class Edition(models.Model):
@@ -2834,7 +2839,7 @@ class NewsItem(models.Model):
     # [1] title of this news-item
     title = models.CharField("Title",  max_length=MAX_TEXT_LEN)
     # [1] the date when this item was created
-    created = models.DateTimeField(default=datetime.now)
+    created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
     # [0-1] optional time after which this should not be shown anymore
     until = models.DateTimeField("Remove at", null=True, blank=True)
