@@ -120,6 +120,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(WRITABLE_DIR, 'passim.db'),
+        'TEST': {
+            'NAME': os.path.join(WRITABLE_DIR, 'passim-test.db'),
+            }
     }
 }
 

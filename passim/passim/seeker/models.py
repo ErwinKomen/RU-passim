@@ -1171,19 +1171,41 @@ class Origin(models.Model):
 
     # [1] Name of the location
     name = models.CharField("Original location", max_length=LONG_STRING)
+    # [0-1] Optional city
+    city = models.ForeignKey(City, null=True, related_name="city_origins")
+    # [0-1] Name of the country this is in
+    country = models.ForeignKey(Country, null=True, related_name="country_origins")
     # [0-1] Further details are perhaps required too
-    # TODO: city/country??
+    note = models.TextField("Notes on this origin", blank=True, null=True)
 
     def __str__(self):
         return self.name
 
-    def find_or_create(sName):
+    def find_or_create(sName, city=None, country=None, note=None):
         """Find a location or create it."""
 
-        qs = Origin.objects.filter(Q(name__iexact=sName))
+        lstQ = []
+        obj_city = None
+        obj_country = None
+        lstQ.append(Q(name__iexact=sName))
+        if city != None and isinstance(city, str): 
+            # Get the city object
+            obj_city = City.objects.filter(name=city).first()
+            if obj_city != None:
+                lstQ.append(Q(city=city))
+        if country != None and isinstance(country, str): 
+            # Get the country object
+            obj_country = Country.objects.filter(name=country).first()
+            if obj_country != None:
+                lstQ.append(Q(country=country))
+        if note!=None: lstQ.append(Q(note__iexact=note))
+        qs = Origin.objects.filter(*lstQ)
         if qs.count() == 0:
             # Create one
             hit = Origin(name=sName)
+            if note!=None: hit.note=note
+            if obj_city != None: hit.city=obj_city
+            if obj_country != None: hit.country=obj_country
             hit.save()
         else:
             hit = qs[0]
@@ -1194,26 +1216,43 @@ class Origin(models.Model):
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 
-    # [1] Name of the location
+    # [1] Name of the location (can be cloister or anything)
     name = models.CharField("Provenance location", max_length=LONG_STRING)
+    # [0-1] Optional city
+    city = models.ForeignKey(City, null=True, related_name="city_provenances")
+    # [0-1] Name of the country this is in
+    country = models.ForeignKey(Country, null=True, related_name="country_provenances")
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this provenance", blank=True, null=True)
-    # TODO: city/country??
 
     def __str__(self):
         return self.name
 
-    def find_or_create(sName, note=None):
+    def find_or_create(sName,  city=None, country=None, note=None):
         """Find a location or create it."""
 
         lstQ = []
+        obj_city = None
+        obj_country = None
         lstQ.append(Q(name__iexact=sName))
+        if city != None and isinstance(city, str): 
+            # Get the city object
+            obj_city = City.objects.filter(name=city).first()
+            if obj_city != None:
+                lstQ.append(Q(city=city))
+        if country != None and isinstance(country, str): 
+            # Get the country object
+            obj_country = Country.objects.filter(name=country).first()
+            if obj_country != None:
+                lstQ.append(Q(country=country))
         if note!=None: lstQ.append(Q(note__iexact=note))
         qs = Provenance.objects.filter(*lstQ)
         if qs.count() == 0:
             # Create one
             hit = Provenance(name=sName)
             if note!=None: hit.note=note
+            if obj_city != None: hit.city=obj_city
+            if obj_country != None: hit.country=obj_country
             hit.save()
         else:
             hit = qs[0]
@@ -1274,7 +1313,7 @@ class Manuscript(models.Model):
     # Note: deletion of a sourceinfo sets the manuscript.source to NULL
     source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
 
-    # [m] Many-to-many: all the provenances of this manuscript
+    # [m] Many-to-many: one manuscript can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
        
     def __str__(self):
