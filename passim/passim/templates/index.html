@@ -56,8 +56,8 @@
         <h2>Getting started</h2>
         <p>
           The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
-          Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>) and maintain his or her own research projects.
-          Projects of one researcher are by default <i>not</i> visible to other researchers, but it is possible to specify a different accessibility level.
+          Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>).
+          Regular researchers are able to read and search through the information that is provided.
         </p>
         <p>
           {% if user.is_authenticated %}
