@@ -1062,7 +1062,7 @@ def get_authors(request):
     if request.is_ajax():
         author = request.GET.get("name", "")
         lstQ = []
-        lstQ.append(Q(name__icontains=author))
+        lstQ.append(Q(name__icontains=author)|Q(abbr__icontains=author))
         authors = Author.objects.filter(*lstQ).order_by('name')
         results = []
         for co in authors:
