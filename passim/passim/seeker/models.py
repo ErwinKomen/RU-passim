@@ -973,6 +973,56 @@ class Visit(models.Model):
         return result
 
 
+class LocationType(models.Model):
+    """Kind of location and level on the location hierarchy"""
+
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] obligatory level of this location on the scale
+    level = models.IntegerField("Hierarchy level", default=0)
+
+    def __str__(self):
+        return self.name
+
+
+class Location(models.Model):
+    """One location element can be a city, village, cloister, region"""
+
+    # [1] obligatory name in ENGLISH
+    name = models.CharField("Name (eng)", max_length=STANDARD_LENGTH)
+    # [1] Link to the location type of this location
+    loctype = models.ForeignKey(LocationType)
+
+    # Many-to-many field that identifies relations between locations
+    relations = models.ManyToManyField("self", through="LocationRelation", related_name="relations_location")
+
+    def __str__(self):
+        return self.name
+
+
+class LocationName(models.Model):
+    """The name of a location in a particular language"""
+
+    # [1] obligatory name in vernacular
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] the language in which this name is given - ISO 3 letter code
+    language = models.CharField("Language", max_length=STANDARD_LENGTH, default="eng")
+    # [1] the Location to which this (vernacular) name belongs
+    location = models.ForeignKey(Location, related_name="location_names")
+
+    def __str__(self):
+        return "{} ({})".format(self.name, self.language)
+
+
+class LocationRelation(models.Model):
+    """Container-contained relation between two locations"""
+
+    # [1] Obligatory container
+    container = models.ForeignKey(Location, related_name="container_locrelations")
+    # [1] Obligatory contained
+    contained = models.ForeignKey(Location, related_name="contained_locrelations")
+
+
 class Country(models.Model):
     """Countries in which there are library cities"""
 
