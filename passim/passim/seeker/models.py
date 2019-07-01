@@ -994,7 +994,7 @@ class Location(models.Model):
     loctype = models.ForeignKey(LocationType)
 
     # Many-to-many field that identifies relations between locations
-    relations = models.ManyToManyField("self", through="LocationRelation", related_name="relations_location")
+    relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
     def __str__(self):
         return self.name

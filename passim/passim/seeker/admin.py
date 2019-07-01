@@ -133,6 +133,21 @@ class ReportAdmin(admin.ModelAdmin):
     fields = ['user', 'created', 'reptype', 'contents']
 
 
+class LocationTypeAdmin(admin.ModelAdmin):
+    """Definition of each location type"""
+
+    fields = ['name', 'level']
+    list_display = ['name', 'level']
+
+
+class LocationAdmin(admin.ModelAdmin):
+    """Definition of each location"""
+
+    fields = ['name', 'loctype']
+    list_display = ['name', 'loctype']
+    list_filter = ['loctype']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -144,6 +159,8 @@ admin.site.register(Country, CountryAdmin)
 admin.site.register(City, CityAdmin)
 admin.site.register(Library, LibraryAdmin)
 admin.site.register(Keyword)
+admin.site.register(LocationType, LocationTypeAdmin)
+admin.site.register(Location, LocationAdmin)
 
 admin.site.register(Report, ReportAdmin)
 
