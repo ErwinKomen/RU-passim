@@ -2168,6 +2168,7 @@ var ru = (function ($, ru) {
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
+            case "manu_search":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
               //  // Return from here
