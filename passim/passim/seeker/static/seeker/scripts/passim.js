@@ -540,7 +540,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: gldexplicit -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.gldexplicits, tr .typeahead.gldexplicits").typeahead(
+          $(".row .typeahead.gldexplicits, tr:not(.empty-form) .typeahead.gldexplicits").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'gldexplicits', source: loc_gldexplicits, limit: 25, displayKey: "name",
@@ -556,7 +556,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: srmexplicit -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.srmexplicits, tr .typeahead.srmexplicits").typeahead(
+          $(".row .typeahead.srmexplicits, tr:not(.empty-form) .typeahead.srmexplicits").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'srmexplicits', source: loc_srmexplicits, limit: 25, displayKey: "name",
@@ -572,7 +572,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: SIGNATURE (SermonGold) -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.signatures, tr .typeahead.signatures").typeahead(
+          $(".form-row:not(.empty-form) .typeahead.signatures, .manuscript-details .typeahead.signatures").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'signatures', source: loc_signature, limit: 25, displayKey: "name",
@@ -588,7 +588,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: SRMSIGNATURE (SermonDescr) -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.srmsignatures, tr .typeahead.srmsignatures").typeahead(
+          $(".row .typeahead.srmsignatures, tr:not(.empty-form) .typeahead.srmsignatures").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'srmsignatures', source: loc_srmsignature, limit: 25, displayKey: "name",
@@ -604,7 +604,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: Gryson Signature
-          $(".row .typeahead.siggrysons, tr .typeahead.siggrysons").typeahead(
+          $(".row .typeahead.siggrysons, tr:not(.empty-form) .typeahead.siggrysons").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'siggrysons', source: loc_siggryson, limit: 25, displayKey: "name",
@@ -620,7 +620,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: Clavis Signature
-          $(".row .typeahead.sigclavises, tr .typeahead.sigclavises").typeahead(
+          $(".row .typeahead.sigclavises, tr:not(.empty-form) .typeahead.sigclavises").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'sigclavises', source: loc_sigclavis, limit: 25, displayKey: "name",
@@ -668,7 +668,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: manuidno -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.manuidnos, tr .typeahead.manuidnos").typeahead(
+          $(".form-row:not(.empty-form) .typeahead.manuidnos, .manuscript-details .typeahead.manuidnos").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'manuidnos', source: loc_manuidno, limit: 25, displayKey: "name",

@@ -1298,7 +1298,7 @@ class Manuscript(models.Model):
     # [0-1] Support: the general type of manuscript
     support = models.CharField("Support", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Extent: the total number of pages
-    extent = models.CharField("Extent", max_length=LONG_STRING, null=True, blank=True)
+    extent = models.TextField("Extent", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 

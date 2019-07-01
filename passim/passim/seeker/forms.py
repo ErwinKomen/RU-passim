@@ -105,7 +105,7 @@ class SearchManuscriptForm(forms.Form):
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
     idno = forms.CharField(label=_("Idno"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}))
 
 
 class SermonForm(forms.ModelForm):
@@ -385,11 +385,11 @@ class ManuscriptForm(forms.ModelForm):
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'idno':        forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}),
                  'origin':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'extent':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})

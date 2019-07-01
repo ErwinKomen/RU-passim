@@ -2389,8 +2389,9 @@ var ru = (function ($, ru) {
 
           // Look at the inner text of <td>
           newElement.find('td').each(function (idx, el) {
+            var elInsideTd = $(el).find("td");
             var elText = $(el).children().first();
-            if (elText !== undefined) {
+            if (elInsideTd.length === 0 && elText !== undefined) {
               var sHtml = $(elText).html();
               if (sHtml !== undefined && sHtml !== "") {
                 sHtml = sHtml.replace("__counter__", (total+1).toString());
