@@ -181,12 +181,16 @@
           <td>
             <div>
               <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#source_info" role="button" title="Show source information...">
-                <span class="glyphicon glyphicon-search">&nbsp;Source collection</span>
+                <span class="glyphicon glyphicon-search"></span>&nbsp;Source Collection
               </a>
             </div>
             <div id="source_info" class="collapse inert">
-              Collected by {{ manuForm.instance.source.collector}} on {{manuForm.instance.source.created}} (<a href="{{manuForm.instance.source.url}}">url</a>).
-              Code: <span class="kw">{{manuForm.instance.source.code}}</span>
+              {% if manuForm.instance.source %}
+                Collected by {{ manuForm.instance.source.collector}} on {{manuForm.instance.source.created}} (<a href="{{manuForm.instance.source.url}}">url</a>).
+                Code: <span class="kw">{{manuForm.instance.source.code}}</span>
+              {% else %}
+                <i>(No source information)</i>
+              {% endif %}
             </div>
           </td>
         </tr>

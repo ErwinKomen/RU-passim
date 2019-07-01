@@ -2601,6 +2601,13 @@ class ManuscriptEdit(BasicPart):
                     instance.origin = origin
                     # Make sure that it is being saved
                     bNeedSaving = True
+            # Is this a new manuscript?
+            if self.add or instance.source == None:
+                # Create a source info element
+                source = SourceInfo(collector=request.user.username, code="Manually added") # TH: aanpassen, klopt niet, ccfr
+                source.save()
+                instance.source = source
+                bNeedSaving = True
 
         return bNeedSaving
 
