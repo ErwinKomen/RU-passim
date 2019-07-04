@@ -1014,6 +1014,20 @@ class LocationName(models.Model):
         return "{} ({})".format(self.name, self.language)
 
 
+class LocationIdentifier(models.Model):
+    """The name and value of a location identifier"""
+
+    # [0-1] Optionally an identifier name
+    idname = models.CharField("Identifier name", null=True, blank=True, max_length=STANDARD_LENGTH)
+    # [0-1]        ... and an identifier value
+    idvalue = models.IntegerField("Identifier value", null=True, blank=True)
+    # [1] the Location to which this (vernacular) name belongs
+    location = models.ForeignKey(Location, related_name="location_identifiers")
+
+    def __str__(self):
+        return "{} ({})".format(self.name, self.language)
+
+
 class LocationRelation(models.Model):
     """Container-contained relation between two locations"""
 
@@ -1115,6 +1129,9 @@ class Library(models.Model):
     city = models.ForeignKey(City, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
+
+    # [0-1] Location, as specific as possible, but optional in the end
+    location = models.ForeignKey(Location, null=True, related_name="location_libraries")
 
     def __str__(self):
         return self.name

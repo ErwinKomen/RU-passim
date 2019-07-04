@@ -46,6 +46,7 @@ urlpatterns = [
     url(r'^tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
     url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
+    url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),

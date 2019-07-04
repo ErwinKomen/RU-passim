@@ -35,7 +35,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 ReportEditForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
-    EqualGold, EqualGoldLink, \
+    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -561,6 +561,131 @@ def do_stype(request):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("goldtogold")
+        return reverse('home')
+
+def do_locations(request):
+    """Add stype on the appropriate places"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Establish location definitions"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Locations", True)
+
+        # Create list to be returned
+        result_list = []
+
+        # Phase 1: Country
+        name = "country"
+        loctype_country = LocationType.objects.filter(name=name).first()
+        idname = "idPaysEtab"
+        added = 0
+        if Location.objects.filter(loctype=loctype_country).count() == 0:
+            with transaction.atomic():
+                # locationtype = city
+                for item in Country.objects.all():
+                    # Get the details of this item
+                    name = item.name
+                    nameFR = item.nameFR
+                    idvalue = item.idPaysEtab
+                    # Create a location with these parameters
+                    obj = Location(name=name, loctype=loctype_country)
+                    obj.save()
+                    added += 1
+                    # Add the French name and identifier
+                    if nameFR != None and nameFR != "":
+                        lname = LocationName(name=nameFR, language="fre", location=obj)
+                        lname.save()
+                    if idvalue != None:
+                        lidt = LocationIdentifier(idname=idname, idvalue=idvalue, location=obj)
+                        lidt.save()
+
+        # Phase 2: City
+        name = "city"
+        loctype_city = LocationType.objects.filter(name=name).first()
+        idname = "idVilleEtab"
+        if Location.objects.filter(loctype=loctype_city).count() == 0:
+            last_country = None
+            last_loc_country = None
+            with transaction.atomic():
+                # locationtype = city
+                for item in City.objects.all().order_by('country__name'):
+                    # Get the details of this item
+                    name = item.name
+                    idvalue = item.idVilleEtab
+                    country = item.country
+                    # Create a location with these parameters
+                    obj = Location(name=name, loctype=loctype_city)
+                    obj.save()
+                    added += 1
+                    # Add the French identifier
+                    if idvalue != None and idvalue >= 0:
+                        lidt = LocationIdentifier(idname=idname, idvalue=idvalue, location=obj)
+                        lidt.save()
+                    # Tie the city to the correct country object through a LocationRelation
+                    if country != None:
+                        if country != last_country:
+                            loc = Location.objects.filter(name=country.name, loctype=loctype_country).first()
+                            if loc != None:
+                                last_loc_country = loc
+                                last_country = country
+                        # Implement relation
+                        loc_rel = LocationRelation(container=last_loc_country, contained=obj)
+                        loc_rel.save()
+
+        # Phase 3: Library
+        name = "library"
+        loctype_lib = LocationType.objects.filter(name=name).first()
+        qs = Library.objects.all().order_by('country__name', 'city__name')
+        with transaction.atomic():
+            for library in qs:
+                if library.location == None:
+                    city = library.city
+                    country = library.country
+                    if country != None:
+                        countries = Location.objects.filter(name__iexact=country.name)
+                    if city != None:
+                    
+                        # Find the city
+                        lstQ = []
+                        lstQ.append(Q(name__iexact=city.name))
+                        if country != None:
+                            lstQ.append(Q(relations_location__in=countries))
+                        obj = Location.objects.filter(*lstQ).first()
+                        # qs = Location.objects.filter(name__iexact=city.name).filter(relations_location__in=countries)
+                        if obj == None:
+                            # Cannot find the location of this library...
+                            iStop = 1
+                        else:
+                            # Set the location in Library
+                            library.location = obj
+                            library.save()
+                            added += 1
+
+        # Wrapping it up
+        context['result_list'] = result_list
+
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_locations")
         return reverse('home')
 
 def do_goldtogold(request):
