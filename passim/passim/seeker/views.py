@@ -993,15 +993,20 @@ def get_countries(request):
     """Get a list of countries for autocomplete"""
 
     data = 'fail'
+    method = "useLocation"
     if request.is_ajax():
         sName = request.GET.get('country', '')
         if sName == "": sName = request.GET.get('country_ta', "")
         lstQ = []
         lstQ.append(Q(name__icontains=sName))
-        countries = Country.objects.filter(*lstQ).order_by('name')
+        if method == "useLocation":
+            loctype = LocationType.find("country")
+            lstQ.append(Q(loctype=loctype))
+            countries = Location.objects.filter(*lstQ).order_by('name')
+        else:
+            countries = Country.objects.filter(*lstQ).order_by('name')
         results = []
         for co in countries:
-            # co_json = {'combi': "{}: {}".format(co.id, co.name)}
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)
@@ -1015,17 +1020,55 @@ def get_cities(request):
     """Get a list of cities for autocomplete"""
 
     data = 'fail'
+    method = "useLocation"
     if request.is_ajax():
+        # Get the user-specified 'country' and 'city' strings
         country = request.GET.get('country', "")
         if country == "": country = request.GET.get('country_ta', "")
         city = request.GET.get("city", "")
         if city == "": city = request.GET.get('city_ta', "")
+
+        # build the query
         lstQ = []
-        lstQ.append(Q(country__name__icontains=country))
-        lstQ.append(Q(name__icontains=city))
-        countries = City.objects.filter(*lstQ).order_by('name')
+        if method == "useLocation":
+            # Start as broad as possible: country
+            qs_loc = None
+            if country != "":
+                loctype_country = LocationType.find("country")
+                lstQ.append(Q(name=country))
+                lstQ.append(Q(loctype=loctype_country))
+                qs_country = Location.objects.filter(*lstQ)
+                # Fine-tune on city...
+                loctype_city = LocationType.find("city")
+                lstQ = []
+                lstQ.append(Q(name__icontains=city))
+                lstQ.append(Q(loctype=loctype_city))
+                lstQ.append(Q(relations_location__in=qs_country))
+                cities = Location.objects.filter(*lstQ)
+            else:
+                loctype_city = LocationType.find("city")
+                lstQ.append(Q(name__icontains=city))
+                lstQ.append(Q(loctype=loctype_city))
+                cities = Location.objects.filter(*lstQ)
+        elif method == "slowLocation":
+            # First of all: city...
+            loctype_city = LocationType.find("city")
+            lstQ.append(Q(name__icontains=city))
+            lstQ.append(Q(loctype=loctype_city))
+            # Do we have a *country* specification?
+            if country != "":
+                loctype_country = LocationType.find("country")
+                lstQ.append(Q(relations_location__name=country))
+                lstQ.append(Q(relations_location__loctype=loctype_country))
+            # Combine everything
+            cities = Location.objects.filter(*lstQ).order_by('name')
+        else:
+            if country != "":
+                lstQ.append(Q(country__name__icontains=country))
+            lstQ.append(Q(name__icontains=city))
+            cities = City.objects.filter(*lstQ).order_by('name')
         results = []
-        for co in countries:
+        for co in cities:
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)
@@ -1039,7 +1082,9 @@ def get_libraries(request):
     """Get a list of libraries for autocomplete"""
 
     data = 'fail'
+    method = "useLocation"
     if request.is_ajax():
+        # Get the user-specified 'country' and 'city' strings
         country = request.GET.get('country', "")
         if country == "": country = request.GET.get('country_ta', "")
         city = request.GET.get("city", "")
@@ -1047,13 +1092,46 @@ def get_libraries(request):
         lib = request.GET.get("library", "")
         if lib == "": lib = request.GET.get('libname_ta', "")
 
+        # build the query
         lstQ = []
-        if country != "": lstQ.append(Q(country__name__icontains=country))
-        if city != "": lstQ.append(Q(city__name__icontains=city))
-        if lib != "": lstQ.append(Q(name__icontains=lib))
-        countries = Library.objects.filter(*lstQ).order_by('name')
+        if method == "useLocation":
+            # Start as broad as possible: country
+            qs_loc = None
+            if country != "":
+                loctype_country = LocationType.find("country")
+                lstQ.append(Q(name=country))
+                lstQ.append(Q(loctype=loctype_country))
+                qs_country = Location.objects.filter(*lstQ)
+                # What about city?
+                if city == "":
+                    qs_loc = qs_country
+                else:
+                    loctype_city = LocationType.find("city")
+                    lstQ = []
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    lstQ.append(Q(relations_location__in=qs_country))
+                    qs_loc = Location.objects.filter(*lstQ)
+            elif city != "":
+                loctype_city = LocationType.find("city")
+                lstQ.append(Q(name__icontains=city))
+                lstQ.append(Q(loctype=loctype_city))
+                qs_loc = Location.objects.filter(*lstQ)
+
+            # Start out with the idea to look for a library by name:
+            lstQ = []
+            if lib != "": lstQ.append(Q(name__icontains=lib))
+            if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
+
+            # Combine everything
+            libraries = Library.objects.filter(*lstQ).order_by('name')
+        else:
+            if country != "": lstQ.append(Q(country__name__icontains=country))
+            if city != "": lstQ.append(Q(city__name__icontains=city))
+            if lib != "": lstQ.append(Q(name__icontains=lib))
+            libraries = Library.objects.filter(*lstQ).order_by('name')
         results = []
-        for co in countries:
+        for co in libraries:
             co_json = {'name': co.name, 'id': co.id }
             results.append(co_json)
         data = json.dumps(results)

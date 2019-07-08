@@ -984,6 +984,10 @@ class LocationType(models.Model):
     def __str__(self):
         return self.name
 
+    def find(sname):
+        obj = LocationType.objects.filter(name__icontains=sname).first()
+        return obj
+
 
 class Location(models.Model):
     """One location element can be a city, village, cloister, region"""
