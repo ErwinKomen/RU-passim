@@ -1136,6 +1136,10 @@ class Library(models.Model):
 
     # [0-1] Location, as specific as possible, but optional in the end
     location = models.ForeignKey(Location, null=True, related_name="location_libraries")
+    # [0-1] City according to the 'Location' specification
+    lcity = models.ForeignKey(Location, null=True, related_name="lcity_libraries")
+    # [0-1] Library according to the 'Location' specification
+    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_libraries")
 
     def __str__(self):
         return self.name
@@ -1145,8 +1149,8 @@ class Library(models.Model):
         lstQ = []
         lstQ.append(Q(idLibrEtab=iId))
         lstQ.append(Q(name=sLibrary))
-        lstQ.append(Q(country=country))
-        lstQ.append(Q(city=city))
+        lstQ.append(Q(lcountry__name=country))
+        lstQ.append(Q(lcity__name=city))
         hit = Library.objects.filter(*lstQ).first()
         if hit == None:
             libtype = "br" if bBracketed else "pl"
@@ -1159,7 +1163,9 @@ class Library(models.Model):
         """Given the library, get the city from the location"""
 
         obj = None
-        if self.location != None:
+        if self.lcity != None:
+            obj = self.lcity
+        elif self.location != None:
             if self.location.loctype and self.location.loctype.name == "city":
                 obj = self.location
             else:
@@ -1169,6 +1175,9 @@ class Library(models.Model):
                     if item.loctype.name == "city":
                         obj = item
                         break
+            # Store this
+            self.lcity = obj
+            self.save()
         return obj
 
     def get_city_name(self):
@@ -1179,7 +1188,9 @@ class Library(models.Model):
         """Given the library, get the country from the location"""
 
         obj = None
-        if self.location != None:
+        if self.lcountry != None:
+            obj = self.lcountry
+        elif self.location != None:
             if self.location.loctype and self.location.loctype.name == "country":
                 obj = self.location
             else:
@@ -1191,6 +1202,9 @@ class Library(models.Model):
                         if container.loctype.name == "country":
                             obj = container
                             break
+            # Store this
+            self.lcountry = obj
+            self.save()
         return obj
 
     def get_country_name(self):

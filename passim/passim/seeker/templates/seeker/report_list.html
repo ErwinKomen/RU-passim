@@ -39,7 +39,7 @@
                   </td>
                   <!-- Buttons for this report-->
                   <td class="tdnowrap">
-                    <form>
+                    <form  targeturl="{% url 'report_results' report.id  %}">
                       <!-- Be sure to add csrf -->
                       {% csrf_token %}
                       <div id="downloadcenter" class="hidden">

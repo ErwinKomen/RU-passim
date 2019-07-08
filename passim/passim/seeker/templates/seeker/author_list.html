@@ -10,7 +10,7 @@
 {% block content %}
 
       <div class="panel panel-default">
-        <form name='authorsearch' id='authorsearch' method='get' action="{% url 'author_search' %}" >
+        <form name='authorsearch' id='authorsearch' method='get' action="{% url 'author_search' %}" targeturl="{% url 'author_search' %}" >
             <!-- Be sure to add csrf -->
             {% csrf_token %}
             <div id="downloadcenter" class="hidden">

@@ -30,7 +30,7 @@
             <td align="center">{{item.sermons}}</td>
             <!-- Allow downloading a report -->
             <td align="right" style="min-width: 200px;">
-              <form>
+              <form targeturl="{% url 'report_results' item.report_id %}" >
                 <!-- Be sure to add csrf -->
                 {% csrf_token %}
                 <div id="downloadcenter" class="hidden">

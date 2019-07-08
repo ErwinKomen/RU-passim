@@ -796,6 +796,7 @@ var ru = (function ($, ru) {
        */
       form_submit: function(e) {
         var target,
+            targeturl = null,
             frm = null;
 
         try {
@@ -806,6 +807,13 @@ var ru = (function ($, ru) {
             target = e.target || e.srcElement;
             // Find the form
             frm = $(target).closest("form");
+            // If there is a downloadtype, then reset it
+            $(frm).find("#downloadtype").val("");
+            // if the form has a targeturl, use that in the action
+            targeturl = $(frm).attr("targeturl");
+            if (targeturl !== undefined && targeturl !== "") {
+              $(frm).attr("action", targeturl);
+            }
             // Make sure the GET method is used
             $(frm).attr("method", "GET");
             // Show we are waiting
@@ -833,6 +841,7 @@ var ru = (function ($, ru) {
             oBack = null,
             dtype = "",
             sMsg = "",
+            method = "normal",
             data = [];
 
         try {
@@ -862,26 +871,36 @@ var ru = (function ($, ru) {
             // Make sure we take only the first matching form
             frm = frm.first();
           }
-          // Set the 'action; attribute in the form
-          frm.attr("action", ajaxurl);
-          // Make sure we do a POST
-          frm.attr("method", "POST");
-
           // Get the download type and put it in the <input>
           dtype = $(elStart).attr("downloadtype");
           $(frm).find("#downloadtype").val(dtype);
 
-          // Do we have a contentid?
-          if (contentid !== undefined && contentid !== null && contentid !== "") {
-            // Process download data
-            switch (dtype) {
-              default:
-                // TODO: add error message here
-                return;
-            }
-          } else {
-            // Do a plain submit of the form
-            oBack = frm.submit();
+          switch (method) {
+            case "erwin":
+              data = frm.serialize();
+              $.post(ajaxurl, data, function (response) {
+                var iready = 1;
+              });
+              break;
+            default:
+              // Set the 'action; attribute in the form
+              frm.attr("action", ajaxurl);
+              // Make sure we do a POST
+              frm.attr("method", "POST");
+
+              // Do we have a contentid?
+              if (contentid !== undefined && contentid !== null && contentid !== "") {
+                // Process download data
+                switch (dtype) {
+                  default:
+                    // TODO: add error message here
+                    return;
+                }
+              } else {
+                // Do a plain submit of the form
+                oBack = frm.submit();
+              }
+              break;
           }
 
           // Check on what has been returned

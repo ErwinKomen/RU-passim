@@ -10,7 +10,7 @@
 {% block content %}
 
       <div class="panel panel-default">
-        <form id='librarysearch' method='get' action="{% url 'library_search' %}" >
+        <form id='librarysearch' method='get' targeturl="{% url 'library_search' %}" >
             <!-- Be sure to add csrf -->
             {% csrf_token %}
             <div id="downloadcenter" class="hidden">
@@ -51,7 +51,8 @@
                            for='id_country'>{{searchform.country.label}}</label>
                     <input id="id_country" name='country' class='form-control typeahead searching countries input-sm' type="text" 
                            {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
-                           placeholder="Country...">
+                           placeholder="Country..."
+                           onkeyup="ru.passim.form_submit(event);">
                 </div>
               </div>
               <div class="col-sm-3">
