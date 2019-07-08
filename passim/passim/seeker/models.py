@@ -1155,6 +1155,38 @@ class Library(models.Model):
 
         return hit
 
+    def get_city(self):
+        """Given the library, get the city from the location"""
+
+        obj = None
+        if self.location != None:
+            if self.location.loctype and self.location.loctype.name == "city":
+                obj = self.location
+            else:
+                # Look at all the related locations
+                qs = self.location.relations_location.all()
+                for item in qs:
+                    if item.loctype.name == "city":
+                        obj = item
+                        break
+        return obj
+
+    def get_country(self):
+        """Given the library, get the country from the location"""
+
+        obj = None
+        if self.location != None:
+            if self.location.loctype and self.location.loctype.name == "country":
+                obj = self.location
+            else:
+                # Look at all the related locations
+                qs = self.location.relations_location.all()
+                for item in qs:
+                    if item.loctype.name == "country":
+                        obj = item
+                        break
+        return obj
+
     def find_or_create(sCity, sLibrary, sCountry = None):
         """Find a library on the basis of the city and the library name.
         If there is no library with that combination yet, create it
@@ -1189,8 +1221,7 @@ class Library(models.Model):
             sError = errHandle.get_error_message()
             oBack['status'] = 'error'
             oBack['msg'] = sError
-
-
+            
     def read_json(oStatus, fname):
         """Read libraries from a JSON file"""
 

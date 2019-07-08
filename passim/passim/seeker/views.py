@@ -4331,9 +4331,7 @@ class LibraryListView(ListView):
 
         # Get parameters for the search
         initial = self.request.GET
-        search_form = LibrarySearchForm(initial)
-
-        context['searchform'] = search_form
+        context['searchform'] = LibrarySearchForm(initial)
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()

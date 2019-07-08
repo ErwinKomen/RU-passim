@@ -10,7 +10,7 @@
 {% block content %}
 
       <div class="panel panel-default">
-        <form name='librarysearch' id='librarysearch' method='get' action="{% url 'library_search' %}" >
+        <form id='librarysearch' method='get' action="{% url 'library_search' %}" >
             <!-- Be sure to add csrf -->
             {% csrf_token %}
             <div id="downloadcenter" class="hidden">
@@ -41,7 +41,7 @@
             </div>
 
             <!-- The actual search parameters: country, city, library -->
-            <div id="searchdefault" class="row">
+            <div id="searchdefault" class="row manuscript-details">
               <div class="col-sm-3">
                 <label>&nbsp;</label>
                 <div class='input-group'>
@@ -49,10 +49,9 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_country'>{{searchform.country.label}}</label>
-                    <input name='country' class='form-control typeahead searching countries input-sm' type="text" 
+                    <input id="id_country" name='country' class='form-control typeahead searching countries input-sm' type="text" 
                            {% if searchform.country.value %}value='{{searchform.country.value}}'{% endif %}
-                           placeholder="Country..."
-                           onkeyup="ru.passim.form_submit(event);">
+                           placeholder="Country...">
                 </div>
               </div>
               <div class="col-sm-3">
@@ -62,7 +61,7 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_city'>{{searchform.city.label}}</label>
-                    <input name='city' class='form-control typeahead searching cities input-sm' type="text" 
+                    <input id="id_city" name='city' class='form-control typeahead searching cities input-sm' type="text" 
                            {% if searchform.city.value %}value='{{searchform.city.value}}'{% endif %}
                            placeholder="City..."
                            onkeyup="ru.passim.form_submit(event);">
@@ -75,7 +74,7 @@
                            data-toggle="popover" data-trigger="hover"
                            data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
                            for='id_name'>{{searchform.name.label}}</label>
-                    <input name='name' class='form-control typeahead searching libraries input-sm' type="text" 
+                    <input id="id_name" name='name' class='form-control typeahead searching libraries input-sm' type="text" 
                            {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
                            placeholder="Name of library..."
                            onkeyup="ru.passim.form_submit(event);">
@@ -167,9 +166,21 @@
                 <tr id="lib-info-{{library.id}}" class="collapse">
                   <td>&nbsp;</td>
                   <td colspan="3">
-                    <span>Country code <code>idPaysEtab</code>: {{library.country.idPaysEtab}}</span>
-                    <span>City code <code>idVilleEtab</code>: {{library.city.idVilleEtab}}</span>
-                    <span>Library code <code>(??)</code>: {{library.idLibrEtab}}</span>
+                    <div>
+                      <span>Library<span class="badge jumbo-1" title="idLibrEtab">{{library.idLibrEtab}}</span></span>
+                      <span>City 
+                        <span class="badge jumbo-2"
+                              title="{% for identifier in library.get_city.location_identifiers.all %}{{identifier.idname}}={{identifier.idvalue}}{% endfor %}">
+                          {{library.get_city.name}}
+                        </span>
+                      </span>
+                      <span>Country 
+                        <span class="badge jumbo-3"
+                              title="{% for identifier in library.get_country.location_identifiers.all %}{{identifier.idname}}={{identifier.idvalue}}{% endfor %}">
+                          {{library.get_country.name}}
+                        </span>
+                      </span>
+                    </div>
                   </td>
                   <td>&nbsp;</td>
                 </tr>

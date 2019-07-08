@@ -428,14 +428,21 @@ class SearchCollectionForm(forms.Form):
     signature = forms.CharField(label=_("Signature code"), required=False)
 
 
-class LibrarySearchForm(forms.ModelForm):
+# class LibrarySearchForm(forms.ModelForm):
+class LibrarySearchForm(forms.Form):
+    country = forms.CharField(label=_("Country"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city = forms.CharField(label=_("City"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    name = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
 
-    class Meta:
+    #class Meta:
 
-        ATTRS_FOR_FORMS = {'class': 'form-control'};
+    #    ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-        model = Library
-        fields = ('country', 'city', 'libtype', 'name')
+    #    model = Library
+    #    fields = ('country', 'city', 'libtype', 'name')
 
 
 class ReportEditForm(forms.ModelForm):
