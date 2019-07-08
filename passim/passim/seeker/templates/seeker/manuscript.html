@@ -325,7 +325,7 @@
                       <tr class="dict-entry">
                         <td class="hidden"> {{ man.id }}</td>
                         <!-- City / Library / Manuscript name -->
-                        <td class="manuscript-city" align="left" title="{{man.library.city.name}}">{{man.library.city.name|truncatechars:12}}</td>
+                        <td class="manuscript-city" align="left" title="{{man.library.lcity.name}}">{{man.library.lcity.name|truncatechars:12}}</td>
                         <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
                         <td style="width: 100%;" class="clickable" >
                           <a href="{% url 'manuscript_details' man.id %}" class="nostyle">

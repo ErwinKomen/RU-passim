@@ -4495,7 +4495,7 @@ class LibraryListDownload(BasicPart):
                 city = ""
                 if lib.country: country = lib.country.name
                 if lib.city: city = lib.city.name
-                row = {"id": lib.id, "country": lib.country.name, "city": lib.city.name, "library": lib.name, "libtype": lib.libtype}
+                row = {"id": lib.id, "country": lib.get_country_name(), "city": lib.get_city_name(), "library": lib.name, "libtype": lib.libtype}
                 lData.append(row)
             # convert to string
             sData = json.dumps(lData)

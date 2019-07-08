@@ -407,10 +407,16 @@ class ManuscriptForm(forms.ModelForm):
             library = instance.library
             if library != None:
                 # In this case: get the city and the country
-                city = library.city.name
-                country = ""  if library.country == None else library.country.name
+                city = library.get_city_name()
+                country = library.get_country_name()
                 if (country == None or country == "") and city != None and city != "":
-                    country = "" if library.city.country == None else library.city.country.name
+                    # We have a city, but the country is not specified...
+                    lstQ = []
+                    lstQ.append(Q(loctype__name="country"))
+                    lstQ.append(Q(relations_location=library.lcity))
+                    obj = Location.objects.filter(*lstQ).first()
+                    if obj != None:
+                        country = obj.name
                 # Put them in the fields
                 self.fields['city_ta'].initial = city
                 self.fields['country_ta'].initial = country

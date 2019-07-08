@@ -56,7 +56,7 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
                         return False, [], msg
                     lHeader.append(sKey)
                 bFirst = False
-            else:
+            elif row[0].value != None:
                 oRow = {}
                 for idx, key in enumerate(lHeader):
                     cell = row[idx]

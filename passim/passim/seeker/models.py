@@ -1003,7 +1003,38 @@ class Location(models.Model):
     def __str__(self):
         return self.name
 
+    def get_location(city="", country=""):
+        """Get the correct location object, based on the city and/or the country"""
 
+        obj = None
+        lstQ = []
+        qs_country = None
+        if country != "":
+            # Specify the country
+            lstQ.append(Q(loctype__name="country"))
+            lstQ.append(Q(name__iexact=country))
+            qs_country = Location.objects.filter(*lstQ)
+            if city == "":
+                obj = qs_country.first()
+            else:
+                lstQ = []
+                lstQ.append(Q(loctype__name="city"))
+                lstQ.append(Q(name__iexact=city))
+                lstQ.append(relations_location__in=qs_country)
+                obj = Location.objects.filter(*lstQ).first()
+        elif city != "":
+            lstQ.append(Q(loctype__name="city"))
+            lstQ.append(Q(name__iexact=city))
+            obj = Location.objects.filter(*lstQ).first()
+        return obj
+
+    def get_idVilleEtab(self):
+        """Get the identifier named [idVilleEtab]"""
+
+        obj = self.location_identifiers.filter(idname="idVilleEtab").first()
+        return "" if obj == None else obj.idvalue
+
+    
 class LocationName(models.Model):
     """The name of a location in a particular language"""
 
@@ -1297,10 +1328,17 @@ class Origin(models.Model):
 
     # [1] Name of the location
     name = models.CharField("Original location", max_length=LONG_STRING)
-    # [0-1] Optional city
-    city = models.ForeignKey(City, null=True, related_name="city_origins")
-    # [0-1] Name of the country this is in
-    country = models.ForeignKey(Country, null=True, related_name="country_origins")
+
+    # [0-1] Optional: LOCATION element this refers to
+    location = models.ForeignKey(Location, null=True, related_name="location_origins")
+
+    # ============== EXTINCT ===================================
+    ## [0-1] Optional city
+    #city = models.ForeignKey(City, null=True, related_name="city_origins")
+    ## [0-1] Name of the country this is in
+    #country = models.ForeignKey(Country, null=True, related_name="country_origins")
+    # ==========================================================
+
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this origin", blank=True, null=True)
 
@@ -1311,27 +1349,17 @@ class Origin(models.Model):
         """Find a location or create it."""
 
         lstQ = []
-        obj_city = None
-        obj_country = None
         lstQ.append(Q(name__iexact=sName))
-        if city != None and isinstance(city, str): 
-            # Get the city object
-            obj_city = City.objects.filter(name=city).first()
-            if obj_city != None:
-                lstQ.append(Q(city=city))
-        if country != None and isinstance(country, str): 
-            # Get the country object
-            obj_country = Country.objects.filter(name=country).first()
-            if obj_country != None:
-                lstQ.append(Q(country=country))
+        obj_loc = Location.get_location(city=city, country=country)
+        if obj_loc != None:
+            lstQ.append(Q(location=Location))
         if note!=None: lstQ.append(Q(note__iexact=note))
         qs = Origin.objects.filter(*lstQ)
         if qs.count() == 0:
             # Create one
             hit = Origin(name=sName)
             if note!=None: hit.note=note
-            if obj_city != None: hit.city=obj_city
-            if obj_country != None: hit.country=obj_country
+            if obj_loc != None: hit.location = obj_loc
             hit.save()
         else:
             hit = qs[0]
@@ -1344,10 +1372,16 @@ class Provenance(models.Model):
 
     # [1] Name of the location (can be cloister or anything)
     name = models.CharField("Provenance location", max_length=LONG_STRING)
-    # [0-1] Optional city
-    city = models.ForeignKey(City, null=True, related_name="city_provenances")
-    # [0-1] Name of the country this is in
-    country = models.ForeignKey(Country, null=True, related_name="country_provenances")
+    # [0-1] Optional: LOCATION element this refers to
+    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
+
+    # ============== EXTINCT ===================================
+    ## [0-1] Optional city
+    #city = models.ForeignKey(City, null=True, related_name="city_provenances")
+    ## [0-1] Name of the country this is in
+    #country = models.ForeignKey(Country, null=True, related_name="country_provenances")
+    # ==========================================================
+
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this provenance", blank=True, null=True)
 
@@ -1358,27 +1392,17 @@ class Provenance(models.Model):
         """Find a location or create it."""
 
         lstQ = []
-        obj_city = None
-        obj_country = None
+        obj_loc = Location.get_location(city=city, country=country)
         lstQ.append(Q(name__iexact=sName))
-        if city != None and isinstance(city, str): 
-            # Get the city object
-            obj_city = City.objects.filter(name=city).first()
-            if obj_city != None:
-                lstQ.append(Q(city=city))
-        if country != None and isinstance(country, str): 
-            # Get the country object
-            obj_country = Country.objects.filter(name=country).first()
-            if obj_country != None:
-                lstQ.append(Q(country=country))
+        if obj_loc != None:
+            lstQ.append(Q(location=Location))
         if note!=None: lstQ.append(Q(note__iexact=note))
         qs = Provenance.objects.filter(*lstQ)
         if qs.count() == 0:
             # Create one
             hit = Provenance(name=sName)
             if note!=None: hit.note=note
-            if obj_city != None: hit.city=obj_city
-            if obj_country != None: hit.country=obj_country
+            if obj_loc != None: hit.location = obj_loc
             hit.save()
         else:
             hit = qs[0]
