@@ -1163,13 +1163,17 @@ class Library(models.Model):
             if self.location.loctype and self.location.loctype.name == "city":
                 obj = self.location
             else:
-                # Look at all the related locations
+                # Look at all the related locations - above and below
                 qs = self.location.relations_location.all()
                 for item in qs:
                     if item.loctype.name == "city":
                         obj = item
                         break
         return obj
+
+    def get_city_name(self):
+        obj = self.get_city()
+        return "" if obj == None else obj.name
 
     def get_country(self):
         """Given the library, get the country from the location"""
@@ -1179,13 +1183,19 @@ class Library(models.Model):
             if self.location.loctype and self.location.loctype.name == "country":
                 obj = self.location
             else:
-                # Look at all the related locations
-                qs = self.location.relations_location.all()
-                for item in qs:
-                    if item.loctype.name == "country":
-                        obj = item
-                        break
+                # If this is a city, look upwards
+                if self.location.loctype.name == "city":
+                    qs = self.location.contained_locrelations.all()
+                    for item in qs:
+                        container = item.container
+                        if container.loctype.name == "country":
+                            obj = container
+                            break
         return obj
+
+    def get_country_name(self):
+        obj = self.get_country()
+        return "" if obj == None else obj.name
 
     def find_or_create(sCity, sLibrary, sCountry = None):
         """Find a library on the basis of the city and the library name.

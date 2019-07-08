@@ -4450,9 +4450,33 @@ class LibraryListDownload(BasicPart):
 
         # Construct the QS
         lstQ = []
-        if country != "": lstQ.append(Q(country__name__iregex=adapt_search(country)))
-        if city != "": lstQ.append(Q(city__name__iregex=adapt_search(city)))
+        loc_qs = None
+
+        # if country != "": lstQ.append(Q(country__name__iregex=adapt_search(country)))
+        # if city != "": lstQ.append(Q(city__name__iregex=adapt_search(city)))
+
+        if country != "":
+            lstQ = []
+            lstQ.append(Q(name__iregex=adapt_search(country)))
+            lstQ.append(Q(loctype__name="country"))
+            country_qs = Location.objects.filter(*lstQ)
+            if city == "":
+                loc_qs = country_qs
+            else:
+                lstQ = []
+                lstQ.append(Q(name__iregex=adapt_search(city)))
+                lstQ.append(Q(loctype__name="city"))
+                loc_qs = Location.objects.filter(*lstQ)
+        elif city != "":
+            lstQ = []
+            lstQ.append(Q(name__iregex=adapt_search(city)))
+            lstQ.append(Q(loctype__name="city"))
+            loc_qs = Location.objects.filter(*lstQ)
+
+        lstQ = []
         if library != "": lstQ.append(Q(name__iregex=adapt_search(library)))
+        if loc_qs != None: lstQ.append(Q(location__in=loc_qs))
+
         qs = Library.objects.filter(*lstQ).order_by('country__name', 'city__name', 'name')
 
         return qs
@@ -4483,10 +4507,12 @@ class LibraryListDownload(BasicPart):
             # Headers
             headers = ['id', 'country', 'city', 'library', 'libtype']
             csvwriter.writerow(headers)
-            # Loop
-            for lib in self.get_queryset(prefix):
-                row = [lib.id, lib.country.name, lib.city.name, lib.name, lib.libtype]
-                csvwriter.writerow(row)
+            qs = self.get_queryset(prefix)
+            if qs.count() > 0:
+                # Loop
+                for lib in qs:
+                    row = [lib.id, lib.get_country_name(), lib.get_city_name(), lib.name, lib.libtype]
+                    csvwriter.writerow(row)
 
             # Convert to string
             sData = output.getvalue()
