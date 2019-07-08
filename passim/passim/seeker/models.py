@@ -540,7 +540,7 @@ def add_gold2gold(src, dst, ltype):
                 obj.save()
                 # Bookkeeping
                 lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
-                    added+1, obj.src.siglist, obj.dst.siglist, ltype, "add" ))
+                    added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
                 prt_added += 1
             else:
                 # (3b) There is a link, but possibly of a different type
@@ -2537,6 +2537,17 @@ class SermonGold(models.Model):
                     # Get or create this golden sermon (the ... symbol is treated there)
                     bCreated, gold = SermonGold.find_or_create(author, oGold['incipit'], oGold['explicit'])
 
+                    # Make sure it belongs to an equality-set: itself
+                    if gold.equal == None:
+                        eqg = EqualGold()
+                        eqg.save()
+                        gold.equal = eqg
+                        gold.save()
+                    else:
+                        iNoNeed = 1
+                    # make sure it ends up in the [obj], even though some things below may go wrong...
+                    oGold['obj'] = gold
+
                     # Keep track of created gold
                     if bCreated: count_obj += 1
 
@@ -2606,7 +2617,6 @@ class SermonGold(models.Model):
                     # Getting here means that the item is read TO SOME EXTENT
                     add_to_read_list(lst_read, oGold)
 
-                    oGold['obj'] = gold
                     iSermCount += 1
                 else:
                     # Show where we are

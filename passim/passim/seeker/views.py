@@ -2075,6 +2075,7 @@ def search_ecodex(request):
     # Return the information
     return JsonResponse(data)
 
+
 class BasicPart(View):
     """This is my own versatile handling view.
 
