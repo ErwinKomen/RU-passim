@@ -66,7 +66,7 @@
       <tr class="form-row">
         <td class="hoverable" valign="top" >Code</td>
         <td>
-          <div class="view-mode">{% if sourceForm.code.value %}{{sourceForm.code.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode"><pre>{% if sourceForm.code.value %}{{sourceForm.code.value|wordwrap:80}}{% else %}-{% endif %}</pre></div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sourceForm.code}}</div>
           {% endif %}
