@@ -378,7 +378,7 @@ def import_data_file(sContents, arErr):
         arErr.DoError("import_data_file error:")
         return {}
 
-def add_gold2equal(src, dst_eq):
+def add_gold2equal(src, dst_eq, eq_log = None):
     """Add a gold sermon to an equality set"""
 
     # Initialisations
@@ -399,6 +399,9 @@ def add_gold2equal(src, dst_eq):
             # It's different groups, so we need to make changes
             prt_added = 0
 
+            if eq_log != None:
+                eq_log.append("gold2equal 0: add gold {} (eqg={}) to equal group {}".format(src.id, src.equal.id, dst_eq.id))
+
             # (1) save the source group
             grp_src = src.equal
             grp_dst = dst_eq
@@ -411,34 +414,55 @@ def add_gold2equal(src, dst_eq):
                     # Does this changed link exist already?
                     obj = EqualGoldLink.objects.filter(src=grp_dst, dst=link.dst, linktype=link.linktype).first()
                     if obj == None:
+                        # Log activity
+                        if eq_log != None:
+                            eq_log.append("gold2equal 1: change equalgoldlink id={} source {} into {} (dst={})".format(link.id, link.src.id, grp_dst.id, link.dst.id))
+                        # Perform the change
                         link.src = grp_dst
                         link.save()
                         prt_added += 1
                     else:
                         # Add this link to those that need be removed
                         link_remove.append(link.id)
+                        # Log activity
+                        if eq_log != None:
+                            eq_log.append("gold2equal 2: remove equalgoldlink id={}".format(link.id))
+                # Reverse links
                 qs_rev = EqualGoldLink.objects.filter(dst=grp_src)
                 for link in qs_rev:
                     # Does this changed link exist already?
                     obj = EqualGoldLink.objects.filter(src=link.src, dst=grp_src, linktype=link.linktype).first()
                     if obj == None:
+                        # Log activity
+                        if eq_log != None:
+                            eq_log.append("gold2equal 3: change equalgoldlink id={} dst {} into {} (src={})".format(link.id, link.dst.id, grp_src.id, link.src.id))
+                        # Perform the change
                         link.dst = grp_src
                         link.save()
                         prt_added += 1
                     else:
                         # Add this link to those that need be removed
                         link_remove.append(link.id)
+                        # Log activity
+                        if eq_log != None:
+                            eq_log.append("gold2equal 4: remove equalgoldlink id={}".format(link.id))
             # (3) remove superfluous links
             EqualGoldLink.objects.filter(id__in=link_remove).delete()
 
             # (4) Change the gold-sermons in the source group
             with transaction.atomic():
                 for gold in grp_src.equal_goldsermons.all():
+                    # Log activity
+                    if eq_log != None:
+                        eq_log.append("gold2equal 5: change gold {} equal group from {} into {}".format(gold.id, gold.equal.id, grp_dst.id))
+                    # Perform the action
                     gold.equal = grp_dst
                     gold.save()
 
             # (5) Remove the source group
+            if eq_log != None: eq_log.append("gold2equal 6: remove group {}".format(grp_src.id))
             grp_src.delete()
+            # x = eq_log[1216]
 
             # (6) Bookkeeping
             added += prt_added
@@ -452,7 +476,7 @@ def add_gold2equal(src, dst_eq):
     # Return the number of added relations
     return added, lst_total
 
-def add_gold2gold(src, dst, ltype):
+def add_gold2gold(src, dst, ltype, eq_log = None):
     """Add a gold-to-gold relation from src to dst of type ltype"""
 
     # Initialisations
@@ -515,7 +539,7 @@ def add_gold2gold(src, dst, ltype):
 
         # Action depends on the kind of relationship that is added
         if ltype == LINK_EQUAL:
-            eq_added, eq_list = add_gold2equal(src, dst.equal)
+            eq_added, eq_list = add_gold2equal(src, dst.equal, eq_log)
 
             for item in eq_list: lst_total.append(item)
 
@@ -538,6 +562,9 @@ def add_gold2gold(src, dst, ltype):
                 # (3a) there is no link yet: add it
                 obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
                 obj.save()
+                # Possibly log the action
+                if eq_log != None:
+                    eq_log.append("Add equalgoldlink {} from eqg {} to eqg {}".format(ltype, grp_src, grp_dst))
                 # Bookkeeping
                 lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
                     added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
@@ -549,7 +576,7 @@ def add_gold2gold(src, dst, ltype):
 
             # (3) Bookkeeping
             added += prt_added
-
+            x = "\n".join( eq_log[-20:])
         # Finish the report list
         lst_total.append("</tbody></table>")
     except:
@@ -2273,7 +2300,7 @@ class SermonGold(models.Model):
         editype = "gr"  # Assume gryson
         if "CPPM" in signature:
             # This is a clavis number
-            signature = signature.split("CPPM")[1].strip()
+            # EXTINCT: signature = signature.split("CPPM")[1].strip()
             editype = "cl"
         # Check if it is linked to a particular signature
         val = adapt_search(signature)
@@ -2289,6 +2316,10 @@ class SermonGold(models.Model):
             lstQ.append(Q(explicit=explicit))
         # Only look for the *FIRST* occurrance
         obj = SermonGold.objects.filter(*lstQ).first()
+
+        if obj == None:
+            istop = 1
+
         # Return what we found
         return obj
 
@@ -2458,11 +2489,16 @@ class SermonGold(models.Model):
             lst.append(oRead)
             return True
 
+        def do_eq_log(msg):
+            """Add string msg to the equality log"""
+            eq_log.append(msg)
+
         # Number to order all the items we read
         order = 0
         iSermCount = 0
         count_obj = 0   # Number of objects added
         count_rel = 0   # Number of relations added
+        eq_log = []
 
         oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
 
@@ -2541,8 +2577,10 @@ class SermonGold(models.Model):
                     if gold.equal == None:
                         eqg = EqualGold()
                         eqg.save()
+                        do_eq_log("Add eqg {}".format(eqg.id))
                         gold.equal = eqg
                         gold.save()
+                        do_eq_log("Assign eqg {} to gold {}".format(eqg.id, gold.id))
                     else:
                         iNoNeed = 1
                     # make sure it ends up in the [obj], even though some things below may go wrong...
@@ -2630,6 +2668,12 @@ class SermonGold(models.Model):
 
                 if 'obj' in oGold:
                     obj = oGold['obj']
+                    # Make sure to get the correct gold
+                    gold = SermonGold.objects.filter(id=obj.id).first()
+
+                    if obj.equal != gold.equal:
+                        iStop = 1
+
                     # Check if any relation has been specified
                     if 'targetlist' in oGold and oGold['targetlist'] != "":
                         target_list = oGold['targetlist'].split(";")
@@ -2659,7 +2703,8 @@ class SermonGold(models.Model):
                                 pass
 
                             # Check and add relation(s), if these are not yet there
-                            count_links, lst_added = add_gold2gold(obj, target, linktype)
+                            count_links, lst_added = add_gold2gold(gold, target, linktype, eq_log)
+                            
                             count_rel += count_links
 
             # Make sure the requester knows how many have been added
