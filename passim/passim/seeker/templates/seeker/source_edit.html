@@ -1,0 +1,77 @@
+﻿{% load i18n %}
+
+<!-- Source information -->
+<form>
+  {% csrf_token %}
+    <table class="source-details">
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" oldtargetid="source_edit"
+               targeturl="{% if sourceForm.instance.id %}{% url 'source_edit' sourceForm.instance.id %}{% else %}{% url 'source_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
+
+            <!-- The source's number (if known) -->
+            <span id="source_number"></span>
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="source_err_msg" class="err-msg"></span>
+
+            <!-- Put the delete button completely to the right-->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" 
+               targetid="" oldtargetid="source_edit"
+               targeturl="{% if sourceForm.instance.id %}{% url 'source_edit' sourceForm.instance.id %}{% endif %}">
+              <span class="glyphicon glyphicon-remove" title="Delete this source"></span>
+            </a>
+          </td>
+        </tr>
+      {% endif %}
+
+      <!-- Only show the created date when it is not a new instance -->
+      <tr class="form-row edit-notnew">
+        <td class="hoverable" valign="top" style="min-width: 150px;">Created</td>
+        <td  style="width: 100%;">
+          <div class="edit-mode view-mode">{{sourceForm.instance.created|date:"j/b/o G:i"}}</div>
+        </td>
+      </tr>
+      <!-- Only show the [collector] when this is not a new instance -->
+      <tr class="form-row edit-notnew">
+        <td class="hoverable"  valign="top" style="min-width: 150px;">Collector</td>
+        <td  style="width: 100%;">
+          <div class="edit-mode view-mode">{{sourceForm.instance.collector}}</div>
+        </td>
+      </tr>
+
+      <tr class="form-row">
+        <td class="hoverable" valign="top"  style="min-width: 150px;">URL</td>
+        <td  style="width: 100%;">
+          <div class="view-mode">{{sourceForm.url.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sourceForm.url}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >Code</td>
+        <td>
+          <div class="view-mode">{% if sourceForm.code.value %}{{sourceForm.code.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sourceForm.code}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+    </table>
+</form>

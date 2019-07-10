@@ -4805,6 +4805,7 @@ class SourceDetailsView(PassimDetails):
     mForm = SourceEditForm
     template_name = 'seeker/source_details.html'
     prefix = 'source'
+    prefix_type = "simple"
     title = "SourceDetails"
     rtype = "html"
 
@@ -4814,6 +4815,41 @@ class SourceDetailsView(PassimDetails):
         context['breadcrumbs'] = process_visit(self.request, "Source edit", False)
         context['prevpage'] = get_previous_page(self.request)
         return context
+
+
+class SourceEdit(BasicPart):
+    """The details of one manuscript"""
+
+    MainModel = SourceInfo
+    template_name = 'seeker/source_edit.html'  
+    title = "SourceInfo" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "source"
+    form_objects = [{'form': SourceEditForm, 'prefix': prefix, 'readonly': False}]
+
+    def custom_init(self):
+        """Adapt the prefix for [sermo] to fit the kind of prefix provided by PassimDetails"""
+
+        return True
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        # Not sure if this is still needed
+        context['msitem'] = instance
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
+
+        return context
+
+    def after_save(self, prefix, instance = None):
+
+        # There's is no real return value needed here 
+        return True
 
 
 

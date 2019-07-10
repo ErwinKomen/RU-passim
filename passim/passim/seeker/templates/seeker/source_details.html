@@ -9,7 +9,9 @@
 
 {% block content %}
   <div>
+
     {% if authenticated %}
+      <!-- Upper part of the source-info details interface -->
       <div class="panel panel-default">
         <div class="row">&nbsp;</div>
         <div class="row">
@@ -25,21 +27,11 @@
 
             <h3>General information</h3>
 
-            <table>
-              <tr><td>Collector:</td><td>{{object.collector}}</td></tr>
-              <tr><td>Created:</td><td>{{object.created|date:"j/b/o G:i"}}</td></tr>
-              <tr><td>URL:</td><td>{{object.url}}</td></tr>
-            </table>
-
-            <h3>Source information details</h3>
-
-            {% if use_the_form %}
-              <form>
-                {{sourceForm.code}}
-              </form>
-            {% else %}
-              <div class="panel panel-default">{{object.code}}</div>
-            {% endif %}
+            <!-- SourceInfo Main information -->
+            <div id="source_edit">
+              <!-- Note: the correct 'pk' is available in [sourceForm] -->
+              {% include 'seeker/source_edit.html' %}
+            </div>
 
           </div>
 
@@ -61,4 +53,9 @@
     {% endif %}
     
   </div>
+
+<script>
+  ru.passim.seeker.init_events();
+</script>
+
 {% endblock content %}

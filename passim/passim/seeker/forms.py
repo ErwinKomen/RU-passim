@@ -434,7 +434,6 @@ class SearchCollectionForm(forms.Form):
     signature = forms.CharField(label=_("Signature code"), required=False)
 
 
-# class LibrarySearchForm(forms.ModelForm):
 class LibrarySearchForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -442,13 +441,6 @@ class LibrarySearchForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-
-    #class Meta:
-
-    #    ATTRS_FOR_FORMS = {'class': 'form-control'};
-
-    #    model = Library
-    #    fields = ('country', 'city', 'libtype', 'name')
 
 
 class ReportEditForm(forms.ModelForm):
@@ -467,12 +459,11 @@ class SourceEditForm(forms.ModelForm):
 
     class Meta:
         model = SourceInfo
-        fields = ['created', 'code', 'url', 'collector']
-        widgets={'collector':    forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'created':      forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'url':          forms.TextInput(attrs={'style': 'width: 100%;'}),
+        fields = [ 'code', 'url']
+        widgets={'url':          forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'code':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
                  }
+
 
 class AuthorEditForm(forms.ModelForm):
 
