@@ -74,6 +74,9 @@ urlpatterns = [
     url(r'^report/list', ReportListView.as_view(), name='report_list'),
     url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
 
+    url(r'^source/list', SourceListView.as_view(), name='source_list'),
+    url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
+
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),

@@ -148,6 +148,13 @@ class LocationAdmin(admin.ModelAdmin):
     list_filter = ['loctype']
 
 
+class SourceInfoAdmin(admin.ModelAdmin):
+    """Sources from where information has been extracted"""
+    fields = ['created', 'code', 'url', 'collector']
+    list_display = ['created', 'code', 'url', 'collector']
+    list_filter = ['collector']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -161,6 +168,7 @@ admin.site.register(Library, LibraryAdmin)
 admin.site.register(Keyword)
 admin.site.register(LocationType, LocationTypeAdmin)
 admin.site.register(Location, LocationAdmin)
+admin.site.register(SourceInfo, SourceInfoAdmin)
 
 admin.site.register(Report, ReportAdmin)
 

@@ -1,0 +1,64 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+  {% include 'breadcrumb_list.html' %}
+  </div>
+{% endblock %}
+
+{% block content %}
+
+    {% if object_list %}
+      <div class="panel panel-default">
+
+        <h3>Information on sources</h3>
+        <div class="row">
+            <div class="col-sm-3"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
+            <div class="col-sm-8">
+            <span class="step-links pull-right">
+
+            {% include 'pagination.html' %}
+
+            </span>
+            </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-hover">
+              <thead><tr><th class="hidden">id</th><th>Date</th><th>Collector</th><th>Collected from</th><th><!-- Buttons --></th></tr></thead>
+              <tbody>
+              {% for source in object_list %}
+                <tr class="dict-entry">
+                  <td class="hidden"> {{ source.id }}</td>
+                  <td><span class="source-date tdnowrap">{{source.created|date:"j/b/o G:i"}}</span></td>
+                  <td><span class="source-name tdnowrap">{{source.collector}}</span></td>
+                  <td style="width: 100%;">{{source.url}}</td>
+                  <!-- Buttons for this source-->
+                  <td class="tdnowrap">
+                    <a class="btn jumbo-1 btn-sm" title="More information" href="{% url 'source_details' source.id %}"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a>
+                  </td>
+                </tr>
+
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <p>No information on sources has been found.</p>
+      {% endif %}
+
+      <div class="pagination">
+          <span class="step-links">
+
+          {% include 'pagination.html' %}
+
+          </span>
+      </div>
+
+      </div>
+
+{% endblock content %}
+

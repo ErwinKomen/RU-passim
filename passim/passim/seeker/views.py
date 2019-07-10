@@ -32,7 +32,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm
+                                ReportEditForm, SourceEditForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
     EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
@@ -4669,7 +4669,7 @@ class ReportDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
+        context['breadcrumbs'] = process_visit(self.request, "Report edit", False)
         context['prevpage'] = get_previous_page(self.request)
         return context
 
@@ -4732,5 +4732,90 @@ class ReportDownload(BasicPart):
             output.close()
 
         return sData
+
+
+class SourceListView(ListView):
+    """Listview of sources"""
+
+    model = SourceInfo
+    paginate_by = 15
+    template_name = 'seeker/source_list.html'
+    entrycount = 0
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(SourceListView, self).get_context_data(**kwargs)
+
+        # Get parameters
+        initial = self.request.GET
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim source info"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Upload reports", True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Calculate the final qs
+        qs = SourceInfo.objects.all().order_by('-created')
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+
+class SourceDetailsView(PassimDetails):
+    model = SourceInfo
+    mForm = SourceEditForm
+    template_name = 'seeker/source_details.html'
+    prefix = 'source'
+    title = "SourceDetails"
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Source edit", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+
 
 

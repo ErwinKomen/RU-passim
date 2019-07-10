@@ -463,6 +463,17 @@ class ReportEditForm(forms.ModelForm):
                  }
 
 
+class SourceEditForm(forms.ModelForm):
+
+    class Meta:
+        model = SourceInfo
+        fields = ['created', 'code', 'url', 'collector']
+        widgets={'collector':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'created':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'url':          forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'code':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
+                 }
+
 class AuthorEditForm(forms.ModelForm):
 
     class Meta:
