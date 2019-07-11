@@ -1036,12 +1036,12 @@ class Location(models.Model):
         obj = None
         lstQ = []
         qs_country = None
-        if country != "":
+        if country != "" and country != None:
             # Specify the country
             lstQ.append(Q(loctype__name="country"))
             lstQ.append(Q(name__iexact=country))
             qs_country = Location.objects.filter(*lstQ)
-            if city == "":
+            if city == "" or city == None:
                 obj = qs_country.first()
             else:
                 lstQ = []
@@ -1049,7 +1049,7 @@ class Location(models.Model):
                 lstQ.append(Q(name__iexact=city))
                 lstQ.append(relations_location__in=qs_country)
                 obj = Location.objects.filter(*lstQ).first()
-        elif city != "":
+        elif city != "" and city != None:
             lstQ.append(Q(loctype__name="city"))
             lstQ.append(Q(name__iexact=city))
             obj = Location.objects.filter(*lstQ).first()
@@ -1422,7 +1422,7 @@ class Provenance(models.Model):
         obj_loc = Location.get_location(city=city, country=country)
         lstQ.append(Q(name__iexact=sName))
         if obj_loc != None:
-            lstQ.append(Q(location=Location))
+            lstQ.append(Q(location=obj_loc))
         if note!=None: lstQ.append(Q(note__iexact=note))
         qs = Provenance.objects.filter(*lstQ)
         if qs.count() == 0:
@@ -1966,7 +1966,10 @@ class Manuscript(models.Model):
 
             # (3) Get or create place of origin: This should be placed into 'provenance'
             # origin = Origin.find_or_create(oInfo['origPlace'])
-            provenance_origin = Provenance.find_or_create(oInfo['origPlace'], 'origPlace')
+            if oInfo['origPlace'] == "":
+                provenance_origin = None
+            else:
+                provenance_origin = Provenance.find_or_create(oInfo['origPlace'], note='origPlace')
 
             # (4) Get or create the Manuscript
             yearstart = oInfo['origDateFrom'] if oInfo['origDateFrom'] != "" else 1800
@@ -1979,8 +1982,9 @@ class Manuscript(models.Model):
             manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, idno, filename, url, support, extent, format, source)
 
             # Add all the provenances we know of
-            pm = ProvenanceMan(provenance=provenance_origin, manuscript=manuscript)
-            pm.save()
+            if provenance_origin != None:
+                pm = ProvenanceMan(provenance=provenance_origin, manuscript=manuscript)
+                pm.save()
             for oProv in lProvenances:
                 provenance = Provenance.find_or_create(oProv['name'], oProv['note'])
                 pm = ProvenanceMan(provenance=provenance, manuscript=manuscript)
