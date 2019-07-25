@@ -32,10 +32,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm, SourceEditForm
+                                ReportEditForm, SourceEditForm, ManuscripProvForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
-    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
+    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -3450,6 +3450,26 @@ class ManuscriptListView(ListView):
             print("ManuscriptListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
 
         # Return the resulting filtered and sorted queryset
+        return qs
+
+
+class ManuscriptProvset(BasicPart):
+    """The set of provenances from one manuscript"""
+
+    MainModel = Manuscript
+    template_name = 'seeker/manuscript_provset.html'
+    title = "ManuscriptProvenances"
+    MprovFormSet = inlineformset_factory(Manuscript, ProvenanceMan,
+                                         form=ManuscripProvForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "mprov":
+            # List the provenances for this manuscript correctly
+            qs = ProvenanceMan.objects.filter(manuscript=self.obj).order_by('provenance__name')
         return qs
 
 

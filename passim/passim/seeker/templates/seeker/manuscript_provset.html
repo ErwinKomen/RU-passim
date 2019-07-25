@@ -1,0 +1,162 @@
+﻿{% load i18n %}
+
+<div id="mprov_formset" class="panel panel-default">
+
+  <div class="panel-heading collapsed row" data-toggle="collapse" data-target="#mprov_formset_main" >
+    <div class="col-md-12">
+      <span>Provenances</span>
+      <span class="pull-right" style="font-size: smaller;">
+        <i>currently: <span id="mprov_number">{{mprov_formset|length}}</span></i>
+      </span>
+    </div>
+  </div>
+
+  <div class="collapse row" id="mprov_formset_main">
+    <form action="">
+      {% csrf_token %}
+      <!-- Need to have the management stuff for 'mprov' -->
+      {{ mprov_formset.management_form }}
+
+      <div class="col-md-12">
+        {% if not is_passim_editor and mprov_formset|length == 0 %}
+          <p>No provenances defined for this manuscript</p>
+        {% else %}
+          <table class="func-view" style="width: 100%;">
+            <thead>
+              <tr><th colspan="2">#</th><th>Provenance</th><th>Location</th><th>Note</th><th>&nbsp;</th></tr>
+            </thead>
+            <tbody>
+              {% for provform in mprov_formset %}
+                <tr class="form-row">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+
+                  <!-- Hidden but essential: the id of this provenance -->
+                  <td class="hidden">{{provform.id}}</td>
+
+                  <!-- A button to edit or save this provenance -->
+                  <td valign="top" class="clickable"  style="min-width: 20px;">
+                    {% if is_passim_editor %}
+                      <div class="view-mode">
+                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this provenance">
+                          <span class="glyphicon glyphicon-pencil"></span>
+                        </a>
+                      </div>
+                      <div class="edit-mode hidden">
+                        <a title="Save changes to this provenance"
+                           onclick="ru.passim.seeker.formset_update(this);"
+                           targetid="manuscript_provset"
+                           targeturl="{% url 'manu_provset' pk=object_id %}">
+                          <span class="glyphicon glyphicon-ok"></span>
+                        </a>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- The provenance itself -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode">{{provform.instance.provenance.name}}</div>
+                    <div class="edit-mode hidden">{{provform.name}}</div>
+                  </td>
+
+                  <!-- The location of this provenance -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode">{% if provform.instance.provenance.location %}{{provform.instance.provenance.location.get_loc_name}}{% else %}-{% endif %}</div>
+                    <div class="edit-mode hidden">{{provform.location_ta}}</div>
+                  </td>
+
+                  <!-- An optional note -->
+                  <td  style="width: 100%;">
+                    <div class="view-mode">{{provform.instance.provenance.note}}</div>
+                    <div class="edit-mode hidden">{{provform.note}}</div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete this provenance" style="vertical-align: middle; width: 20px; " class="clickable">
+                    {% if is_passim_editor %}
+                      <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    {% endif %}
+                  </td>
+                </tr>
+
+              {% endfor %}
+
+              {% if is_passim_editor %}
+                <!-- Empty row with specifications -->
+                <tr class="form-row empty-form">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>__counter__</span></td>
+
+                  <!-- A button to edit or save this link -->
+                  <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                    <div class="view-mode hidden">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                      </a>
+                    </div>
+                    <div class="edit-mode">
+                      <a title="Save changes to this link"
+                          onclick="ru.passim.seeker.formset_update(this);"
+                          targetid="manuscript_provset"
+                          targeturl="{% url 'manu_provset' pk=object_id %}">
+                        <span class="glyphicon glyphicon-ok"></span>
+                      </a>
+                    </div>
+                  </td>
+
+                  <!-- The linktype -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode hidden">{{mprov_formset.empty_form.instance.get_linktype_display}}</div>
+                    <div class="edit-mode">{{mprov_formset.empty_form.linktype}}</div>
+                  </td>
+
+                  <!-- The contents of the destination gold sermon -->
+                  <td style="width: 100%;">
+                    <div class="hidden"><input id="id_mprov-__counter__-gold" name="mprov-__counter__-gold" value="" /></div>
+                    <div class="view-mode hidden">
+                      {% include 'seeker/sermongold_view.html' with msitem=mprov_formset.empty_form.instance.dst %}
+                    </div>
+                    <div class="edit-mode selected clickable" 
+                         data-toggle="modal" 
+                         data-target="#modal-goldlink-{{object_id}}"
+                         onclick="ru.passim.seeker.gold_search_prepare(this);"
+                         targeturl="{% if object_id %}{% url 'select_gold' %}?source_id={{object_id}}{% else %}{% url 'select_gold' %}{% endif %}"
+                         targetid="edit-goldlink-{{object_id}}">
+                      Search and select a gold sermon to link to
+                    </div>
+                    <!-- Confirmation of delete -->
+                    <div class="delete-confirm hidden">
+                      <span>Do you really want to delete this provenance?</span>
+                      <span>
+                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                      </span>
+                      <span>
+                        <a class="btn btn-xs jumbo-4 delete-row" extra="mprov">Delete</a>
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete this provenance" style="vertical-align: middle; width: 20px; " class="clickable">
+                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                  </td>
+                </tr>
+
+                <!-- Add row -->
+                <tr class="add-row">
+                  <td colspan="5">
+                    <span id="add_manu_prov">
+                      <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a provenance to this manuscript</a>
+                    </span>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        <div id="error_location"></div>
+      </div>
+    </form>
+  </div>
+</div>

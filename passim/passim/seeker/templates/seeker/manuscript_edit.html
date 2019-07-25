@@ -92,14 +92,14 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Identifier</b></td>
         <td class="manuscript-name" align="left">
           <div class="view-mode">{{manuForm.idno.value}}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.idno}}</div>{% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Title</b></td>
         <td class="manuscript-name" align="left">
           <div class="view-mode">{{manuForm.name.value}}</div>
@@ -118,7 +118,7 @@
       </tr>
 
       <!-- Dates for this manuscript -->
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Date</b></td>
         <td class="manuscript-date" align="left">
           <div class="view-mode">{{manuForm.yearstart.value}} - {{manuForm.yearfinish.value}}</div>
@@ -127,21 +127,21 @@
       </tr>
 
       <!-- Physical appearance -->
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Support</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">{% if manuForm.instance.support %}{{manuForm.support.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.support}}</div>{% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Extent</b></td>
         <td class="manuscript-extent" align="left">
           <div class="view-mode">{% if manuForm.instance.extent %}{{manuForm.extent.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.extent}}</div>{% endif %}
         </td>
       </tr>
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>Format</b></td>
         <td class="manuscript-format" align="left">
           <div class="view-mode">{% if manuForm.instance.format %}{{manuForm.format.value}}{% else %}-{% endif %}</div>
@@ -150,7 +150,7 @@
       </tr>
 
       <!-- External link -->
-      <tr>
+      <tr class="form-row">
         <td valign="top"><b>External</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">
@@ -164,7 +164,7 @@
         </td>
       </tr>
         <!-- Bibliography and link to Bibliography page -->  
-      <tr>
+      <tr class="form-row">
         <td valign="top"><a href="{% url 'bibliography' %}" title="Bibliography">Literature</a>
         <td class="manuscript-literature" align="left">
           <div class="view-mode">{% if manuForm.instance.literature %}{{manuForm.literature.value}}{% else %}-{% endif %}</div>

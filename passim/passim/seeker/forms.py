@@ -356,6 +356,36 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 self.fields['name'].initial = kw
 
 
+class ManuscripProvForm(forms.ModelForm):
+    name = forms.CharField(label=_("Name"), required=False, 
+                           widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
+    note = forms.CharField(label=_("Note"), required=False,
+                           widget = forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ProvenanceMan
+        fields = ['provenance', 'manuscript']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscripProvForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['name'].required = False
+        self.fields['note'].required = False
+        self.fields['location_ta'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.provenance != None:
+                provname = instance.provenance.name
+                self.fields['name'].initial = provname
+
+
 class SermonGoldFtextlinkForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

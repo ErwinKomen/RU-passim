@@ -1030,6 +1030,10 @@ class Location(models.Model):
     def __str__(self):
         return self.name
 
+    def get_loc_name(self):
+        lname = "{} ({})".format(self.name, self.loctype)
+        return lname
+
     def get_location(city="", country=""):
         """Get the correct location object, based on the city and/or the country"""
 
