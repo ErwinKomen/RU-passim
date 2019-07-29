@@ -32,10 +32,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm, SourceEditForm, ManuscripProvForm
+                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
-    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, \
+    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -688,6 +688,63 @@ def do_locations(request):
         oErr.DoError("do_locations")
         return reverse('home')
 
+def do_provenance(request):
+    """Add stype on the appropriate places"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Tweak Manuscript-Provenance connections"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Provenance", True)
+
+        # Create list to be returned
+        result_list = []
+
+        # Get a list of all Manuscript-Provenance links
+        qs = ProvenanceMan.objects.all().order_by('manuscript', 'provenance')
+        lst_del = []
+        man_id = -1
+        prov_id = -1
+        for item in qs:
+            if item.manuscript.id != man_id:
+                # This is a new manuscript
+                prov_id = -1
+                man_id = item.manuscript.id
+            if item.provenance.id == prov_id or item.provenance.id == 1:
+                # Set for removal
+                lst_del.append(item.id)
+            # Take over the prov id
+            prov_id = item.provenance.id
+        # Remove them
+        ProvenanceMan.objects.filter(id__in=lst_del).delete()
+
+
+        # Wrapping it up
+        context['result_list'] = lst_del
+
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_provenance")
+        return reverse('home')
+
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
 
@@ -1082,7 +1139,6 @@ def get_libraries(request):
     """Get a list of libraries for autocomplete"""
 
     data = 'fail'
-    method = "useLocation"
     if request.is_ajax():
         # Get the user-specified 'country' and 'city' strings
         country = request.GET.get('country', "")
@@ -1094,45 +1150,39 @@ def get_libraries(request):
 
         # build the query
         lstQ = []
-        if method == "useLocation":
-            # Start as broad as possible: country
-            qs_loc = None
-            if country != "":
-                loctype_country = LocationType.find("country")
-                lstQ.append(Q(name=country))
-                lstQ.append(Q(loctype=loctype_country))
-                qs_country = Location.objects.filter(*lstQ)
-                # What about city?
-                if city == "":
-                    qs_loc = qs_country
-                else:
-                    loctype_city = LocationType.find("city")
-                    lstQ = []
-                    lstQ.append(Q(name__icontains=city))
-                    lstQ.append(Q(loctype=loctype_city))
-                    lstQ.append(Q(relations_location__in=qs_country))
-                    qs_loc = Location.objects.filter(*lstQ)
-            elif city != "":
+        # Start as broad as possible: country
+        qs_loc = None
+        if country != "":
+            loctype_country = LocationType.find("country")
+            lstQ.append(Q(name=country))
+            lstQ.append(Q(loctype=loctype_country))
+            qs_country = Location.objects.filter(*lstQ)
+            # What about city?
+            if city == "":
+                qs_loc = qs_country
+            else:
                 loctype_city = LocationType.find("city")
+                lstQ = []
                 lstQ.append(Q(name__icontains=city))
                 lstQ.append(Q(loctype=loctype_city))
+                lstQ.append(Q(relations_location__in=qs_country))
                 qs_loc = Location.objects.filter(*lstQ)
+        elif city != "":
+            loctype_city = LocationType.find("city")
+            lstQ.append(Q(name__icontains=city))
+            lstQ.append(Q(loctype=loctype_city))
+            qs_loc = Location.objects.filter(*lstQ)
 
-            # Start out with the idea to look for a library by name:
-            lstQ = []
-            if lib != "": lstQ.append(Q(name__icontains=lib))
-            if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
+        # Start out with the idea to look for a library by name:
+        lstQ = []
+        if lib != "": lstQ.append(Q(name__icontains=lib))
+        if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
 
-            # Combine everything
-            libraries = Library.objects.filter(*lstQ).order_by('name')
-        else:
-            if country != "": lstQ.append(Q(country__name__icontains=country))
-            if city != "": lstQ.append(Q(city__name__icontains=city))
-            if lib != "": lstQ.append(Q(name__icontains=lib))
-            libraries = Library.objects.filter(*lstQ).order_by('name')
+        # Combine everything
+        libraries = Library.objects.filter(*lstQ).order_by('name').values('name','id') 
         results = []
         for co in libraries:
-            co_json = {'name': co.name, 'id': co.id }
+            co_json = {'name': co['name'], 'id': co['id'] }
             results.append(co_json)
         data = json.dumps(results)
     else:
@@ -1153,6 +1203,27 @@ def get_origins(request):
         results = []
         for co in origins:
             co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_locations(request):
+    """Get a list of location names for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        sName = request.GET.get('name', '')
+        lstQ = []
+        lstQ.append(Q(name__icontains=sName))
+        locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
+        results = []
+        for co in locations:
+            name = "{} ({})".format(co['name'], co['loctype__name'])
+            co_json = {'name': name, 'id': co['id'] }
             results.append(co_json)
         data = json.dumps(results)
     else:
@@ -2225,7 +2296,7 @@ class BasicPart(View):
                                                 if self.before_save(prefix, request, sub_instance, form):
                                                     has_changed = True
                                                 # Save this construction
-                                                if has_changed: 
+                                                if has_changed and len(self.arErr) == 0: 
                                                     # Save the instance
                                                     sub_instance.save()
                                                     # Adapt the last save time
@@ -2857,6 +2928,188 @@ class ManuscriptEdit(BasicPart):
         return context
 
 
+class LocationListView(ListView):
+    """Listview of locations"""
+
+    model = Location
+    paginate_by = 15
+    template_name = 'seeker/location_list.html'
+    entrycount = 0
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(LocationListView, self).get_context_data(**kwargs)
+
+        # Get parameters
+        initial = self.request.GET
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Get parameters for the search
+        initial = self.request.GET
+        # The searchform is just a list form, but filled with the 'initial' parameters
+        context['searchform'] = LocationForm(initial)
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim location info"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Locations", True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        lstQ = []
+
+        # Check for author [name]
+        if 'name' in get and get['name'] != '':
+            val = adapt_search(get['name'])
+            # Search in both the name field
+            lstQ.append(Q(name__iregex=val))
+
+        # Check for location type
+        if 'loctype' in get and get['loctype'] != '':
+            val = get['loctype']
+            # Search in both the name field
+            lstQ.append(Q(loctype=val))
+
+        # Calculate the final qs
+        qs = Location.objects.filter(*lstQ).order_by('name').distinct()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+
+class LocationDetailsView(PassimDetails):
+    model = Location
+    mForm = LocationForm
+    template_name = 'seeker/location_details.html'
+    prefix = 'loc'
+    prefix_type = "simple"
+    title = "LocationDetails"
+    rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('location_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+class LocationEdit(BasicPart):
+    """The details of one location"""
+
+    MainModel = Location
+    template_name = 'seeker/location_edit.html'  
+    title = "Location" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "loc"
+    form_objects = [{'form': LocationForm, 'prefix': prefix, 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "loc":
+            pass
+
+        return bNeedSaving
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        if instance != None:
+            pass
+
+        afternew =  reverse('location_list')
+        if 'afternewurl' in self.qd:
+            afternew = self.qd['afternewurl']
+        context['afternewurl'] = afternew
+
+        return context
+
+
+class LocationRelset(BasicPart):
+    """The set of provenances from one manuscript"""
+
+    MainModel = Location
+    template_name = 'seeker/location_relset.html'
+    title = "LocationRelations"
+    LrelFormSet = inlineformset_factory(Location, LocationRelation,
+                                         form=LocationRelForm, min_num=0,
+                                         fk_name = "contained",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': LrelFormSet, 'prefix': 'lrel', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "lrel":
+            # List the parent locations for this location correctly
+            qs = LocationRelation.objects.filter(contained=self.obj).order_by('container__name')
+        return qs
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "lrel":
+            # Get any selected partof location id
+            loc_id = form.cleaned_data['partof']
+            if loc_id != "":
+                # Check if a new relation should be made or an existing one should be changed
+                if instance.id == None:
+                    # Set the correct container
+                    location = Location.objects.filter(id=loc_id).first()
+                    instance.container = location
+                    has_changed = True
+                elif instance.container == None or instance.container.id == None or instance.container.id != int(loc_id):
+                    location = Location.objects.filter(id=loc_id).first()
+                    # Set the correct container
+                    instance.container = location
+                    has_changed = True
+ 
+        return has_changed
+
+
 class SermonDetails(PassimDetails):
     """The details of one sermon"""
 
@@ -3460,7 +3713,7 @@ class ManuscriptProvset(BasicPart):
     template_name = 'seeker/manuscript_provset.html'
     title = "ManuscriptProvenances"
     MprovFormSet = inlineformset_factory(Manuscript, ProvenanceMan,
-                                         form=ManuscripProvForm, min_num=0,
+                                         form=ManuscriptProvForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False}]
@@ -3471,6 +3724,45 @@ class ManuscriptProvset(BasicPart):
             # List the provenances for this manuscript correctly
             qs = ProvenanceMan.objects.filter(manuscript=self.obj).order_by('provenance__name')
         return qs
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "mprov":
+            # First need to get a possible ID of the (new) location 
+            loc_id = form.cleaned_data['location']
+            # Check if a new provenance should be made
+            if instance.id == None or instance.provenance == None or instance.provenance.id == None or \
+               instance.provenance.location != None and instance.provenance.location.id != int(loc_id):
+                # Need to create a new provenance
+                name = form.cleaned_data['name']
+                note = form.cleaned_data['note']
+                # Create the new provenance
+                provenance = Provenance(name=name, note=note)
+
+                bCanSave = True
+                # Possibly add location
+                loc_name = form.cleaned_data['location_ta']
+                if loc_id != "":
+                    location = Location.objects.filter(id=loc_id).first()
+                    provenance.location = location
+                elif loc_name != "":
+                    # The user specified a new location, but we are not able to process it here
+                    # TODO: how do we signal to the user that he has to add a location elsewhere??
+                    bCanSave = False
+                    self.arErr.append("You are using a new location [{}]. Add it first, and then select it.".format(loc_name))
+
+                if bCanSave:
+                    # Save the new provenance
+                    provenance.save()
+                    instance.provenance = provenance
+
+                    # Make a new ProvenanceMan
+                    instance.manuscript = self.obj
+
+                    # Indicate that changes have been made
+                    has_changed = True
+
+        return has_changed
 
 
 class SermonGoldListView(ListView):
@@ -4792,7 +5084,7 @@ class SourceListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Upload reports", True)
+        context['breadcrumbs'] = process_visit(self.request, "Sources", True)
         context['prevpage'] = get_previous_page(self.request)
 
         # Return the calculated context

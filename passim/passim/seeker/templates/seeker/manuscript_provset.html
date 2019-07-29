@@ -1,17 +1,8 @@
 ﻿{% load i18n %}
 
-<div id="mprov_formset" class="panel panel-default">
+<div id="mprov_formset" class="panel panel-wide panel-default">
 
-  <div class="panel-heading collapsed row" data-toggle="collapse" data-target="#mprov_formset_main" >
-    <div class="col-md-12">
-      <span>Provenances</span>
-      <span class="pull-right" style="font-size: smaller;">
-        <i>currently: <span id="mprov_number">{{mprov_formset|length}}</span></i>
-      </span>
-    </div>
-  </div>
-
-  <div class="collapse row" id="mprov_formset_main">
+  <div class="row" id="mprov_formset_main">
     <form action="">
       {% csrf_token %}
       <!-- Need to have the management stuff for 'mprov' -->
@@ -55,6 +46,10 @@
 
                   <!-- The provenance itself -->
                   <td  style="min-width: 150px;">
+                    <div class="hidden">
+                      <input name="mprov-{{forloop.counter0}}-provenance" value="{{provform.instance.provenance.id}}" />
+                      <input name="mprov-{{forloop.counter0}}-manuscript" value="{{provform.instance.manuscript.id}}" />
+                    </div>
                     <div class="view-mode">{{provform.instance.provenance.name}}</div>
                     <div class="edit-mode hidden">{{provform.name}}</div>
                   </td>
@@ -62,6 +57,7 @@
                   <!-- The location of this provenance -->
                   <td  style="min-width: 150px;">
                     <div class="view-mode">{% if provform.instance.provenance.location %}{{provform.instance.provenance.location.get_loc_name}}{% else %}-{% endif %}</div>
+                    <div class="location-key hidden">{{provform.location}}</div>
                     <div class="edit-mode hidden">{{provform.location_ta}}</div>
                   </td>
 
@@ -69,6 +65,22 @@
                   <td  style="width: 100%;">
                     <div class="view-mode">{{provform.instance.provenance.note}}</div>
                     <div class="edit-mode hidden">{{provform.note}}</div>
+                    <!-- Confirmation of delete -->
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete the link to this provenance?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span class="hidden">{{provform.DELETE}}</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4" 
+                             onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                             targetid="manuscript_provset"
+                             targeturl="{% url 'manu_provset' pk=object_id %}">Delete</a>
+                        </span>
+                      </div>
+                    {% endif %}
                   </td>
 
                   <!-- A delete button -->
@@ -104,29 +116,30 @@
                     </div>
                   </td>
 
-                  <!-- The linktype -->
+                  <!-- The provenance itself -->
                   <td  style="min-width: 150px;">
-                    <div class="view-mode hidden">{{mprov_formset.empty_form.instance.get_linktype_display}}</div>
-                    <div class="edit-mode">{{mprov_formset.empty_form.linktype}}</div>
+                    <div class="hidden">
+                      <input id="id_mprov-__counter__-provenance" name="mprov-__counter__-provenance" />
+                      <input id="id_mprov-__counter__-manuscript" name="mprov-__counter__-manuscript" value="{{provform.instance.manuscript.id}}" />
+                    </div>
+                    <div class="view-mode hidden">{{mprov_formset.empty_form.instance.provenance.name}}</div>
+                    <div class="edit-mode">{{mprov_formset.empty_form.name}}</div>
                   </td>
 
-                  <!-- The contents of the destination gold sermon -->
-                  <td style="width: 100%;">
-                    <div class="hidden"><input id="id_mprov-__counter__-gold" name="mprov-__counter__-gold" value="" /></div>
-                    <div class="view-mode hidden">
-                      {% include 'seeker/sermongold_view.html' with msitem=mprov_formset.empty_form.instance.dst %}
-                    </div>
-                    <div class="edit-mode selected clickable" 
-                         data-toggle="modal" 
-                         data-target="#modal-goldlink-{{object_id}}"
-                         onclick="ru.passim.seeker.gold_search_prepare(this);"
-                         targeturl="{% if object_id %}{% url 'select_gold' %}?source_id={{object_id}}{% else %}{% url 'select_gold' %}{% endif %}"
-                         targetid="edit-goldlink-{{object_id}}">
-                      Search and select a gold sermon to link to
-                    </div>
+                  <!-- The location of this provenance -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode hidden">{% if mprov_formset.empty_form.instance.provenance.location %}{{mprov_formset.empty_form.instance.provenance.location.get_loc_name}}{% else %}-{% endif %}</div>
+                    <div class="location-key hidden">{{mprov_formset.empty_form.location}}</div>
+                    <div class="edit-mode">{{mprov_formset.empty_form.location_ta}}</div>
+                  </td>
+
+                  <!-- An optional note -->
+                  <td  style="width: 100%;">
+                    <div class="view-mode hidden">{{mprov_formset.empty_form.instance.provenance.note}}</div>
+                    <div class="edit-mode">{{mprov_formset.empty_form.note}}</div>
                     <!-- Confirmation of delete -->
                     <div class="delete-confirm hidden">
-                      <span>Do you really want to delete this provenance?</span>
+                      <span>Do you really want to delete the link to this provenance?</span>
                       <span>
                         <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                       </span>
@@ -144,7 +157,7 @@
 
                 <!-- Add row -->
                 <tr class="add-row">
-                  <td colspan="5">
+                  <td colspan="6">
                     <span id="add_manu_prov">
                       <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a provenance to this manuscript</a>
                     </span>

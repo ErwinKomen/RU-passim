@@ -114,6 +114,12 @@ div.inline-group a.add-related {
     display: inline-block;
 }
 
+.panel-wide {
+    margin-left: 0px;
+    margin-right: 0px;
+    cursor: pointer; 
+}
+
 .panel-none {
   border: 0 !important;
   box-shadow: none;

@@ -1,0 +1,68 @@
+﻿{% load i18n %}
+
+<!-- Source information -->
+<form>
+  {% csrf_token %}
+    <table class="location-details">
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" oldtargetid="location_edit"
+               targeturl="{% if locForm.instance.id %}{% url 'location_edit' locForm.instance.id %}{% else %}{% url 'location_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="location_err_msg" class="err-msg"></span>
+
+            <!-- Put the delete button completely to the right-->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" 
+               targetid="" oldtargetid="location_edit"
+               targeturl="{% if locForm.instance.id %}{% url 'location_edit' locForm.instance.id %}{% endif %}">
+              <span class="glyphicon glyphicon-remove" title="Delete this location"></span>
+            </a>
+          </td>
+        </tr>
+      {% endif %}
+
+      <tr class="form-row">
+        <td class="hoverable" valign="top"  style="min-width: 150px;">Name</td>
+        <td  style="width: 100%;">
+          <div class="view-mode">{{locForm.name.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{locForm.name}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >Location type</td>
+        <td>
+          <div class="view-mode">{% if locForm.instance.loctype %}{{locForm.instance.loctype.name}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{locForm.loctype}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Possibly afternew information -->
+      {% if afternewurl %}
+        <tr class="hidden">
+          <td colspan="2">
+            <input name="afternewurl" value="{{afternewurl}}" />
+          </td>
+        </tr>
+      {% endif %}
+
+    </table>
+</form>

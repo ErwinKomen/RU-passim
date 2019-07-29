@@ -28,8 +28,32 @@
             </div>
 
             <!-- Manuscript provenances: zero-to-many -->
-            <div class="row">&nbsp;</div>
-            <div id="manuscript_provset" class="post-load" targeturl="{% url 'manu_provset' pk=manuForm.instance.id %}">
+            <div class="row">
+              <div class="col-md-6">
+                <span><a role="button" class="btn btn-xs jumbo-1" targetid="manuscript_provset" title="Show/Hide provenances" onclick="ru.passim.seeker.toggle_click(this);">Provenances</a></span>
+              </div>
+              {% if is_passim_editor %}
+                <div class="col-md-6">
+                  <span class="pull-right">
+                    <a role="button" class="btn btn-xs jumbo-3" target="_blank"
+                       href="{% url 'location_list' %}">
+                    <span class="glyphicon glyphicon-plus"></span>Locations...</a>
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+            <!-- This is where a NEW sermon definition can be edited -->
+            {% if is_passim_editor %}
+              <div class="row subform">
+                <div class="col-md-10 col-md-offset-1">
+                  <div id="location_new">
+                    <!-- Room to create a new location instance that can be used as Origin or Provenance -->
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+
+            <div id="manuscript_provset" class="post-load hidden" targeturl="{% url 'manu_provset' pk=manuForm.instance.id %}">
               <!-- The wait symbol will be overwritten -->
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
             </div>

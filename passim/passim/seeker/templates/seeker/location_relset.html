@@ -1,0 +1,165 @@
+﻿{% load i18n %}
+
+<div id="lrel_formset" class="panel panel-wide panel-default">
+
+  <div class="row" id="lrel_formset_main">
+    <form action="">
+      {% csrf_token %}
+      <!-- Need to have the management stuff for 'mprov' -->
+      {{ lrel_formset.management_form }}
+
+      <div class="col-md-12">
+        {% if not is_passim_editor and lrel_formset|length == 0 %}
+          <p>No containers defined for this location</p>
+        {% else %}
+          <table class="func-view" style="width: 100%;">
+            <thead>
+              <tr><th colspan="2">#</th><th>Container</th><th>Type</th><th>&nbsp;</th></tr>
+            </thead>
+            <tbody>
+              {% for lrelform in lrel_formset %}
+                <tr class="form-row">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+
+                  <!-- Hidden but essential: the id of this relation -->
+                  <td class="hidden">{{lrelform.id}}</td>
+
+                  <!-- A button to edit or save this relation -->
+                  <td valign="top" class="clickable"  style="min-width: 20px;">
+                    {% if is_passim_editor %}
+                      <div class="view-mode">
+                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this relation">
+                          <span class="glyphicon glyphicon-pencil"></span>
+                        </a>
+                      </div>
+                      <div class="edit-mode hidden">
+                        <a title="Save changes to this relation"
+                           onclick="ru.passim.seeker.formset_update(this);"
+                           targetid="location_relset"
+                           targeturl="{% url 'loc_relset' pk=object_id %}">
+                          <span class="glyphicon glyphicon-ok"></span>
+                        </a>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- The parent location (container) -->
+                  <td  style="width: 100%;">
+                    <div class="hidden">
+                      <input name="lrel-{{forloop.counter0}}-container" value="{{lrelform.instance.container.id}}" />
+                      <input name="lrel-{{forloop.counter0}}-contained" value="{{lrelform.instance.contained.id}}" />
+                    </div>
+                    <div class="view-mode">{% if lrelform.instance.container %}{{lrelform.instance.container.name}}{% else %}-{% endif %}</div>
+                    <div class="location-key hidden">{{lrelform.partof}}</div>
+                    <div class="edit-mode hidden">{{lrelform.partof_ta}}</div>
+                    <!-- Confirmation of delete -->
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete the link to this container?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span class="hidden">{{lrelform.DELETE}}</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4" 
+                             onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                             targetid="location_relset"
+                             targeturl="{% url 'loc_relset' pk=object_id %}">Delete</a>
+                        </span>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- The type of the container -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode">{% if lrelform.instance.container %}{{lrelform.instance.container.loctype.name}}{% else %}-{% endif %}</div>
+                    <div class="edit-mode hidden">{% if lrelform.instance.container %}{{lrelform.instance.container.loctype.name}}{% else %}-{% endif %}</div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete the link to this container" style="vertical-align: middle; width: 20px; " class="clickable">
+                    {% if is_passim_editor %}
+                      <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    {% endif %}
+                  </td>
+                </tr>
+
+              {% endfor %}
+
+              {% if is_passim_editor %}
+                <!-- Empty row with specifications -->
+                <tr class="form-row empty-form">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>__counter__</span></td>
+
+                  <!-- A button to edit or save this link -->
+                  <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                    <div class="view-mode hidden">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this relation">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                      </a>
+                    </div>
+                    <div class="edit-mode">
+                      <a title="Save changes to this link"
+                          onclick="ru.passim.seeker.formset_update(this);"
+                          targetid="location_relset"
+                          targeturl="{% url 'loc_relset' pk=object_id %}">
+                        <span class="glyphicon glyphicon-ok"></span>
+                      </a>
+                    </div>
+                  </td>
+
+                  <!-- The parent location (container) -->
+                  <td  style="width: 100%;">
+                    <div class="hidden">
+                      <input id="id_lrel-__counter__-container" name="lrel-__counter__-container" />
+                      <input id="id_lrel-__counter__-contained" name="lrel-__counter__-contained" value="{{lrelform.instance.contained.id}}" />
+                    </div>
+                    <div class="view-mode hidden">{{lrel_formset.empty_form.instance.container.name}}</div>
+                    <div class="location-key hidden">{{lrel_formset.empty_form.partof}}</div>
+                    <div class="edit-mode">{{lrel_formset.empty_form.partof_ta}}</div>
+                    <!-- Confirmation of delete -->
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete the link to this container?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4 delete-row" extra="lrel">Delete</a>
+                        </span>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- The type of the container -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode hidden">-</div>
+                    <div class="edit-mode">-</div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete the link to this container" style="vertical-align: middle; width: 20px; " class="clickable">
+                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                  </td>
+                </tr>
+
+                <!-- Add row -->
+                <tr class="add-row">
+                  <td colspan="5">
+                    <span id="add_loc_rel">
+                      <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a container relation to this location</a>
+                    </span>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        <div id="error_location"></div>
+      </div>
+    </form>
+  </div>
+</div>

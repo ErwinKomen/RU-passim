@@ -47,6 +47,7 @@ urlpatterns = [
     url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
+    url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -61,6 +62,11 @@ urlpatterns = [
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
+
+    url(r'^location/list', LocationListView.as_view(), name='location_list'),
+    url(r'^location/details(?:/(?P<pk>\d+))?/$', LocationDetailsView.as_view(), name='location_details'),
+    url(r'^location/edit(?:/(?P<pk>\d+))?/$', LocationEdit.as_view(), name='location_edit'),
+    url(r'^location/relset(?:/(?P<pk>\d+))?/$', LocationRelset.as_view(), name='loc_relset'),
 
     # url(r'^sermon/view(?:/(?P<pk>\d+))?/$', SermonDetailsView.as_view(), name='sermon_view'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
@@ -94,6 +100,7 @@ urlpatterns = [
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
     url(r'^api/libraries/$', passim.seeker.views.get_libraries, name='api_libraries'),
     url(r'^api/origins/$', passim.seeker.views.get_origins, name='api_origins'),
+    url(r'^api/locations/$', passim.seeker.views.get_locations, name='api_locations'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
     url(r'^api/nicknames/$', passim.seeker.views.get_nicknames, name='api_nicknames'),

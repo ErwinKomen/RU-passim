@@ -1,0 +1,156 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+  {% include 'breadcrumb_list.html' %}
+  </div>
+{% endblock %}
+
+{% block content %}
+
+    <!-- Search area -->
+    <div class="panel panel-default">
+      <form id='locationsearch' method='get' targeturl="{% url 'location_list' %}" >
+          <!-- Be sure to add csrf -->
+          {% csrf_token %}
+
+          <!-- EK: A sort-order specification is in a hidden form field, which is filled by JS:do_sort_column() -->
+          <div class="hidden">
+              <input name='sortOrder' class='form-control' value='name' >
+              <input name='search_type' class='form-control' value='name'>
+              <input id="submit_type" name='submit_type' class='form-control' value='simple'>
+          </div>
+
+          <!-- The actual search parameters: country, city, library -->
+          <div id="searchdefault" class="row location-details">
+            <div class="col-sm-3">
+              <label>&nbsp;</label>
+              <div class='input-group'>
+                  <label class='input-group-addon' 
+                          data-toggle="popover" data-trigger="hover"
+                          data-placement="right" data-content="Willekeurige tekens: ? (één) * (0 of meer). Groep tekens: [m-n]"
+                          for='id_name'>{{searchform.name.label}}</label>
+                  <input id="id_name" name='name' class='form-control' type="text" 
+                          {% if searchform.name.value %}value='{{searchform.name.value}}'{% endif %}
+                          placeholder="Name..."
+                          onkeyup="ru.passim.form_submit(event);">
+              </div>
+            </div>
+            <div class="col-sm-3">
+              <label>&nbsp;</label>
+              <div class='input-group'>{{searchform.loctype}}</div>
+            </div>
+            <div class="col-sm-4">
+              <!-- this is empty -->
+            </div>
+            <div class="col-sm-1">
+              <div class='form-group' id='paginate_by'>
+                <label for='paginate_by'>Per page</label>
+                <select class='form-control input-sm' name="paginate_by">
+                  {% for pag in paginateValues %}
+                  <option {% if pag == paginateSize %} selected {% endif %}>{{pag}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="col-sm-1 pull-right" align="right">
+              <div class="input-group">
+                <div><label>&nbsp;</label></div>
+                <div class='btn-group'>
+                    <!-- Reset the search buttons -->
+                    <a role="button" class="btn btn-sm jumbo-1" title="reset" onclick="ru.passim.seeker.search_reset(this);"><span class="glyphicon glyphicon-remove"></span></a>
+                    <!-- Submit the search form -->
+                    <a role="button" class="btn btn-sm jumbo-3" title="search" onclick="ru.passim.seeker.search_start(this);"><span class="glyphicon glyphicon-search"></span></a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+      </form>
+    </div>
+
+    {% if object_list %}
+      <div class="panel panel-default">
+
+        <!-- Heading and button to add a new author -->
+        <form>
+          <h3>
+            <span title="Locations used for Origin and Provenance">Locations</span>
+            {% if is_passim_editor %}
+              <span id="add_author" class="pull-right">
+                {% csrf_token %}
+                <a class="btn btn-xs jumbo-3" role="button" 
+                    targeturl="{% url 'location_edit' %}"
+                    targetid="location_new"
+                    onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                  <span class="glyphicon glyphicon-plus"></span>Add a location
+                </a>
+              </span>
+            {% endif %}
+          </h3>
+        </form>
+
+        <!-- Room to add a new location -->
+        <div class="row subform">
+          <div class="col-md-offset-1 col-md-10">
+            <div id="location_new">
+              <!-- Room to create a new location instance-->
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-3"><span>Found: </span><span>{{entrycount}}</span></div>
+            <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
+            <div class="col-sm-8">
+            <span class="step-links pull-right">
+
+            {% include 'pagination.html' %}
+
+            </span>
+            </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-hover">
+              <thead><tr><th class="hidden">id</th><th>Name</th><th>Type</th><th>Part of...</th><th><!-- Buttons --></th></tr></thead>
+              <tbody>
+              {% for location in object_list %}
+                <tr class="dict-entry">
+                  <td class="hidden"> {{ location.id }}</td>
+                  <td style="min-width: 150px;"><span class="location-name tdnowrap">{{location.name}}</span></td>
+                  <td style="min-width: 120px;"><span class="location-type tdnowrap">{{location.loctype.name}}</span></td>
+                  <td style="width: 100%;">
+                    <span class="location-partof">
+                      {{location.partof}}
+                    </span>
+                  </td>
+                  <!-- Buttons for this location-->
+                  <td class="tdnowrap" style="width: 30px;">
+                    <a class="btn jumbo-1 btn-xs" title="More information" href="{% url 'location_details' location.id %}"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a>
+                  </td>
+                </tr>
+
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <p>No information on locations has been found.</p>
+      {% endif %}
+
+      <div class="pagination">
+          <span class="step-links">
+
+          {% include 'pagination.html' %}
+
+          </span>
+      </div>
+
+      </div>
+
+{% endblock content %}
+

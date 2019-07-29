@@ -1065,6 +1065,32 @@ class Location(models.Model):
         obj = self.location_identifiers.filter(idname="idVilleEtab").first()
         return "" if obj == None else obj.idvalue
 
+    def partof(self):
+        """give a list of locations (and their type) of which I am part"""
+
+        lst_main = []
+        lst_back = []
+
+        def get_above(loc, lst_this):
+            """Perform depth-first recursive procedure above"""
+
+            above_lst = LocationRelation.objects.filter(contained=loc)
+            for item in above_lst:
+                # Add this item
+                lst_this.append(item.container)
+                # Add those above this item
+                get_above(item.container, lst_this)
+
+        # Calculate the aboves
+        get_above(self, lst_main)
+
+        # Walk the main list
+        for item in lst_main:
+            lst_back.append("{} ({})".format(item.name, item.loctype.name))
+
+        # Return the list of locations
+        return " | ".join(lst_back)
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""

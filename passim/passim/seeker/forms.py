@@ -356,11 +356,12 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 self.fields['name'].initial = kw
 
 
-class ManuscripProvForm(forms.ModelForm):
+class ManuscriptProvForm(forms.ModelForm):
     name = forms.CharField(label=_("Name"), required=False, 
                            widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
     note = forms.CharField(label=_("Note"), required=False,
                            widget = forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
+    location = forms.CharField(required=False)
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
 
@@ -372,18 +373,22 @@ class ManuscripProvForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
-        super(ManuscripProvForm, self).__init__(*args, **kwargs)
+        super(ManuscriptProvForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
         self.fields['name'].required = False
         self.fields['note'].required = False
+        self.fields['provenance'].required = False
+        self.fields['location'].required = False
         self.fields['location_ta'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
             # Check if the initial name should be added
             if instance.provenance != None:
-                provname = instance.provenance.name
-                self.fields['name'].initial = provname
+                self.fields['name'].initial = instance.provenance.name
+                self.fields['note'].initial = instance.provenance.note
+                if instance.provenance.location != None:
+                    self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
 
 
 class SermonGoldFtextlinkForm(forms.ModelForm):
@@ -455,6 +460,53 @@ class ManuscriptForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
+
+
+class LocationForm(forms.ModelForm):
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Location
+        fields = ['name', 'loctype']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(LocationForm, self).__init__(*args, **kwargs)
+        # All fields are required
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class LocationRelForm(forms.ModelForm):
+    partof_ta = forms.CharField(label=_("Part of"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Part of...',  'style': 'width: 100%;'}))
+    partof = forms.CharField(required=False)
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = LocationRelation
+        fields = ['container', 'contained']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(LocationRelForm, self).__init__(*args, **kwargs)
+
+        # Set other parameters
+        self.fields['partof_ta'].required = False
+        self.fields['partof'].required = False
+        self.fields['container'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.container != None:
+                self.fields['partof_ta'].initial = instance.container.get_loc_name()
 
 
 class SearchCollectionForm(forms.Form):
