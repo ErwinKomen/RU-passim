@@ -32,7 +32,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm
+                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
+                                LibraryForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
     EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
@@ -4989,6 +4990,77 @@ class LibraryListDownload(BasicPart):
             output.close()
 
         return sData
+
+
+class LibraryDetailsView(PassimDetails):
+    model = Library
+    mForm = LibraryForm
+    template_name = 'seeker/library_details.html'
+    prefix = 'lib'
+    prefix_type = "simple"
+    title = "LibraryDetails"
+    rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('library_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Library edit", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+class LibraryEdit(BasicPart):
+    """The details of one library"""
+
+    MainModel = Library
+    template_name = 'seeker/library_edit.html'  
+    title = "Library" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "lib"
+    form_objects = [{'form': LibraryForm, 'prefix': prefix, 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "lib":
+            # Check whether the location has changed
+            if 'location' in form.changed_data:
+                # Get the new location
+                location = form.cleaned_data['location']
+                if location != None:
+                    # Get the hierarchy including myself
+                    hierarchy = location.hierarchy()
+                    for item in hierarchy:
+                        if item.loctype.name == "city":
+                            instance.lcity = item
+                            bNeedSaving = True
+                        elif item.loctype.name == "country":
+                            instance.lcountry = item
+                            bNeedSaving = True
+            pass
+
+        return bNeedSaving
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        if instance != None:
+            pass
+
+        afternew =  reverse('library_list')
+        if 'afternewurl' in self.qd:
+            afternew = self.qd['afternewurl']
+        context['afternewurl'] = afternew
+
+        return context
 
 
 class AuthorListDownload(BasicPart):

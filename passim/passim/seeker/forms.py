@@ -424,6 +424,45 @@ class OriginForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
+class LibraryForm(forms.ModelForm):
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Library
+        fields = ['name', 'libtype', 'idLibrEtab', 'location', 'lcity', 'lcountry']
+        widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
+                 'location': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'lcity':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'lcountry': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'libtype':  forms.Select()
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(LibraryForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['name'].required = False
+        self.fields['libtype'].required = False
+        self.fields['location'].required = False
+        self.fields['location_ta'].required = False
+        self.fields['lcity'].required = False
+        self.fields['lcountry'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance != None:
+                self.fields['name'].initial = instance.name
+                self.fields['libtype'].initial = instance.libtype
+                self.fields['lcity'].initial = instance.lcity
+                self.fields['lcountry'].initial = instance.lcountry
+                if instance.location != None:
+                    self.fields['location_ta'].initial = instance.location.get_loc_name()
+
+
 
 class SermonGoldFtextlinkForm(forms.ModelForm):
     class Meta:

@@ -1091,6 +1091,27 @@ class Location(models.Model):
         # Return the list of locations
         return " | ".join(lst_back)
 
+    def hierarchy(self):
+        """give a list of locations (and their type) of which I am part"""
+
+        lst_main = [self]
+
+        def get_above(loc, lst_this):
+            """Perform depth-first recursive procedure above"""
+
+            above_lst = LocationRelation.objects.filter(contained=loc)
+            for item in above_lst:
+                # Add this item
+                lst_this.append(item.container)
+                # Add those above this item
+                get_above(item.container, lst_this)
+
+        # Calculate the aboves
+        get_above(self, lst_main)
+
+        # Return the list of locations
+        return lst_main
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -1218,7 +1239,7 @@ class Library(models.Model):
                             max_length=5)
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
-    city = models.ForeignKey(City, related_name="city_libraries")
+    city = models.ForeignKey(City, null=True, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
 

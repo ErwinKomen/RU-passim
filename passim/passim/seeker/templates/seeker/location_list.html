@@ -71,10 +71,9 @@
       </form>
     </div>
 
-    {% if object_list %}
       <div class="panel panel-default">
 
-        <!-- Heading and button to add a new author -->
+        <!-- Heading and button to add a new location -->
         <form>
           <h3>
             <span title="Locations used for Origin and Provenance">Locations</span>
@@ -101,6 +100,8 @@
           </div>
         </div>
 
+      {% if object_list %}
+        <!-- Pagination above-->
         <div class="row">
             <div class="col-sm-3"><span>Found: </span><span>{{entrycount}}</span></div>
             <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
@@ -112,6 +113,8 @@
             </span>
             </div>
         </div>
+
+        <!-- Table with information -->
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
@@ -138,17 +141,19 @@
             </table>
           </div>
         </div>
+
+        <!-- Pagination below-->
+        <div class="pagination">
+            <span class="step-links">
+
+            {% include 'pagination.html' %}
+
+            </span>
+        </div>
+
       {% else %}
         <p>No information on locations has been found.</p>
       {% endif %}
-
-      <div class="pagination">
-          <span class="step-links">
-
-          {% include 'pagination.html' %}
-
-          </span>
-      </div>
 
       </div>
 

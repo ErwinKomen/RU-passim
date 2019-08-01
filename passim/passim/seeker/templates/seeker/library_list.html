@@ -9,6 +9,7 @@
 
 {% block content %}
 
+      <!-- Library search area -->
       <div class="panel panel-default">
         <form id='librarysearch' method='get' targeturl="{% url 'library_search' %}" >
             <!-- Be sure to add csrf -->
@@ -108,10 +109,37 @@
         </form>
       </div>
 
-    {% if object_list %}
       <div class="panel panel-default">
 
-        <h3>Libraries</h3>
+      <!-- Heading and button to add a new origin -->
+      <form>
+        <h3>
+          <span title="Currently defined libraries">Libraries</span>
+          {% if is_passim_editor %}
+            <span id="add_library" class="pull-right">
+              {% csrf_token %}
+              <a class="btn btn-xs jumbo-3" role="button" 
+                  targeturl="{% url 'library_edit' %}"
+                  targetid="library_new"
+                  onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                <span class="glyphicon glyphicon-plus"></span>Add a library
+              </a>
+            </span>
+          {% endif %}
+        </h3>
+      </form>
+
+      <!-- Room to add a new library -->
+      <div class="row subform">
+        <div class="col-md-offset-1 col-md-10">
+          <div id="library_new">
+            <!-- Room to create a new library instance-->
+          </div>
+        </div>
+      </div>
+
+      {% if object_list %}
+        <!-- Intro with starting pagination-->
         <div class="row">
             <div class="col-sm-3"><span>Found: </span><span>{{entrycount}}</span></div>
             <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
@@ -123,6 +151,8 @@
             </span>
             </div>
         </div>
+
+        <!-- List of libraries (found) -->
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
@@ -137,8 +167,10 @@
                   <td class="tdnowrap">
                     <span class="library-city">{{library.city}}</span>
                   </td>
-                  <td style="width: 100%;">
-                    <span class="library-name">{{library.name}}</span>
+                  <td style="width: 100%;" class="clickable" >
+                    <a href="{% url 'library_details' library.id %}" class="nostyle">
+                      <span class="library-name">{{library.name}}</span>
+                    </a>
                   </td>
                   <td>
                     <span class="library-CNRS">{% if library.idLibrEtab < 0 %}<i>None</i>{% else %}{{library.idLibrEtab}}{% endif %}</span>
@@ -214,19 +246,21 @@
             </table>
           </div>
         </div>
+
+        <!-- Closing pagination -->
+        <div class="pagination">
+            <span class="step-links">
+
+            {% include 'pagination.html' %}
+
+            </span>
+        </div>
+
       {% else %}
-        <p>No libraries have beenfound.</p>
+        <p>No libraries have been found.</p>
       {% endif %}
 
-      <div class="pagination">
-          <span class="step-links">
-
-          {% include 'pagination.html' %}
-
-          </span>
-      </div>
-
-      </div>
+    </div>
 
 {% endblock content %}
 

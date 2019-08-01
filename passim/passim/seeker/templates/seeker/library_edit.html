@@ -1,0 +1,111 @@
+﻿{% load i18n %}
+
+<!-- Source information -->
+<form>
+  {% csrf_token %}
+    <table class="library-details">
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" oldtargetid="library_edit"
+               targeturl="{% if libForm.instance.id %}{% url 'library_edit' libForm.instance.id %}{% else %}{% url 'library_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="library_err_msg" class="err-msg"></span>
+
+            <!-- Put the delete button completely to the right-->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" 
+               targetid="" oldtargetid="library_edit"
+               targeturl="{% if libForm.instance.id %}{% url 'library_edit' libForm.instance.id %}{% endif %}">
+              <span class="glyphicon glyphicon-remove" title="Delete this library"></span>
+            </a>
+          </td>
+        </tr>
+      {% endif %}
+
+      <!-- [1] Name of the library -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top"  style="min-width: 150px;">Name</td>
+        <td  style="width: 100%;">
+          <div class="view-mode">{{libForm.name.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{libForm.name}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- [0-1] Type of the library -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >Library type</td>
+        <td>
+          <div class="view-mode">{{libForm.instance.get_libtype_display}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{libForm.libtype}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- [0-1] CNRS Id of the library -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >CNRS library id</td>
+        <td>
+          <div class="view-mode">{{libForm.idLibrEtab.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{libForm.idLibrEtab}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Allow the user to select a location from the available locations through type-ahead -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" title="Select a location that is as specific as possible">Library location</td>
+        <td>
+          <div class="view-mode">{% if libForm.instance.location %}{{libForm.instance.location.get_loc_name}}{% else %}-{% endif %}</div>
+          <div class="location-key hidden">{{libForm.location}}</div>
+          <div class="edit-mode hidden">{{libForm.location_ta}}</div>
+        </td>
+      </tr>
+      
+      <!-- SHOW the CITY of the library, if it is known -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >City</td>
+        <td>
+          <div class="any-mode">{% if libForm.instance.lcity %}{{libForm.instance.lcity.name}}{% else %}-{% endif %}</div>
+          <div class="hidden">{{libForm.lcity}}</div>
+        </td>
+      </tr>
+
+      <!-- SHOW the Country of the library, if it is known -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >Country</td>
+        <td>
+          <div class="any-mode">{% if libForm.instance.lcountry %}{{libForm.instance.lcountry.name}}{% else %}-{% endif %}</div>
+          <div class="hidden">{{libForm.lcountry}}</div>
+        </td>
+      </tr>
+
+
+      <!-- Possibly afternew information -->
+      {% if afternewurl %}
+        <tr class="hidden">
+          <td colspan="2">
+            <input name="afternewurl" value="{{afternewurl}}" />
+          </td>
+        </tr>
+      {% endif %}
+
+    </table>
+</form>
