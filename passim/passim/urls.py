@@ -68,7 +68,10 @@ urlpatterns = [
     url(r'^location/edit(?:/(?P<pk>\d+))?/$', LocationEdit.as_view(), name='location_edit'),
     url(r'^location/relset(?:/(?P<pk>\d+))?/$', LocationRelset.as_view(), name='loc_relset'),
 
-    # url(r'^sermon/view(?:/(?P<pk>\d+))?/$', SermonDetailsView.as_view(), name='sermon_view'),
+    url(r'^origin/list', OriginListView.as_view(), name='origin_list'),
+    url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetailsView.as_view(), name='origin_details'),
+    url(r'^origin/edit(?:/(?P<pk>\d+))?/$', OriginEdit.as_view(), name='origin_edit'),
+
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
     url(r'^sermon/signset(?:/(?P<pk>\d+))?/$', SermonSignset.as_view(), name='sermon_signset'),

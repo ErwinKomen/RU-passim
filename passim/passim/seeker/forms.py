@@ -391,6 +391,40 @@ class ManuscriptProvForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
 
 
+class OriginForm(forms.ModelForm):
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Origin
+        fields = ['name', 'location', 'note']
+        widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
+                 'location': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'note':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'placeholder': 'Note on this origin...', 'style': 'height: 40px; width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(OriginForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['name'].required = False
+        self.fields['note'].required = False
+        self.fields['location'].required = False
+        self.fields['location_ta'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance != None:
+                self.fields['name'].initial = instance.name
+                self.fields['note'].initial = instance.note
+                if instance.location != None:
+                    self.fields['location_ta'].initial = instance.location.get_loc_name()
+
+
+
 class SermonGoldFtextlinkForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

@@ -32,7 +32,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm
+                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
     EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
@@ -3108,6 +3108,148 @@ class LocationRelset(BasicPart):
                     has_changed = True
  
         return has_changed
+
+
+class OriginListView(ListView):
+    """Listview of origins"""
+
+    model = Origin
+    paginate_by = 15
+    template_name = 'seeker/origin_list.html'
+    entrycount = 0
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(OriginListView, self).get_context_data(**kwargs)
+
+        # Get parameters
+        initial = self.request.GET
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Get parameters for the search
+        initial = self.request.GET
+        # The searchform is just a list form, but filled with the 'initial' parameters
+        context['searchform'] = OriginForm(initial)
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim origin info"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Origins", True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        lstQ = []
+
+        # Check for author [name]
+        if 'name' in get and get['name'] != '':
+            val = adapt_search(get['name'])
+            # Search in both the name field
+            lstQ.append(Q(name__iregex=val))
+
+        # Check for origin type
+        if 'location_ta' in get and get['location_ta'] != '':
+            val = adapt_search(get['location_ta'])
+            # Search in both the name field
+            lstQ.append(Q(location__name__iregex=val))
+
+        # Calculate the final qs
+        qs = Origin.objects.filter(*lstQ).order_by('name').distinct()
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+
+class OriginDetailsView(PassimDetails):
+    model = Origin
+    mForm = OriginForm
+    template_name = 'seeker/origin_details.html'
+    prefix = 'org'
+    prefix_type = "simple"
+    title = "OriginDetails"
+    rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('origin_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Origin edit", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+class OriginEdit(BasicPart):
+    """The details of one origin"""
+
+    MainModel = Origin
+    template_name = 'seeker/origin_edit.html'  
+    title = "Origin" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "org"
+    form_objects = [{'form': OriginForm, 'prefix': prefix, 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "org":
+            pass
+
+        return bNeedSaving
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        if instance != None:
+            pass
+
+        afternew =  reverse('origin_list')
+        if 'afternewurl' in self.qd:
+            afternew = self.qd['afternewurl']
+        context['afternewurl'] = afternew
+
+        return context
 
 
 class SermonDetails(PassimDetails):

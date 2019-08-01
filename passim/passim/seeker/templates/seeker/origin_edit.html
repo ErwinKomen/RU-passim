@@ -1,0 +1,77 @@
+﻿{% load i18n %}
+
+<!-- Source information -->
+<form>
+  {% csrf_token %}
+    <table class="origin-details">
+      <!-- Row to indicate editing, if possible -->
+      {% if is_passim_editor %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" oldtargetid="origin_edit"
+               targeturl="{% if orgForm.instance.id %}{% url 'origin_edit' orgForm.instance.id %}{% else %}{% url 'origin_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="origin_err_msg" class="err-msg"></span>
+
+            <!-- Put the delete button completely to the right-->
+            <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right" 
+               targetid="" oldtargetid="origin_edit"
+               targeturl="{% if orgForm.instance.id %}{% url 'origin_edit' orgForm.instance.id %}{% endif %}">
+              <span class="glyphicon glyphicon-remove" title="Delete this origin"></span>
+            </a>
+          </td>
+        </tr>
+      {% endif %}
+
+      <tr class="form-row">
+        <td class="hoverable" valign="top"  style="min-width: 150px;">Name</td>
+        <td  style="width: 100%;">
+          <div class="view-mode">{{orgForm.name.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{orgForm.name}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="form-row">
+        <td class="hoverable" valign="top" >Origin note</td>
+        <td>
+          <div class="view-mode">{{orgForm.note.value}}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{orgForm.note}}</div>
+          {% endif %}
+        </td>
+      </tr>
+      <!-- Allow the user to select a location from the available locations through type-ahead -->
+      <tr class="form-row">
+        <td class="hoverable" valign="top" title="Select a location that is as specific as possible">Origin location</td>
+        <td>
+          <div class="view-mode">{% if orgForm.instance.location %}{{orgForm.instance.location.get_loc_name}}{% else %}-{% endif %}</div>
+          <div class="location-key hidden">{{orgForm.location}}</div>
+          <div class="edit-mode hidden">{{orgForm.location_ta}}</div>
+        </td>
+      </tr>
+
+      <!-- Possibly afternew information -->
+      {% if afternewurl %}
+        <tr class="hidden">
+          <td colspan="2">
+            <input name="afternewurl" value="{{afternewurl}}" />
+          </td>
+        </tr>
+      {% endif %}
+
+    </table>
+</form>

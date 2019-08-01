@@ -109,7 +109,11 @@
       <tr class="form-row">
         <td valign="top"><b>Origin</b></td>
         <td class="manuscript-support" align="left">
-          <div class="view-mode">{% if manuForm.instance.origin %}{{manuForm.instance.origin.name}}{% else %}-{% endif %}</div>
+          <div class="view-mode">
+            {% if manuForm.instance.origin %}
+              {{manuForm.instance.origin.name}}{% if manuForm.instance.origin.location %}: {{manuForm.instance.origin.location.get_loc_name}}{% endif %}
+            {% else %}-{% endif %}
+          </div>
           {% if is_passim_editor %}
             <div class="origin-key hidden">{{manuForm.origin}}</div>
             <div class="edit-mode hidden">{{manuForm.origname_ta}}</div>
