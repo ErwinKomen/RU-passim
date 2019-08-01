@@ -1299,6 +1299,12 @@ class Library(models.Model):
         obj = self.get_country()
         return "" if obj == None else obj.name
 
+    def num_manuscripts(self):
+        """Get the number of manuscripts in our database that refer to this library"""
+
+        num = Manuscript.objects.filter(library=self).count()
+        return num
+
     def find_or_create(sCity, sLibrary, sCountry = None):
         """Find a library on the basis of the city and the library name.
         If there is no library with that combination yet, create it

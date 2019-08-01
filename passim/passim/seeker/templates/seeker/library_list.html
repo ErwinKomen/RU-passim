@@ -126,7 +126,7 @@
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
-              <thead><tr><th class="hidden">id</th><th>Country</th><th>City</th><th>Library</th><th>type</th><th><!-- Buttons --></th></tr></thead>
+              <thead><tr><th class="hidden">id</th><th>Country</th><th>City</th><th>Library</th><th title="CNRS library ID (if known)">CNRS</th><th>Manuscripts</th><th>type</th><th><!-- Buttons --></th></tr></thead>
               <tbody>
               {% for library in object_list %}
                 <tr class="dict-entry">
@@ -134,11 +134,26 @@
                   <td>
                     <span class="library-country"><a href="{% url 'library_search' %}?country={{library.country|urlencode}}">{{library.country}}</a></span>
                   </td>
-                  <td>
+                  <td class="tdnowrap">
                     <span class="library-city">{{library.city}}</span>
                   </td>
                   <td style="width: 100%;">
                     <span class="library-name">{{library.name}}</span>
+                  </td>
+                  <td>
+                    <span class="library-CNRS">{% if library.idLibrEtab < 0 %}<i>None</i>{% else %}{{library.idLibrEtab}}{% endif %}</span>
+                  </td>
+                  <td align="right">
+                    <span class="library-manuscripts" >
+                      {% if library.num_manuscripts %}
+                        <span>{{library.num_manuscripts}}</span>
+                        <!-- Link to these manuscripts -->
+                        <a role="button" class="btn btn-xs jumbo-3" title="Go to these manuscripts" target="_blank"
+                           href="{% url 'search_manuscript' %}?library={{library.id}}">
+                          <span class="glyphicon glyphicon-chevron-right"></span>
+                        </a>
+                      {% else %}-{% endif %}
+                    </span>
                   </td>
                   <td>
                     <span class="library-type">{{library.libtype}}</span>

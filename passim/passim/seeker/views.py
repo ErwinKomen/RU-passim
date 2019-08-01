@@ -3801,8 +3801,13 @@ class ManuscriptListView(ListView):
 
                         # Check for library name
                         if 'library' in oFields and oFields['library'] != "": 
-                            val = adapt_search(oFields['library'])
-                            lstThisQ.append(Q(library__name__iregex=val))
+                            # Is this a number?
+                            val = oFields['library']
+                            if val.isdigit():
+                                lstThisQ.append(Q(library__id=val))
+                            else:
+                                val = adapt_search(val)
+                                lstThisQ.append(Q(library__name__iregex=val))
 
                         # Now add these criterya to the overall lstQ
                         if len(lstThisQ) > 0:
@@ -3821,6 +3826,16 @@ class ManuscriptListView(ListView):
             else:
                 criteria = reduce(operator.or_, lstQ)
                 qs = Manuscript.objects.filter(criteria).distinct()
+        elif 'library' in get:
+            lstQ = []
+            # Is this a number?
+            val = get['library']
+            if val.isdigit():
+                lstQ.append(Q(library__id=val))
+            else:
+                val = adapt_search(val)
+                lstQ.append(Q(library__name__iregex=val))
+            qs = Manuscript.objects.filter(*lstQ).distinct()
         else:
             # Just show everything
             qs = Manuscript.objects.all()
