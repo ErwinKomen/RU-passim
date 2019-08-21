@@ -1600,7 +1600,8 @@ class Manuscript(models.Model):
                 if support != "": manuscript.support = support
                 if extent != "": manuscript.extent = extent
                 if format != "": manuscript.format = format
-                if url != "": manuscript.url = url
+                # NOTE: the URL is no longer saved as part of the manuscript - it is part of ManuscriptExt
+                # EXTINCT: if url != "": manuscript.url = url
                 if source != None: manuscript.source=source
                 manuscript.stype = stype
                 manuscript.save()
@@ -2037,6 +2038,13 @@ class Manuscript(models.Model):
             idno = "" if 'idno' not in oInfo else oInfo['idno']
             url = oInfo['url']
             manuscript = Manuscript.find_or_create(oInfo['name'], yearstart, yearfinish, library, idno, filename, url, support, extent, format, source)
+
+            # If there is an URL, then this is an external reference and it needs to be added separately
+            if url != None and url != "":
+                # There is an actual URL: Create a new ManuscriptExt instance
+                mext = ManuscriptExt(url=url, manuscript=manuscript)
+                mext.save()
+
 
             # Add all the provenances we know of
             if provenance_origin != None:
