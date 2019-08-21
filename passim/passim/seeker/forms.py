@@ -391,6 +391,24 @@ class ManuscriptProvForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
 
 
+class ManuscriptExtForm(forms.ModelForm):
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptExt
+        fields = ['url']
+        widgets={'url':     forms.TextInput(attrs={'placeholder': 'External link (URL)...', 'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptExtForm, self).__init__(*args, **kwargs)
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
 class OriginForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))

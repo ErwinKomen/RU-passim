@@ -33,9 +33,9 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm
+                                LibraryForm, ManuscriptExtForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, \
+    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
     Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
@@ -745,6 +745,61 @@ def do_provenance(request):
         msg = oErr.get_error_message()
         oErr.DoError("do_provenance")
         return reverse('home')
+
+def do_mext(request):
+    """Copy all 'url' fields from Manuscript instances to separate ManuscriptExt instances and link them to the Manuscript"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Copy Manuscript links to externals"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Mext", True)
+
+        # Create list to be returned
+        result_list = []
+        added_list = []
+
+        # Get a list of all Manuscripts that are not referred to via a ManuscriptExt
+        man_ids = [x.manuscript.id for x in ManuscriptExt.objects.all() ]
+
+        qs = Manuscript.objects.exclude(id__in=man_ids)
+        with transaction.atomic():
+            for item in qs:
+                # Get any possible URL here
+                url = item.url
+                if url != None:
+                    # There is an actual URL: Create a new ManuscriptExt instance
+                    mext = ManuscriptExt(url=url, manuscript=item)
+                    mext.save()
+                    added_list.append(mext.id)
+
+        # Wrapping it up
+        result_list.append({'part': 'All additions', 'result': json.dumps(added_list)})
+        context['result_list'] = result_list
+
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_mext")
+        return reverse('home')
+
 
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
@@ -3920,6 +3975,31 @@ class ManuscriptProvset(BasicPart):
                     # Indicate that changes have been made
                     has_changed = True
 
+        return has_changed
+
+
+class ManuscriptExtset(BasicPart):
+    """The set of provenances from one manuscript"""
+
+    MainModel = Manuscript
+    template_name = 'seeker/manuscript_extset.html'
+    title = "ManuscriptExternalLinks"
+    MprovFormSet = inlineformset_factory(Manuscript, ManuscriptExt,
+                                         form=ManuscriptExtForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MprovFormSet, 'prefix': 'mext', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "mext":
+            # List the external links for this manuscript correctly
+            qs = ManuscriptExt.objects.filter(manuscript=self.obj).order_by('url')
+        return qs
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        # NOTE: no drastic things here yet
         return has_changed
 
 

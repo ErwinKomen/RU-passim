@@ -2881,6 +2881,21 @@ class Ftextlink(models.Model):
         return self.url
 
 
+class ManuscriptExt(models.Model):
+    """External URL (link) that belongs to a particular manuscript"""
+
+    # [1] The URL itself
+    url = models.URLField("External URL", max_length=LONG_STRING)
+    # [1] Every external URL belongs to exactly one Manuscript
+    manuscript = models.ForeignKey(Manuscript, null=False, blank=False, related_name="manuscriptexternals")
+
+    def __str__(self):
+        return self.url
+
+    def short(self):
+        return self.url
+
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
