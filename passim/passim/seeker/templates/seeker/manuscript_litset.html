@@ -1,0 +1,151 @@
+﻿{% load i18n %}
+
+<div id="mlit_formset" class="panel panel-wide panel-default">
+
+  <div class="row" id="mlit_formset_main">
+    <form action="">
+      {% csrf_token %}
+      <!-- Need to have the management stuff for 'mlit' -->
+      {{ mlit_formset.management_form }}
+
+      <div class="col-md-12">
+        {% if not is_passim_editor and mlit_formset|length == 0 %}
+          <p>No literature references defined for this manuscript</p>
+        {% else %}
+          <table class="func-view" style="width: 100%;">
+            <thead>
+              <tr><th colspan="2">#</th><th>Literature reference</th><th>&nbsp;</th></tr>
+            </thead>
+            <tbody>
+              {% for litrform in mlit_formset %}
+                <tr class="form-row">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+
+                  <!-- Hidden but essential: the id of this litref -->
+                  <td class="hidden">{{litrform.id}}</td>
+
+                  <!-- A button to edit or save this litref -->
+                  <td valign="top" class="clickable"  style="min-width: 20px;">
+                    {% if is_passim_editor %}
+                      <div class="view-mode">
+                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this literature reference">
+                          <span class="glyphicon glyphicon-pencil"></span>
+                        </a>
+                      </div>
+                      <div class="edit-mode hidden">
+                        <a title="Save changes to this literature reference"
+                           onclick="ru.passim.seeker.formset_update(this);"
+                           targetid="manuscript_litset"
+                           targeturl="{% url 'manu_litset' pk=object_id %}">
+                          <span class="glyphicon glyphicon-ok"></span>
+                        </a>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- The litref itself -->
+                  <td  style="min-width: 100%;">
+                    <div class="hidden">
+                      <input name="mlit-{{forloop.counter0}}-manuscript" value="{{litrform.instance.manuscript.id}}" />
+                      <input name="mlit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
+                    </div>
+                    <div class="view-mode">{% if litrform.instance.reference %}{{litrform.instance.reference.get_full}}{% else %}-{% endif %}</div>
+                    <div class="litref-key hidden">{{litrform.litref}}</div>
+                    <div class="edit-mode hidden">{{litrform.litref_ta}}</div>
+                    <!-- Confirmation of delete -->
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete the link to this literature reference?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span class="hidden">{{litrform.DELETE}}</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4" 
+                             onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                             targetid="manuscript_litset"
+                             targeturl="{% url 'manu_litset' pk=object_id %}">Delete</a>
+                        </span>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete this literature reference" style="vertical-align: middle; width: 20px; " class="clickable">
+                    {% if is_passim_editor %}
+                      <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                    {% endif %}
+                  </td>
+                </tr>
+
+              {% endfor %}
+
+              {% if is_passim_editor %}
+                <!-- Empty row with specifications -->
+                <tr class="form-row empty-form">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>__counter__</span></td>
+
+                  <!-- A button to edit or save this link -->
+                  <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                    <div class="view-mode hidden">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                      </a>
+                    </div>
+                    <div class="edit-mode">
+                      <a title="Save changes to this link"
+                          onclick="ru.passim.seeker.formset_update(this);"
+                          targetid="manuscript_litset"
+                          targeturl="{% url 'manu_litset' pk=object_id %}">
+                        <span class="glyphicon glyphicon-ok"></span>
+                      </a>
+                    </div>
+                  </td>
+
+                  <!-- The litref itself -->
+                  <td  style="min-width: 100%;">
+                    <div class="hidden">
+                      <input id="id_mlit-__counter__-reference" name="mlit-__counter__-reference" />
+                      <input id="id_mlit-__counter__-manuscript" name="mlit-__counter__-manuscript" value="{{litrform.instance.manuscript.id}}" />
+                    </div>
+                    <div class="view-mode hidden">{% if mlit_formset.empty_form.instance.reference %}{{mlit_formset.empty_form.instance.reference.get_full}}{% else %}-{% endif %}</div>
+                    <div class="litref-key hidden">{{mlit_formset.empty_form.litref}}</div>
+                    <div class="edit-mode">{{mlit_formset.empty_form.litref_ta}}</div>
+                    <!-- Confirmation of delete -->
+                    <div class="delete-confirm hidden">
+                      <span>Do you really want to delete the link to this literature reference?</span>
+                      <span>
+                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                      </span>
+                      <span>
+                        <a class="btn btn-xs jumbo-4 delete-row" extra="mlit">Delete</a>
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete this literature reference" style="vertical-align: middle; width: 20px; " class="clickable">
+                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                  </td>
+                </tr>
+
+                <!-- Add row -->
+                <tr class="add-row">
+                  <td colspan="6">
+                    <span id="add_manu_lit">
+                      <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a literature reference to this manuscript</a>
+                    </span>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        <div id="error_location"></div>
+      </div>
+    </form>
+  </div>
+</div>

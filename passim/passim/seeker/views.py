@@ -33,11 +33,11 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
-    Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Litref, LitrefMan, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys, os
@@ -1279,6 +1279,27 @@ def get_locations(request):
         results = []
         for co in locations:
             name = "{} ({})".format(co['name'], co['loctype__name'])
+            co_json = {'name': name, 'id': co['id'] }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_litrefs(request):
+    """Get a list of literature references for autocomplete"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        sName = request.GET.get('name', '')
+        lstQ = []
+        lstQ.append(Q(full__icontains=sName))
+        litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'id')
+        results = []
+        for co in litrefs:
+            name = co['full']
             co_json = {'name': name, 'id': co['id'] }
             results.append(co_json)
         data = json.dumps(results)
@@ -3978,17 +3999,53 @@ class ManuscriptProvset(BasicPart):
         return has_changed
 
 
+class ManuscriptLitset(BasicPart):
+    """The set of provenances from one manuscript"""
+
+    MainModel = Manuscript
+    template_name = 'seeker/manuscript_litset.html'
+    title = "ManuscriptLiterature"
+    MlitFormSet = inlineformset_factory(Manuscript, LitrefMan,
+                                         form=ManuscriptLitrefForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "mlit":
+            # List the litrefs for this manuscript correctly
+            qs = LitrefMan.objects.filter(manuscript=self.obj).order_by('reference__short')
+        return qs
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        # Check if a new reference should be processed
+        litref_id = form.cleaned_data['litref']
+        if litref_id != "":
+            if instance.id == None or instance.reference == None or instance.reference.id == None or \
+                instance.reference.id != int(litref_id):
+                # Find the correct litref
+                litref = Litref.objects.filter(id=litref_id).first()
+                if litref != None:
+                    # Adapt the value of the instance 
+                    instance.reference = litref
+                    has_changed = True
+            
+        return has_changed
+
+
 class ManuscriptExtset(BasicPart):
     """The set of provenances from one manuscript"""
 
     MainModel = Manuscript
     template_name = 'seeker/manuscript_extset.html'
     title = "ManuscriptExternalLinks"
-    MprovFormSet = inlineformset_factory(Manuscript, ManuscriptExt,
+    MextFormSet = inlineformset_factory(Manuscript, ManuscriptExt,
                                          form=ManuscriptExtForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': MprovFormSet, 'prefix': 'mext', 'readonly': False}]
+    formset_objects = [{'formsetClass': MextFormSet, 'prefix': 'mext', 'readonly': False}]
 
     def get_queryset(self, prefix):
         qs = None

@@ -866,6 +866,13 @@ class Information(models.Model):
     def __str__(self):
         return self.name
 
+    def get_kvalue(name):
+        info = Information.objects.filter(name=name).first()
+        if info == None:
+            return ''
+        else:
+            return info.kvalue
+
 
 class Profile(models.Model):
     """Information about the user"""
@@ -1507,6 +1514,230 @@ class SourceInfo(models.Model):
     collector = models.CharField("Collected by", max_length=LONG_STRING)
 
 
+class Litref(models.Model):
+    """A literature reference as found in a shared Zotero database"""
+
+    # [1] The itemId for this literature reference
+    itemid = models.CharField("Item ID", max_length=LONG_STRING)
+    # [0-1] The abbreviation (retrieved) for this item
+    abbr = models.CharField("Abbreviation", max_length=STANDARD_LENGTH, blank=True, default="")
+    # [0-1] The full reference, including possible markdown symbols
+    full = models.TextField("Full reference", blank=True, default="")
+    # [0-1] A short reference: author-year-title-type
+    short = models.TextField("Short reference", blank=True, default="")
+
+    def __str__(self):
+        return self.itemid
+
+    def get_zotero(self):
+        """Retrieve the zotero list of dicts for this item"""
+
+        libid = Information.get_kvalue("zotero_libraryid")
+        libtype = "group"
+        apikey = Information.get_kvalue("zotero_apikey")
+        zot = zotero.Zotero(libid, libtype, apikey)
+        try:
+            oZot = zot.item(self.itemid)
+            if oZot == None:
+                oBack = None
+            elif 'data' in oZot:
+                oBack = oZot['data']
+            else:
+                oBack = oZot
+        except:
+            oBack = None
+        return oBack
+
+    def read_zotero(self):
+        """Process the information from zotero"""
+
+        # Try to read the data from zotero
+        data = self.get_zotero()
+        result = ""
+        back = True
+
+        # Check if this is okay
+        if data != None and 'itemType' in data:
+            # Action depends on the [itemType]
+            itemType = data['itemType']
+
+            # First step: make a short reference: author, year, title
+            authors = self.get_creators(data, type="author", style= "first")
+            year = "?" if "date" not in data else data['date']
+            title = "(no title)" if "title" not in data else data['title']
+            self.short = "{}. {}. {}. ({})".format(authors, year, title, itemType)
+
+            # Next step: make a full reference
+            authors = self.get_creators(data, type="author")
+            if itemType == "book":
+                # Get publisher
+                publisher = data['publisher']
+                # optional volume
+                volume = data['volume']
+                if volume != "":
+                    publisher = "{}. {}".format(volume, publisher)
+                result = "{}. {}. _{}._ {}.".format(auhtors, year, title, publisher)
+            elif itemType == "bookSection":
+                # Get the editor(s)
+                editors = self.get_creators(data, type="editor")
+                # Get title of book
+                booktitle = data['bookTitle']
+                # Get page(s)
+                pages = data['pages']
+                # Get the location
+                place = data['place']
+                # Get publisher
+                publisher = data['publisher']
+                if place != "":
+                    publisher = "{}: {}".format(place, publisher)
+                result = "{}. {}. {}. In {}, _{}_, {}. {}".format(authors, year, title, editors, booktitle, pages, publisher)
+            elif itemType == "conferencePaper":
+                combi = [authors, year, title]
+                # Name of the proceedings
+                proceedings = data['proceedingsTitle']
+                if proceedings != "": combi.append(proceedings)
+                # Get page(s)
+                pages = data['pages']
+                if pages != "": combi.append(pages)
+                # Get the location
+                place = data['place']
+                if place != "": combi.append(place)
+                # Combine
+                result = ". ".join(combi) + "."
+            elif itemType == "edited-volume":
+                # No idea how to process this
+                pass
+            elif itemType == "journalArticle":
+                combi = [authors, year, title]
+                # Name of the journal
+                journal = data['publicationTitle']
+                # Volume
+                volume = data['volume']
+                # Issue
+                issue = data['issue']
+                if volume == "":
+                    if issue == "":
+                        # No vol/iss
+                        journal = "_{}_".format(journal)
+                    else:
+                        # No vol, but there is an issue
+                        journal = "_{}_ {}".format(journal, issue)
+                elif issue == "":
+                    # There is a volume, but no issue
+                    journal = "_{}_ {}".format(journal, volume)
+                else:
+                    # Both volume and issue
+                    journal = "_{}_ ({}){}".format(journal, volume, issue)
+                combi.append(journal)
+
+                # Get page(s)
+                pages = data['pages']
+                if pages != "": combi.append(pages)
+                # Combine
+                result = ". ".join(combi) + "."
+            elif itemType == "manuscript":
+                combi = [authors, year, title]
+                # Get the location
+                place = data['place']
+                if place == "":
+                    place = "Ms"
+                else:
+                    place = place + ", ms"
+                if place != "": 
+                    combi.append(place)
+                # Combine
+                result = ". ".join(combi) + "."
+            elif itemType == "report":
+                pass
+            elif itemType == "thesis":
+                combi = [authors, year, title]
+                # Get the location
+                place = data['place']
+                # Get the university
+                university = data['university']
+                if university != "": place = "{}: {}".format(place, university)
+                # Get the thesis type
+                thesis = data['thesisType']
+                if thesis != "":
+                    place = "{} {}".format(place, thesis)
+                combi.append(place)
+                # Combine
+                result = ". ".join(combi) + "."
+            elif itemType == "webpage":
+                pass
+            if result != "":
+                # update the full field
+                self.full = result
+        else:
+            back = False
+        # Return ability
+        return back
+
+    def get_creators(data, type="author", style=""):
+        """Extract the authors"""
+
+        authors = []
+        result = ""
+        number = 0
+        bFirst = (style == "first")
+        if data != None and 'creators' in data:
+            for item in data['creators']:
+                if item['creatorType'] == type:
+                    number += 1
+                    # Add this author
+                    if bFirst:
+                        # Extremely short: only the last name of the first author
+                        authors.append(item['lastName'])
+                    else:
+                        if number == 1 and type == "author":
+                            # First author of anything must have lastname-firstname
+                            authors.append("{}, {}".format(item['lastName'], item['firstName']))
+                        else:
+                            # Any other author or editor is firstname-lastname
+                            authors.append("{} {}".format(item['firstName'], item['lastName']))
+            if bFirst:
+                if len(authors) == 0:
+                    result = "(unknown)"
+                else:
+                    result = authors[0]
+                    if len(authors) > 0:
+                        result = result + " e.a."
+            else:
+                if number == 1:
+                    result = authors[0]
+                else:
+                    preamble = authors[:-1]
+                    last = authors[-1]
+                    # The first [n-1] authors should be combined with a comma, the last with an ampersand
+                    result = "{} & {}".format( ", ".join(preamble), last)
+            # Possibly add (eds.)
+            if type == "editor":
+                result = result + " (eds.)"
+
+        return result
+
+    def get_abbr(self):
+        """Get the abbreviation, reading from Zotero if not yet done"""
+
+        if self.abbr == "":
+            self.read_zotero()
+        return self.abbr
+
+    def get_full(self):
+        """Get the full text, reading from Zotero if not yet done"""
+
+        if self.full == "":
+            self.read_zotero()
+        return self.full
+
+    def get_short(self):
+        """Get the short text, reading from Zotero if not yet done"""
+
+        if self.short == "":
+            self.read_zotero()
+        return self.short
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -1549,6 +1780,9 @@ class Manuscript(models.Model):
 
     # [m] Many-to-many: one manuscript can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
+       
+    # [m] Many-to-many: one manuscript can have a series of literature references
+    litrefs = models.ManyToManyField("Litref", through="LitrefMan")
        
     def __str__(self):
         return self.name
@@ -3159,6 +3393,15 @@ class ProvenanceMan(models.Model):
     provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
     # [1] The manuscript this sermon is written on 
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
+
+
+class LitrefMan(models.Model):
+    """The link between a literature item and a manuscript"""
+
+    # [1] The literature item
+    reference = models.ForeignKey(Litref, related_name="reference_litrefs")
+    # [1] The manuscript to which the literature item refers
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
 
 
 class NewsItem(models.Model):

@@ -391,6 +391,41 @@ class ManuscriptProvForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
 
 
+class ManuscriptLitrefForm(forms.ModelForm):
+    litref = forms.CharField(required=False)
+    litref_ta = forms.CharField(label=_("Reference"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = LitrefMan
+        fields = ['reference', 'manuscript']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptLitrefForm, self).__init__(*args, **kwargs)
+        self.fields['reference'].required = False
+        self.fields['litref'].required = False
+        self.fields['litref_ta'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial reference should be added
+            if instance.reference != None:
+                self.fields['litref_ta'].initial = instance.reference.get_full()
+
+    def clean(self):
+        cleaned_data = super(ManuscriptLitrefForm, self).clean()
+        litref = cleaned_data.get("litref")
+        reference = cleaned_data.get("reference")
+        if reference == None and (litref == None or litref == ""):
+            #litref_ta = cleaned_data.get("litref_ta")
+            #obj = Litref.objects.filter(full=litref_ta).first()
+            #if obj == None:
+            raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
+
+
 class ManuscriptExtForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

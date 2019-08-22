@@ -46,6 +46,8 @@ var ru = (function ($, ru) {
         loc_originsL = [],
         loc_locations = [],         // Provenance and Origina locations for manuscripts
         loc_locationsL = [],
+        loc_litrefs = [],           // Literatur references for manuscripts
+        loc_litrefsL = [],
         loc_gldincipits = [],       // Use in sermongold_select.html
         loc_gldincipitsL = [],  
         loc_gldexplicits = [],      // Use in sermongold_select.html
@@ -164,6 +166,19 @@ var ru = (function ($, ru) {
           prefetch: { url: base_url + 'api/locations/', cache: true },
           remote: {
             url: base_url + 'api/locations/?name=',
+            replace: ru.passim.tt_library
+          }
+        });
+
+        // Bloodhound: LITREF
+        loc_litrefs = new Bloodhound({
+          datumTokenizer: Bloodhound.tokenizers.whitespace,
+          queryTokenizer: Bloodhound.tokenizers.whitespace,
+          // loc_litrefs will be an array of literature references
+          local: loc_litrefsL,
+          prefetch: { url: base_url + 'api/litrefs/', cache: true },
+          remote: {
+            url: base_url + 'api/litrefs/?name=',
             replace: ru.passim.tt_library
           }
         });
@@ -430,6 +445,7 @@ var ru = (function ($, ru) {
           $(".typeahead.libraries").typeahead('destroy');
           $(".typeahead.origins").typeahead('destroy');
           $(".typeahead.locations").typeahead('destroy');
+          $(".typeahead.litrefs").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
           $(".typeahead.nicknames").typeahead('destroy');
           $(".typeahead.gldincipits").typeahead('destroy');
@@ -504,6 +520,21 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".location-key input").last().val(suggestion.id);
+          });
+
+          // Type-ahead: LITREF
+          $(".form-row:not(.empty-form) .typeahead.litrefs, .manuscript-details .typeahead.litrefs").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'litrefs', source: loc_litrefs, limit: 25, displayKey: "name",
+              templates: {
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".litref-key input").last().val(suggestion.id);
           });
 
           // Type-ahead: AUTHOR -- NOTE: not in a form-row, but in a normal 'row'
