@@ -1537,6 +1537,12 @@ class Litref(models.Model):
         libid = Information.get_kvalue("zotero_libraryid")
         libtype = "group"
         apikey = Information.get_kvalue("zotero_apikey")
+
+        # Double check
+        if libid == ""  or apikey == "":
+            # Cannot proceed, but we'll return True anyway
+            return True
+
         zot = zotero.Zotero(libid, libtype, apikey)
         group_size = 25
         bBack = True
