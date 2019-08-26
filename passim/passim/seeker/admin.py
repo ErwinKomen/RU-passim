@@ -155,6 +155,13 @@ class SourceInfoAdmin(admin.ModelAdmin):
     list_filter = ['collector']
 
 
+class LitrefAdmin(admin.ModelAdmin):
+    """Literature references"""
+    fields = ['itemid', 'data', 'abbr', 'short', 'full']
+    list_display = ['itemid', 'abbr', 'short']
+    list_filter = ['itemid']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -170,6 +177,7 @@ admin.site.register(Origin)
 admin.site.register(LocationType, LocationTypeAdmin)
 admin.site.register(Location, LocationAdmin)
 admin.site.register(SourceInfo, SourceInfoAdmin)
+admin.site.register(Litref, LitrefAdmin)
 
 admin.site.register(Report, ReportAdmin)
 

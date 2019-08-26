@@ -1521,6 +1521,8 @@ class Litref(models.Model):
 
     # [1] The itemId for this literature reference
     itemid = models.CharField("Item ID", max_length=LONG_STRING)
+    # [0-1] The actual 'data' contents as a JSON string
+    data = models.TextField("JSON data", blank=True, default="")
     # [0-1] The abbreviation (retrieved) for this item
     abbr = models.CharField("Abbreviation", max_length=STANDARD_LENGTH, blank=True, default="")
     # [0-1] The full reference, including possible markdown symbols
@@ -1558,18 +1560,21 @@ class Litref(models.Model):
                 # Fetch these publications
                 for item in zot.items(start=start, limit=25):
                     # Get the itemid
+                    sData = json.dumps( item['data'])
                     itemid = item['key']
                     # Check if the item is in Litref
                     obj = Litref.objects.filter(itemid=itemid).first()
                     if obj == None:
                         # Add it
-                        obj = Litref(itemid=itemid)
+                        obj = Litref(itemid=itemid, data=sData)
                         obj.save()
                     # Check if it needs processing
-                    if obj.short == "":
+                    if obj.short == "" or obj.data != sData:
                         # It needs processing
-                        if 'data' in item:
-                            obj.read_zotero(data=item['data'])
+                        obj.read_zotero(data=item['data'])
+                    elif obj.data != sData:
+                        obj.data = sData
+                        obj.save()
                     
         except:
             msg = oErr.get_error_message()
@@ -1615,6 +1620,11 @@ class Litref(models.Model):
                 itemType = data['itemType']
 
                 if itemType in ok_types:
+                    # Check presence of data
+                    sData = json.dumps(data)
+                    # Check and adapt the JSON string data
+                    if self.data != sData:
+                        self.data = sData
 
                     # First step: make a short reference: author, year, title
                     authors = Litref.get_creators(data, type="author", style= "first")
@@ -1764,7 +1774,7 @@ class Litref(models.Model):
                     result = "(unknown)"
                 else:
                     result = authors[0]
-                    if len(authors) > 0:
+                    if len(authors) > 1:
                         result = result + " e.a."
             else:
                 if number == 1:
