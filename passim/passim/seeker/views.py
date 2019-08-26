@@ -1108,21 +1108,26 @@ def get_countries(request):
     data = 'fail'
     method = "useLocation"
     if request.is_ajax():
-        sName = request.GET.get('country', '')
-        if sName == "": sName = request.GET.get('country_ta', "")
-        lstQ = []
-        lstQ.append(Q(name__icontains=sName))
-        if method == "useLocation":
-            loctype = LocationType.find("country")
-            lstQ.append(Q(loctype=loctype))
-            countries = Location.objects.filter(*lstQ).order_by('name')
-        else:
-            countries = Country.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in countries:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('country', '')
+            if sName == "": sName = request.GET.get('country_ta', "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=sName))
+            if method == "useLocation":
+                loctype = LocationType.find("country")
+                lstQ.append(Q(loctype=loctype))
+                countries = Location.objects.filter(*lstQ).order_by('name')
+            else:
+                countries = Country.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in countries:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_countries")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -1135,56 +1140,61 @@ def get_cities(request):
     data = 'fail'
     method = "useLocation"
     if request.is_ajax():
-        # Get the user-specified 'country' and 'city' strings
-        country = request.GET.get('country', "")
-        if country == "": country = request.GET.get('country_ta', "")
-        city = request.GET.get("city", "")
-        if city == "": city = request.GET.get('city_ta', "")
+        oErr = ErrHandle()
+        try:
+            # Get the user-specified 'country' and 'city' strings
+            country = request.GET.get('country', "")
+            if country == "": country = request.GET.get('country_ta', "")
+            city = request.GET.get("city", "")
+            if city == "": city = request.GET.get('city_ta', "")
 
-        # build the query
-        lstQ = []
-        if method == "useLocation":
-            # Start as broad as possible: country
-            qs_loc = None
-            if country != "":
-                loctype_country = LocationType.find("country")
-                lstQ.append(Q(name=country))
-                lstQ.append(Q(loctype=loctype_country))
-                qs_country = Location.objects.filter(*lstQ)
-                # Fine-tune on city...
+            # build the query
+            lstQ = []
+            if method == "useLocation":
+                # Start as broad as possible: country
+                qs_loc = None
+                if country != "":
+                    loctype_country = LocationType.find("country")
+                    lstQ.append(Q(name=country))
+                    lstQ.append(Q(loctype=loctype_country))
+                    qs_country = Location.objects.filter(*lstQ)
+                    # Fine-tune on city...
+                    loctype_city = LocationType.find("city")
+                    lstQ = []
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    lstQ.append(Q(relations_location__in=qs_country))
+                    cities = Location.objects.filter(*lstQ)
+                else:
+                    loctype_city = LocationType.find("city")
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    cities = Location.objects.filter(*lstQ)
+            elif method == "slowLocation":
+                # First of all: city...
                 loctype_city = LocationType.find("city")
-                lstQ = []
                 lstQ.append(Q(name__icontains=city))
                 lstQ.append(Q(loctype=loctype_city))
-                lstQ.append(Q(relations_location__in=qs_country))
-                cities = Location.objects.filter(*lstQ)
+                # Do we have a *country* specification?
+                if country != "":
+                    loctype_country = LocationType.find("country")
+                    lstQ.append(Q(relations_location__name=country))
+                    lstQ.append(Q(relations_location__loctype=loctype_country))
+                # Combine everything
+                cities = Location.objects.filter(*lstQ).order_by('name')
             else:
-                loctype_city = LocationType.find("city")
+                if country != "":
+                    lstQ.append(Q(country__name__icontains=country))
                 lstQ.append(Q(name__icontains=city))
-                lstQ.append(Q(loctype=loctype_city))
-                cities = Location.objects.filter(*lstQ)
-        elif method == "slowLocation":
-            # First of all: city...
-            loctype_city = LocationType.find("city")
-            lstQ.append(Q(name__icontains=city))
-            lstQ.append(Q(loctype=loctype_city))
-            # Do we have a *country* specification?
-            if country != "":
-                loctype_country = LocationType.find("country")
-                lstQ.append(Q(relations_location__name=country))
-                lstQ.append(Q(relations_location__loctype=loctype_country))
-            # Combine everything
-            cities = Location.objects.filter(*lstQ).order_by('name')
-        else:
-            if country != "":
-                lstQ.append(Q(country__name__icontains=country))
-            lstQ.append(Q(name__icontains=city))
-            cities = City.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in cities:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
+                cities = City.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in cities:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_cities")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -1196,51 +1206,56 @@ def get_libraries(request):
 
     data = 'fail'
     if request.is_ajax():
-        # Get the user-specified 'country' and 'city' strings
-        country = request.GET.get('country', "")
-        if country == "": country = request.GET.get('country_ta', "")
-        city = request.GET.get("city", "")
-        if city == "": city = request.GET.get('city_ta', "")
-        lib = request.GET.get("library", "")
-        if lib == "": lib = request.GET.get('libname_ta', "")
+        oErr = ErrHandle()
+        try:
+            # Get the user-specified 'country' and 'city' strings
+            country = request.GET.get('country', "")
+            if country == "": country = request.GET.get('country_ta', "")
+            city = request.GET.get("city", "")
+            if city == "": city = request.GET.get('city_ta', "")
+            lib = request.GET.get("library", "")
+            if lib == "": lib = request.GET.get('libname_ta', "")
 
-        # build the query
-        lstQ = []
-        # Start as broad as possible: country
-        qs_loc = None
-        if country != "":
-            loctype_country = LocationType.find("country")
-            lstQ.append(Q(name=country))
-            lstQ.append(Q(loctype=loctype_country))
-            qs_country = Location.objects.filter(*lstQ)
-            # What about city?
-            if city == "":
-                qs_loc = qs_country
-            else:
+            # build the query
+            lstQ = []
+            # Start as broad as possible: country
+            qs_loc = None
+            if country != "":
+                loctype_country = LocationType.find("country")
+                lstQ.append(Q(name=country))
+                lstQ.append(Q(loctype=loctype_country))
+                qs_country = Location.objects.filter(*lstQ)
+                # What about city?
+                if city == "":
+                    qs_loc = qs_country
+                else:
+                    loctype_city = LocationType.find("city")
+                    lstQ = []
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    lstQ.append(Q(relations_location__in=qs_country))
+                    qs_loc = Location.objects.filter(*lstQ)
+            elif city != "":
                 loctype_city = LocationType.find("city")
-                lstQ = []
                 lstQ.append(Q(name__icontains=city))
                 lstQ.append(Q(loctype=loctype_city))
-                lstQ.append(Q(relations_location__in=qs_country))
                 qs_loc = Location.objects.filter(*lstQ)
-        elif city != "":
-            loctype_city = LocationType.find("city")
-            lstQ.append(Q(name__icontains=city))
-            lstQ.append(Q(loctype=loctype_city))
-            qs_loc = Location.objects.filter(*lstQ)
 
-        # Start out with the idea to look for a library by name:
-        lstQ = []
-        if lib != "": lstQ.append(Q(name__icontains=lib))
-        if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
+            # Start out with the idea to look for a library by name:
+            lstQ = []
+            if lib != "": lstQ.append(Q(name__icontains=lib))
+            if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
 
-        # Combine everything
-        libraries = Library.objects.filter(*lstQ).order_by('name').values('name','id') 
-        results = []
-        for co in libraries:
-            co_json = {'name': co['name'], 'id': co['id'] }
-            results.append(co_json)
-        data = json.dumps(results)
+            # Combine everything
+            libraries = Library.objects.filter(*lstQ).order_by('name').values('name','id') 
+            results = []
+            for co in libraries:
+                co_json = {'name': co['name'], 'id': co['id'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_libraries")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -1272,16 +1287,21 @@ def get_locations(request):
 
     data = 'fail'
     if request.is_ajax():
-        sName = request.GET.get('name', '')
-        lstQ = []
-        lstQ.append(Q(name__icontains=sName))
-        locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
-        results = []
-        for co in locations:
-            name = "{} ({})".format(co['name'], co['loctype__name'])
-            co_json = {'name': name, 'id': co['id'] }
-            results.append(co_json)
-        data = json.dumps(results)
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('name', '')
+            lstQ = []
+            lstQ.append(Q(name__icontains=sName))
+            locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
+            results = []
+            for co in locations:
+                name = "{} ({})".format(co['name'], co['loctype__name'])
+                co_json = {'name': name, 'id': co['id'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_locations")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -1293,16 +1313,21 @@ def get_litrefs(request):
     
     data = 'fail'
     if request.is_ajax():
-        sName = request.GET.get('name', '')
-        lstQ = []
-        lstQ.append(Q(full__icontains=sName))
-        litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'id')
-        results = []
-        for co in litrefs:
-            name = co['full']
-            co_json = {'name': name, 'id': co['id'] }
-            results.append(co_json)
-        data = json.dumps(results)
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('name', '')
+            lstQ = []
+            lstQ.append(Q(full__icontains=sName))
+            litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'id')
+            results = []
+            for co in litrefs:
+                name = co['full']
+                co_json = {'name': name, 'id': co['id'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_litrefs")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -4010,6 +4035,11 @@ class ManuscriptLitset(BasicPart):
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False}]
+
+    def custom_init(self):
+        # Ad-hoc: refresh literature references
+        Litref.sync_zotero()
+        return True
 
     def get_queryset(self, prefix):
         qs = None

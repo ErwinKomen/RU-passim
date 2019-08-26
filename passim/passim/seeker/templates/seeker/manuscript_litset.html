@@ -50,7 +50,7 @@
                       <input name="mlit-{{forloop.counter0}}-manuscript" value="{{litrform.instance.manuscript.id}}" />
                       <input name="mlit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                     </div>
-                    <div class="view-mode">{% if litrform.instance.reference %}{{litrform.instance.reference.get_full}}{% else %}-{% endif %}</div>
+                    <div class="view-mode">{% if litrform.instance.reference %}{{litrform.instance.reference.get_full_markdown|safe}}{% else %}-{% endif %}</div>
                     <div class="litref-key hidden">{{litrform.litref}}</div>
                     <div class="edit-mode hidden">{{litrform.litref_ta}}</div>
                     <!-- Confirmation of delete -->
@@ -110,7 +110,7 @@
                       <input id="id_mlit-__counter__-reference" name="mlit-__counter__-reference" />
                       <input id="id_mlit-__counter__-manuscript" name="mlit-__counter__-manuscript" value="{{litrform.instance.manuscript.id}}" />
                     </div>
-                    <div class="view-mode hidden">{% if mlit_formset.empty_form.instance.reference %}{{mlit_formset.empty_form.instance.reference.get_full}}{% else %}-{% endif %}</div>
+                    <div class="view-mode hidden">{% if mlit_formset.empty_form.instance.reference %}{{mlit_formset.empty_form.instance.reference.get_full_markdown}}{% else %}-{% endif %}</div>
                     <div class="litref-key hidden">{{mlit_formset.empty_form.litref}}</div>
                     <div class="edit-mode">{{mlit_formset.empty_form.litref_ta}}</div>
                     <!-- Confirmation of delete -->

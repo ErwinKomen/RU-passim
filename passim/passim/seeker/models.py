@@ -20,7 +20,9 @@ import json
 import time
 import fnmatch
 import csv
+import math
 from io import StringIO
+from pyzotero import zotero
 
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
@@ -1529,6 +1531,47 @@ class Litref(models.Model):
     def __str__(self):
         return self.itemid
 
+    def sync_zotero():
+        """Read all stuff from Zotero"""
+
+        libid = Information.get_kvalue("zotero_libraryid")
+        libtype = "group"
+        apikey = Information.get_kvalue("zotero_apikey")
+        zot = zotero.Zotero(libid, libtype, apikey)
+        group_size = 25
+        bBack = True
+        oErr = ErrHandle()
+        try:
+            # Get the total number of items
+            total_count = zot.count_items()
+            # Read them in groups of 25
+            total_groups = math.ceil(total_count / group_size)
+            for grp_num in range( total_groups):
+                # Calculate the umber to start from
+                start = grp_num * group_size
+                # Fetch these publications
+                for item in zot.items(start=start, limit=25):
+                    # Get the itemid
+                    itemid = item['key']
+                    # Check if the item is in Litref
+                    obj = Litref.objects.filter(itemid=itemid).first()
+                    if obj == None:
+                        # Add it
+                        obj = Litref(itemid=itemid)
+                        obj.save()
+                    # Check if it needs processing
+                    if obj.short == "":
+                        # It needs processing
+                        if 'data' in item:
+                            obj.read_zotero(data=item['data'])
+                    
+        except:
+            msg = oErr.get_error_message()
+            bBack = False
+        return bBack
+
+
+
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""
 
@@ -1548,127 +1591,142 @@ class Litref(models.Model):
             oBack = None
         return oBack
 
-    def read_zotero(self):
+    def read_zotero(self, data=None):
         """Process the information from zotero"""
 
         # Try to read the data from zotero
-        data = self.get_zotero()
+        if data == None:
+            data = self.get_zotero()
         result = ""
         back = True
+        ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+        oErr = ErrHandle()
 
-        # Check if this is okay
-        if data != None and 'itemType' in data:
-            # Action depends on the [itemType]
-            itemType = data['itemType']
+        try:
+            # Check if this is okay
+            if data != None and 'itemType' in data:
+                # Action depends on the [itemType]
+                itemType = data['itemType']
 
-            # First step: make a short reference: author, year, title
-            authors = self.get_creators(data, type="author", style= "first")
-            year = "?" if "date" not in data else data['date']
-            title = "(no title)" if "title" not in data else data['title']
-            self.short = "{}. {}. {}. ({})".format(authors, year, title, itemType)
+                if itemType in ok_types:
 
-            # Next step: make a full reference
-            authors = self.get_creators(data, type="author")
-            if itemType == "book":
-                # Get publisher
-                publisher = data['publisher']
-                # optional volume
-                volume = data['volume']
-                if volume != "":
-                    publisher = "{}. {}".format(volume, publisher)
-                result = "{}. {}. _{}._ {}.".format(auhtors, year, title, publisher)
-            elif itemType == "bookSection":
-                # Get the editor(s)
-                editors = self.get_creators(data, type="editor")
-                # Get title of book
-                booktitle = data['bookTitle']
-                # Get page(s)
-                pages = data['pages']
-                # Get the location
-                place = data['place']
-                # Get publisher
-                publisher = data['publisher']
-                if place != "":
-                    publisher = "{}: {}".format(place, publisher)
-                result = "{}. {}. {}. In {}, _{}_, {}. {}".format(authors, year, title, editors, booktitle, pages, publisher)
-            elif itemType == "conferencePaper":
-                combi = [authors, year, title]
-                # Name of the proceedings
-                proceedings = data['proceedingsTitle']
-                if proceedings != "": combi.append(proceedings)
-                # Get page(s)
-                pages = data['pages']
-                if pages != "": combi.append(pages)
-                # Get the location
-                place = data['place']
-                if place != "": combi.append(place)
-                # Combine
-                result = ". ".join(combi) + "."
-            elif itemType == "edited-volume":
-                # No idea how to process this
-                pass
-            elif itemType == "journalArticle":
-                combi = [authors, year, title]
-                # Name of the journal
-                journal = data['publicationTitle']
-                # Volume
-                volume = data['volume']
-                # Issue
-                issue = data['issue']
-                if volume == "":
-                    if issue == "":
-                        # No vol/iss
-                        journal = "_{}_".format(journal)
-                    else:
-                        # No vol, but there is an issue
-                        journal = "_{}_ {}".format(journal, issue)
-                elif issue == "":
-                    # There is a volume, but no issue
-                    journal = "_{}_ {}".format(journal, volume)
+                    # First step: make a short reference: author, year, title
+                    authors = Litref.get_creators(data, type="author", style= "first")
+                    year = "?" if "date" not in data else data['date']
+                    title = "(no title)" if "title" not in data else data['title']
+                    self.short = "{}. {}. {}. ({})".format(authors, year, title, itemType)
+
+                    # Next step: make a full reference
+                    authors = Litref.get_creators(data, type="author")
+                    if itemType == "book":
+                        # Get publisher
+                        publisher = data['publisher']
+                        # optional volume
+                        volume = data['volume']
+                        if volume != "":
+                            publisher = "{}. {}".format(volume, publisher)
+                        result = "{}. {}. _{}._ {}.".format(authors, year, title, publisher)
+                    elif itemType == "bookSection":
+                        # Get the editor(s)
+                        editors = self.get_creators(data, type="editor")
+                        # Get title of book
+                        booktitle = data['bookTitle']
+                        # Get page(s)
+                        pages = data['pages']
+                        # Get the location
+                        place = data['place']
+                        # Get publisher
+                        publisher = data['publisher']
+                        if place != "":
+                            publisher = "{}: {}".format(place, publisher)
+                        result = "{}. {}. {}. In {}, _{}_, {}. {}".format(authors, year, title, editors, booktitle, pages, publisher)
+                    elif itemType == "conferencePaper":
+                        combi = [authors, year, title]
+                        # Name of the proceedings
+                        proceedings = data['proceedingsTitle']
+                        if proceedings != "": combi.append(proceedings)
+                        # Get page(s)
+                        pages = data['pages']
+                        if pages != "": combi.append(pages)
+                        # Get the location
+                        place = data['place']
+                        if place != "": combi.append(place)
+                        # Combine
+                        result = ". ".join(combi) + "."
+                    elif itemType == "edited-volume":
+                        # No idea how to process this
+                        pass
+                    elif itemType == "journalArticle":
+                        combi = [authors, year, title]
+                        # Name of the journal
+                        journal = data['publicationTitle']
+                        # Volume
+                        volume = data['volume']
+                        # Issue
+                        issue = data['issue']
+                        if volume == "":
+                            if issue == "":
+                                # No vol/iss
+                                journal = "_{}_".format(journal)
+                            else:
+                                # No vol, but there is an issue
+                                journal = "_{}_ {}".format(journal, issue)
+                        elif issue == "":
+                            # There is a volume, but no issue
+                            journal = "_{}_ {}".format(journal, volume)
+                        else:
+                            # Both volume and issue
+                            journal = "_{}_ ({}){}".format(journal, volume, issue)
+                        combi.append(journal)
+
+                        # Get page(s)
+                        pages = data['pages']
+                        if pages != "": combi.append(pages)
+                        # Combine
+                        result = ". ".join(combi) + "."
+                    elif itemType == "manuscript":
+                        combi = [authors, year, title]
+                        # Get the location
+                        place = data['place']
+                        if place == "":
+                            place = "Ms"
+                        else:
+                            place = place + ", ms"
+                        if place != "": 
+                            combi.append(place)
+                        # Combine
+                        result = ". ".join(combi) + "."
+                    elif itemType == "report":
+                        pass
+                    elif itemType == "thesis":
+                        combi = [authors, year, title]
+                        # Get the location
+                        place = data['place']
+                        # Get the university
+                        university = data['university']
+                        if university != "": place = "{}: {}".format(place, university)
+                        # Get the thesis type
+                        thesis = data['thesisType']
+                        if thesis != "":
+                            place = "{} {}".format(place, thesis)
+                        combi.append(place)
+                        # Combine
+                        result = ". ".join(combi) + "."
+                    elif itemType == "webpage":
+                        pass
+                    if result != "":
+                        # update the full field
+                        self.full = result
+
+                    # Now update this item
+                    self.save()
                 else:
-                    # Both volume and issue
-                    journal = "_{}_ ({}){}".format(journal, volume, issue)
-                combi.append(journal)
-
-                # Get page(s)
-                pages = data['pages']
-                if pages != "": combi.append(pages)
-                # Combine
-                result = ". ".join(combi) + "."
-            elif itemType == "manuscript":
-                combi = [authors, year, title]
-                # Get the location
-                place = data['place']
-                if place == "":
-                    place = "Ms"
-                else:
-                    place = place + ", ms"
-                if place != "": 
-                    combi.append(place)
-                # Combine
-                result = ". ".join(combi) + "."
-            elif itemType == "report":
-                pass
-            elif itemType == "thesis":
-                combi = [authors, year, title]
-                # Get the location
-                place = data['place']
-                # Get the university
-                university = data['university']
-                if university != "": place = "{}: {}".format(place, university)
-                # Get the thesis type
-                thesis = data['thesisType']
-                if thesis != "":
-                    place = "{} {}".format(place, thesis)
-                combi.append(place)
-                # Combine
-                result = ". ".join(combi) + "."
-            elif itemType == "webpage":
-                pass
-            if result != "":
-                # update the full field
-                self.full = result
-        else:
+                    # This item type is not yet supported
+                    pass
+            else:
+                back = False
+        except:
+            msg = oErr.get_error_message()
             back = False
         # Return ability
         return back
@@ -1729,6 +1787,13 @@ class Litref(models.Model):
         if self.full == "":
             self.read_zotero()
         return self.full
+
+    def get_full_markdown(self):
+        """Get the full text, reading from Zotero if not yet done"""
+
+        if self.full == "":
+            self.read_zotero()
+        return adapt_markdown(self.full, lowercase=False)
 
     def get_short(self):
         """Get the short text, reading from Zotero if not yet done"""
