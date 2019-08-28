@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Q
 import operator
 from functools import reduce
+from pyzotero import zotero
 
 from django.db.models.functions import Lower
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
