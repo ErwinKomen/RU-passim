@@ -247,10 +247,75 @@ def bibliography(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)
     context =  {'title':'Bibliography',
-                'year':get_current_datetime().year,
+                'year':datetime.now().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Add the edition references (abreviated and full)
+
+    # Create empty list for the editions
+    edition_list = []
+    
+    # Retrieve all records from the Zotero database (user for now)
+    zot = zotero.Zotero('5802673', 'user', 'oVBhIJH5elqA8zxrJGwInwWd')
+    
+    # Store only the records from the Edition collection (key: from URL 7HQU3AY8)
+    zot_editions = zot.collection_items('7HQU3AY8')
+   
+    for item in zot_editions:
+        creators_ed = item['data']['creators']
+        creator_list_ed = []
+        for creator in creators_ed:
+            first_name = creator['firstName']
+            last_name = creator['lastName']
+            creator_list_ed.append(first_name + " " + last_name)
+        edition_list.append({'abbr': item['data']['extra'] + ", " + item['data']['pages'], 'full': item['data']['title'], 'creators': ", ".join(creator_list_ed)})
+   
+    context['edition_list'] = edition_list    
+    
+    # Add the literature references from zotero, data extra 
+        
+    # Create empty list for the literature
+    
+    reference_list = []
+    
+    # Retrieve all records from the Zotero database (user for now)
+    zot = zotero.Zotero('5802673', 'user', 'oVBhIJH5elqA8zxrJGwInwWd')
+    
+    # Store only the records in the Literature collection,  (key: from URL FEPVSGVX)
+    zot_literature = zot.collection_items('FEPVSGVX')
+        
+    
+    for item in zot_literature:
+        creators = item['data']['creators']
+        creator_list = []
+        for creator in creators:
+            first_name = creator['firstName']
+            last_name = creator['lastName']
+            creator_list.append(first_name + " " + last_name)
+        reference_list.append({'abbr':creator['lastName'] + ", " + item['data']['extra'] + " " + item['data']['volume'] + " (" + item['data']['date']+ ")"+", "+item['data']['pages'], 'full': item['data']['title'], 'creators': ", ".join(creator_list)})
+     
+       # Hoe is een deel in italic te krijgen? Voorbeelden in passim? Misschien eerst alle velden in 1 bestand zoals bij sam krijgen
+       # via index dan aan de slag. Wellicht eerst maar bestand alleen voor abbreviated, dus met extra, lastname, volume, date, pages 
+       # Bij literature onderscheid maken tussen article and book_section, zie wat voor Sam is gedaan, if... in aparte stings
+       # reference_list_abbr = [] ZIE hiernaast new_list en zie hierboven hoe lastName eruit te halen is.
+       
+       # EK heeft al een oplossing...eerst in Django en abbr en full precies juist in 1 veld, met noodzakelijke markdown
+
+       # string1 = author(s)
+       # string2 = , extra
+       # string3 =  (volume), 
+       # sting4a= (date)
+       # string4b = date
+       # string5 = , pages 
+
+    
+        
+    #reference_list.append({'abbr': 'app', 'full': 'In artis is een aap ontsnapt'})
+    #reference_list.append({'abbr': 'noot', 'full': 'Hij had een nootje opgegeten'})
+    
+    context['reference_list'] = reference_list
 
     # Process this visit
     context['breadcrumbs'] =  process_visit(request, "Bibliography", True)
