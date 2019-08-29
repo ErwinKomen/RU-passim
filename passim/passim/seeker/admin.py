@@ -105,6 +105,18 @@ class VisitAdmin(admin.ModelAdmin):
     fields = ['user', 'when', 'name', 'path']
 
 
+class ActionAdmin(admin.ModelAdmin):
+    """Display and edit Action moments"""
+
+    list_display = ['user', 'when', 'itemtype', 'actiontype']
+    list_filter = ['user', 'itemtype', 'actiontype']
+    search_fields = ['user']
+    fields = ['user', 'when', 'itemtype', 'actiontype', 'details']
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
 class ProfileAdmin(admin.ModelAdmin):
     """Display user profiles"""
 
@@ -185,6 +197,7 @@ admin.site.register(Report, ReportAdmin)
 admin.site.register(LogEntry, LogEntryAdmin)
 admin.site.register(Visit, VisitAdmin)
 admin.site.register(Profile, ProfileAdmin)
+admin.site.register(Action, ActionAdmin)
 
 # How to display user information
 admin.site.unregister(User)
