@@ -460,6 +460,9 @@ var ru = (function ($, ru) {
           $(".typeahead.keywords").typeahead('destroy');
           $(".typeahead.manuidnos").typeahead('destroy');
 
+          // Explicitly clear them
+          // loc_litrefs.clear();
+
           // Type-ahead: COUNTRY
           $(".form-row:not(.empty-form) .typeahead.countries, .manuscript-details .typeahead.countries").typeahead(
             { hint: true, highlight: true, minLength: 1 },

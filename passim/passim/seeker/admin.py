@@ -108,7 +108,7 @@ class VisitAdmin(admin.ModelAdmin):
 class ActionAdmin(admin.ModelAdmin):
     """Display and edit Action moments"""
 
-    list_display = ['user', 'when', 'itemtype', 'actiontype']
+    list_display = ['user', 'when', 'itemtype', 'actiontype', 'details']
     list_filter = ['user', 'itemtype', 'actiontype']
     search_fields = ['user']
     fields = ['user', 'when', 'itemtype', 'actiontype', 'details']

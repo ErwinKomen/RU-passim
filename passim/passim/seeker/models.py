@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.html import mark_safe
 from django.utils import timezone
+from django.forms.models import model_to_dict
 import pytz
 from django.urls import reverse
 from datetime import datetime
@@ -844,13 +845,23 @@ class Action(models.Model):
     when = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):
-        action = "{}|{}".format(self.user.username, self.created)
+        action = "{}|{}".format(self.user.username, self.when)
         return action
 
     def add(user, itemtype, actiontype, details=None):
         """Add an action"""
 
-        action = Action(user=user, itemtype=itemtype, actiontype=actiontype)
+        # Check if we are getting a string user name or not
+        if isinstance(user, str):
+            # Get the user object
+            oUser = User.objects.filter(username=user).first()
+        else:
+            oUser = user
+        # If there are details, make sure they are stringified
+        if details != None and not isinstance(details, str):
+            details = json.dumps(details)
+        # Create the correct action
+        action = Action(user=oUser, itemtype=itemtype, actiontype=actiontype)
         if details != None: action.details = details
         action.save()
         return action
@@ -1031,6 +1042,7 @@ class Visit(models.Model):
                 # There is no profile yet, so make it
                 profile = Profile(user=user)
                 profile.save()
+
             # Process this visit in the profile
             profile.add_visit(name, path, is_menu, **kwargs)
             # Return success

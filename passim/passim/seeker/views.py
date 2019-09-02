@@ -15,6 +15,7 @@ from pyzotero import zotero
 
 from django.db.models.functions import Lower
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
+from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -37,7 +38,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
-    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
+    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
     Litref, LitrefMan, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -138,6 +139,22 @@ def add_visit(request, name, is_menu):
     username = "anonymous" if request.user == None else request.user.username
     if username != "anonymous":
         Visit.add(username, name, request.path, is_menu)
+
+def action_model_changes(form, instance):
+    field_values = model_to_dict(instance)
+    changed_fields = form.changed_data
+    changes = {}
+    for item in changed_fields: 
+        if item in field_values:
+            changes[item] = field_values[item]
+        else:
+            # It is a form field
+            try:
+                changes[item] = formObj['forminstance'].cleaned_data[item]
+            except:
+                changes[item] = "(unavailable)"
+    return changes
+
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -2360,6 +2377,7 @@ class BasicPart(View):
                     if self.add:
                         # We are saving a NEW item
                         formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
+                        formObj['action'] = "new"
                     else:
                         # We are saving an EXISTING item
                         # Determine the instance to be passed on
@@ -2368,6 +2386,7 @@ class BasicPart(View):
                         formObj['instance'] = instance
                         # Get an instance of the form
                         formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
+                        formObj['action'] = "change"
 
                 # Initially we are assuming this just is a review
                 context['savedate']="reviewed at {}".format(get_current_datetime().strftime("%X"))
@@ -2390,6 +2409,12 @@ class BasicPart(View):
                             if bNeedSaving:
                                 # Perform the saving
                                 instance.save()
+                                # Log the SAVE action
+                                details = {'id': instance.id}
+                                if formObj['forminstance'].changed_data != None:
+                                    details['changes'] = action_model_changes(formObj['forminstance'], instance)
+                                if 'action' in formObj: details['savetype'] = formObj['action']
+                                Action.add(request.user.username, self.MainModel.__name__, "save", json.dumps(details))
                                 # Set the context
                                 context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
@@ -2436,6 +2461,8 @@ class BasicPart(View):
                         self.process_formset(prefix, request, formset)
                         # Store the instance
                         formsetObj['formsetinstance'] = formset
+                        # Make sure we know what we are dealing with
+                        itemtype = "form_{}".format(prefix)
                         # Adapt the formset contents only, when it is NOT READONLY
                         if not formsetObj['readonly']:
                             # Is the formset valid?
@@ -2451,6 +2478,9 @@ class BasicPart(View):
                                             if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
                                                 # Check if deletion should be done
                                                 if self.before_delete(prefix, form.instance):
+                                                    # Log the delete action
+                                                    details = {'id': form.instance.id}
+                                                    Action.add(request.user.username, itemtype, "delete", json.dumps(details))
                                                     # Delete this one
                                                     form.instance.delete()
                                                     # NOTE: the template knows this one is deleted by looking at form.DELETE
@@ -2469,6 +2499,11 @@ class BasicPart(View):
                                                     sub_instance.save()
                                                     # Adapt the last save time
                                                     context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
+                                                    # Log the delete action
+                                                    details = {'id': sub_instance.id}
+                                                    if form.changed_data != None:
+                                                        details['changes'] = action_model_changes(form, sub_instance)
+                                                    Action.add(request.user.username, itemtype, "save", json.dumps(details))
                                                     # Store the instance id in the data
                                                     self.data[prefix + '_instanceid'] = sub_instance.id
                                                     # Any action after saving this form
@@ -2546,6 +2581,9 @@ class BasicPart(View):
             elif self.action == "delete":
                 # The user requests this to be deleted
                 if self.before_delete():
+                    # Log the delete action
+                    details = {'id': self.obj.id}
+                    Action.add(request.user.username, self.MainModel.__name__, "delete", json.dumps(details))
                     # We have permission to delete the instance
                     self.obj.delete()
                     context['deleted'] = True
@@ -2925,6 +2963,9 @@ class PassimDetails(DetailView):
                 try:
                     bResult, msg = self.before_delete(instance)
                     if bResult:
+                        # Log the DELETE action
+                        details = {'id': instance.id}
+                        Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
                         # Remove this sermongold instance
                         instance.delete()
                     else:
@@ -2956,6 +2997,12 @@ class PassimDetails(DetailView):
                 if bResult:
                     # Now save it for real
                     instance.save()
+                    # Log the SAVE action
+                    details = {'id': instance.id}
+                    details["savetype"] = "new" if bNew else "change"
+                    if frm.changed_data != None:
+                        details['changes'] = action_model_changes(frm, instance)
+                    Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
                 else:
                     context['errors'] = {'save': msg }
             else:
