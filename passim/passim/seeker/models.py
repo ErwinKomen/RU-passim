@@ -1506,6 +1506,9 @@ class Origin(models.Model):
         return hit
 
 
+   
+
+
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 
@@ -1676,7 +1679,7 @@ class Litref(models.Model):
                     authors = Litref.get_creators(data, type="author", style= "first")
                     year = "?" if "date" not in data else data['date']
                     title = "(no title)" if "title" not in data else data['title']
-                    self.short = "{}. {}. {}. ({})".format(authors, year, title, itemType)
+                    self.short = "{}. {}. {}. ({})".format(authors, year, title)
 
                     # Next step: make a full reference
                     authors = Litref.get_creators(data, type="author")
@@ -3529,6 +3532,10 @@ class LitrefMan(models.Model):
     reference = models.ForeignKey(Litref, related_name="reference_litrefs")
     # [1] The manuscript to which the literature item refers
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
+   
+    # pages = models.ForeignKey(Pages, related_name = "reference_pages") ?
+    # [0-1] The first and last page of the reference (
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
 
 class NewsItem(models.Model):
