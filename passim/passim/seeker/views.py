@@ -150,7 +150,7 @@ def action_model_changes(form, instance):
         else:
             # It is a form field
             try:
-                changes[item] = formObj['forminstance'].cleaned_data[item]
+                changes[item] = form.cleaned_data[item]
             except:
                 changes[item] = "(unavailable)"
     return changes
