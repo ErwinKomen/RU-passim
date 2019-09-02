@@ -829,6 +829,33 @@ class Status(models.Model):
         self.save()
 
 
+class Action(models.Model):
+    """Track actions made by users"""
+
+    # [1] The user
+    user = models.ForeignKey(User)
+    # [1] The item (e.g: Manuscript, SermonDescr, SermonGold)
+    itemtype = models.CharField("Item type", max_length=MAX_TEXT_LEN)
+    # [1] The kind of action performed (e.g: create, edit, delete)
+    actiontype = models.CharField("Action type", max_length=MAX_TEXT_LEN)
+    # [0-1] Room for possible action-specific details
+    details = models.TextField("Detail", blank=True, null=True)
+    # [1] Date and time of this action
+    when = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        action = "{}|{}".format(self.user.username, self.created)
+        return action
+
+    def add(user, itemtype, actiontype, details=None):
+        """Add an action"""
+
+        action = Action(user=user, itemtype=itemtype, actiontype=actiontype)
+        if details != None: action.details = details
+        action.save()
+        return action
+
+
 class Report(models.Model):
     """Report of an upload action or something like that"""
 
@@ -854,6 +881,10 @@ class Report(models.Model):
         user = User.objects.filter(username=username).first()
         obj = Report(user=user, reptype=rtype, contents=contents)
         obj.save()
+        # Add a create action
+        details = {'reptype': rtype, 'id': obj.id}
+        Action.add(user, "Report", "create", json.dumps(details))
+        # Return the object
         return obj
 
 
@@ -874,6 +905,9 @@ class Information(models.Model):
             return ''
         else:
             return info.kvalue
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        return super(Information, self).save(force_insert, force_update, using, update_fields)
 
 
 class Profile(models.Model):
