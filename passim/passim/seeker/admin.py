@@ -190,6 +190,7 @@ admin.site.register(LocationType, LocationTypeAdmin)
 admin.site.register(Location, LocationAdmin)
 admin.site.register(SourceInfo, SourceInfoAdmin)
 admin.site.register(Litref, LitrefAdmin)
+admin.site.register(LitrefMan)
 
 admin.site.register(Report, ReportAdmin)
 
