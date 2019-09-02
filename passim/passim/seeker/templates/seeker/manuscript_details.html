@@ -95,6 +95,7 @@
                     <span>Contents</span>
                     {% if is_passim_editor %}
                       <span id="add_search_criteria" class="pull-right">
+                        <!-- Completely manual sermon adding -->
                         <a class="btn btn-xs jumbo-3" role="button" 
                            targetid="sermon_new"
                            targeturl="{% url 'sermon_edit' %}?manuscript_id={{manuForm.instance.id}}"

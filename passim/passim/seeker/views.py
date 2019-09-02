@@ -1777,6 +1777,49 @@ def get_keywords(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
+@csrf_exempt
+def get_gold(request):
+    """Get details of one particular gold sermon"""
+
+    oErr = ErrHandle()
+    data = {'status': 'fail'}
+    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
+    try:
+        if request.is_ajax():
+            # Get the id of the gold sermon
+            goldid = request.GET.get("goldid", "")
+            signature = Signature.objects.filter(id=goldid).first()
+            if signature==None:
+                data['msg'] = "Signature not found"
+                data['status'] = "error"
+            else:
+                obj = signature.gold
+                if obj == None:
+                    data['msg'] = "Gold not found"
+                    data['status'] = "error"
+                else:
+                    # Copy all relevant information
+                    info = {}
+                    d = model_to_dict(obj)
+                    for field in fields:
+                        info[field] = d[field]  
+                    # Add the authorname
+                    authorname = ""
+                    if obj.author != None:
+                        authorname = obj.author.name                  
+                    info['authorname'] = authorname
+                    data['data'] = info
+                    data['status'] = "ok"
+        else:
+            data['msg'] = "Request is not ajax"
+            data['status'] = "error"
+    except: 
+        msg = oErr.get_error_message()
+        data['msg'] = msg
+        data['status'] = "error"
+    mimetype = "application/json"
+    return HttpResponse(json.dumps(data), mimetype)
+
 
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""

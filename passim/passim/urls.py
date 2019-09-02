@@ -130,6 +130,7 @@ urlpatterns = [
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
+    url(r'^api/gold/get/$', passim.seeker.views.get_gold, name='get_gold'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),

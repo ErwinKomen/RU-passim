@@ -637,7 +637,7 @@ var ru = (function ($, ru) {
           });
 
           // Type-ahead: SIGNATURE (SermonGold) -- NOTE: not in a form-row, but in a normal 'row'
-          $(".form-row:not(.empty-form) .typeahead.signatures, .manuscript-details .typeahead.signatures").typeahead(
+          $("tr:not(.empty-form) .typeahead.signatures, .manuscript-details .typeahead.signatures").typeahead(
             { hint: true, highlight: true, minLength: 1 },
             {
               name: 'signatures', source: loc_signature, limit: 25, displayKey: "name",

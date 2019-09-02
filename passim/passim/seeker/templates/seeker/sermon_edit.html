@@ -39,6 +39,28 @@
         </tr>
       {% endif %}
 
+      <tr class="edit-new form-row hidden">
+        <td class="hoverable" style="min-width: 300px;">Copy information from:</td>
+        <td>
+          <table>
+            <tr>
+              <td >
+                <div class="hidden signature-key">{{sermoForm.signatureid}}</div>
+                <div>{{sermoForm.signature}}</div>
+              </td>
+              <td>
+                <a class="btn btn-xs jumbo-3 pull-right" role="button"
+                   targeturl="{% url 'get_gold' %}"
+                   onclick="ru.passim.seeker.base_sermon(this, 'signature-key');">
+                  <span class="glyphicon glyphicon-arrow-right" title="Copy the information from gold-sermon">&nbsp;Copy</span>
+                </a>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+
       <!-- Make sure we pass on the manuscript_id to which this sermon belongs -->
       <tr class="hidden">
         <td colspan="2">
@@ -46,6 +68,7 @@
         </td>
       </tr>
 
+      <!-- Sermon status -->
       <tr class="form-row edit-notnew">
         <td valign="top">Status</td>
         <td class="sermon-status" align="left">
@@ -55,6 +78,7 @@
           {% endif %}
         </td>
       </tr>
+      <!-- Locus -->
       <tr class="form-row">
         <td class="hoverable" style="min-width: 150px;">Locus</td>
         <td  style="width: 100%;">
@@ -64,6 +88,7 @@
           {% endif %}
         </td>
       </tr>
+      <!-- Gold-standard author -->
       <tr class="form-row">
         <td class="hoverable">Author (gold standard)</td>
         <td>

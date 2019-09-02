@@ -1972,6 +1972,55 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * base_sermon
+       *   Base the sermon on the gold-sermon identified by sClass
+       *
+       */
+      base_sermon: function (el, sClass) {
+        var frm = null,
+            url = "",
+            data = null,
+            goldid = "";
+
+        try {
+          // Get to the form I'm in
+          frm = $(el).closest("form");
+          // Find the gold-sermon ID
+          goldid = $(frm).find("." + sClass + " input").first().val();
+          // Get the values of this gold sermonid
+          url = $(el).attr("targeturl") + "?goldid=" + goldid;
+          $.get(url, null, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ok":
+                  // Process the results
+                  data = response['data'];
+                  $("#id_sermo-incipit").val(data['incipit']);
+                  $("#id_sermo-explicit").val(data['explicit']);
+                  $("#id_sermo-author").val(data['author']);
+                  $("#id_sermo-authorname").val(data['authorname']);
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("base_sermon", ex);
+        }
+      },
+
+      /**
        * delete_confirm
        *   Open the next <tr> to get delete confirmation (or not)
        *
