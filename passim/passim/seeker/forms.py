@@ -119,10 +119,6 @@ class SermonForm(forms.ModelForm):
     signature = forms.CharField(label=_("Signature"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 200px;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
-    siggryson = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}))
-    sigclavis = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}))
     manuidno = forms.CharField(label=_("Manuscript"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifier...', 'style': 'width: 100%;'}))
 
@@ -136,9 +132,9 @@ class SermonForm(forms.ModelForm):
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'clavis':      forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
-                 'gryson':      forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
-                 'edition':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'clavis':      forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
+                 'gryson':      forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
+                 'edition':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Edition...', 'style': 'width: 100%;'}),
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
