@@ -555,27 +555,38 @@ def add_gold2gold(src, dst, ltype, eq_log = None):
             # What is added is a partially equals link - between equality groups
             prt_added = 0
 
-            # (1) save the source group
-            grp_src = src.equal
-            grp_dst = dst.equal
+            groups = ['to']
+            # Implement the REVERSE for link types Partially, Similar, Nearly Equals
+            if ltype in LINK_PRT:
+                groups.append('back')
 
-            # (2) Check existing link(s) between the groups
-            obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
-            if obj == None:
-                # (3a) there is no link yet: add it
-                obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
-                obj.save()
-                # Possibly log the action
-                if eq_log != None:
-                    eq_log.append("Add equalgoldlink {} from eqg {} to eqg {}".format(ltype, grp_src, grp_dst))
-                # Bookkeeping
-                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
-                    added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
-                prt_added += 1
-            else:
-                # (3b) There is a link, but possibly of a different type
-                obj.linktype = ltype
-                obj.save()
+            for group in groups:
+                # (1) save the source group
+                if group == "to":
+                    grp_src = src.equal
+                    grp_dst = dst.equal
+                else:
+                    grp_src = dst.equal
+                    grp_dst = src.equal
+
+                # (2) Check existing link(s) between the groups
+                obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+                if obj == None:
+                    # (3a) there is no link yet: add it
+                    obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                    obj.save()
+                    # Possibly log the action
+                    if eq_log != None:
+                        eq_log.append("Add equalgoldlink {} from eqg {} to eqg {}".format(ltype, grp_src, grp_dst))
+                    # Bookkeeping
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
+                    prt_added += 1
+                else:
+                    # (3b) There is a link, but possibly of a different type
+                    obj.linktype = ltype
+                    obj.save()
+
 
             # (3) Bookkeeping
             added += prt_added
@@ -1506,9 +1517,6 @@ class Origin(models.Model):
         return hit
 
 
-   
-
-
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 
@@ -2088,12 +2096,8 @@ class Manuscript(models.Model):
                     if 'location' in msItem: sermon.locus = msItem['location']
                     if 'incipit' in msItem: sermon.incipit = msItem['incipit']
                     if 'explicit' in msItem: sermon.explicit = msItem['explicit']
-                    if 'edition' in msItem: sermon.edition = msItem['edition']
                     if 'quote' in msItem: sermon.quote = msItem['quote']
-                    if 'gryson' in msItem: sermon.gryson = msItem['gryson']
-                    if 'clavis' in msItem: sermon.clavis = msItem['clavis']
                     if 'feast' in msItem: sermon.feast = msItem['feast']
-                    if 'keyword' in msItem: sermon.keyword = msItem['keyword']
                     if 'bibleref' in msItem: sermon.bibleref = msItem['bibleref']
                     if 'additional' in msItem: sermon.additional = msItem['additional']
                     if 'note' in msItem: sermon.note = msItem['note']
@@ -2106,6 +2110,13 @@ class Manuscript(models.Model):
                             sermon.nickname = nickname
                         else:
                             sermon.author = author
+
+                    # The following items are [0-n]
+                    #  -- These may be replaced by separate entries in SermonSignature
+                    if 'gryson' in msItem: sermon.gryson = msItem['gryson']     # SermonSignature
+                    if 'clavis' in msItem: sermon.clavis = msItem['clavis']     # SermonSignature
+                    if 'keyword' in msItem: sermon.keyword = msItem['keyword']  # Keyword
+                    if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
                     # Set the default status type
                     sermon.stype = "imp"    # Imported

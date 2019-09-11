@@ -498,6 +498,18 @@ var ru = (function ($, ru) {
           $(".typeahead.keywords").typeahead('destroy');
           $(".typeahead.manuidnos").typeahead('destroy');
 
+          // Make sure the signature types (gryson/clavis) are set correctly
+          $(".editype-gr .signaturetype").each(function () {
+            $(this).removeClass("signaturetype");
+            $(this).addClass("gldsiggrysons");
+            $(this).attr("placeholder", "Gryson code...");
+          });
+          $(".editype-cl .signaturetype").each(function () {
+            $(this).removeClass("signaturetype");
+            $(this).addClass("gldsigclavises");
+            $(this).attr("placeholder", "Clavis code...");
+          });
+
           // Explicitly clear them
           // loc_litrefs.clear();
 

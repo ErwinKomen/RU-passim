@@ -44,7 +44,7 @@
                   </td>
 
                   <!-- The signature -->
-                  <td  style="width: 100%;">
+                  <td  style="width: 100%;" class="editype-{{item.type}}">
                     <div class="view-mode">{{signform.code.value}}</div>
                     <div class="edit-mode hidden">{{signform.code}}</div>
 
@@ -111,7 +111,7 @@
                 </td>
 
                 <!-- The signature -->
-                <td  style="width: 100%;">
+                <td  style="width: 100%;" class="editype-{{item.type}}">
                   <div class="view-mode hidden">{{gsign_formset.empty_form.code.value}}</div>
                   <div class="edit-mode">{{gsign_formset.empty_form.code}}</div>
                   <!-- Confirmation of delete -->

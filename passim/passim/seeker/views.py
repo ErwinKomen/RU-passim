@@ -883,6 +883,83 @@ def do_mext(request):
         oErr.DoError("do_mext")
         return reverse('home')
 
+def do_sermons(request):
+    """Remove duplicate sermons from manuscripts"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Repair manuscript-sermons"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+    
+        # Start up processing
+        added = 0
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>Manuscript</th><th>Sermon</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Step #1: walk all manuscripts
+        qs_m = Manuscript.objects.all().order_by('id')
+        for manu in qs_m:
+            # Get all the sermons for this manuscript in appropriate order (reverse ID)
+            sermon_lst = SermonDescr.objects.filter(manu=manu).order_by('-id').values('id', 'title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'note', 'additional', 'order')
+            remove_lst = []
+            if manu.id == 1245:
+                iStop = 1
+            for idx, sermon_obj in enumerate(sermon_lst):
+                # Check if duplicates are there, and if so put them in the remove list
+                start = idx + 1
+                for check in sermon_lst[start:]:
+                    # compare all relevant elements
+                    bEqual = True
+                    for attr in check:
+                        if attr != 'id':
+                            if check[attr] != sermon_obj[attr]:
+                                bEqual = False
+                                break
+                    if bEqual:
+                        id = check['id']
+                        if id not in remove_lst:
+                            remove_lst.append(id)
+                            lst_total.append("<tr><td>{}</td><td>{}</td></tr>".format(manu.id, check['id']))
+                            added += 1
+            # Remove duplicates for this manuscript
+            if len(remove_lst) > 0:
+                SermonDescr.objects.filter(id__in=remove_lst).delete()
+
+
+        lst_total.append("</tbody></table>")
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of removed sermons', 'result': added})
+        result_list.append({'part': 'All changes', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_sermons")
+        return reverse('home')
+
 
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
@@ -918,14 +995,14 @@ def do_goldtogold(request):
 
         # Step #1: remove all unnecessary links
         oErr.Status("{} step #1".format(method))
-        qs = SermonGoldSame.objects.all()
+        qs = EqualGoldLink.objects.all()
         lst_delete = []
         for relation in qs:
             if relation.src == relation.dst:
                 lst_delete.append(relation.id)
         oErr.Status("Step 1: removing {} links".format(len(lst_delete)))
         if len(lst_delete) > 0:
-            SermonGoldSame.objects.filter(Q(id__in=lst_delete)).delete()
+            EqualGoldLink.objects.filter(Q(id__in=lst_delete)).delete()
 
         # Step #2: create groups of equals
         oErr.Status("{} step #2".format(method))
@@ -970,6 +1047,7 @@ def do_goldtogold(request):
                         for item in group:
                             item.equal = eqg
                             item.save()
+                            added += 1
 
         # Step #3: add individual equals
         oErr.Status("{} step #3".format(method))
@@ -980,6 +1058,7 @@ def do_goldtogold(request):
                 eqg.save()
                 gold.equal = eqg
                 gold.save()
+                added += 1
 
         # -- or can a SermonGold be left without an equality group, if he is not equal to anything (yet)?
 
@@ -988,12 +1067,12 @@ def do_goldtogold(request):
         for linktype in LINK_PRT:
             lst_prt_add = []    # List of partially equals relations to be added
             # Get all links of the indicated type
-            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
+            qs_prt = EqualGoldLink.objects.filter(linktype=linktype).order_by('src__id')
             # Walk these links
             for obj_prt in qs_prt:
                 # Get the equal groups of the link
-                src_eqg = obj_prt.src.equal
-                dst_eqg = obj_prt.dst.equal
+                src_eqg = obj_prt.src
+                dst_eqg = obj_prt.dst
                 # Translate the link to one between equal-groups
                 oLink = {'src': src_eqg, 'dst': dst_eqg}
                 if oLink not in lst_prt_add: lst_prt_add.append(oLink)
@@ -1008,7 +1087,10 @@ def do_goldtogold(request):
                     if obj == None:
                         obj = EqualGoldLink(linktype=linktype, src=item['src'], dst=item['dst'])
                         obj.save()
-        
+                        added += 1
+                        lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                            (idx+1), item['src'].id, item['dst'].id, linktype, "add", "" ))
+        # y = [o for o in lst_prt_add if o['src'].id == 708]
         lst_total.append("</tbody></table>")
 
         # Create list to be returned
