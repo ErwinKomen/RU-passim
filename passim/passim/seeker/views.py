@@ -943,6 +943,20 @@ def do_sermons(request):
             if len(remove_lst) > 0:
                 SermonDescr.objects.filter(id__in=remove_lst).delete()
 
+        # Step #2: tidy up sermon fields
+        qs_s = SermonDescr.objects.all().order_by('id')
+        with transaction.atomic():
+            for sermo in qs_s:
+                bChange = False
+                # Check if the sub title equals the title
+                if sermo.subtitle != None and sermo.title != None and sermo.subtitle == sermo.title:
+                    sermo.subtitle = ""
+                    bChange = True
+                # Save if needed
+                if bChange:
+                    sermo.save()
+
+
 
         lst_total.append("</tbody></table>")
 
@@ -2981,16 +2995,22 @@ class PassimDetails(DetailView):
             if 'errors' in context and len(context['errors']) > 0:
                 data['status'] = "error"
                 data['msg'] = context['errors']
-            # response = self.render_to_response(self.template_post, context)
-            response = render_to_string(self.template_post, context, request)
-            response = response.replace("\ufeff", "")
-            data['html'] = response
+
+            if self.rtype == "json":
+                response = render_to_string(self.template_post, context, request)
+                response = response.replace("\ufeff", "")
+                data['html'] = response
+                response = JsonResponse(data)
+            else:
+                # This takes self.template_name...
+                response = self.render_to_response(context)
         else:
             data['html'] = "(No authorization)"
             data['status'] = "error"
+            response = JsonResponse(data)
 
         # Return the response
-        return JsonResponse(data)
+        return response
 
     def initializations(self, request, pk):
         # Store the previous page
@@ -3122,6 +3142,9 @@ class PassimDetails(DetailView):
                 if bResult:
                     # Now save it for real
                     instance.save()
+                    # Make it available
+                    context['object'] = instance
+                    self.object = instance
                     # Log the SAVE action
                     details = {'id': instance.id}
                     details["savetype"] = "new" if bNew else "change"
@@ -3630,7 +3653,14 @@ class SermonDetails(PassimDetails):
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
-        # self.afternewurl = reverse('search_gold')
+
+        # Calculate how many sermons there are
+        manuscript = instance.manu
+        if manuscript != None:
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -3641,7 +3671,19 @@ class SermonDetails(PassimDetails):
         context['prevpage'] = get_previous_page(self.request)
 
         # New:
-        if instance.manu == None:
+        if instance == None:
+            # We are creating a new sermon
+            man_id = None
+            # What is the manuscript id?
+            if 'manuscript_id' in self.qd:
+                man_id = self.qd['manuscript_id']
+            context['manuscript_id'] = man_id
+        elif 'sermo-manu_id' in self.qd:
+            context['manuscript_id'] = self.qd['sermo-manu_id']
+            manuscript_id = context['manuscript_id']
+            self.afternewurl = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+            context['afternewurl'] = self.afternewurl
+        elif instance.manu == None:
             context['manuscript_id'] = None
         else:
             context['manuscript_id'] = instance.manu.id
@@ -3704,6 +3746,13 @@ class SermonEdit(BasicPart):
                     # Make sure the new sermon gets changed
                     instance.order = sermon_count
                     instance.save()
+        elif instance and instance.order <= 0:
+            # Calculate how many sermons there are
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
+
                         
         
         # There's is no real return value needed here 

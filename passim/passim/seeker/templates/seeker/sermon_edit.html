@@ -63,9 +63,10 @@
 
       <!-- Make sure we pass on the manuscript_id to which this sermon belongs -->
       <tr class="hidden">
-        <td colspan="2">
+        <td colspan="1">
           <input id="id_manuscript_id" name="manuscript_id" type="text" value="{{manuscript_id}}" />
         </td>
+        <td>{{sermoForm.manu}}</td>
       </tr>
 
       <!-- Sermon status -->
@@ -78,6 +79,7 @@
           {% endif %}
         </td>
       </tr>
+
       <!-- Locus -->
       <tr class="form-row">
         <td class="hoverable" style="min-width: 150px;">Locus</td>
@@ -88,6 +90,7 @@
           {% endif %}
         </td>
       </tr>
+
       <!-- Gold-standard author -->
       <tr class="form-row">
         <td class="hoverable">Author (gold standard)</td>
@@ -109,6 +112,8 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Title -->
       <tr class="form-row">
         <td class="hoverable">Title</td>
         <td>
@@ -118,6 +123,19 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Sub Title -->
+      <tr class="form-row">
+        <td class="hoverable">Sub title</td>
+        <td>
+          <div class="view-mode">{% if sermoForm.subtitle.value %}{{sermoForm.subtitle.value}}{% else %}-{% endif %}</div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{sermoForm.subtitle}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Incipit -->
       <tr class="form-row">
         <td class="hoverable">Incipit</td>
         <td >
@@ -127,6 +145,8 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Explicit -->
       <tr class="form-row">
         <td class="hoverable">Explicit</td>
         <td >
@@ -136,6 +156,8 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Quote -->
       <tr class="form-row">
         <td class="hoverable">Quote</td>
         <td >
@@ -145,33 +167,19 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Bibliography notes -->
       <tr class="form-row">
-        <td class="hoverable">Clavis</td>
+        <td class="hoverable">Bibliography notes</td>
         <td >
-          <div class="view-mode">{% if sermoForm.clavis.value %}{{sermoForm.clavis.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode">{% if sermoForm.bibnotes.value %}{{sermoForm.bibnotes.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
-            <div class="edit-mode hidden">{{sermoForm.clavis}}</div>
+            <div class="edit-mode hidden">{{sermoForm.bibnotes}}</div>
           {% endif %}
         </td>
       </tr>
-      <tr class="form-row">
-        <td class="hoverable">Gryson</td>
-        <td >
-          <div class="view-mode">{% if sermoForm.gryson.value %}{{sermoForm.gryson.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
-            <div class="edit-mode hidden">{{sermoForm.gryson}}</div>
-          {% endif %}
-        </td>
-      </tr>
-      <tr class="form-row">
-        <td class="hoverable">Edition</td>
-        <td >
-          <div class="view-mode">{% if sermoForm.edition.value %}{{sermoForm.edition.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
-            <div class="edit-mode hidden">{{sermoForm.edition}}</div>
-          {% endif %}
-        </td>
-      </tr>
+
+      <!-- Feast -->
       <tr class="form-row">
         <td class="hoverable">Feast</td>
         <td >
@@ -181,6 +189,8 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Bible reference(s) -->
       <tr class="form-row">
         <td class="hoverable">Bible reference(s)</td>
         <td >
@@ -190,6 +200,8 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- Additional -->
       <tr class="form-row">
         <td class="hoverable">Additional</td>
         <td >
@@ -199,15 +211,8 @@
           {% endif %}
         </td>
       </tr>
-      <tr class="form-row">
-        <td class="hoverable">Keyword</td>
-        <td >
-          <div class="view-mode">{% if sermoForm.keyword.value %}{{sermoForm.keyword.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
-            <div class="edit-mode hidden">{{sermoForm.keyword}}</div>
-          {% endif %}
-        </td>
-      </tr>
+
+      <!-- Note(s) -->
       <tr class="form-row">
         <td class="hoverable">Note</td>
         <td >
@@ -217,5 +222,6 @@
           {% endif %}
         </td>
       </tr>
+
     </table>
 </form>

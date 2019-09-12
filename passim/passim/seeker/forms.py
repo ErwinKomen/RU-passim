@@ -126,21 +126,25 @@ class SermonForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
-                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword', 'stype']
+        fields = ['title', 'subtitle', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'manu',
+                  'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
+                  #, 'clavis', 'gryson', 'keyword']
         widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'clavis':      forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
-                 'gryson':      forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
-                 'edition':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Edition...', 'style': 'width: 100%;'}),
+                 'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;'}),
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+
+                 # On the verge of leaving...
+                 #'clavis':      forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
+                 #'gryson':      forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
+                 #'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -154,6 +158,7 @@ class SermonForm(forms.ModelForm):
         super(SermonForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['manu'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

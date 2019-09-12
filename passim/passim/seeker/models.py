@@ -3285,6 +3285,9 @@ class SermonDescr(models.Model):
     # [0-1] Not every sermon might have a title ...
     title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
 
+    # [0-1] Some (e.g. e-codices) may have a subtitle (field <rubric>)
+    subtitle = models.CharField("Sub title", null=True, blank=True, max_length=LONG_STRING)
+
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
@@ -3300,22 +3303,23 @@ class SermonDescr(models.Model):
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
     quote = models.TextField("Quote", null=True, blank=True)
-    # [0-1] We would like to know the Clavis number (if available)
-    clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] We would like to know the Gryson number (if available)
-    gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] The FEAST??
     feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] Edition
-    edition = models.TextField("Edition", null=True, blank=True)
+    # [0-1] Notes on the bibliography, literature for this sermon
+    bibnotes = models.TextField("Bibliography notes", null=True, blank=True)
     # [0-1] Any notes for this sermon
     note = models.TextField("Note", null=True, blank=True)
     # [0-1] Additional information 
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
-    # [0-1] One keyword or more??
-    keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
+
+    ## [0-1] We would like to know the Clavis number (if available)
+    #clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
+    ## [0-1] We would like to know the Gryson number (if available)
+    #gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
+    ## [0-1] One keyword or more??
+    #keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
