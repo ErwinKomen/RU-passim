@@ -52,9 +52,22 @@
                 <td style="width: 100%;">
                   <div class="hidden"><input id="id_stog-{{forloop.counter0}}-gold" name="stog-{{forloop.counter0}}-gold" value="{{linkform.instance.gold.id}}" /></div>
                   <div class="view-mode">
-                    <a href="{% url 'gold_details' linkform.instance.gold.id %}" target="_blank">
-                      {% include 'seeker/sermon_view.html' with msitem=linkform.instance.gold %}
-                    </a>
+                    <span>
+                      <a class="btn btn-xs jumbo-1" 
+                         OUD_targeturl="{% url 'get_gold' linkform.instance.gold.id %}"
+                         OUD_onclick="ru.passim.seeker.base_sermon(this, 'edit');" 
+
+                         href="{% url 'sermon_details' object_id %}?goldcopy={{linkform.instance.gold.id}}"
+
+                         title="Copy Gold Sermon information to this Sermon (incipit, explicit, Gryson, Clavis, editions etc)">
+                        <span class="glyphicon glyphicon-share-alt"></span>
+                      </a>
+                    </span>
+                    <span>
+                      <a href="{% url 'gold_details' linkform.instance.gold.id %}" target="_blank">
+                        {% include 'seeker/sermon_view.html' with msitem=linkform.instance.gold %}
+                      </a>
+                    </span>
                   </div>
                   <div class="edit-mode hidden selected clickable"
                        data-toggle="modal" 

@@ -3325,6 +3325,9 @@ class SermonDescr(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
 
+    # [0-n] Many-to-many: keywords per SermonDescr
+    keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
@@ -3449,6 +3452,17 @@ class SermonDescr(models.Model):
     def get_explicit_markdown(self):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
+
+
+class SermonDescrKeyword(models.Model):
+    """Relation between a SermonDescr and a Keyword"""
+
+    # [1] The link is between a SermonGold instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
 
 
 class SermonDescrGold(models.Model):

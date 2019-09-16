@@ -1,0 +1,17 @@
+﻿{% load i18n %}
+
+<div class="">
+
+    <!-- This div is updated when the sermon_linkset is saved -->
+    <table class="func-view" style="width: 100%;">
+      <thead>
+        <tr><th>#</th><th class="tdnowrap">Edition</th></tr>
+      </thead>
+      <tbody>
+        {% for item in sedi_list %}
+          <tr><td>{{forloop.counter}}</td><td>{{item.name}}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+</div>

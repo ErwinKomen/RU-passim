@@ -35,9 +35,9 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
+    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
     Litref, LitrefMan, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
@@ -1874,38 +1874,53 @@ def get_keywords(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
-def get_gold(request):
+def get_gold(request, pk=None):
     """Get details of one particular gold sermon"""
 
     oErr = ErrHandle()
     data = {'status': 'fail'}
     fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
     try:
-        if request.is_ajax():
+        if request.is_ajax() and user_is_authenticated(request):
             # Get the id of the gold sermon
-            goldid = request.GET.get("goldid", "")
-            signature = Signature.objects.filter(id=goldid).first()
-            if signature==None:
-                data['msg'] = "Signature not found"
-                data['status'] = "error"
+            qd = request.GET if request.method == "GET" else request.POST
+            goldid = qd.get("goldid", "")
+            bFound = False
+            if goldid == "" and pk != None:
+                obj = SermonGold.objects.filter(id=pk).first()
+                bFound = True
             else:
-                obj = signature.gold
-                if obj == None:
-                    data['msg'] = "Gold not found"
+                signature = Signature.objects.filter(id=goldid).first()
+                if signature==None:
+                    data['msg'] = "Signature not found"
                     data['status'] = "error"
                 else:
-                    # Copy all relevant information
-                    info = {}
-                    d = model_to_dict(obj)
-                    for field in fields:
-                        info[field] = d[field]  
-                    # Add the authorname
-                    authorname = ""
-                    if obj.author != None:
-                        authorname = obj.author.name                  
-                    info['authorname'] = authorname
-                    data['data'] = info
-                    data['status'] = "ok"
+                    obj = signature.gold
+                    bFound = True
+            if obj == None:
+                data['msg'] = "Gold not found"
+                data['status'] = "error"
+            elif bFound:
+                # Copy all relevant information
+                info = {}
+                d = model_to_dict(obj)
+                for field in fields:
+                    info[field] = d[field]  
+                # Add the authorname
+                authorname = ""
+                if obj.author != None:
+                    authorname = obj.author.name                  
+                info['authorname'] = authorname
+
+                # Copy keywords
+                info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
+
+                # Copy signatures
+                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
+
+                data['data'] = info
+
+                data['status'] = "ok"
         else:
             data['msg'] = "Request is not ajax"
             data['status'] = "error"
@@ -2939,6 +2954,8 @@ class PassimDetails(DetailView):
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
+    newRedirect = False     # Redirect the page name to a correct one after creating
+    redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -2969,6 +2986,8 @@ class PassimDetails(DetailView):
                 sHtml = sHtml.replace("\ufeff", "")
                 data['html'] = sHtml
                 response = JsonResponse(data)
+            elif self.redirectpage != "":
+                return redirect(self.redirectpage)
             else:
                 # This takes self.template_name...
                 response = self.render_to_response(context)
@@ -3001,6 +3020,9 @@ class PassimDetails(DetailView):
                 response = response.replace("\ufeff", "")
                 data['html'] = response
                 response = JsonResponse(data)
+            elif self.newRedirect and self.redirectpage != "":
+                # Redirect to this page
+                return redirect(self.redirectpage)
             else:
                 # This takes self.template_name...
                 response = self.render_to_response(context)
@@ -3627,6 +3649,7 @@ class SermonDetails(PassimDetails):
     title = "Sermon" 
     afternewurl = ""
     rtype = "html"
+    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
     StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
                                          form=SermonDescrGoldForm, min_num=0,
                                          fk_name = "sermon",
@@ -3661,6 +3684,9 @@ class SermonDetails(PassimDetails):
             # Make sure the new sermon gets changed
             instance.order = sermon_count
             instance.save()
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': instance.id})
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -3688,6 +3714,55 @@ class SermonDetails(PassimDetails):
         else:
             context['manuscript_id'] = instance.manu.id
 
+        # Are we copying information??
+        if 'goldcopy' in self.qd:
+            # Get the ID of the gold sermon from which we are copying
+            goldid = self.qd['goldcopy']
+            gold = SermonGold.objects.filter(id=goldid).first()
+
+            if gold != None:
+                # Copy all relevant information to obj
+                obj = self.object
+                # (1) copy author
+                if gold.author != None: obj.author = gold.author
+                # (2) copy incipit
+                if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
+                # (3) copy explicit
+                if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
+                # (4) copy author
+                if gold.author != None: obj.author = gold.author
+                # (5) copy keywords
+                kwlist = [x['id'] for x in obj.keywords.all().values('id')]
+                for kw in gold.keywords.all():
+                    # Check if it is already there
+                    if kw.id not in kwlist:
+                        # Add it in the proper way
+                        srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
+                        srm_kw.save()
+                # (6) copy signatures
+                for gold_sig in gold.goldsignatures.all():
+                    # Check if it is already there
+                    srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
+                    if srm_sig == None:
+                        srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
+                        srm_sig.save()
+                # Now save the adapted sermon
+                obj.save()
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+        else:
+            # Pass on all the linked-gold editions
+            sedi_list = []
+            # Visit all linked gold sermons
+            for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
+                # Access the gold sermon
+                gold = linked.gold
+                # Get all the editions of this gold sermon
+                for edi in gold.goldeditions.all():
+                    name = edi.name
+                    if name not in sedi_list:
+                        sedi_list.append({'name': name})
+            context['sedi_list'] = sedi_list
 
         return context
 
@@ -4002,6 +4077,63 @@ class SermonSignset(BasicPart):
                                {'type': 'ot', 'name': 'Other'}]
         return context
 
+
+class SermonKwset(BasicPart):
+    """The set of keywords from one sermon"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_kwset.html'
+    title = "SermonDescrKeywords"
+    SkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
+                                         form=SermonDescrKeywordForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SkwFormSet, 'prefix': 'skw', 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "skw":
+            # Get the chosen keyword
+            obj = form.cleaned_data['keyword']
+            if obj == None:
+                # Get the value entered for the keyword
+                kw = form['name'].data
+                # Check if this is an existing Keyword
+                obj = Keyword.objects.filter(name__iexact=kw).first()
+                if obj == None:
+                    # Create it
+                    obj = Keyword(name=kw.lower())
+                    obj.save()
+                # Now set the instance value correctly
+                instance.keyword = obj
+                has_changed = True
+
+        return has_changed
+
+
+class SermonEdiset(BasicPart):
+    """The set of editions from the gold-sermons related to me"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_ediset.html'
+    title = "SermonDescrEditions"
+
+    def add_to_context(self, context):
+
+        # Pass on all the linked-gold editions
+        sedi_list = []
+        # Visit all linked gold sermons
+        for linked in SermonDescrGold.objects.filter(sermon=self.obj, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Get all the editions of this gold sermon
+            for edi in gold.goldeditions.all():
+                name = edi.name
+                if name not in sedi_list:
+                    sedi_list.append({'name': name})
+        context['sedi_list'] = sedi_list
+
+        return context
 
 class ManuscriptDetails(PassimDetails):
     """Editable manuscript details"""

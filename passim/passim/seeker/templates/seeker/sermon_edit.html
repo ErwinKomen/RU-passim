@@ -84,7 +84,7 @@
       <tr class="form-row">
         <td class="hoverable" style="min-width: 150px;">Locus</td>
         <td  style="width: 100%;">
-          <div class="view-mode">{{sermoForm.locus.value}}</div>
+          <div class="view-mode">{% if sermoForm.locus.value %}{{sermoForm.locus.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sermoForm.locus}}</div>
           {% endif %}

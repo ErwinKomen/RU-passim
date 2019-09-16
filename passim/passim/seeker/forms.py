@@ -214,6 +214,30 @@ class SermonDescrGoldForm(forms.ModelForm):
                 pass
 
 
+class SermonDescrKeywordForm(forms.ModelForm):
+    name = forms.CharField(label=_("Keyword"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescrKeyword
+        fields = ['sermon', 'keyword']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonDescrKeywordForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['keyword'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.keyword != None:
+                kw = instance.keyword.name
+                self.fields['name'].initial = kw
+
+
 class SermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
         widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
@@ -326,18 +350,6 @@ class SermonGoldSignatureForm(forms.ModelForm):
         super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
-
-        # editype = None
-        #if 'editype' in self.initial:
-        #    editype = self.initial['editype']
-        #elif self.instance:
-        #    editype = self.instance.editype
-        #if editype != None:
-        #    if editype == "cl":
-        #        self.Meta.widgets['code'] = forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'})
-        #    elif editype == "gr":
-        #        self.Meta.widgets['code'] = forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'})
-
 
 
 class SermonGoldEditionForm(forms.ModelForm):
