@@ -39,10 +39,11 @@
                            aria-haspopup="true" aria-expanded="false">Tools<span class="caret"></span></a>
                         
                        <ul class="dropdown-menu">
-                          <li><a href="{% url 'bibliography' %}" title="Bibliography">Bibliography</a></li>
                           {% if is_passim_editor %}
+                            <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'literature_list' %}" title="Bibliography test">Bibliography_test</a></li>
+                            <li><a href="{% url 'sync_zotero' %}" title="Force Zotero Sync">Synchronize Zotero (force)</a></li>
+                            <li role="separator" class="divider"></li>
                             <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
                             <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
@@ -58,7 +59,7 @@
                         
                          <ul class="dropdown-menu">
                             <li><a href="" title="Upload XML files from e-codices (ch)">Import e-codices XML</a></li>
-                            <li><a href="{% url 'sync_zotero' %}" title="Force Zotero Sync">Synchronize Zotero (force)</a></li>
+                            
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
 
