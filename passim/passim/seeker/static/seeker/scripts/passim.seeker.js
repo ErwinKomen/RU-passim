@@ -498,6 +498,19 @@ var ru = (function ($, ru) {
 
           // Make sure typeahead is re-established
           ru.passim.init_typeahead();
+
+          // REACT experiment: process LIKE buttons
+          document.querySelectorAll(".like_button_container")
+            .forEach(domContainer => {
+              // Read the comment ID from the data-* attribute
+              const commentID = parseInt(domContainer.dataset.commentid, 10);
+              // Render the like button appropriately
+              ReactDOM.render(
+                e(LikeButton, { commentID: commentID}),
+                domContainer
+                )
+            });
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
