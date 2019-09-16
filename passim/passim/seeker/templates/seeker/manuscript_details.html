@@ -95,18 +95,28 @@
                     <span>Contents</span>
                     {% if is_passim_editor %}
                       <span id="add_search_criteria" class="pull-right">
+                        <!-- Completely manual sermon adding -->
                         <a class="btn btn-xs jumbo-3" role="button" 
-                           targetid="sermon_new"
-                           targeturl="{% url 'sermon_edit' %}?manuscript_id={{manuForm.instance.id}}"
-                           onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                           PREVIOUS_targetid="sermon_new"
+                           PREVIOUS_targeturl="{% url 'sermon_edit' %}?manuscript_id={{manuForm.instance.id}}"
+                           PREVIOUS_onclick="ru.passim.seeker.manu_edit(this, 'new');"
+                           ATTEMPT_href="{% url 'sermon_details' %}?manuscript_id={{manuForm.instance.id}}"
+                           onclick="document.getElementById('create_new_sermon').submit();"
+                           >
                           <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
                         </a>
                       </span>
                     {% endif %}
                   </h3>
-                  {% if object.manusermons.count == 0 %}
-                    <p><i>This manuscript does not contain a definition of its contents</i></p>
-                  {% else %}
+
+                  <!-- Room to have the form-link to create a new sermon for this manuscript -->
+                  <div class="hidden" >
+                    <form action="{% url 'sermon_details' %}" method="post" id="create_new_sermon">
+                      {% csrf_token %}
+                      <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
+                    </form>
+                  </div>
+
                     <!-- This is where the sermon that is currently being edited shows up -->
                     {% if is_passim_editor %}
                       <div class="row edit-sermon hidden">
@@ -130,6 +140,11 @@
                         </div>
                       </div>
                     {% endif %}
+
+
+                  {% if object.manusermons.count == 0 %}
+                    <p><i>This manuscript does not contain a definition of its contents</i></p>
+                  {% else %}
 
                     <!-- A table to show all the sermons of this manuscript -->
                     <table id="sermon_list" class="func-view">

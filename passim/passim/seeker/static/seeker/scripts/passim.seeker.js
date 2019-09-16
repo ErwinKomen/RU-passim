@@ -25,6 +25,8 @@ var ru = (function ($, ru) {
           { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "skw_formset", "prefix": "skw", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
@@ -1972,6 +1974,62 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * base_sermon
+       *   Base the sermon on the gold-sermon identified by sClass
+       *
+       */
+      base_sermon: function (el, sClass) {
+        var frm = null,
+            url = "",
+            data = null,
+            goldid = "";
+
+        try {
+          // Get to the form I'm in
+          frm = $(el).closest("form");
+          // Get the initial URL
+          url = $(el).attr("targeturl");
+          // Does it have a number for the gold sermon?
+          if (url.indexOf("goldid") < 0 && !url.match(/\/\d+\/$/i)) {
+            // Find the gold-sermon ID
+            goldid = $(frm).find("." + sClass + " input").first().val();
+            // Get the values of this gold sermonid
+            url = url + "?goldid=" + goldid;
+          }
+          $.get(url, null, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ok":
+                  // Process the results
+                  data = response['data'];
+                  $("#id_sermo-incipit").val(data['incipit']);
+                  $("#id_sermo-explicit").val(data['explicit']);
+                  $("#id_sermo-author").val(data['author']);
+                  $("#id_sermo-authorname").val(data['authorname']);
+                  // Set editing mode
+                  $(".sermon-details a[mode=edit]").click();
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("base_sermon", ex);
+        }
+      },
+
+      /**
        * delete_confirm
        *   Open the next <tr> to get delete confirmation (or not)
        *
@@ -2112,6 +2170,10 @@ var ru = (function ($, ru) {
                         case "sermongold_eqset":
                           // We need to update 'sermongold_linkset'
                           ru.passim.seeker.do_get("sermongold_linkset");
+                          break;
+                        case "sermon_linkset":
+                          // We need to update 'sermongold_ediset'
+                          ru.passim.seeker.do_get("sermondescr_ediset");
                           break;
                       }
                     }

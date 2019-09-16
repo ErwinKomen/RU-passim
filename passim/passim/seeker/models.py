@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.html import mark_safe
 from django.utils import timezone
+from django.forms.models import model_to_dict
 import pytz
 from django.urls import reverse
 from datetime import datetime
@@ -554,27 +555,38 @@ def add_gold2gold(src, dst, ltype, eq_log = None):
             # What is added is a partially equals link - between equality groups
             prt_added = 0
 
-            # (1) save the source group
-            grp_src = src.equal
-            grp_dst = dst.equal
+            groups = ['to']
+            # Implement the REVERSE for link types Partially, Similar, Nearly Equals
+            if ltype in LINK_PRT:
+                groups.append('back')
 
-            # (2) Check existing link(s) between the groups
-            obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
-            if obj == None:
-                # (3a) there is no link yet: add it
-                obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
-                obj.save()
-                # Possibly log the action
-                if eq_log != None:
-                    eq_log.append("Add equalgoldlink {} from eqg {} to eqg {}".format(ltype, grp_src, grp_dst))
-                # Bookkeeping
-                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
-                    added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
-                prt_added += 1
-            else:
-                # (3b) There is a link, but possibly of a different type
-                obj.linktype = ltype
-                obj.save()
+            for group in groups:
+                # (1) save the source group
+                if group == "to":
+                    grp_src = src.equal
+                    grp_dst = dst.equal
+                else:
+                    grp_src = dst.equal
+                    grp_dst = src.equal
+
+                # (2) Check existing link(s) between the groups
+                obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+                if obj == None:
+                    # (3a) there is no link yet: add it
+                    obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                    obj.save()
+                    # Possibly log the action
+                    if eq_log != None:
+                        eq_log.append("Add equalgoldlink {} from eqg {} to eqg {}".format(ltype, grp_src, grp_dst))
+                    # Bookkeeping
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
+                    prt_added += 1
+                else:
+                    # (3b) There is a link, but possibly of a different type
+                    obj.linktype = ltype
+                    obj.save()
+
 
             # (3) Bookkeeping
             added += prt_added
@@ -844,13 +856,23 @@ class Action(models.Model):
     when = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):
-        action = "{}|{}".format(self.user.username, self.created)
+        action = "{}|{}".format(self.user.username, self.when)
         return action
 
     def add(user, itemtype, actiontype, details=None):
         """Add an action"""
 
-        action = Action(user=user, itemtype=itemtype, actiontype=actiontype)
+        # Check if we are getting a string user name or not
+        if isinstance(user, str):
+            # Get the user object
+            oUser = User.objects.filter(username=user).first()
+        else:
+            oUser = user
+        # If there are details, make sure they are stringified
+        if details != None and not isinstance(details, str):
+            details = json.dumps(details)
+        # Create the correct action
+        action = Action(user=oUser, itemtype=itemtype, actiontype=actiontype)
         if details != None: action.details = details
         action.save()
         return action
@@ -1031,6 +1053,7 @@ class Visit(models.Model):
                 # There is no profile yet, so make it
                 profile = Profile(user=user)
                 profile.save()
+
             # Process this visit in the profile
             profile.add_visit(name, path, is_menu, **kwargs)
             # Return success
@@ -1492,9 +1515,6 @@ class Origin(models.Model):
             hit = qs[0]
         # Return what we found or created
         return hit
-
-
-   
 
 
 class Provenance(models.Model):
@@ -2134,12 +2154,8 @@ class Manuscript(models.Model):
                     if 'location' in msItem: sermon.locus = msItem['location']
                     if 'incipit' in msItem: sermon.incipit = msItem['incipit']
                     if 'explicit' in msItem: sermon.explicit = msItem['explicit']
-                    if 'edition' in msItem: sermon.edition = msItem['edition']
                     if 'quote' in msItem: sermon.quote = msItem['quote']
-                    if 'gryson' in msItem: sermon.gryson = msItem['gryson']
-                    if 'clavis' in msItem: sermon.clavis = msItem['clavis']
                     if 'feast' in msItem: sermon.feast = msItem['feast']
-                    if 'keyword' in msItem: sermon.keyword = msItem['keyword']
                     if 'bibleref' in msItem: sermon.bibleref = msItem['bibleref']
                     if 'additional' in msItem: sermon.additional = msItem['additional']
                     if 'note' in msItem: sermon.note = msItem['note']
@@ -2152,6 +2168,13 @@ class Manuscript(models.Model):
                             sermon.nickname = nickname
                         else:
                             sermon.author = author
+
+                    # The following items are [0-n]
+                    #  -- These may be replaced by separate entries in SermonSignature
+                    if 'gryson' in msItem: sermon.gryson = msItem['gryson']     # SermonSignature
+                    if 'clavis' in msItem: sermon.clavis = msItem['clavis']     # SermonSignature
+                    if 'keyword' in msItem: sermon.keyword = msItem['keyword']  # Keyword
+                    if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
                     # Set the default status type
                     sermon.stype = "imp"    # Imported
@@ -3320,6 +3343,9 @@ class SermonDescr(models.Model):
     # [0-1] Not every sermon might have a title ...
     title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
 
+    # [0-1] Some (e.g. e-codices) may have a subtitle (field <rubric>)
+    subtitle = models.CharField("Sub title", null=True, blank=True, max_length=LONG_STRING)
+
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
@@ -3335,26 +3361,30 @@ class SermonDescr(models.Model):
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
     quote = models.TextField("Quote", null=True, blank=True)
-    # [0-1] We would like to know the Clavis number (if available)
-    clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] We would like to know the Gryson number (if available)
-    gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] The FEAST??
     feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
-    # [0-1] Edition
-    edition = models.TextField("Edition", null=True, blank=True)
+    # [0-1] Notes on the bibliography, literature for this sermon
+    bibnotes = models.TextField("Bibliography notes", null=True, blank=True)
     # [0-1] Any notes for this sermon
     note = models.TextField("Note", null=True, blank=True)
     # [0-1] Additional information 
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
-    # [0-1] One keyword or more??
-    keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
+
+    ## [0-1] We would like to know the Clavis number (if available)
+    #clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
+    ## [0-1] We would like to know the Gryson number (if available)
+    #gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
+    ## [0-1] One keyword or more??
+    #keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
+
+    # [0-n] Many-to-many: keywords per SermonDescr
+    keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
@@ -3480,6 +3510,17 @@ class SermonDescr(models.Model):
     def get_explicit_markdown(self):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
+
+
+class SermonDescrKeyword(models.Model):
+    """Relation between a SermonDescr and a Keyword"""
+
+    # [1] The link is between a SermonGold instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
 
 
 class SermonDescrGold(models.Model):

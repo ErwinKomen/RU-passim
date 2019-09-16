@@ -15,6 +15,7 @@ from pyzotero import zotero
 
 from django.db.models.functions import Lower
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
+from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -34,10 +35,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold,  Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
-    EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
+    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
+    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
     Litref, LitrefMan, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -138,6 +139,22 @@ def add_visit(request, name, is_menu):
     username = "anonymous" if request.user == None else request.user.username
     if username != "anonymous":
         Visit.add(username, name, request.path, is_menu)
+
+def action_model_changes(form, instance):
+    field_values = model_to_dict(instance)
+    changed_fields = form.changed_data
+    changes = {}
+    for item in changed_fields: 
+        if item in field_values:
+            changes[item] = field_values[item]
+        else:
+            # It is a form field
+            try:
+                changes[item] = form.cleaned_data[item]
+            except:
+                changes[item] = "(unavailable)"
+    return changes
+
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -864,6 +881,97 @@ def do_mext(request):
         oErr.DoError("do_mext")
         return reverse('home')
 
+def do_sermons(request):
+    """Remove duplicate sermons from manuscripts"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Repair manuscript-sermons"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+    
+        # Start up processing
+        added = 0
+        lst_total = []
+        lst_total.append("<table><thead><tr><th>Manuscript</th><th>Sermon</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Step #1: walk all manuscripts
+        qs_m = Manuscript.objects.all().order_by('id')
+        for manu in qs_m:
+            # Get all the sermons for this manuscript in appropriate order (reverse ID)
+            sermon_lst = SermonDescr.objects.filter(manu=manu).order_by('-id').values('id', 'title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'note', 'additional', 'order')
+            remove_lst = []
+            if manu.id == 1245:
+                iStop = 1
+            for idx, sermon_obj in enumerate(sermon_lst):
+                # Check if duplicates are there, and if so put them in the remove list
+                start = idx + 1
+                for check in sermon_lst[start:]:
+                    # compare all relevant elements
+                    bEqual = True
+                    for attr in check:
+                        if attr != 'id':
+                            if check[attr] != sermon_obj[attr]:
+                                bEqual = False
+                                break
+                    if bEqual:
+                        id = check['id']
+                        if id not in remove_lst:
+                            remove_lst.append(id)
+                            lst_total.append("<tr><td>{}</td><td>{}</td></tr>".format(manu.id, check['id']))
+                            added += 1
+            # Remove duplicates for this manuscript
+            if len(remove_lst) > 0:
+                SermonDescr.objects.filter(id__in=remove_lst).delete()
+
+        # Step #2: tidy up sermon fields
+        qs_s = SermonDescr.objects.all().order_by('id')
+        with transaction.atomic():
+            for sermo in qs_s:
+                bChange = False
+                # Check if the sub title equals the title
+                if sermo.subtitle != None and sermo.title != None and sermo.subtitle == sermo.title:
+                    sermo.subtitle = ""
+                    bChange = True
+                # Save if needed
+                if bChange:
+                    sermo.save()
+
+
+
+        lst_total.append("</tbody></table>")
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of removed sermons', 'result': added})
+        result_list.append({'part': 'All changes', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_sermons")
+        return reverse('home')
+
 
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
@@ -899,14 +1007,14 @@ def do_goldtogold(request):
 
         # Step #1: remove all unnecessary links
         oErr.Status("{} step #1".format(method))
-        qs = SermonGoldSame.objects.all()
+        qs = EqualGoldLink.objects.all()
         lst_delete = []
         for relation in qs:
             if relation.src == relation.dst:
                 lst_delete.append(relation.id)
         oErr.Status("Step 1: removing {} links".format(len(lst_delete)))
         if len(lst_delete) > 0:
-            SermonGoldSame.objects.filter(Q(id__in=lst_delete)).delete()
+            EqualGoldLink.objects.filter(Q(id__in=lst_delete)).delete()
 
         # Step #2: create groups of equals
         oErr.Status("{} step #2".format(method))
@@ -951,6 +1059,7 @@ def do_goldtogold(request):
                         for item in group:
                             item.equal = eqg
                             item.save()
+                            added += 1
 
         # Step #3: add individual equals
         oErr.Status("{} step #3".format(method))
@@ -961,6 +1070,7 @@ def do_goldtogold(request):
                 eqg.save()
                 gold.equal = eqg
                 gold.save()
+                added += 1
 
         # -- or can a SermonGold be left without an equality group, if he is not equal to anything (yet)?
 
@@ -969,12 +1079,12 @@ def do_goldtogold(request):
         for linktype in LINK_PRT:
             lst_prt_add = []    # List of partially equals relations to be added
             # Get all links of the indicated type
-            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
+            qs_prt = EqualGoldLink.objects.filter(linktype=linktype).order_by('src__id')
             # Walk these links
             for obj_prt in qs_prt:
                 # Get the equal groups of the link
-                src_eqg = obj_prt.src.equal
-                dst_eqg = obj_prt.dst.equal
+                src_eqg = obj_prt.src
+                dst_eqg = obj_prt.dst
                 # Translate the link to one between equal-groups
                 oLink = {'src': src_eqg, 'dst': dst_eqg}
                 if oLink not in lst_prt_add: lst_prt_add.append(oLink)
@@ -989,7 +1099,10 @@ def do_goldtogold(request):
                     if obj == None:
                         obj = EqualGoldLink(linktype=linktype, src=item['src'], dst=item['dst'])
                         obj.save()
-        
+                        added += 1
+                        lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                            (idx+1), item['src'].id, item['dst'].id, linktype, "add", "" ))
+        # y = [o for o in lst_prt_add if o['src'].id == 708]
         lst_total.append("</tbody></table>")
 
         # Create list to be returned
@@ -1758,6 +1871,64 @@ def get_keywords(request):
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
+@csrf_exempt
+def get_gold(request, pk=None):
+    """Get details of one particular gold sermon"""
+
+    oErr = ErrHandle()
+    data = {'status': 'fail'}
+    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
+    try:
+        if request.is_ajax() and user_is_authenticated(request):
+            # Get the id of the gold sermon
+            qd = request.GET if request.method == "GET" else request.POST
+            goldid = qd.get("goldid", "")
+            bFound = False
+            if goldid == "" and pk != None:
+                obj = SermonGold.objects.filter(id=pk).first()
+                bFound = True
+            else:
+                signature = Signature.objects.filter(id=goldid).first()
+                if signature==None:
+                    data['msg'] = "Signature not found"
+                    data['status'] = "error"
+                else:
+                    obj = signature.gold
+                    bFound = True
+            if obj == None:
+                data['msg'] = "Gold not found"
+                data['status'] = "error"
+            elif bFound:
+                # Copy all relevant information
+                info = {}
+                d = model_to_dict(obj)
+                for field in fields:
+                    info[field] = d[field]  
+                # Add the authorname
+                authorname = ""
+                if obj.author != None:
+                    authorname = obj.author.name                  
+                info['authorname'] = authorname
+
+                # Copy keywords
+                info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
+
+                # Copy signatures
+                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
+
+                data['data'] = info
+
+                data['status'] = "ok"
+        else:
+            data['msg'] = "Request is not ajax"
+            data['status'] = "error"
+    except: 
+        msg = oErr.get_error_message()
+        data['msg'] = msg
+        data['status'] = "error"
+    mimetype = "application/json"
+    return HttpResponse(json.dumps(data), mimetype)
+
 
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
@@ -2358,6 +2529,7 @@ class BasicPart(View):
                     if self.add:
                         # We are saving a NEW item
                         formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
+                        formObj['action'] = "new"
                     else:
                         # We are saving an EXISTING item
                         # Determine the instance to be passed on
@@ -2366,6 +2538,7 @@ class BasicPart(View):
                         formObj['instance'] = instance
                         # Get an instance of the form
                         formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
+                        formObj['action'] = "change"
 
                 # Initially we are assuming this just is a review
                 context['savedate']="reviewed at {}".format(get_current_datetime().strftime("%X"))
@@ -2388,6 +2561,12 @@ class BasicPart(View):
                             if bNeedSaving:
                                 # Perform the saving
                                 instance.save()
+                                # Log the SAVE action
+                                details = {'id': instance.id}
+                                if formObj['forminstance'].changed_data != None:
+                                    details['changes'] = action_model_changes(formObj['forminstance'], instance)
+                                if 'action' in formObj: details['savetype'] = formObj['action']
+                                Action.add(request.user.username, self.MainModel.__name__, "save", json.dumps(details))
                                 # Set the context
                                 context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
@@ -2434,6 +2613,8 @@ class BasicPart(View):
                         self.process_formset(prefix, request, formset)
                         # Store the instance
                         formsetObj['formsetinstance'] = formset
+                        # Make sure we know what we are dealing with
+                        itemtype = "form_{}".format(prefix)
                         # Adapt the formset contents only, when it is NOT READONLY
                         if not formsetObj['readonly']:
                             # Is the formset valid?
@@ -2449,6 +2630,9 @@ class BasicPart(View):
                                             if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
                                                 # Check if deletion should be done
                                                 if self.before_delete(prefix, form.instance):
+                                                    # Log the delete action
+                                                    details = {'id': form.instance.id}
+                                                    Action.add(request.user.username, itemtype, "delete", json.dumps(details))
                                                     # Delete this one
                                                     form.instance.delete()
                                                     # NOTE: the template knows this one is deleted by looking at form.DELETE
@@ -2467,6 +2651,11 @@ class BasicPart(View):
                                                     sub_instance.save()
                                                     # Adapt the last save time
                                                     context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
+                                                    # Log the delete action
+                                                    details = {'id': sub_instance.id}
+                                                    if form.changed_data != None:
+                                                        details['changes'] = action_model_changes(form, sub_instance)
+                                                    Action.add(request.user.username, itemtype, "save", json.dumps(details))
                                                     # Store the instance id in the data
                                                     self.data[prefix + '_instanceid'] = sub_instance.id
                                                     # Any action after saving this form
@@ -2544,6 +2733,9 @@ class BasicPart(View):
             elif self.action == "delete":
                 # The user requests this to be deleted
                 if self.before_delete():
+                    # Log the delete action
+                    details = {'id': self.obj.id}
+                    Action.add(request.user.username, self.MainModel.__name__, "delete", json.dumps(details))
                     # We have permission to delete the instance
                     self.obj.delete()
                     context['deleted'] = True
@@ -2760,6 +2952,8 @@ class PassimDetails(DetailView):
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
+    newRedirect = False     # Redirect the page name to a correct one after creating
+    redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -2790,6 +2984,8 @@ class PassimDetails(DetailView):
                 sHtml = sHtml.replace("\ufeff", "")
                 data['html'] = sHtml
                 response = JsonResponse(data)
+            elif self.redirectpage != "":
+                return redirect(self.redirectpage)
             else:
                 # This takes self.template_name...
                 response = self.render_to_response(context)
@@ -2816,16 +3012,25 @@ class PassimDetails(DetailView):
             if 'errors' in context and len(context['errors']) > 0:
                 data['status'] = "error"
                 data['msg'] = context['errors']
-            # response = self.render_to_response(self.template_post, context)
-            response = render_to_string(self.template_post, context, request)
-            response = response.replace("\ufeff", "")
-            data['html'] = response
+
+            if self.rtype == "json":
+                response = render_to_string(self.template_post, context, request)
+                response = response.replace("\ufeff", "")
+                data['html'] = response
+                response = JsonResponse(data)
+            elif self.newRedirect and self.redirectpage != "":
+                # Redirect to this page
+                return redirect(self.redirectpage)
+            else:
+                # This takes self.template_name...
+                response = self.render_to_response(context)
         else:
             data['html'] = "(No authorization)"
             data['status'] = "error"
+            response = JsonResponse(data)
 
         # Return the response
-        return JsonResponse(data)
+        return response
 
     def initializations(self, request, pk):
         # Store the previous page
@@ -2923,6 +3128,9 @@ class PassimDetails(DetailView):
                 try:
                     bResult, msg = self.before_delete(instance)
                     if bResult:
+                        # Log the DELETE action
+                        details = {'id': instance.id}
+                        Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
                         # Remove this sermongold instance
                         instance.delete()
                     else:
@@ -2954,6 +3162,15 @@ class PassimDetails(DetailView):
                 if bResult:
                     # Now save it for real
                     instance.save()
+                    # Make it available
+                    context['object'] = instance
+                    self.object = instance
+                    # Log the SAVE action
+                    details = {'id': instance.id}
+                    details["savetype"] = "new" if bNew else "change"
+                    if frm.changed_data != None:
+                        details['changes'] = action_model_changes(frm, instance)
+                    Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
                 else:
                     context['errors'] = {'save': msg }
             else:
@@ -3430,6 +3647,7 @@ class SermonDetails(PassimDetails):
     title = "Sermon" 
     afternewurl = ""
     rtype = "html"
+    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
     StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
                                          form=SermonDescrGoldForm, min_num=0,
                                          fk_name = "sermon",
@@ -3456,7 +3674,17 @@ class SermonDetails(PassimDetails):
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
-        # self.afternewurl = reverse('search_gold')
+
+        # Calculate how many sermons there are
+        manuscript = instance.manu
+        if manuscript != None:
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': instance.id})
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -3467,11 +3695,72 @@ class SermonDetails(PassimDetails):
         context['prevpage'] = get_previous_page(self.request)
 
         # New:
-        if instance.manu == None:
+        if instance == None:
+            # We are creating a new sermon
+            man_id = None
+            # What is the manuscript id?
+            if 'manuscript_id' in self.qd:
+                man_id = self.qd['manuscript_id']
+            context['manuscript_id'] = man_id
+        elif 'sermo-manu_id' in self.qd:
+            context['manuscript_id'] = self.qd['sermo-manu_id']
+            manuscript_id = context['manuscript_id']
+            self.afternewurl = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+            context['afternewurl'] = self.afternewurl
+        elif instance.manu == None:
             context['manuscript_id'] = None
         else:
             context['manuscript_id'] = instance.manu.id
 
+        # Are we copying information??
+        if 'goldcopy' in self.qd:
+            # Get the ID of the gold sermon from which we are copying
+            goldid = self.qd['goldcopy']
+            gold = SermonGold.objects.filter(id=goldid).first()
+
+            if gold != None:
+                # Copy all relevant information to obj
+                obj = self.object
+                # (1) copy author
+                if gold.author != None: obj.author = gold.author
+                # (2) copy incipit
+                if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
+                # (3) copy explicit
+                if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
+                # (4) copy author
+                if gold.author != None: obj.author = gold.author
+                # (5) copy keywords
+                kwlist = [x['id'] for x in obj.keywords.all().values('id')]
+                for kw in gold.keywords.all():
+                    # Check if it is already there
+                    if kw.id not in kwlist:
+                        # Add it in the proper way
+                        srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
+                        srm_kw.save()
+                # (6) copy signatures
+                for gold_sig in gold.goldsignatures.all():
+                    # Check if it is already there
+                    srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
+                    if srm_sig == None:
+                        srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
+                        srm_sig.save()
+                # Now save the adapted sermon
+                obj.save()
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+        else:
+            # Pass on all the linked-gold editions
+            sedi_list = []
+            # Visit all linked gold sermons
+            for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
+                # Access the gold sermon
+                gold = linked.gold
+                # Get all the editions of this gold sermon
+                for edi in gold.goldeditions.all():
+                    name = edi.name
+                    if name not in sedi_list:
+                        sedi_list.append({'name': name})
+            context['sedi_list'] = sedi_list
 
         return context
 
@@ -3530,6 +3819,13 @@ class SermonEdit(BasicPart):
                     # Make sure the new sermon gets changed
                     instance.order = sermon_count
                     instance.save()
+        elif instance and instance.order <= 0:
+            # Calculate how many sermons there are
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
+
                         
         
         # There's is no real return value needed here 
@@ -3779,6 +4075,63 @@ class SermonSignset(BasicPart):
                                {'type': 'ot', 'name': 'Other'}]
         return context
 
+
+class SermonKwset(BasicPart):
+    """The set of keywords from one sermon"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_kwset.html'
+    title = "SermonDescrKeywords"
+    SkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
+                                         form=SermonDescrKeywordForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SkwFormSet, 'prefix': 'skw', 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "skw":
+            # Get the chosen keyword
+            obj = form.cleaned_data['keyword']
+            if obj == None:
+                # Get the value entered for the keyword
+                kw = form['name'].data
+                # Check if this is an existing Keyword
+                obj = Keyword.objects.filter(name__iexact=kw).first()
+                if obj == None:
+                    # Create it
+                    obj = Keyword(name=kw.lower())
+                    obj.save()
+                # Now set the instance value correctly
+                instance.keyword = obj
+                has_changed = True
+
+        return has_changed
+
+
+class SermonEdiset(BasicPart):
+    """The set of editions from the gold-sermons related to me"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_ediset.html'
+    title = "SermonDescrEditions"
+
+    def add_to_context(self, context):
+
+        # Pass on all the linked-gold editions
+        sedi_list = []
+        # Visit all linked gold sermons
+        for linked in SermonDescrGold.objects.filter(sermon=self.obj, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Get all the editions of this gold sermon
+            for edi in gold.goldeditions.all():
+                name = edi.name
+                if name not in sedi_list:
+                    sedi_list.append({'name': name})
+        context['sedi_list'] = sedi_list
+
+        return context
 
 class ManuscriptDetails(PassimDetails):
     """Editable manuscript details"""

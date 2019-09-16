@@ -117,11 +117,8 @@ class SermonForm(forms.ModelForm):
     libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
-    siggryson = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}))
-    sigclavis = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}))
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 200px;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
     manuidno = forms.CharField(label=_("Manuscript"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifier...', 'style': 'width: 100%;'}))
 
@@ -129,21 +126,25 @@ class SermonForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'clavis', 'gryson', 
-                  'feast', 'bibleref', 'edition', 'additional', 'note', 'keyword', 'stype']
+        fields = ['title', 'subtitle', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'manu',
+                  'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
+                  #, 'clavis', 'gryson', 'keyword']
         widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'locus':       forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'clavis':      forms.TextInput(attrs={'class': 'typeahead searching sigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
-                 'gryson':      forms.TextInput(attrs={'class': 'typeahead searching siggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
-                 'edition':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'locus':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;'}),
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+
+                 # On the verge of leaving...
+                 #'clavis':      forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
+                 #'gryson':      forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
+                 #'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -157,6 +158,7 @@ class SermonForm(forms.ModelForm):
         super(SermonForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['manu'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -175,8 +177,10 @@ class SermonDescrSignatureForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonSignature
-        fields = ['code', 'editype', 'sermon']
-        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'})
+        # fields = ['code', 'editype', 'sermon']
+        fields = ['code', 'editype']
+        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
+                 'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -208,6 +212,30 @@ class SermonDescrGoldForm(forms.ModelForm):
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
                 pass
+
+
+class SermonDescrKeywordForm(forms.ModelForm):
+    name = forms.CharField(label=_("Keyword"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescrKeyword
+        fields = ['sermon', 'keyword']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonDescrKeywordForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['keyword'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.keyword != None:
+                kw = instance.keyword.name
+                self.fields['name'].initial = kw
 
 
 class SermonGoldForm(forms.ModelForm):
@@ -311,8 +339,10 @@ class SermonGoldSignatureForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Signature
-        fields = ['code', 'editype', 'gold']
-        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'})
+        # fields = ['code', 'editype', 'gold']
+        fields = ['code', 'editype']
+        widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
+                 'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):

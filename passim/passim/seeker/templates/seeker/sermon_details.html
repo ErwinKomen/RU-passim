@@ -76,7 +76,32 @@
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
             </div>
 
-            <!-- Room for the links from this gold sermon -->
+            <!-- SermonDescr critical editions: viewed from linked gold-sermons -->
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <!-- One or more critical editions that are linked to the gold-sermons associated with me -->
+              <div class="col-md-4">
+                <div id="sermondescr_ediset" class="post-load" targeturl="{% url 'sermon_ediset' pk=sermoForm.instance.id %}"  >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+
+              <!-- One or more fulltext links (to critical editions) -->
+              <div class="col-md-5">
+                <!-- this is only applicable to gold sermons, not to sermon descriptions -->
+              </div>
+
+              <!-- Room for the keywords attached to this gold sermon -->
+              <div class="col-md-3">
+                <div id="sermondescr_kwset" class="post-load" targeturl="{% url 'sermon_kwset' pk=sermoForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Room for the links from this sermon -->
             <div class="row">&nbsp;</div>
             <div id="sermon_linkset" class="post-load" targeturl="{% url 'sermon_linkset' pk=sermoForm.instance.id %}" >
               <!-- The contents first show the waiting glyph and are then updated with the Ajax-fetched linkset -->

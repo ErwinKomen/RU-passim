@@ -50,6 +50,7 @@ urlpatterns = [
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
     url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
+    url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -84,6 +85,8 @@ urlpatterns = [
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
     url(r'^sermon/signset(?:/(?P<pk>\d+))?/$', SermonSignset.as_view(), name='sermon_signset'),
     url(r'^sermon/linkset(?:/(?P<pk>\d+))?/$', SermonLinkset.as_view(), name='sermon_linkset'),
+    url(r'^sermon/kwset(?:/(?P<pk>\d+))?/$', SermonKwset.as_view(), name='sermon_kwset'),
+    url(r'^sermon/ediset(?:/(?P<pk>\d+))?/$', SermonEdiset.as_view(), name='sermon_ediset'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
 
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
@@ -133,6 +136,7 @@ urlpatterns = [
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
+    url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
