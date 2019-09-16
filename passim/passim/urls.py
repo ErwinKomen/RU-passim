@@ -42,6 +42,7 @@ urlpatterns = [
     url(r'^sync/entry/$', passim.seeker.views.sync_entry, name='entries_json'),
     url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
     url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
+    url(r'^sync/zotero/$', passim.seeker.views.redo_zotero, name='sync_zotero'),
 
     url(r'^tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
     url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
@@ -91,6 +92,8 @@ urlpatterns = [
     url(r'^report/list', ReportListView.as_view(), name='report_list'),
     url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
 
+    url(r'^literature/list', LitRefListView.as_view(), name='literature_list'),
+    
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),

@@ -42,6 +42,7 @@
                           <li><a href="{% url 'bibliography' %}" title="Bibliography">Bibliography</a></li>
                           {% if is_passim_editor %}
                             <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'literature_list' %}" title="Bibliography test">Bibliography_test</a></li>
                             <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
                             <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
@@ -67,6 +68,7 @@
                             <li><a href="{% url 'do_locations' %}" title="Convert locations">Convert locations</a></li>
                             <li><a href="{% url 'do_provenance' %}" title="Remove duplicate Manuscript-Provenance links">Tweak provenances</a></li>
                             <li><a href="{% url 'do_mext' %}" title="Copy URL to ManuscriptExt">Copy manuscript links to externals</a></li>
+                            <li><a href="{% url 'sync_zotero' %}" title="Force Zotero Sync">Synchronize Zotero (force)</a></li>
 
                           </ul>
                         </li>

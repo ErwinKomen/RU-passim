@@ -1570,7 +1570,7 @@ class Litref(models.Model):
     def __str__(self):
         return self.itemid
 
-    def sync_zotero():
+    def sync_zotero(force=False):
         """Read all stuff from Zotero"""
 
         libid = Information.get_kvalue("zotero_libraryid")
@@ -1606,7 +1606,7 @@ class Litref(models.Model):
                         obj = Litref(itemid=itemid, data=sData)
                         obj.save()
                     # Check if it needs processing
-                    if obj.short == "" or obj.data != sData:
+                    if force or obj.short == "" or obj.data != sData:
                         # It needs processing
                         obj.read_zotero(data=item['data'])
                     elif obj.data != sData:
@@ -1614,6 +1614,7 @@ class Litref(models.Model):
                         obj.save()
                     
         except:
+            print("sync_zotero error")
             msg = oErr.get_error_message()
             bBack = False
         return bBack
@@ -1663,27 +1664,56 @@ class Litref(models.Model):
                     if self.data != sData:
                         self.data = sData
 
-                    # First step: make a short reference: author, year, title
+                    # First step: store author, year, title, short_title, journal_abbr, volume
                     authors = Litref.get_creators(data, type="author", style= "first")
-                    year = "?" if "date" not in data else data['date']
+                    year = "?" if "date" not in data else data['date'][-4:]
                     title = "(no title)" if "title" not in data else data['title']
-                    self.short = "{}. {}. {}. ({})".format(authors, year, title)
+                    short_title = "(no short title)" if "shortTitle" not in data else data['shortTitle']
+                    #[TH: journalAbbreviation ipv Journal dit werkt! tzt aanpassen]
+                    journal_abbr = "(no abbr journal title)" if "publicationTitle" not in data else data['publicationTitle']
+                    volume = "?" if "volume" not in data else data['volume']
+                    
+                    # Second step: make short reference for article in journal
+                    if itemType == "journalArticle":
+                        result = "{}, _{}_ {} ({})".format(authors, journal_abbr, volume, year)
+                    
+                    # Third step: make short reference for book section TH: aparte author style maken voor bookSection Hermsen & Hermsen zie voorbeeld              
+                    elif itemType == "bookSection":
+                        result = "{} {}".format(authors, year)
+                    
+                    # Fourth step: make short reference for book
+                    elif itemType == "book":
+                        result = "{}, _{}_ ({})".format(authors, short_title, year)
+                    
+                    if result != "":
+                        # update the full field
+                        self.short = result
 
+                    # Now update this item
+                    self.save()
+                    
+                  
                     # Next step: make a full reference
                     authors = Litref.get_creators(data, type="author")
                     if itemType == "book":
                         # Get publisher
                         publisher = data['publisher']
+                        # Get place
+                        place = data['place']
                         # optional volume
                         volume = data['volume']
                         if volume != "":
                             publisher = "{}. {}".format(volume, publisher)
-                        result = "{}. {}. _{}._ {}.".format(authors, year, title, publisher)
+                        result = "{}, _{}_, {}: {} ({})".format(authors, title, place, publisher, year)
                     elif itemType == "bookSection":
                         # Get the editor(s)
-                        editors = self.get_creators(data, type="editor")
+                        editors = Litref.get_creators(data, type="editor")
                         # Get title of book
                         booktitle = data['bookTitle']
+                        # Get the name of the series
+                        series = data['series']
+                        # Get the series number
+                        series_number = data['seriesNumber']
                         # Get page(s)
                         pages = data['pages']
                         # Get the location
@@ -1692,7 +1722,19 @@ class Litref(models.Model):
                         publisher = data['publisher']
                         if place != "":
                             publisher = "{}: {}".format(place, publisher)
-                        result = "{}. {}. {}. In {}, _{}_, {}. {}".format(authors, year, title, editors, booktitle, pages, publisher)
+                        if series == "":
+                            if series_number == "":
+                                # No series_number, no series name
+                                result = "{}, '{}' in: {}, _{}_, {} ({}), {}".format(authors, title, editors, booktitle, publisher, year, pages)
+                            else:
+                             # There is no series name but there is a series_number
+                             result = "{}, '{}' in: {}, _{}_ ({}), {} ({}), {}".format(authors, title, editors, booktitle, series_number, publisher, year, pages)
+                        elif series_number == "":
+                            # There is a series name but no series_number
+                            result = "{}, '{}' in: {}, _{}_ ({}), {} ({}), {}".format(authors, title, editors, booktitle, series, publisher, year, pages)
+                        else:
+                            # Both series name and series_number
+                            result = "{}, '{}' in: {}, _{}_ ({} {}), {} ({}), {}".format(authors, title, editors, booktitle, series, series_number, publisher, year, pages)
                     elif itemType == "conferencePaper":
                         combi = [authors, year, title]
                         # Name of the proceedings
@@ -1710,7 +1752,8 @@ class Litref(models.Model):
                         # No idea how to process this
                         pass
                     elif itemType == "journalArticle":
-                        combi = [authors, year, title]
+                        # combi = [authors, title]
+
                         # Name of the journal
                         journal = data['publicationTitle']
                         # Volume
@@ -1720,23 +1763,23 @@ class Litref(models.Model):
                         if volume == "":
                             if issue == "":
                                 # No vol/iss
-                                journal = "_{}_".format(journal)
+                                result = "{}, '{}', _{}_, ({})".format(authors, title, journal, year)
                             else:
                                 # No vol, but there is an issue
-                                journal = "_{}_ {}".format(journal, issue)
+                                result = "{}, '{}', _{}_, {} ({})".format(authors, title, journal, issue, year)
                         elif issue == "":
                             # There is a volume, but no issue
-                            journal = "_{}_ {}".format(journal, volume)
+                            result = "{}, '{}', _{}_, {} ({})".format(authors, title, journal, volume, year)
                         else:
                             # Both volume and issue
-                            journal = "_{}_ ({}){}".format(journal, volume, issue)
-                        combi.append(journal)
+                            result = "{}, '{}', _{}_, {} {} ({})".format(authors, title, journal, volume, issue, year)
+                        # combi.append(journal)
 
                         # Get page(s)
-                        pages = data['pages']
-                        if pages != "": combi.append(pages)
+                        # pages = data['pages']
+                        # if pages != "": combi.append(pages)
                         # Combine
-                        result = ". ".join(combi) + "."
+                        # result = ". ".join(combi) + "."
                     elif itemType == "manuscript":
                         combi = [authors, year, title]
                         # Get the location
@@ -1778,7 +1821,8 @@ class Litref(models.Model):
                     pass
             else:
                 back = False
-        except:
+        except Exception as e:
+            print("read_zotero error", str(e))
             msg = oErr.get_error_message()
             back = False
         # Return ability
@@ -1801,11 +1845,14 @@ class Litref(models.Model):
                         authors.append(item['lastName'])
                     else:
                         if number == 1 and type == "author":
-                            # First author of anything must have lastname-firstname
-                            authors.append("{}, {}".format(item['lastName'], item['firstName']))
-                        else:
-                            # Any other author or editor is firstname-lastname
+                            # First author of anything must have lastname-first initial
+                            authors.append("{}, {}.".format(item['lastName'], item['firstName'][:1]))
+                        elif type == "editor":
+                            # editor??
                             authors.append("{} {}".format(item['firstName'], item['lastName']))
+                        else:
+                            # Any other author or editor is first initial-lastname
+                            authors.append("{}. {}".format(item['firstName'][:1], item['lastName']))
             if bFirst:
                 if len(authors) == 0:
                     result = "(unknown)"
@@ -1821,11 +1868,16 @@ class Litref(models.Model):
                     last = authors[-1]
                     # The first [n-1] authors should be combined with a comma, the last with an ampersand
                     result = "{} & {}".format( ", ".join(preamble), last)
-            # Possibly add (eds.)
-            if type == "editor":
+            # Possibly add (eds.) TH: aanpassen, "ed." als er 1 editor is
+            if type == "editor" and len(authors) > 1:
                 result = result + " (eds.)"
+            elif type == "editor" and len(authors) == 1:
+                result = result + " (ed.)"
+
 
         return result
+
+    
 
     def get_abbr(self):
         """Get the abbreviation, reading from Zotero if not yet done"""
@@ -1842,7 +1894,7 @@ class Litref(models.Model):
         return self.full
 
     def get_full_markdown(self):
-        """Get the full text, reading from Zotero if not yet done"""
+        """Get the full text in markdown, reading from Zotero if not yet done"""
 
         if self.full == "":
             self.read_zotero()
@@ -1855,6 +1907,12 @@ class Litref(models.Model):
             self.read_zotero()
         return self.short
 
+    def get_short_markdown(self):
+        """Get the short text in markdown, reading from Zotero if not yet done"""
+
+        if self.short == "":
+            self.read_zotero()
+        return adapt_markdown(self.short, lowercase=False)
 
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
@@ -3520,11 +3578,8 @@ class LitrefMan(models.Model):
     reference = models.ForeignKey(Litref, related_name="reference_litrefs")
     # [1] The manuscript to which the literature item refers
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
-   
-    # pages = models.ForeignKey(Pages, related_name = "reference_pages") ?
-    # [0-1] The first and last page of the reference (
+    # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
-
 
 class NewsItem(models.Model):
     """A news-item that can be displayed for a limited time"""
@@ -3553,3 +3608,5 @@ class NewsItem(models.Model):
       self.saved = datetime.now()
       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
       return response
+
+

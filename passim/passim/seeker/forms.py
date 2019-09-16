@@ -400,7 +400,9 @@ class ManuscriptLitrefForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = LitrefMan
-        fields = ['reference', 'manuscript']
+        fields = ['reference', 'manuscript', 'pages']
+        widgets={'pages':     forms.TextInput(attrs={'placeholder': 'Page range...', 'style': 'width: 100%;'})
+                 }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling

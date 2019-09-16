@@ -255,6 +255,8 @@ def bibliography(request):
 
     # Add the edition references (abreviated and full)
 
+
+
     # Create empty list for the editions
     edition_list = []
     
@@ -279,7 +281,7 @@ def bibliography(request):
         
     # Create empty list for the literature
     
-    reference_list = []
+    reference_list = [] 
     
     # Retrieve all records from the Zotero database (user for now)
     zot = zotero.Zotero('5802673', 'user', 'oVBhIJH5elqA8zxrJGwInwWd')
@@ -296,30 +298,10 @@ def bibliography(request):
             last_name = creator['lastName']
             creator_list.append(first_name + " " + last_name)
         reference_list.append({'abbr':creator['lastName'] + ", " + item['data']['extra'] + " " + item['data']['volume'] + " (" + item['data']['date']+ ")"+", "+item['data']['pages'], 'full': item['data']['title'], 'creators': ", ".join(creator_list)})
-     
-       # Hoe is een deel in italic te krijgen? Voorbeelden in passim? Misschien eerst alle velden in 1 bestand zoals bij sam krijgen
-       # via index dan aan de slag. Wellicht eerst maar bestand alleen voor abbreviated, dus met extra, lastname, volume, date, pages 
-       # Bij literature onderscheid maken tussen article and book_section, zie wat voor Sam is gedaan, if... in aparte stings
-       # reference_list_abbr = [] ZIE hiernaast new_list en zie hierboven hoe lastName eruit te halen is.
-       
-       # EK heeft al een oplossing...eerst in Django en abbr en full precies juist in 1 veld, met noodzakelijke markdown
-
-       # string1 = author(s)
-       # string2 = , extra
-       # string3 =  (volume), 
-       # sting4a= (date)
-       # string4b = date
-       # string5 = , pages 
-
-    
-        
-    #reference_list.append({'abbr': 'app', 'full': 'In artis is een aap ontsnapt'})
-    #reference_list.append({'abbr': 'noot', 'full': 'Hij had een nootje opgegeten'})
-    
     context['reference_list'] = reference_list
 
     # Process this visit
-    context['breadcrumbs'] =  process_visit(request, "Bibliography", True)
+    context['breadcrumbs'] = process_visit(request, "Bibliography", True)
 
     return render(request,'bibliography.html', context)
 
@@ -544,6 +526,22 @@ def signup(request):
     else:
         form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
+
+def redo_zotero(request):
+    oErr = ErrHandle()
+    data = {'status': 'preparing'}
+
+    try:
+        if request.method == 'GET':
+            Litref.sync_zotero(True)
+        data['status'] = 'ok'
+    except:
+        oErr.DoError("redo_zotero error")
+        data = {'status': 'error'}
+
+    # Return this response
+    return JsonResponse(data)
+
 
 def do_clavis(request):
     # Create a regular expression
@@ -4091,7 +4089,7 @@ class ManuscriptProvset(BasicPart):
 
 
 class ManuscriptLitset(BasicPart):
-    """The set of provenances from one manuscript"""
+    """The set of literature references from one manuscript"""
 
     MainModel = Manuscript
     template_name = 'seeker/manuscript_litset.html'
@@ -4102,10 +4100,10 @@ class ManuscriptLitset(BasicPart):
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False}]
 
-    def custom_init(self):
+   #def custom_init(self):
         # Ad-hoc: refresh literature references
-        Litref.sync_zotero()
-        return True
+   #    Litref.sync_zotero()
+   #    return True
 
     def get_queryset(self, prefix):
         qs = None
@@ -5625,7 +5623,71 @@ class SourceEdit(BasicPart):
         # There's is no real return value needed here 
         return True
 
+class LitRefListView(ListView):
+    """Listview of literature references"""
 
+    model = Litref
+    paginate_by = 20
+    template_name = 'seeker/literature_list.html'
+    entrycount = 0
+    
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(LitRefListView, self).get_context_data(**kwargs)
+
+        # Get parameters
+        initial = self.request.GET
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Set the title of the application
+        context['title'] = "Passim literature info"
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Sources", True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+    
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Calculate the final qs
+        litref_ids = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
+        qs = Litref.objects.filter(id__in=litref_ids).order_by('short')
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
 
 
 

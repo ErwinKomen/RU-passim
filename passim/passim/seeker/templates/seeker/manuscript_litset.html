@@ -14,7 +14,7 @@
         {% else %}
           <table class="func-view" style="width: 100%;">
             <thead>
-              <tr><th colspan="2">#</th><th>Literature reference</th><th>&nbsp;</th></tr>
+              <tr><th colspan="2">#</th><th>Literature reference</th><th>Pages</th><th>&nbsp;</th></tr>
             </thead>
             <tbody>
               {% for litrform in mlit_formset %}
@@ -50,7 +50,8 @@
                       <input name="mlit-{{forloop.counter0}}-manuscript" value="{{litrform.instance.manuscript.id}}" />
                       <input name="mlit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                     </div>
-                    <div class="view-mode">{% if litrform.instance.reference %}{{litrform.instance.reference.get_full_markdown|safe}}{% else %}-{% endif %}</div>
+                    <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
+                      
                     <div class="litref-key hidden">{{litrform.litref}}</div>
                     <div class="edit-mode hidden">{{litrform.litref_ta}}</div>
                     <!-- Confirmation of delete -->
@@ -70,6 +71,12 @@
                       </div>
                     {% endif %}
                   </td>
+
+                  <!-- The specific set of pages of the literature reference -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode">{{litrform.instance.pages}}</div>
+                    <div class="edit-mode hidden">{{litrform.pages}}</div>
+                  </td>    
 
                   <!-- A delete button -->
                   <td title="Delete this literature reference" style="vertical-align: middle; width: 20px; " class="clickable">
@@ -124,6 +131,12 @@
                       </span>
                     </div>
                   </td>
+
+                  <!-- The specific set of pages of the literature reference -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode hidden">-</div>
+                    <div class="edit-mode">{{mlit_formset.empty_form.pages}}</div>
+                  </td>    
 
                   <!-- A delete button -->
                   <td title="Delete this literature reference" style="vertical-align: middle; width: 20px; " class="clickable">
