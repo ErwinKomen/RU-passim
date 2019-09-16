@@ -153,33 +153,6 @@
         </td>
       </tr>
 
-      <!-- External link -->
-      <!--- OUTDATED and replaced by [manu_extset]
-      <tr class="form-row">
-        <td valign="top"><b>External</b></td>
-        <td class="manuscript-support" align="left">
-          <div class="view-mode">
-          {% if manuForm.instance.url %}
-            <a title="External link" href="{{manuForm.instance.url}}" target="_blank" >{{manuForm.instance.url}}</a>
-          {% else %}
-            -
-          {% endif %}
-          </div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.url}}</div>{% endif %}
-        </td>
-      </tr>
-        -->
-
-      <!-- Bibliography and link to Bibliography page -->  
-      <tr class="form-row">
-        <td valign="top"><a href="{% url 'bibliography' %}" title="Bibliography">Literature</a>
-        <td class="manuscript-literature" align="left">
-          <div class="view-mode">{% if manuForm.instance.literature %}{{manuForm.literature.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.literature}}</div>{% endif %}
-        </td>
-      </tr>
-
-
 
       <!-- The remainder is only visible by passim editors, and only in EDIT mode, and only as visualisation... -->
       {% if is_passim_editor %}
