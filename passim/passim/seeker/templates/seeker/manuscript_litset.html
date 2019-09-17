@@ -51,7 +51,7 @@
                       <input name="mlit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                     </div>
                     <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
-                      
+                    
                     <div class="litref-key hidden">{{litrform.litref}}</div>
                     <div class="edit-mode hidden">{{litrform.litref_ta}}</div>
                     <!-- Confirmation of delete -->
@@ -74,7 +74,7 @@
 
                   <!-- The specific set of pages of the literature reference -->
                   <td  style="min-width: 150px;">
-                    <div class="view-mode">{{litrform.instance.pages}}</div>
+                    <div class="view-mode">{{litrform.instance.pages|default_if_none:""}}</div>
                     <div class="edit-mode hidden">{{litrform.pages}}</div>
                   </td>    
 
