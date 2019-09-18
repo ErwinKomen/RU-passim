@@ -117,7 +117,7 @@ class SermonForm(forms.ModelForm):
     libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 200px;'}))
+        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     manuidno = forms.CharField(label=_("Manuscript"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifier...', 'style': 'width: 100%;'}))
@@ -142,8 +142,6 @@ class SermonForm(forms.ModelForm):
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
                  # On the verge of leaving...
-                 #'clavis':      forms.TextInput(attrs={'class': 'typeahead searching gldsigclavises input-sm', 'placeholder': 'Clavis number...', 'style': 'width: 100%;'}),
-                 #'gryson':      forms.TextInput(attrs={'class': 'typeahead searching gldsiggrysons input-sm', 'placeholder': 'Gryson code...', 'style': 'width: 100%;'}),
                  #'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  # larger areas

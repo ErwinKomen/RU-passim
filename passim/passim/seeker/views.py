@@ -155,6 +155,9 @@ def action_model_changes(form, instance):
                 changes[item] = "(unavailable)"
     return changes
 
+def has_string_value(field, obj):
+    response = (field in obj and obj[field] != None and obj[field] != "")
+    return response
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -882,7 +885,7 @@ def do_mext(request):
         return reverse('home')
 
 def do_sermons(request):
-    """Remove duplicate sermons from manuscripts"""
+    """Remove duplicate sermons from manuscripts and/or do other SermonDescr initialisations"""
 
     oErr = ErrHandle()
     try:
@@ -954,6 +957,8 @@ def do_sermons(request):
                 if bChange:
                     sermo.save()
 
+        # Step #3: init latin
+        SermonDescr.init_latin()
 
 
         lst_total.append("</tbody></table>")
@@ -3886,6 +3891,8 @@ class SermonListView(ListView):
             # context['page_obj'].number = initial['page']
             page_num = int(initial['page'])
             context['page_obj'] = context['paginator'].page( page_num)
+            # Make sure to adapt the object_list
+            context['object_list'] = context['page_obj']
         context['has_filter'] = self.bFilter
 
 
@@ -3944,41 +3951,60 @@ class SermonListView(ListView):
                 oFields = sermoForm.cleaned_data
 
                 # Check for author name -- which is in the typeahead parameter
-                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+                if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
                     lstQ.append(Q(author=val))
-                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
-                    val = adapt_search(oFields['authorname'])
-                    lstQ.append(Q(author__name__iregex=val))
+                elif has_string_value('authorname', oFields): 
+                    val = oFields['authorname']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(author__name__iregex=val))
+                    else:
+                        lstQ.append(Q(author__name__iexact=val))
 
                 # Check for incipit string
-                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                    val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(srchincipit__iregex=val))
+                if has_string_value('incipit', oFields): 
+                    val = oFields['incipit']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchincipit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchincipit__iexact=val))
 
                 # Check for explicit string
-                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                    val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(srchexplicit__iregex=val))
+                if has_string_value('explicit', oFields): 
+                    val = oFields['explicit']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchexplicit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchexplicit__iexact=val))
+
+                # Check for title string
+                if has_string_value('title', oFields): 
+                    val = oFields['title']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(title__iregex=val))
+                    else:
+                        lstQ.append(Q(title__iexact=val))
 
                 # Check for explicit string
-                if 'manuidno' in oFields and oFields['manuidno'] != "" and oFields['manuidno'] != None: 
+                if has_string_value('manuidno', oFields): 
                     val = adapt_search(oFields['manuidno'])
                     lstQ.append(Q(manu__idno__iregex=val))
 
-                # Check for Sermon Clavis [signature]
-                if 'sigclavis' in oFields and oFields['sigclavis'] != "" and oFields['sigclavis'] != None: 
-                    val = adapt_search(oFields['sigclavis'])
-                    lstQ.append(Q(sermonsignatures__code__iregex=val))
-                    editype = "cl"
-                    lstQ.append(Q(sermonsignatures__editype=editype))
-
-                # Check for Sermon Gryson [signature]
-                if 'siggryson' in oFields and oFields['siggryson'] != "" and oFields['siggryson'] != None: 
-                    val = adapt_search(oFields['siggryson'])
-                    lstQ.append(Q(sermonsignatures__code__iregex=val))
-                    editype = "gr"
-                    lstQ.append(Q(sermonsignatures__editype=editype))
+                # Check for *ANY* signature(s)
+                if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
+                    val = oFields['signatureid']
+                    lstQ.append(Q(sermonsignatures__id=val))
+                elif has_string_value('signature', oFields):
+                    val = oFields['signature']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(sermonsignatures__code__iregex=val))
+                    else:
+                        lstQ.append(Q(sermonsignatures__code__iexact=val))
 
                 # Calculate the final qs
                 if len(lstQ) == 0:
@@ -3990,7 +4016,6 @@ class SermonListView(ListView):
                     self.bFilter = True
             else:
                 # TODO: communicate the error to the user???
-
 
                 # Just show everything
                 qs = SermonDescr.objects.all().distinct()

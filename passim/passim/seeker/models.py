@@ -205,6 +205,8 @@ def get_searchable(sText):
     sText = sText.replace("<", "")
     sText = sText.replace(">", "")
     sText = sText.replace("_", "")
+    # Make sure to TRIM the text
+    sText = sText.strip()
     return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):

@@ -55,11 +55,13 @@
                         <tr><td>Explicit</td><td>{{sermoForm.explicit}}</td></tr>
                         <tr><td>Title</td><td>{{sermoForm.title}}</td></tr>
 
-                        <!-- Empty row 
-                        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>-->
-
-                        <tr><td>Gryson</td><td style="width: 100%;">{{sermoForm.siggryson}}</td></tr>
-                        <tr><td>Clavis</td><td style="width: 100%;">{{sermoForm.sigclavis}}</td></tr>
+                        <tr>
+                          <td class="tdnowrap">Gryson or Clavis</td>
+                          <td>
+                            <div class="signature-key hidden">{{sermoForm.signatureid}}</div>
+                            <div>{{sermoForm.signature}}</div>
+                          </td>
+                        </tr>
                         <tr><td>Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
                         <tr><td>Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
 
