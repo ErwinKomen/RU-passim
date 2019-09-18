@@ -24,6 +24,12 @@
                   <span class="glyphicon glyphicon-search"></span>
                 </a>
               </span>
+
+              <span class="">
+                <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
+                  <span class="glyphicon glyphicon-filter"></span>
+                </a>
+              </span>
             </div>
           </div>
         </div>
@@ -36,7 +42,7 @@
             <input name="page" type="text" />
           </div>
           <!-- Search tab -->
-          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_search">
+          <div class="hidden inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_search">
             <div class="panel panel-default">
                 <div>
 
@@ -91,6 +97,116 @@
 
             </div>
           </div>
+
+          <!-- Filter tab -->
+          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
+            <div class="panel panel-default">
+              <!-- Filter interface -->
+              <div class="row">
+                <div class="col-md-12">
+                  <h4>
+                    <span>Selected filters</span>
+                    {% for filter in filters %}
+                      <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                    {% endfor %}
+                  </h4>
+                </div>
+              </div>
+              
+              <div class="row">
+                <!-- The column with the different filter sections -->
+                <div class="col-sm-10 col-sm-offset-1">
+                  <!-- One or more authors -->
+                  <div id="filter_author" class="{% if not sermoForm.author.value and not sermoForm.authorname.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Author</td>
+                        <td style="width: 100%;">
+                          <div class="author-key hidden">{{sermoForm.author}}</div>
+                          <div>{{sermoForm.authorname}}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more incipits -->
+                  <div id="filter_incipit" class="{% if not sermoForm.incipit.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Incipit</td><td style="width: 100%;">{{sermoForm.incipit}}</td></tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more explicits -->
+                  <div id="filter_explicit" class="{% if not sermoForm.explicit.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Explicit</td><td style="width: 100%;">{{sermoForm.explicit}}</td></tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more titles -->
+                  <div id="filter_title" class="{% if not sermoForm.title.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Title</td><td style="width: 100%;">{{sermoForm.title}}</td></tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more signatures -->
+                  <div id="filter_signature" class="{% if not sermoForm.signature.value and not sermoForm.singatureid.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="min-width: 130px;">Gryson or Clavis:</td>
+                        <td style="width: 100%;">
+                          <div class="signature-key hidden">{{sermoForm.signatureid}}</div>
+                          <div>{{sermoForm.signature}}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more feasts -->
+                  <div id="filter_feast" class="{% if not sermoForm.feast.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more keywords -->
+                  <div id="filter_keyword" class="{% if not sermoForm.keyword.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
+                    </table>
+                  </div>
+
+                  <!-- One or more manuids -->
+                  <div id="filter_manuid" class="{% if not sermoForm.manuidno.value %}hidden{% endif %}">
+                    <table style="width: 100%;">
+                      <tr><td style="min-width: 130px;">Manuscript</td><td style="width: 100%;">{{sermoForm.manuidno}}</td></tr>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Row with buttons-->
+              <div class="row">
+                <div class="col-md-2 col-md-offset-10 text-right">
+                  <!-- Room to reset the search criteria -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
+                  </span>
+                  <!-- Submit the search form -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);" >Search</a>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </form>
+
+        <!-- New filter interface -->
+        <form id="sermon_filter" method="post" action="{% url 'sermon_list' %}">
+
         </form>
 
         <!-- List tab -->

@@ -499,6 +499,10 @@ var ru = (function ($, ru) {
           // Make sure typeahead is re-established
           ru.passim.init_typeahead();
 
+          // Switch filters
+          $(".switch.filter input").unbind("click").click(ru.passim.seeker.switch_click);
+          $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
+
           // REACT experiment: process LIKE buttons
           document.querySelectorAll(".like_button_container")
             .forEach(domContainer => {
@@ -513,6 +517,72 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * switch_click
+       *    What happens when clicking a switch
+       *
+       */
+      switch_click: function (el) {
+        var target;
+        try {
+          target = $(this).val();
+          if (target !== undefined && target !== null && target !== "") {
+            target = $("#" + target);
+            // Action depends on checking or not
+            if ($(this)[0].checked) {
+              // Must show it
+              $(target).removeClass("hidden");
+            } else {
+              // Must hide it and reset it
+              $(target).addClass("hidden");
+              $(target).find("input").each(function (idx, elThis) {
+                $(elThis).val("");
+              });
+            }
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("switch_click", ex);
+        }
+      },
+
+      /**
+       * filter_click
+       *    What happens when clicking a badge filter
+       *
+       */
+      filter_click: function (el) {
+        var target;
+        try {
+          target = $(this).attr("targetid");
+          if (target !== undefined && target !== null && target !== "") {
+            target = $("#" + target);
+            // Action depends on checking or not
+            if ($(this).hasClass("on")) {
+              // it is on, switch it off
+              $(this).removeClass("on");
+              $(this).removeClass("jumbo-3");
+              $(this).addClass("jumbo-1");
+              // Must hide it and reset target
+              $(target).addClass("hidden");
+              $(target).find("input").each(function (idx, elThis) {
+                $(elThis).val("");
+              });
+            } else {
+              // Must show target
+              $(target).removeClass("hidden");
+              // it is off, switch it on
+              $(this).addClass("on");
+              $(this).removeClass("jumbo-1");
+              $(this).addClass("jumbo-3");
+            }
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_click", ex);
         }
       },
 

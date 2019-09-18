@@ -3855,6 +3855,16 @@ class SermonListView(ListView):
                    {'name': 'Locus', 'order': '', 'type': 'str'},
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
+    filters = [
+        {"name": "Author",          "id": "filter_author",      "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+        {"name": "Title",           "id": "filter_title",       "enabled": False},
+        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+        {"name": "Feast",           "id": "filter_feast",       "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Manuscript id",   "id": "filter_manuid",      "enabled": False}
+        ]
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -3894,7 +3904,7 @@ class SermonListView(ListView):
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
         context['has_filter'] = self.bFilter
-
+        context['filters'] = self.filters
 
         # Set the title of the application
         context['title'] = "Sermons"
@@ -3926,6 +3936,13 @@ class SermonListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
+        def enable_filter(filter_id):
+            for item in self.filters:
+                if filter_id in item['id']:
+                    item['enabled'] = True
+                    break
+            return True
+
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
 
@@ -3938,6 +3955,10 @@ class SermonListView(ListView):
 
         # Fix the sort-order
         get['sortOrder'] = 'name'
+
+        # Reset filters
+        for item in self.filters:
+            item['enabled'] = False
 
         if self.bHasFormset:
             # Get the formset from the input
@@ -3953,9 +3974,11 @@ class SermonListView(ListView):
                 # Check for author name -- which is in the typeahead parameter
                 if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
+                    enable_filter("author")
                     lstQ.append(Q(author=val))
                 elif has_string_value('authorname', oFields): 
                     val = oFields['authorname']
+                    enable_filter("author")
                     if "*" in val:
                         val = adapt_search(val)
                         lstQ.append(Q(author__name__iregex=val))
@@ -3965,6 +3988,7 @@ class SermonListView(ListView):
                 # Check for incipit string
                 if has_string_value('incipit', oFields): 
                     val = oFields['incipit']
+                    enable_filter("incipit")
                     if "*" in val:
                         val = adapt_search(val)
                         lstQ.append(Q(srchincipit__iregex=val))
@@ -3974,6 +3998,7 @@ class SermonListView(ListView):
                 # Check for explicit string
                 if has_string_value('explicit', oFields): 
                     val = oFields['explicit']
+                    enable_filter("explicit")
                     if "*" in val:
                         val = adapt_search(val)
                         lstQ.append(Q(srchexplicit__iregex=val))
@@ -3992,14 +4017,17 @@ class SermonListView(ListView):
                 # Check for explicit string
                 if has_string_value('manuidno', oFields): 
                     val = adapt_search(oFields['manuidno'])
+                    enable_filter("manuid")
                     lstQ.append(Q(manu__idno__iregex=val))
 
                 # Check for *ANY* signature(s)
                 if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
                     val = oFields['signatureid']
+                    enable_filter("signature")
                     lstQ.append(Q(sermonsignatures__id=val))
                 elif has_string_value('signature', oFields):
                     val = oFields['signature']
+                    enable_filter("signature")
                     if "*" in val:
                         val = adapt_search(val)
                         lstQ.append(Q(sermonsignatures__code__iregex=val))
