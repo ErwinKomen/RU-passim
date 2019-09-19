@@ -159,6 +159,10 @@ def has_string_value(field, obj):
     response = (field in obj and obj[field] != None and obj[field] != "")
     return response
 
+def has_list_value(field, obj):
+    response = (field in obj and obj[field] != None and len(obj[field]) > 0)
+    return response
+
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
@@ -3985,6 +3989,12 @@ class SermonListView(ListView):
                     else:
                         lstQ.append(Q(author__name__iexact=val))
 
+                # Check for list of specific authors
+                if has_list_value('authorlist', oFields):
+                    enable_filter("author")
+                    id_list = [x.id for x in oFields['authorlist']]
+                    lstQ.append(Q(author__id__in=id_list))
+
                 # Check for incipit string
                 if has_string_value('incipit', oFields): 
                     val = oFields['incipit']
@@ -4014,11 +4024,17 @@ class SermonListView(ListView):
                     else:
                         lstQ.append(Q(title__iexact=val))
 
-                # Check for explicit string
+                # Check for manuid string
                 if has_string_value('manuidno', oFields): 
                     val = adapt_search(oFields['manuidno'])
                     enable_filter("manuid")
                     lstQ.append(Q(manu__idno__iregex=val))
+
+                # Check for list of specific signatures
+                if has_list_value('manuidlist', oFields):
+                    enable_filter("manuid")
+                    id_list = [x.id for x in oFields['manuidlist']]
+                    lstQ.append(Q(manu__id__in=id_list))
 
                 # Check for *ANY* signature(s)
                 if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
@@ -4033,6 +4049,12 @@ class SermonListView(ListView):
                         lstQ.append(Q(sermonsignatures__code__iregex=val))
                     else:
                         lstQ.append(Q(sermonsignatures__code__iexact=val))
+
+                # Check for list of specific signatures
+                if has_list_value('siglist', oFields):
+                    enable_filter("signature")
+                    id_list = [x.id for x in oFields['siglist']]
+                    lstQ.append(Q(sermonsignatures__id__in=id_list))
 
                 # Calculate the final qs
                 if len(lstQ) == 0:

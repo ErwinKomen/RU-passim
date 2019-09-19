@@ -500,7 +500,6 @@ var ru = (function ($, ru) {
           ru.passim.init_typeahead();
 
           // Switch filters
-          $(".switch.filter input").unbind("click").click(ru.passim.seeker.switch_click);
           $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
 
           // REACT experiment: process LIKE buttons
@@ -517,35 +516,6 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
-        }
-      },
-
-      /**
-       * switch_click
-       *    What happens when clicking a switch
-       *
-       */
-      switch_click: function (el) {
-        var target;
-        try {
-          target = $(this).val();
-          if (target !== undefined && target !== null && target !== "") {
-            target = $("#" + target);
-            // Action depends on checking or not
-            if ($(this)[0].checked) {
-              // Must show it
-              $(target).removeClass("hidden");
-            } else {
-              // Must hide it and reset it
-              $(target).addClass("hidden");
-              $(target).find("input").each(function (idx, elThis) {
-                $(elThis).val("");
-              });
-            }
-
-          }
-        } catch (ex) {
-          private_methods.errMsg("switch_click", ex);
         }
       },
 
@@ -570,6 +540,10 @@ var ru = (function ($, ru) {
               $(target).addClass("hidden");
               $(target).find("input").each(function (idx, elThis) {
                 $(elThis).val("");
+              });
+              // Also reset all select 2 items
+              $(target).find("select").each(function (idx, elThis) {
+                $(elThis).val("").trigger("change");
               });
             } else {
               // Must show target

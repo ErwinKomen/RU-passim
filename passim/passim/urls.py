@@ -138,6 +138,9 @@ urlpatterns = [
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
 
+    # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
+    url(r'^select2/', include('django_select2.urls')),
+
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
 

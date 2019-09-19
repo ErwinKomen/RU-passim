@@ -5,7 +5,9 @@ Definition of forms.
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
+from django.forms import ModelMultipleChoiceField
 from django.forms.widgets import *
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
 from passim.seeker.models import *
 
 def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
@@ -108,19 +110,57 @@ class SearchManuscriptForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}))
 
 
+class SignatureWidget(ModelSelect2MultipleWidget):
+    model = Signature
+    search_fields = [ 'code__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        return Signature.objects.all().order_by('code').distinct()
+
+
+class ManuidWidget(ModelSelect2MultipleWidget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        return Manuscript.objects.all().order_by('idno').distinct()
+
+
+class AuthorWidget(ModelSelect2MultipleWidget):
+    model = Author
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Author.objects.all().order_by('name').distinct()
+
+
 class SermonForm(forms.ModelForm):
-    # parent_id = forms.CharField(required=False)
     authorname = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
     nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
     libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    signature = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
-    signatureid = forms.CharField(label=_("Signature ID"), required=False)
     manuidno = forms.CharField(label=_("Manuscript"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifier...', 'style': 'width: 100%;'}))
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifiers using wildcards...', 'style': 'width: 100%;'}))
+    signature = forms.CharField(label=_("Signature"), required=False,
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    siglist = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    manuidlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    authorlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -157,6 +197,9 @@ class SermonForm(forms.ModelForm):
         # Some fields are not required
         self.fields['stype'].required = False
         self.fields['manu'].required = False
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
