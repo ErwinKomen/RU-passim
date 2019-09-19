@@ -648,6 +648,7 @@ var ru = (function ($, ru) {
             lFormRow = [];
 
         try {
+          /*
           // Get to the form
           frm = $(elStart).closest('form');
           // Remove additional rows
@@ -659,6 +660,33 @@ var ru = (function ($, ru) {
 
           // Clear the fields in the first row
           $(frm).find("input:not([readonly]).searching").val("");
+          */
+
+          // Clear filters
+          $(".badge.filter").each(function (idx, elThis) {
+            var target;
+
+            target = $(elThis).attr("targetid");
+            if (target !== undefined && target !== null && target !== "") {
+              target = $("#" + target);
+              // Action depends on checking or not
+              if ($(elThis).hasClass("on")) {
+                // it is on, switch it off
+                $(elThis).removeClass("on");
+                $(elThis).removeClass("jumbo-3");
+                $(elThis).addClass("jumbo-1");
+                // Must hide it and reset target
+                $(target).addClass("hidden");
+                $(target).find("input").each(function (idx, elThis) {
+                  $(elThis).val("");
+                });
+                // Also reset all select 2 items
+                $(target).find("select").each(function (idx, elThis) {
+                  $(elThis).val("").trigger("change");
+                });
+              }
+            }
+          });
 
         } catch (ex) {
           private_methods.errMsg("search_clear", ex);

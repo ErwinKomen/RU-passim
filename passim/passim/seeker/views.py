@@ -3976,24 +3976,35 @@ class SermonListView(ListView):
                 oFields = sermoForm.cleaned_data
 
                 # Check for author name -- which is in the typeahead parameter
+                auth_q = ""
                 if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
                     enable_filter("author")
-                    lstQ.append(Q(author=val))
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(Author=val)
                 elif has_string_value('authorname', oFields): 
                     val = oFields['authorname']
                     enable_filter("author")
                     if "*" in val:
                         val = adapt_search(val)
-                        lstQ.append(Q(author__name__iregex=val))
+                        # lstQ.append(Q(author__name__iregex=val))
+                        auth_q = Q(author__name__iregex=val)
                     else:
-                        lstQ.append(Q(author__name__iexact=val))
+                        # lstQ.append(Q(author__name__iexact=val))
+                        auth_q = Q(author__name__iexact=val)
 
                 # Check for list of specific authors
                 if has_list_value('authorlist', oFields):
                     enable_filter("author")
                     id_list = [x.id for x in oFields['authorlist']]
-                    lstQ.append(Q(author__id__in=id_list))
+                    # lstQ.append(Q(author__id__in=id_list))
+                    auth_q_lst = Q(author__id__in=id_list)
+                    if auth_q == "":
+                        lstQ.append(auth_q_lst)
+                    else:
+                        lstQ.append(auth_q | auth_q_lst)
+                elif auth_q != "":
+                    lstQ.append(auth_q)
 
                 # Check for incipit string
                 if has_string_value('incipit', oFields): 
@@ -4037,24 +4048,34 @@ class SermonListView(ListView):
                     lstQ.append(Q(manu__id__in=id_list))
 
                 # Check for *ANY* signature(s)
+                sig_q = ""
                 if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
                     val = oFields['signatureid']
                     enable_filter("signature")
-                    lstQ.append(Q(sermonsignatures__id=val))
+                    # lstQ.append(Q(sermonsignatures__id=val))
+                    sig_q = Q(sermonsignatures__id=val)
                 elif has_string_value('signature', oFields):
                     val = oFields['signature']
                     enable_filter("signature")
                     if "*" in val:
                         val = adapt_search(val)
-                        lstQ.append(Q(sermonsignatures__code__iregex=val))
+                        # lstQ.append(Q(sermonsignatures__code__iregex=val))
+                        sig_q = Q(sermonsignatures__code__iregex=val)
                     else:
-                        lstQ.append(Q(sermonsignatures__code__iexact=val))
+                        # lstQ.append(Q(sermonsignatures__code__iexact=val))
+                        sig_q = Q(sermonsignatures__code__iexact=val)
 
                 # Check for list of specific signatures
                 if has_list_value('siglist', oFields):
                     enable_filter("signature")
-                    id_list = [x.id for x in oFields['siglist']]
-                    lstQ.append(Q(sermonsignatures__id__in=id_list))
+                    code_list = [x.code for x in oFields['siglist']]
+                    sig_q_lst = Q(sermonsignatures__code__in=code_list)
+                    if sig_q == "":
+                        lstQ.append(sig_q_lst)
+                    else:
+                        lstQ.append(sig_q | sig_q_lst)
+                elif sig_q != "":
+                    lstQ.append(sig_q)
 
                 # Calculate the final qs
                 if len(lstQ) == 0:
