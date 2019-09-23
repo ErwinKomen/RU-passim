@@ -33,13 +33,6 @@
               {% include 'seeker/sermon_edit.html' %}
             </div>
 
-            <!-- React experiment -->
-            {% if is_passim_uploader %}
-              <div class="like_button_container" data-commentid="2">
-                <!-- Will be filled by react -->
-              </div>
-            {% endif %}
-
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
             {% if sermoForm.instance.id and is_passim_editor %}
               <div id="sermongold-links-{{sermoForm.instance.id}}">

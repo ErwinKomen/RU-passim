@@ -493,7 +493,7 @@ var ru = (function ($, ru) {
             window.location.href = loc_urlStore;
           } else if (sUrlShow !== undefined && sUrlShow !== "") {
             // window.location.href = sUrlShow;
-            history.pushState(null, null, sUrlShow);
+            // history.pushState(null, null, sUrlShow);
           }
 
           // Make sure typeahead is re-established
@@ -501,18 +501,6 @@ var ru = (function ($, ru) {
 
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
-
-          // REACT experiment: process LIKE buttons
-          document.querySelectorAll(".like_button_container")
-            .forEach(domContainer => {
-              // Read the comment ID from the data-* attribute
-              const commentID = parseInt(domContainer.dataset.commentid, 10);
-              // Render the like button appropriately
-              ReactDOM.render(
-                e(LikeButton, { commentID: commentID}),
-                domContainer
-                )
-            });
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
