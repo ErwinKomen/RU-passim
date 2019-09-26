@@ -107,7 +107,7 @@ class SearchManuscriptForm(forms.Form):
     name = forms.CharField(label=_("Title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
     idno = forms.CharField(label=_("Idno"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
 
 
 class SignatureWidget(ModelSelect2MultipleWidget):
@@ -151,7 +151,7 @@ class SermonForm(forms.ModelForm):
     libname_ta = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     manuidno = forms.CharField(label=_("Manuscript"), required=False,
-                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Manuscript identifiers using wildcards...', 'style': 'width: 100%;'}))
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)

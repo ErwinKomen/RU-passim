@@ -3867,7 +3867,7 @@ class SermonListView(ListView):
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
         {"name": "Feast",           "id": "filter_feast",       "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript id",   "id": "filter_manuid",      "enabled": False}
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False}
         ]
 
     def get_context_data(self, **kwargs):

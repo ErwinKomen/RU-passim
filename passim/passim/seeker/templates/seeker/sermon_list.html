@@ -204,6 +204,7 @@
                     </thead>
                     <tbody>
                     {% for sermon in object_list %}
+                      {% if sermon.manu %}
                       <tr class="dict-entry clickable"
                           onclick="ru.passim.seeker.goto_url('{% url 'sermon_details' sermon.id %}')">
                         <td class="hidden"> {{ sermon.id }}</td>
@@ -253,7 +254,7 @@
                         <!-- Show the status of this item -->
                         <td class="tdnowrap"><span class="badge" title="{{sermon.get_stype_display}}">{{sermon.stype|slice:":1"}}</span></td>
                       </tr>
-
+                      {% endif %}
                     {% endfor %}
                     </tbody>
                   </table>
