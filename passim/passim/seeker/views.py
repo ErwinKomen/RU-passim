@@ -3727,6 +3727,8 @@ class SermonDetails(PassimDetails):
             goldid = self.qd['goldcopy']
             gold = SermonGold.objects.filter(id=goldid).first()
 
+            include_keyword_copy = False
+
             if gold != None:
                 # Copy all relevant information to obj
                 obj = self.object
@@ -3738,21 +3740,30 @@ class SermonDetails(PassimDetails):
                 if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
                 # (4) copy author
                 if gold.author != None: obj.author = gold.author
-                # (5) copy keywords
-                kwlist = [x['id'] for x in obj.keywords.all().values('id')]
-                for kw in gold.keywords.all():
-                    # Check if it is already there
-                    if kw.id not in kwlist:
-                        # Add it in the proper way
-                        srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
-                        srm_kw.save()
-                # (6) copy signatures
-                for gold_sig in gold.goldsignatures.all():
-                    # Check if it is already there
-                    srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
-                    if srm_sig == None:
-                        srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
-                        srm_sig.save()
+
+                if include_keyword_copy:
+                    # (5) copy keywords
+                    kwlist = [x['id'] for x in obj.keywords.all().values('id')]
+                    for kw in gold.keywords.all():
+                        # Check if it is already there
+                        if kw.id not in kwlist:
+                            # Add it in the proper way
+                            srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
+                            srm_kw.save()
+
+                # (6) copy signatures from *all* gold sermons in the equality set
+                # [6.a] get my gold equality set
+                geq = gold.equal
+                # [6.b] get all gold sermons in this equality set
+                qs_geq = SermonGold.objects.filter(equal=geq)
+                # [6.c] Walk all gold sermons in the equality set
+                for obj_geq in qs_geq:
+                    for gold_sig in obj_geq.goldsignatures.all():
+                        # Check if it is already there
+                        srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
+                        if srm_sig == None:
+                            srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
+                            srm_sig.save()
                 # Now save the adapted sermon
                 obj.save()
             # And in all cases: make sure we redirect to the 'clean' GET page
@@ -4151,6 +4162,15 @@ class SermonLinkset(BasicPart):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+
+    def add_to_context(self, context):
+        x = 1
+        #for fs in context['stog_formset']:
+        #    for form in fs:
+        #        gold = form['gold']
+        #        geq = gold.equal_goldsermons.all()
+        #        qs = geq
+        return context
 
 
 class SermonSignset(BasicPart):
