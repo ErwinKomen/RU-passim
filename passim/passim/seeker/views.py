@@ -3316,6 +3316,7 @@ class ManuscriptEdit(BasicPart):
         # context['isnew'] = bNew
 
         context['afternewurl'] = reverse('search_manuscript')
+        context['afterdelurl'] = get_previous_page(self.request)
 
         return context
 

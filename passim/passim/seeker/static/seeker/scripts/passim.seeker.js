@@ -1935,7 +1935,7 @@ var ru = (function ($, ru) {
                     switch (response.status) {
                       case "ready":
                       case "ok":
-                        // Do we have an afterurl?
+                        // Do we have afterdelurl afterurl?
                         // If an 'afternewurl' is specified, go there
                         if ('afterdelurl' in response && response['afterdelurl'] !== "") {
                           window.location = response['afterdelurl'];
