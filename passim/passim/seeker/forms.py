@@ -144,23 +144,43 @@ class AuthorWidget(ModelSelect2MultipleWidget):
 
 
 class SermonForm(forms.ModelForm):
-    authorname = forms.CharField(label=_("Author"), required=False, 
+    # Helper fields for SermonDescr fields
+    authorname  = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
     nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
-    libname_ta = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    manuidno = forms.CharField(label=_("Manuscript"), required=False,
+    manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
-    signature = forms.CharField(label=_("Signature"), required=False,
+    signature   = forms.CharField(label=_("Signature"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
-    siglist = ModelMultipleChoiceField(queryset=None, required=False, 
+    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;'}))
-    manuidlist = ModelMultipleChoiceField(queryset=None, required=False, 
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
-    authorlist = ModelMultipleChoiceField(queryset=None, required=False, 
+    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;'}))
+
+    # Fields for searching sermons through their containing manuscripts
+    country     = forms.CharField(required=False)
+    country_ta  = forms.CharField(label=_("Country"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city        = forms.CharField(required=False)
+    city_ta     = forms.CharField(label=_("City"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    library     = forms.CharField(required=False)
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    origin      = forms.CharField(required=False)
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    prov        = forms.CharField(required=False)
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

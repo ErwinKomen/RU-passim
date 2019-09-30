@@ -89,6 +89,9 @@ urlpatterns = [
     url(r'^sermon/ediset(?:/(?P<pk>\d+))?/$', SermonEdiset.as_view(), name='sermon_ediset'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
 
+    url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
+    url(r'^basket/show', BasketView.as_view(), name='basket_show'),
+
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
 

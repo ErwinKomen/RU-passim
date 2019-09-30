@@ -513,7 +513,9 @@ var ru = (function ($, ru) {
        *
        */
       filter_click: function (el) {
-        var target;
+        var target = null,
+            specs = null;
+
         try {
           target = $(this).attr("targetid");
           if (target !== undefined && target !== null && target !== "") {
@@ -526,6 +528,27 @@ var ru = (function ($, ru) {
               $(this).addClass("jumbo-1");
               // Must hide it and reset target
               $(target).addClass("hidden");
+
+              // Check if target has a targetid
+              specs = $(target).attr("targetid");
+              if (specs !== undefined && specs !== "") {
+                // Reset related badges
+                $(target).find("span.badge").each(function (idx, elThis) {
+                  var subtarget = "";
+
+                  $(elThis).removeClass("on");
+                  $(elThis).removeClass("jumbo-3");
+                  $(elThis).removeClass("jumbo-2");
+                  $(elThis).addClass("jumbo-1");
+                  subtarget = $(elThis).attr("targetid");
+                  if (subtarget !== undefined && subtarget !== "") {
+                    $("#" + subtarget).addClass("hidden");
+                  }
+                });
+                // Re-define the target
+                target = $("#" + specs);
+              } 
+
               $(target).find("input").each(function (idx, elThis) {
                 $(elThis).val("");
               });
@@ -533,6 +556,7 @@ var ru = (function ($, ru) {
               $(target).find("select").each(function (idx, elThis) {
                 $(elThis).val("").trigger("change");
               });
+
             } else {
               // Must show target
               $(target).removeClass("hidden");
@@ -604,6 +628,76 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_basket
+       *    Perform a basket action
+       *
+       */
+      do_basket: function (elStart) {
+        var frm = null,
+            targeturl = "",
+            operation = "",
+            targetid = "",
+            target = null,
+            data = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Get the data from the form
+          data = frm.serializeArray();
+          // The url is in the ajaxurl
+          targeturl = $(elStart).attr("ajaxurl");
+          // Get the operation
+          operation = $(elStart).attr("operation");
+          // Get the targetid
+          targetid = $(elStart).attr("targetid");
+
+          // validation
+          if (targeturl === undefined || targeturl === "" || operation === undefined || operation === "" ||
+              targetid === undefined || targetid === "") { return; }
+
+          // Where to go to 
+          target = $('#' + targetid);
+
+          // Add operation to data
+          data.push({ "name": "operation", "value": operation });
+
+          // Call the ajax POST method
+          // Issue a post
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Show the HTML target
+                  $(target).html(response['html']);
+                  // Possibly do some initialisations again??
+
+                  // Make sure events are re-established
+                  // ru.passim.seeker.init_events();
+                  ru.passim.init_typeahead();
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(target).html(response.msg);
+                  } else {
+                    $(target).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_basket", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *
@@ -636,20 +730,6 @@ var ru = (function ($, ru) {
             lFormRow = [];
 
         try {
-          /*
-          // Get to the form
-          frm = $(elStart).closest('form');
-          // Remove additional rows
-          lFormRow = $(frm).find("tr.form-row").not(".empty-form");
-          for (idx = lFormRow.length - 1; idx > 0; idx--) {
-            // Remove this row
-            lFormRow[idx].remove();
-          }
-
-          // Clear the fields in the first row
-          $(frm).find("input:not([readonly]).searching").val("");
-          */
-
           // Clear filters
           $(".badge.filter").each(function (idx, elThis) {
             var target;

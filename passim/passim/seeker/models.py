@@ -942,6 +942,11 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    # [1] Current size of the user's basket
+    basketsize = models.IntegerField("Basket size", default=0)
+    # Many-to-many field for the contents of a search basket per user
+    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
+
     def __str__(self):
         sStack = self.stack
         return sStack
@@ -1018,6 +1023,17 @@ class Profile(models.Model):
         else:
             # Return the stack as object (list)
             return json.loads(profile.stack)
+
+    def get_user_profile(username):
+        # Sanity check
+        if username == "":
+            # Rebuild the stack
+            return None
+        # Get the user
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        profile = Profile.objects.filter(user=user).first()
+        return profile
 
 
 class Visit(models.Model):
@@ -1935,6 +1951,7 @@ class Litref(models.Model):
         if self.short == "":
             self.read_zotero()
         return adapt_markdown(self.short, lowercase=False)
+
 
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
@@ -3606,6 +3623,19 @@ class SermonSignature(models.Model):
         return response
 
     
+class Basket(models.Model):
+    """The basket is the user's vault of search results (sermondescr items)"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="basket_contents")
+    # [1] The user
+    profile = models.ForeignKey(Profile, related_name="basket_contents")
+
+    def __str__(self):
+        combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
+        return combi
+
+
 class ProvenanceMan(models.Model):
 
     # [1] The provenance
@@ -3623,6 +3653,7 @@ class LitrefMan(models.Model):
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
 
 class NewsItem(models.Model):
     """A news-item that can be displayed for a limited time"""
