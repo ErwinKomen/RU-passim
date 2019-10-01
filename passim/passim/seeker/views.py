@@ -1092,6 +1092,54 @@ def do_mext(request):
         oErr.DoError("do_mext")
         return reverse('home')
 
+def do_goldsearch(request):
+    """Re-calculate the srchincipit and srchexplicit fields for gold sermons"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Re-create Gold sermon searching (incipit/explicit)"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+
+        # Start up processing
+        added = 0
+        with transaction.atomic():
+            for item in SermonGold.objects.all():
+                srchincipit = item.srchincipit
+                srchexplicit = item.srchexplicit
+                item.save()
+                if item.srchincipit != srchincipit or item.srchexplicit != srchexplicit:
+                    added += 1
+   
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of changed gold-sermons', 'result': added})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_goldsearch")
+        return reverse('home')
+
 def do_sermons(request):
     """Remove duplicate sermons from manuscripts and/or do other SermonDescr initialisations"""
 

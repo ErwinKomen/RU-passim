@@ -46,6 +46,7 @@ urlpatterns = [
 
     url(r'^tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
     url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
+    url(r'^tools/goldsearch/$', passim.seeker.views.do_goldsearch, name='do_goldsearch'),
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
     url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),

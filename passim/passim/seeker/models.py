@@ -201,10 +201,17 @@ def getText(nodeStart):
     return ' '.join(rc)
 
 def get_searchable(sText):
+    sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
+
+    # Move to lower case
     sText = sText.lower()
-    sText = sText.replace("<", "")
-    sText = sText.replace(">", "")
-    sText = sText.replace("_", "")
+
+    # Remove punctuation with nothing
+    sText = re.sub(sRemove, "", sText)
+    #sText = sText.replace("<", "")
+    #sText = sText.replace(">", "")
+    #sText = sText.replace("_", "")
+
     # Make sure to TRIM the text
     sText = sText.strip()
     return sText
