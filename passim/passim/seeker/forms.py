@@ -189,7 +189,7 @@ class SermonForm(forms.ModelForm):
         fields = ['title', 'subtitle', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'manu',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
                   #, 'clavis', 'gryson', 'keyword']
-        widgets={'title':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+        widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),

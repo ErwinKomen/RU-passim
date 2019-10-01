@@ -1136,6 +1136,9 @@ div > span.twitter-typeahead {
     width: 80%;
     margin: 30px auto;
   }
+.modal-header {
+  cursor: move;
+}
 
 td.hightlighted {
   background-color: yellow;

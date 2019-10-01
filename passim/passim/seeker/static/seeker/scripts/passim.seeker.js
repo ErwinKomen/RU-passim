@@ -502,6 +502,30 @@ var ru = (function ($, ru) {
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
 
+          // Make modal draggable
+          $(".modal-header").on("mousedown", function (mousedownEvt) {
+            var $draggable = $(this),
+                x = mousedownEvt.pageX - $draggable.offset().left,
+                y = mousedownEvt.pageY - $draggable.offset().top;
+
+            $("body").on("mousemove.draggable", function (mousemoveEvt) {
+              $draggable.closest(".modal-dialog").offset({
+                "left": mousemoveEvt.pageX - x,
+                "top": mousemoveEvt.pageY - y
+              });
+            });
+            $("body").one("mouseup", function () {
+              $("body").off("mousemove.draggable");
+            });
+            $draggable.closest(".modal").one("bs.modal.hide", function () {
+              $("body").off("mousemove.draggable");
+            });
+          });
+
+/*          $(".modal-dialog").draggable({
+            "handle": ".modal-header"
+          })*/
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
