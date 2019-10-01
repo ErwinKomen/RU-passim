@@ -14,6 +14,7 @@ from functools import reduce
 from pyzotero import zotero
 
 from django.db.models.functions import Lower
+from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -169,7 +170,15 @@ def action_model_changes(form, instance):
         else:
             # It is a form field
             try:
-                changes[item] = form.cleaned_data[item]
+                representation = form.cleaned_data[item]
+                if isinstance(representation, QuerySet):
+                    # This is a list
+                    rep_list = []
+                    for rep in representation:
+                        rep_str = str(rep)
+                        rep_list.append(rep_str)
+                    representation = json.dumps(rep_list)
+                changes[item] = representation
             except:
                 changes[item] = "(unavailable)"
     return changes
@@ -1123,6 +1132,10 @@ def do_goldsearch(request):
             for item in SermonGold.objects.all():
                 srchincipit = item.srchincipit
                 srchexplicit = item.srchexplicit
+                # Double check the equal field
+                if item.equal == None:
+                    geq = EqualGold.objects.create()
+                    item.equal = geq
                 item.save()
                 if item.srchincipit != srchincipit or item.srchexplicit != srchexplicit:
                     added += 1
@@ -5492,6 +5505,11 @@ class SermonGoldEdit(PassimDetails):
         # Set the 'afternew' URL
         self.afternewurl = reverse('search_gold')
 
+        # Create a new equality set to which we add this Gold sermon
+        geq = EqualGold.objects.create()
+        instance.equal = geq
+        instance.save()
+
         # Get the list of signatures
         signatures = form.cleaned_data['signature'].strip()
         if signatures != "":
@@ -5504,6 +5522,12 @@ class SermonGoldEdit(PassimDetails):
                 # Add signature
                 obj = Signature(code=sigcode, editype=editype, gold=instance)
                 obj.save()
+
+        # Get the list of editions
+        edi_list = form.cleaned_data['editionlist']
+        # Copy these editions and link those copies to the Gold Sermon instance
+        for edi in edi_list:
+            edi_copy = Edition.objects.create(name=edi.name, gold=instance)
 
         # Get the list of keywords
         keywords = form.cleaned_data['keyword'].strip()

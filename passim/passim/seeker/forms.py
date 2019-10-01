@@ -7,7 +7,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField
 from django.forms.widgets import *
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget
 from passim.seeker.models import *
 
 def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
@@ -141,6 +141,51 @@ class AuthorWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Author.objects.all().order_by('name').distinct()
+
+
+class EditionWidget(ModelSelect2TagWidget):
+    model = Edition
+    queryset = Edition.objects.all().order_by('name').distinct()
+    search_fields = [ 'name__icontains']
+
+    def __init__(self, *args, **kwargs):
+        response = super(EditionWidget, self).__init__(*args, **kwargs)
+
+        return response
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Edition.objects.all().order_by('name').distinct()
+
+    def value_from_datadict(self, data, files, name):
+        values = super(EditionWidget, self).value_from_datadict(data, files, name)
+
+        cleaned_values = []
+        # Walk the list and create "cleaned_values"
+        for val in values:
+            obj = None
+            if is_number(val):
+                # Find the item
+                obj = self.queryset.filter(id=val).first()
+
+            #if obj == None:
+            #    obj = self.queryset.create(name=val)
+
+            # Creating a new one is NOT going to work
+            if obj != None:
+                cleaned_values.append(obj)
+
+        ## Get all the PKs
+        #qs = self.queryset.filter(**{'pk__in': list(values)})
+        #pks = set(str(getattr(o, "pk")) for o in qs)
+        #cleaned_values = []
+        #for val in values:
+        #    if str(val) not in pks:
+        #        val = self.queryset.create(name=val).pk
+        #    cleaned_values.append(val)
+        return cleaned_values
 
 
 class SermonForm(forms.ModelForm):
@@ -306,6 +351,8 @@ class SermonGoldForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -324,6 +371,7 @@ class SermonGoldForm(forms.ModelForm):
         super(SermonGoldForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['editionlist'].queryset = Edition.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

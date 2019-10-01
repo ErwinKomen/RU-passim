@@ -1,5 +1,10 @@
 ﻿{% load i18n %}
 
+{% block scripts %}
+  {{goldForm.media.css}}
+{% endblock %}
+
+
 <!-- SermonGold information -->
 <form>
   {% csrf_token %}
@@ -109,7 +114,19 @@
         </td>
       </tr>
 
+      <!-- Edition(s) -->
+      <tr class="edit-new hidden">
+        <td class="hoverable" valign="top">Edition(s)</td>
+        <td valign="top">
+          <div class="view-mode">{{goldForm.instance.editionlist}}</div>
+          <div class="edit-mode hidden">{{goldForm.editionlist}}</div>
+        </td>
+      </tr>
+
     </table>
 </form>
 
 
+{% block endcontent %} 
+  {{goldForm.media.js }} 
+{% endblock %}
