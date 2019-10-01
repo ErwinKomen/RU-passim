@@ -664,8 +664,8 @@ def search_sermon(filters, qd):
                     val = oFields['library']
                     enable_filter("library", "manuscript")
                     lstQ.append(Q(manu__library__id=val))
-                elif has_string_value('library_ta', oFields):
-                    val = adapt_search(oFields['library_ta'])
+                elif has_string_value('libname_ta', oFields):
+                    val = adapt_search(oFields['libname_ta'])
                     enable_filter("library", "manuscript")
                     lstQ.append(Q(manu__library__name__iregex=val))
 

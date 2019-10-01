@@ -173,7 +173,7 @@ class SermonForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origin      = forms.CharField(required=False)
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
     prov        = forms.CharField(required=False)
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))

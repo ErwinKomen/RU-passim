@@ -211,13 +211,13 @@
                     </div>
 
                     <!-- One particular library -->
-                    <div id="filter_library" class="{% if not sermoForm.library.value and not sermoForm.library_ta.value %}hidden{% endif %}">
+                    <div id="filter_library" class="{% if not sermoForm.library.value and not sermoForm.libname_ta.value %}hidden{% endif %}">
                       <table style="width: 100%;">
                         <tr class="form-row">
-                          <td style="min-width: 130px;" valign="top">Country:</td>
+                          <td style="min-width: 130px;" valign="top">Library:</td>
                           <td style="width: 100%;">
                             <div class="library-key hidden">{{sermoForm.library}}</div>
-                            <div>{{sermoForm.library_ta}}</div>
+                            <div>{{sermoForm.libname_ta}}</div>
                           </td>
                         </tr>
                       </table>
@@ -277,7 +277,7 @@
                   </span>
                   <!-- Submit the search form -->
                   <span>
-                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);" >Search</a>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
                   </span>
                 </div>
               </div>
