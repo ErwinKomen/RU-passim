@@ -2873,7 +2873,10 @@ class BasicPart(View):
                         form_kwargs = self.get_form_kwargs(prefix)
                         if self.add:
                             # Saving a NEW item
-                            formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                            if 'initial' in formsetObj:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                            else:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
                         else:
                             # Saving an EXISTING item
                             instance = self.get_instance(prefix)
@@ -3099,13 +3102,18 @@ class BasicPart(View):
                     # Saving a NEW item
                     formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
                 else:
+                    # Possibly initial (default) values
+                    if 'initial' in formsetObj:
+                        initial = formsetObj['initial']
+                    else:
+                        initial = None
                     # show the data belonging to the current [obj]
                     instance = self.get_instance(prefix)
                     qs = self.get_queryset(prefix)
                     if qs == None:
                         formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                     else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
                 # Process all the forms in the formset
                 ordered_forms = self.process_formset(prefix, request, formset)
                 if ordered_forms:
@@ -5265,7 +5273,7 @@ class SermonGoldLinkset(BasicPart):
                                          form=EqualGoldLinkForm, min_num=0,
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
 
     def custom_init(self):
         x = 1

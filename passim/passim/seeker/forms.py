@@ -144,6 +144,8 @@ class AuthorWidget(ModelSelect2MultipleWidget):
 
 
 class EditionWidget(ModelSelect2TagWidget):
+    """This allows the user to add editions--but that can only happen when the model changes to m2m"""
+
     model = Edition
     queryset = Edition.objects.all().order_by('name').distinct()
     search_fields = [ 'name__icontains']
@@ -186,6 +188,19 @@ class EditionWidget(ModelSelect2TagWidget):
         #        val = self.queryset.create(name=val).pk
         #    cleaned_values.append(val)
         return cleaned_values
+
+
+class EditionExistingWidget(ModelSelect2MultipleWidget):
+    """Only allow user to choose from existing editions"""
+
+    model = Edition
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Edition.objects.all().order_by('name').distinct()
 
 
 class SermonForm(forms.ModelForm):
@@ -352,7 +367,10 @@ class SermonGoldForm(forms.ModelForm):
     keyword = forms.CharField(label=_("Keyword"), required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
+                            widget=EditionExistingWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;'}))
+    # FUTURE: once model 'Edition' has become attached with ManyToMany to SermonGold
+    #editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+    #                        widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

@@ -2604,6 +2604,9 @@ var ru = (function ($, ru) {
               $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
               // Possibly set a default value
               td = $(el).parent('td');
+              if (td.length === 0) {
+                td = $(el).parent("div").parent("td");
+              }
               if (td.length === 1) {
                 val = $(td).attr("defaultvalue");
                 if (val !== undefined && val !== "") {
@@ -2613,13 +2616,19 @@ var ru = (function ($, ru) {
             }
           });
           newElement.find('select').each(function (idx, el) {
+            var td = null;
+
             if ($(el).attr("name") !== undefined) {
-              // Get the name of this element, adapting it on the fly
-              var name = $(el).attr("name").replace("__prefix__", total.toString());
-              // Produce a new id for this element
-              var id = $(el).attr("id").replace("__prefix__", total.toString());
-              // Adapt this element's name and id, unchecking it
-              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              td = $(el).parent('td');
+              if (td.length === 0) { td = $(el).parent("div").parent("td"); }
+              if (td.length === 0 || (td.length === 1 && $(td).attr("defaultvalue") === undefined)) {
+                // Get the name of this element, adapting it on the fly
+                var name = $(el).attr("name").replace("__prefix__", total.toString());
+                // Produce a new id for this element
+                var id = $(el).attr("id").replace("__prefix__", total.toString());
+                // Adapt this element's name and id, unchecking it
+                $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              }
             }
           });
 
