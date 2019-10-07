@@ -33,13 +33,13 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
-                                SermonDescrSignatureForm, SermonGoldKeywordForm, EqualGoldLinkForm, EqualGoldForm, \
+                                SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
-    Litref, LitrefMan, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Litref, LitrefMan, LitrefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys, os
@@ -51,6 +51,8 @@ import demjson
 import openpyxl
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
+from itertools import chain
+
 
 # Some constants that can be used
 paginateSize = 20
@@ -4133,6 +4135,77 @@ class SermonEdiset(BasicPart):
 
         return context
 
+class SermonLitset(BasicPart):
+    """The set of literature references from SermonGold(s) and Manuscript passed over to each Sermon"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_litset.html'
+    title = "SermonDescrLiterature"
+    
+    def add_to_context(self, context):
+        
+        # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
+               
+        # First the litrefs from the manuscript: 
+        manu = self.obj.manu
+        lref_list = []
+        for item in LitrefMan.objects.filter(manuscript=manu):
+            oAdd = {}
+            oAdd['reference_id'] = item.reference.id
+            oAdd['short'] = item.reference.short
+            oAdd['reference'] = item.reference
+            oAdd['pages'] = item.pages
+            lref_list.append(oAdd)
+       
+        # Second the litrefs from the linked Gold sermons: 
+
+        for linked in SermonDescrGold.objects.filter(sermon=self.obj, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Get all the literature references of this gold sermon TH nu naar Litref SG
+            for item in LitrefSG.objects.filter(sermon_gold_id = gold):
+                
+                oAdd = {}
+                oAdd['reference_id'] = item.reference.id
+                oAdd['short'] = item.reference.short
+                oAdd['reference'] = item.reference
+                oAdd['pages'] = item.pages
+                lref_list.append(oAdd)
+                
+                # Set the sort order TH: werkt
+                lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
+                
+                # Remove duplicates 
+                unique_litref_list=[]
+                
+                previous = None
+                for item in lref_list:
+                    # Keep the first
+                    if previous == None:
+                        unique_litref_list.append(item)
+                    # Try to compare current item to previous
+                    elif previous != None:
+                        # Are they the same?
+                        if item['reference_id'] == previous['reference_id'] and \
+                           item['pages'] == previous['pages']:
+                            # They are the same, no need to copy
+                            pass
+                            
+                       # elif previous == None: 
+                        #    unique_litref_list.append(item)
+                        else:
+                            # Add this item to the new list
+                            unique_litref_list.append(item)
+
+                    # assign previous
+                    previous = item
+                
+                litref_list = unique_litref_list
+        
+        context['lref_list'] = litref_list
+       
+        return context
+
 class ManuscriptDetails(PassimDetails):
     """Editable manuscript details"""
 
@@ -5225,6 +5298,39 @@ class SermonGoldEdit(PassimDetails):
 
         return context
 
+class SermonGoldLitset(BasicPart):
+    """The set of literature references from one SermonGold"""
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_litset.html'
+    title = "SermonGoldLiterature"
+    SGlitFormSet = inlineformset_factory(SermonGold, LitrefSG, form=SermonGoldLitrefForm, 
+                                         min_num=0, fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SGlitFormSet, 'prefix': 'sglit', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "sglit":
+            # List the litrefs for this SermonGold correctly
+            qs = LitrefSG.objects.filter(sermon_gold=self.obj).order_by('reference__short')
+        return qs
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        # Check if a new reference should be processed
+        litref_id = form.cleaned_data['litref']
+        if litref_id != "":
+            if instance.id == None or instance.reference == None or instance.reference.id == None or \
+                instance.reference.id != int(litref_id):
+                # Find the correct litref
+                litref = Litref.objects.filter(id=litref_id).first()
+                if litref != None:
+                    # Adapt the value of the instance 
+                    instance.reference = litref
+                    has_changed = True
+            
+        return has_changed
 
 class AuthorDetails(PassimDetails):
     """The details of one author"""
@@ -5980,7 +6086,7 @@ class LitRefListView(ListView):
     """Listview of literature references"""
 
     model = Litref
-    paginate_by = 20
+    paginate_by = 2000
     template_name = 'seeker/literature_list.html'
     entrycount = 0
     
@@ -6032,8 +6138,13 @@ class LitRefListView(ListView):
         get = get.copy()
         self.get = get
 
-        # Calculate the final qs
-        litref_ids = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
+        # Calculate the final qs for the manuscript litrefs
+        litref_ids_man = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
+        # Calculate the final qs for the Gold sermon litrefs
+        litref_ids_sg = [x['reference'] for x in LitrefSG.objects.all().values('reference')]
+
+        # Combine the two qs into one and filter
+        litref_ids = chain(litref_ids_man, litref_ids_sg)
         qs = Litref.objects.filter(id__in=litref_ids).order_by('short')
 
         # Determine the length

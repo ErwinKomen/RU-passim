@@ -224,4 +224,12 @@
       </tr>
 
     </table>
+      <!-- A button to show/hide the table of literature -->
+      <span><a role="button" class="btn btn-xs jumbo-1" targetid="sermon_litset" title="Show/Hide literature references" onclick="ru.passim.seeker.toggle_click(this);">Literature</a></span>
+    
+      <!-- The set of literature references belonging to this manuscript --> 
+      <div id="sermon_litset" class="post-load hidden" targeturl="{% url 'sermon_litset' pk=sermoForm.instance.id %}">
+        <!-- The wait symbol will be overwritten -->
+            <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+      </div>
 </form>

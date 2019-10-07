@@ -1,0 +1,17 @@
+﻿{% load i18n %}
+
+<div class="">
+        
+    <table class="func-view" style="width: 100%;">
+      <thead><tr><th class="hidden">id</th><tr><th class="tdnowrap">Literature references</th><th>Pages</th></tr></thead>
+      <tbody>
+        {% for litref in lref_list %} 
+              
+            <tr class="dict-entry">
+                <td><span class="short reference"></a>{{litref.reference.get_short_markdown|safe}}</span></td>
+                <td><span class="pages">{{litref.pages|default_if_none:""}}</span></td>
+            </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+</div>

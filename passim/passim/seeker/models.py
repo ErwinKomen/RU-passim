@@ -1584,7 +1584,7 @@ class Litref(models.Model):
     abbr = models.CharField("Abbreviation", max_length=STANDARD_LENGTH, blank=True, default="")
     # [0-1] The full reference, including possible markdown symbols
     full = models.TextField("Full reference", blank=True, default="")
-    # [0-1] A short reference: author-year-title-type
+    # [0-1] A short reference: including possible markdown symbols
     short = models.TextField("Short reference", blank=True, default="")
 
     def __str__(self):
@@ -1684,27 +1684,90 @@ class Litref(models.Model):
                     if self.data != sData:
                         self.data = sData
 
-                    # First step: store author, year, title, short_title, journal_abbr, volume
+                    # First step: store data 
+
+                    # Get the first author
                     authors = Litref.get_creators(data, type="author", style= "first")
+                    
+                    # Get the editor(s)
+                    editors = Litref.get_creators(data, type="editor")
+
+                    # Get the year 
                     year = "?" if "date" not in data else data['date'][-4:]
+                   
+                    # Get the title
                     title = "(no title)" if "title" not in data else data['title']
+                   
+                    # Get the short title (for books and book sections)
                     short_title = "(no short title)" if "shortTitle" not in data else data['shortTitle']
-                    #[TH: journalAbbreviation ipv Journal dit werkt! tzt aanpassen]
+                   
+                   # Get the abbreviation of the journal 
                     journal_abbr = "(no abbr journal title)" if "publicationTitle" not in data else data['publicationTitle']
+                   
+                   # Get the volume
                     volume = "?" if "volume" not in data else data['volume']
                     
+                    # Get the coding for edition ("ed") or catalogue ("cat")
+                    extra = data['extra']
+                    
+                    # Get the name of the series
+                    series = data['series']
+                    
+                    # Get the series number
+                    series_number = "(no series number)" if "seriesNumber" not in data else data['seriesNumber']
+
                     # Second step: make short reference for article in journal
                     if itemType == "journalArticle":
-                        result = "{}, _{}_ {} ({})".format(authors, journal_abbr, volume, year)
+                        # In case the journal article is marked as edition in extra ("ed")
+                        if extra == "ed":
+                            result = "{}, _{}_ {} ({})".format(authors, short_title, volume, year)
+                        else:
+                            result = "{}, _{}_ {} ({})".format(authors, journal_abbr, volume, year)
+                      
                     
-                    # Third step: make short reference for book section TH: aparte author style maken voor bookSection Hermsen & Hermsen zie voorbeeld              
+                    # Third step: make short reference for book section         
                     elif itemType == "bookSection":
-                        result = "{} {}".format(authors, year)
+                        result = "{} ({})".format(authors, year)
                     
-                    # Fourth step: make short reference for book
+                    # Fourth step: make short reference for book 
                     elif itemType == "book":
-                        result = "{}, _{}_ ({})".format(authors, short_title, year)
-                    
+                        if extra == "": 
+                            if short_title == "": 
+                                # If the books is not an edition/catalogue and there is no short title
+                                if authors !="":
+                                    result = "{} ({})".format(authors, year)
+                                # If there are only editors  
+                                    if editors != "": 
+                                        result = "{} ({})".format(editors, year)
+                            # If there is a short title
+                            elif short_title != "": 
+                                # If there is a series number 
+                                if series_number != "": 
+                                    result = "{} {} ({})".format(short_title, series_number, year)
+                                # If there is a volume number 
+                                elif series_number == "" and volume != "":     
+                                    result = "{} {} ({})".format(short_title, volume, year)
+                                                                          
+                        # Fifth step: make short reference for edition (book) 
+                        elif extra == "ed":
+                            if series_number != "":
+                                result = "{} {} ({})".format(short_title, series_number, year)
+                            # If there is no series number
+                            elif series_number =="":
+                                result = "{} ({})".format(short_title, year)
+                            # If there is a volume number
+                            elif volume != "":
+                                result = "{} {} ({})".format(short_title, volume, year)
+                        
+                        # Sixth step: make short reference for catalogue (book)
+                        elif extra == "cat":
+                            # If there is no short title
+                            if short_title == "": 
+                                result = "{} ({})".format(authors, year)
+                            # If there is a short title
+                            elif short_title != "":
+                                result = "{} ({})".format(short_title, year)
+ 
                     if result != "":
                         # update the full field
                         self.short = result
@@ -1713,48 +1776,108 @@ class Litref(models.Model):
                     self.save()
                     
                   
-                    # Next step: make a full reference
+                    # Make a full reference for a book
                     authors = Litref.get_creators(data, type="author")
+                    
+                    # First step: store new data, combine place and publisher, series name and number
+                    
+                    # Get place
+                    place = "(no place)" if "place" not in data else data['place']
+                        
+                    # Get publisher
+                    publisher = "(no publisher)" if "publisher" not in data else data['publisher']
+
+                    # Add place to publisher if both available
+                    if place != "":
+                        if publisher != "":
+                            publisher = "{}: {}".format(place, publisher)
+                        # Add place to publisher if only place available: 
+                        elif publisher == "":
+                            publisher = "{}".format(place)    
+                    
+                    # Add series number to series if both available
+                    if series != "":
+                        if series_number != "":
+                            series = "{} {}".format(series, series_number)
+                            
+                    # Add series number to series if only series number available
+                    if series == "":
+                        if series_number != "":
+                            series = "{}".format(series_number)
+                   
+                    # Second step: Make full reference for book
                     if itemType == "book":
-                        # Get publisher
-                        publisher = data['publisher']
-                        # Get place
-                        place = data['place']
-                        # optional volume
-                        volume = data['volume']
-                        if volume != "":
-                            publisher = "{}. {}".format(volume, publisher)
-                        result = "{}, _{}_, {}: {} ({})".format(authors, title, place, publisher, year)
-                    elif itemType == "bookSection":
+                    
                         # Get the editor(s)
                         editors = Litref.get_creators(data, type="editor")
-                        # Get title of book
-                        booktitle = data['bookTitle']
-                        # Get the name of the series
-                        series = data['series']
-                        # Get the series number
-                        series_number = data['seriesNumber']
-                        # Get page(s)
-                        pages = data['pages']
-                        # Get the location
-                        place = data['place']
-                        # Get publisher
-                        publisher = data['publisher']
-                        if place != "":
-                            publisher = "{}: {}".format(place, publisher)
-                        if series == "":
-                            if series_number == "":
-                                # No series_number, no series name
-                                result = "{}, '{}' in: {}, _{}_, {} ({}), {}".format(authors, title, editors, booktitle, publisher, year, pages)
+                                                
+                        # For a book without authors 
+                        if authors == "":
+                            # And without publisher
+                            if publisher == "":
+                                # And without series name and or serie number
+                                    if series !="":
+                                        result = "_{}_ ({}) ({})".format(title, series, year)
+                            # With publisher
+                            elif publisher != "":
+                                # With series name and or number
+                                    if series !="":
+                                        result = "_{}_ ({}), {} ({})".format(title, series, publisher, year)     
+                                        # With only editors but NOT an edition
+                                        if editors != "" and extra =="":
+                                            result = "{}, _{}_ ({}), {} ({})".format(editors, title, series, publisher, year)                    
+                        
+                        # In other cases, with author and usual stuff
+                        else: 
+                            result = "{}, _{}_, {} ({})".format(authors, title, publisher, year)
+                        
+                        # Third step: Make a full reference for an edition (book)
+                        if extra == "ed":
+                            # There are no editors:
+                            if editors == "":
+                                # There is no series name
+                                if series =="":
+                                    # There is no series number
+                                    if series_number =="":
+                                        result = "_{}_ {}, {} ({})".format(title, volume, publisher, year)
+                            
+                            # In other cases with editors
                             else:
-                             # There is no series name but there is a series_number
-                             result = "{}, '{}' in: {}, _{}_ ({}), {} ({}), {}".format(authors, title, editors, booktitle, series_number, publisher, year, pages)
-                        elif series_number == "":
-                            # There is a series name but no series_number
-                            result = "{}, '{}' in: {}, _{}_ ({}), {} ({}), {}".format(authors, title, editors, booktitle, series, publisher, year, pages)
+                                result = "{}, _{}_ ({}), {}, ({})".format(editors, title, series, publisher, year)
+                        
+                        # Fourth step: Make a full reference for a catalog (book) 
+                        elif extra == "cat":
+                            if series == "":
+                                # There is no series_number and no series name
+                                result = "{}, _{}_, {} ({})".format(authors, title, publisher, year)
+                                if volume !="":
+                                    result = "{}, _{}_, {} ({}), {}".format(authors, title, publisher, year, volume)        
+                            else:
+                                # There is a series name and or series_number
+                                result = "{}, _{}_ ({}), {} ({})".format(authors, title, series, publisher, year)
+                                if volume !="":
+                                    result = "{}, _{}_ ({}), {} ({}), {}".format(authors, title, series, publisher, year, volume)
+                           
+                    # Fifth step: Make a full references for book section
+                    elif itemType == "bookSection":
+                        
+                        # Get the editor(s)
+                        editors = Litref.get_creators(data, type="editor")
+                        
+                        # Get the title of the book
+                        booktitle = data['bookTitle']
+                        
+                        # Get the pages of the book section
+                        pages = data['pages']
+                        
+                        # Reference without and with series name/number                                 
+                        if series == "":
+                            # There is no series_number and no series name available
+                            result = "{}, '{}' in: {}, _{}_, {} ({}), {}".format(authors, title, editors, booktitle, publisher, year, pages)
                         else:
-                            # Both series name and series_number
-                            result = "{}, '{}' in: {}, _{}_ ({} {}), {} ({}), {}".format(authors, title, editors, booktitle, series, series_number, publisher, year, pages)
+                            # There is a series name and or series_number available
+                            result = "{}, '{}' in: {}, _{}_ ({}), {} ({}), {}".format(authors, title, editors, booktitle, series, publisher, year, pages)
+                    
                     elif itemType == "conferencePaper":
                         combi = [authors, year, title]
                         # Name of the proceedings
@@ -1771,35 +1894,33 @@ class Litref(models.Model):
                     elif itemType == "edited-volume":
                         # No idea how to process this
                         pass
+                    
+                    # Sixth step: Make a full references for a journal article
                     elif itemType == "journalArticle":
-                        # combi = [authors, title]
-
+                        
                         # Name of the journal
                         journal = data['publicationTitle']
+                        
                         # Volume
                         volume = data['volume']
+                        
                         # Issue
                         issue = data['issue']
+                        
                         if volume == "":
                             if issue == "":
-                                # No vol/iss
+                                # There is no volume or issue
                                 result = "{}, '{}', _{}_, ({})".format(authors, title, journal, year)
                             else:
-                                # No vol, but there is an issue
+                                # There is no volume but there is an issue
                                 result = "{}, '{}', _{}_, {} ({})".format(authors, title, journal, issue, year)
                         elif issue == "":
-                            # There is a volume, but no issue
+                            # There is a volume but there is no issue
                             result = "{}, '{}', _{}_, {} ({})".format(authors, title, journal, volume, year)
                         else:
-                            # Both volume and issue
+                            # There are both volume and issue
                             result = "{}, '{}', _{}_, {} {} ({})".format(authors, title, journal, volume, issue, year)
-                        # combi.append(journal)
-
-                        # Get page(s)
-                        # pages = data['pages']
-                        # if pages != "": combi.append(pages)
-                        # Combine
-                        # result = ". ".join(combi) + "."
+                        
                     elif itemType == "manuscript":
                         combi = [authors, year, title]
                         # Get the location
@@ -1851,52 +1972,63 @@ class Litref(models.Model):
     def get_creators(data, type="author", style=""):
         """Extract the authors"""
 
+        oErr = ErrHandle()
         authors = []
+        extra = ['data']
         result = ""
         number = 0
-        bFirst = (style == "first")
-        if data != None and 'creators' in data:
-            for item in data['creators']:
-                if item['creatorType'] == type:
-                    number += 1
-                    # Add this author
-                    if bFirst:
-                        # Extremely short: only the last name of the first author
-                        authors.append(item['lastName'])
-                    else:
-                        if number == 1 and type == "author":
-                            # First author of anything must have lastname-first initial
-                            authors.append("{}, {}.".format(item['lastName'], item['firstName'][:1]))
-                        elif type == "editor":
-                            # editor??
-                            authors.append("{} {}".format(item['firstName'], item['lastName']))
+        try:
+            bFirst = (style == "first")
+            if data != None and 'creators' in data:
+                for item in data['creators']:
+                    if item['creatorType'] == type:
+                        number += 1
+                    
+                        # Add this author
+                        if bFirst:
+                            # Extremely short: only the last name of the first author TH: afvangen igv geen auteurs
+                            authors.append(item['lastName'])
                         else:
-                            # Any other author or editor is first initial-lastname
-                            authors.append("{}. {}".format(item['firstName'][:1], item['lastName']))
-            if bFirst:
-                if len(authors) == 0:
-                    result = "(unknown)"
+                            if number == 1 and type == "author":
+                                # First author of anything must have lastname - first initial
+                                authors.append("{}, {}.".format(item['lastName'], item['firstName'][:1]))
+                                if extra == "ed": 
+                                    authors.append("{} {}".format(item['firstName'], item['lastName']))
+                            elif type == "editor":
+                                # Editors should have full first name
+                                authors.append("{} {}".format(item['firstName'], item['lastName']))
+                            else:
+                                # Any other author or editor is first initial-lastname
+                                authors.append("{}. {}".format(item['firstName'][:1], item['lastName']))
+                if bFirst:
+                    if len(authors) == 0:
+                        result = "(unknown)"
+                    else:
+                        result = authors[0]
+                        if len(authors) > 1:
+                            result = result + " e.a."
                 else:
-                    result = authors[0]
-                    if len(authors) > 1:
-                        result = result + " e.a."
-            else:
-                if number == 1:
-                    result = authors[0]
-                else:
-                    preamble = authors[:-1]
-                    last = authors[-1]
-                    # The first [n-1] authors should be combined with a comma, the last with an ampersand
-                    result = "{} & {}".format( ", ".join(preamble), last)
-            # Possibly add (eds.) TH: aanpassen, "ed." als er 1 editor is
-            if type == "editor" and len(authors) > 1:
-                result = result + " (eds.)"
-            elif type == "editor" and len(authors) == 1:
-                result = result + " (ed.)"
-
-
-        return result
-
+                    if number == 1:
+                        result = authors[0]
+                    else:
+                        preamble = authors[:-1]
+                        last = authors[-1]
+                        # The first [n-1] authors should be combined with a comma, the last with an ampersand
+                        result = "{} & {}".format( ", ".join(preamble), last)
+                # Possibly add (ed.) or (eds.) but not in case of an edition
+                # extra = data['extra']
+                if type == "editor" and extra == "ed":
+                    result = result
+                elif type == "editor" and len(authors) > 1:
+                    result = result + " (eds.)"
+                elif type == "editor" and len(authors) == 1: 
+                    result = result + " (ed.)"
+           
+            
+            return result
+        except:
+            msg = oErr.get_error_message()
+            return ""
     
 
     def get_abbr(self):
@@ -3619,6 +3751,16 @@ class LitrefMan(models.Model):
     reference = models.ForeignKey(Litref, related_name="reference_litrefs")
     # [1] The manuscript to which the literature item refers
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+class LitrefSG(models.Model):
+    """The link between a literature item and a SermonGold"""
+    
+    # [1] The literature item
+    reference = models.ForeignKey(Litref, related_name="reference_litrefs_2")
+    # [1] The SermonGold to which the literature item refers
+    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_litrefs")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 

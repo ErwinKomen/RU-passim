@@ -88,6 +88,8 @@ urlpatterns = [
     url(r'^sermon/kwset(?:/(?P<pk>\d+))?/$', SermonKwset.as_view(), name='sermon_kwset'),
     url(r'^sermon/ediset(?:/(?P<pk>\d+))?/$', SermonEdiset.as_view(), name='sermon_ediset'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
+    
+    url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
 
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
@@ -111,6 +113,7 @@ urlpatterns = [
     url(r'^gold/ediset(?:/(?P<pk>\d+))?/$', SermonGoldEdiset.as_view(), name='gold_ediset'),
     url(r'^gold/ftxtset(?:/(?P<pk>\d+))?/$', SermonGoldFtxtset.as_view(), name='gold_ftxtset'),
     url(r'^gold/kwset(?:/(?P<pk>\d+))?/$', SermonGoldKwset.as_view(), name='gold_kwset'),
+    url(r'^gold/litset(?:/(?P<pk>\d+))?/$', SermonGoldLitset.as_view(), name='gold_litset'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

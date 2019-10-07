@@ -385,6 +385,42 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
+class SermonGoldLitrefForm(forms.ModelForm):
+    litref = forms.CharField(required=False)
+    litref_ta = forms.CharField(label=_("Reference"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = LitrefSG
+        fields = ['reference', 'sermon_gold', 'pages']
+        widgets={'pages':     forms.TextInput(attrs={'placeholder': 'Page range...', 'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldLitrefForm, self).__init__(*args, **kwargs)
+        self.fields['reference'].required = False
+        self.fields['litref'].required = False
+        self.fields['litref_ta'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial reference should be added
+            if instance.reference != None:
+                self.fields['litref_ta'].initial = instance.reference.get_full()
+
+    def clean(self):
+        cleaned_data = super(SermonGoldLitrefForm, self).clean()
+        litref = cleaned_data.get("litref")
+        reference = cleaned_data.get("reference")
+        if reference == None and (litref == None or litref == ""):
+            #litref_ta = cleaned_data.get("litref_ta")
+            #obj = Litref.objects.filter(full=litref_ta).first()
+            #if obj == None:
+            raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
+
 
 class ManuscriptProvForm(forms.ModelForm):
     name = forms.CharField(label=_("Name"), required=False, 
@@ -573,7 +609,7 @@ class ManuscriptForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'literature', 'stype']
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype']
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
@@ -583,7 +619,7 @@ class ManuscriptForm(forms.ModelForm):
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 # 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
