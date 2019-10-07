@@ -2,6 +2,8 @@
 
     {% if msitem.sermonsignatures.all|length > 0 %}
       <span class="signature">{{msitem.signatures}}</span>
+    {% elif msitem.goldsignatures.all|length > 0 %}
+      <span class="signature">{{msitem.signatures}}</span>
     {% else %}
       [-]
     {% endif %}

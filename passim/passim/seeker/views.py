@@ -14,6 +14,7 @@ from functools import reduce
 from pyzotero import zotero
 
 from django.db.models.functions import Lower
+from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -63,6 +64,25 @@ paginateValues = (100, 50, 20, 10, 5, 2, 1, )
 bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
+
+SERMON_SEARCH_FILTERS = [
+        {"name": "Author",          "id": "filter_author",      "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+        {"name": "Title",           "id": "filter_title",       "enabled": False},
+        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+        {"name": "Feast",           "id": "filter_feast",       "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date range",      "id": "filter_daterange",   "enabled": False, "head_id": "filter_manuscript"},
+        ]
+
 
 def treat_bom(sHtml):
     """REmove the BOM marker except at the beginning of the string"""
@@ -152,11 +172,26 @@ def action_model_changes(form, instance):
         else:
             # It is a form field
             try:
-                changes[item] = form.cleaned_data[item]
+                representation = form.cleaned_data[item]
+                if isinstance(representation, QuerySet):
+                    # This is a list
+                    rep_list = []
+                    for rep in representation:
+                        rep_str = str(rep)
+                        rep_list.append(rep_str)
+                    representation = json.dumps(rep_list)
+                changes[item] = representation
             except:
                 changes[item] = "(unavailable)"
     return changes
 
+def has_string_value(field, obj):
+    response = (field in obj and obj[field] != None and obj[field] != "")
+    return response
+
+def has_list_value(field, obj):
+    response = (field in obj and obj[field] != None and len(obj[field]) > 0)
+    return response
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -472,27 +507,213 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-def search_sermon(request):
-    """Search for a sermon"""
+def search_sermon(filters, qd):
+    """Create a queryset to search for a sermon"""
 
-    # Set defaults
-    template_name = "seeker/sermon.html"
+    qs = None
+    oErr = ErrHandle()
+    bFilter = False
+    try:
+        def enable_filter(filter_id, head_id=None):
+            for item in filters:
+                if filter_id in item['id']:
+                    item['enabled'] = True
+                    # Break from my loop
+                    break
+            # Check if this one has a head
+            if head_id != None and head_id != "":
+                for item in filters:
+                    if head_id in item['id']:
+                        item['enabled'] = True
+                        # Break from this sub-loop
+                        break
+            return True
 
-    # Get a link to a form
-    searchForm = SearchSermonForm()
+        bHasFormset = (len(qd) > 0)
 
-    # Other initialisations
-    currentuser = request.user
-    authenticated = currentuser.is_authenticated()
+        # Reset filters
+        for item in filters:
+            item['enabled'] = False
 
-    # Create context and add to it
-    context = dict(title="Search sermon",
-                   authenticated=authenticated,
-                   searchForm=searchForm)
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        if bHasFormset:
+            # Get the formset from the input
+            lstQ = []
 
-    # Create and show the result
-    return render(request, template_name, context)
+            sermoForm = SermonForm(qd, prefix='sermo')
+
+            if sermoForm.is_valid():
+
+                # Process the criteria from this form 
+                oFields = sermoForm.cleaned_data
+
+                # Check for author name -- which is in the typeahead parameter
+                auth_q = ""
+                if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
+                    val = oFields['author']
+                    enable_filter("author")
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(Author=val)
+                elif has_string_value('authorname', oFields): 
+                    val = oFields['authorname']
+                    enable_filter("author")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        # lstQ.append(Q(author__name__iregex=val))
+                        auth_q = Q(author__name__iregex=val)
+                    else:
+                        # lstQ.append(Q(author__name__iexact=val))
+                        auth_q = Q(author__name__iexact=val)
+
+                # Check for list of specific authors
+                if has_list_value('authorlist', oFields):
+                    enable_filter("author")
+                    id_list = [x.id for x in oFields['authorlist']]
+                    # lstQ.append(Q(author__id__in=id_list))
+                    auth_q_lst = Q(author__id__in=id_list)
+                    if auth_q == "":
+                        lstQ.append(auth_q_lst)
+                    else:
+                        lstQ.append(auth_q | auth_q_lst)
+                elif auth_q != "":
+                    lstQ.append(auth_q)
+
+                # Check for incipit string
+                if has_string_value('incipit', oFields): 
+                    val = oFields['incipit']
+                    enable_filter("incipit")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchincipit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchincipit__iexact=val))
+
+                # Check for explicit string
+                if has_string_value('explicit', oFields): 
+                    val = oFields['explicit']
+                    enable_filter("explicit")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchexplicit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchexplicit__iexact=val))
+
+                # Check for title string
+                if has_string_value('title', oFields): 
+                    val = oFields['title']
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(title__iregex=val))
+                    else:
+                        lstQ.append(Q(title__iexact=val))
+
+                # Check for *ANY* signature(s)
+                sig_q = ""
+                if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
+                    val = oFields['signatureid']
+                    enable_filter("signature")
+                    # lstQ.append(Q(sermonsignatures__id=val))
+                    sig_q = Q(sermonsignatures__id=val)
+                elif has_string_value('signature', oFields):
+                    val = oFields['signature']
+                    enable_filter("signature")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        # lstQ.append(Q(sermonsignatures__code__iregex=val))
+                        sig_q = Q(sermonsignatures__code__iregex=val)
+                    else:
+                        # lstQ.append(Q(sermonsignatures__code__iexact=val))
+                        sig_q = Q(sermonsignatures__code__iexact=val)
+
+                # Check for list of specific signatures
+                if has_list_value('siglist', oFields):
+                    enable_filter("signature")
+                    code_list = [x.code for x in oFields['siglist']]
+                    sig_q_lst = Q(sermonsignatures__code__in=code_list)
+                    if sig_q == "":
+                        lstQ.append(sig_q_lst)
+                    else:
+                        lstQ.append(sig_q | sig_q_lst)
+                elif sig_q != "":
+                    lstQ.append(sig_q)
+
+                # ========= Manuscript properties ============
+
+                # Check for manuid string
+                if has_string_value('manuidno', oFields): 
+                    val = adapt_search(oFields['manuidno'])
+                    enable_filter("manuid", "manuscript")
+                    lstQ.append(Q(manu__idno__iregex=val))
+
+                # Check for list of specific signatures
+                if has_list_value('manuidlist', oFields):
+                    enable_filter("manuid", "manuscript")
+                    id_list = [x.id for x in oFields['manuidlist']]
+                    lstQ.append(Q(manu__id__in=id_list))
+
+                # Check for country
+                if has_string_value('country', oFields):
+                    val = oFields['country']
+                    enable_filter("country", "manuscript")
+                    lstQ.append(Q(manu__library__lcountry__id=val))
+                elif has_string_value('country_ta', oFields):
+                    val = adapt_search(oFields['country_ta'])
+                    enable_filter("country", "manuscript")
+                    lstQ.append(Q(manu__library__lcountry__name__iregex=val))
+
+                # Check for city
+                if has_string_value('city', oFields):
+                    val = oFields['city']
+                    enable_filter("city", "manuscript")
+                    lstQ.append(Q(manu__library__lcity__id=val))
+                elif has_string_value('city_ta', oFields):
+                    val = adapt_search(oFields['city_ta'])
+                    enable_filter("city", "manuscript")
+                    lstQ.append(Q(manu__library__lcity__name__iregex=val))
+
+                # Check for library
+                if has_string_value('library', oFields):
+                    val = oFields['library']
+                    enable_filter("library", "manuscript")
+                    lstQ.append(Q(manu__library__id=val))
+                elif has_string_value('libname_ta', oFields):
+                    val = adapt_search(oFields['libname_ta'])
+                    enable_filter("library", "manuscript")
+                    lstQ.append(Q(manu__library__name__iregex=val))
+
+                # Check for date range
+                if has_string_value('date_from', oFields):
+                    val = oFields['date_from']
+                    enable_filter("daterange", "manuscript")
+                    lstQ.append(Q(manu__yearstart__gte=val))
+                if has_string_value('date_until', oFields):
+                    val = oFields['date_until']
+                    enable_filter("daterange", "manuscript")
+                    lstQ.append(Q(manu__yearfinish__lte=val))
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # No filter: Just show everything
+                    qs = SermonDescr.objects.all()
+                else:
+                    # There is a filter: apply it
+                    qs = SermonDescr.objects.filter(*lstQ).distinct()
+                    bFilter = True
+            else:
+                # TODO: communicate the error to the user???
+
+                # Just show everything
+                qs = SermonDescr.objects.all().distinct()
+
+        else:
+            # Just show everything
+            qs = SermonDescr.objects.all().distinct()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("search_sermon")
+        qs = None
+        bFilter = False
+    # Return the resulting filtered and sorted queryset
+    return filters, bFilter, qs
 
 def search_collection(request):
     """Search for a collection"""
@@ -560,7 +781,6 @@ def redo_zotero(request):
 
     # Return this response
     return JsonResponse(data)
-
 
 def do_clavis(request):
     # Create a regular expression
@@ -883,8 +1103,60 @@ def do_mext(request):
         oErr.DoError("do_mext")
         return reverse('home')
 
+def do_goldsearch(request):
+    """Re-calculate the srchincipit and srchexplicit fields for gold sermons"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Re-create Gold sermon searching (incipit/explicit)"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+
+        # Start up processing
+        added = 0
+        with transaction.atomic():
+            for item in SermonGold.objects.all():
+                srchincipit = item.srchincipit
+                srchexplicit = item.srchexplicit
+                # Double check the equal field
+                if item.equal == None:
+                    geq = EqualGold.objects.create()
+                    item.equal = geq
+                item.save()
+                if item.srchincipit != srchincipit or item.srchexplicit != srchexplicit:
+                    added += 1
+   
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of changed gold-sermons', 'result': added})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_goldsearch")
+        return reverse('home')
+
 def do_sermons(request):
-    """Remove duplicate sermons from manuscripts"""
+    """Remove duplicate sermons from manuscripts and/or do other SermonDescr initialisations"""
 
     oErr = ErrHandle()
     try:
@@ -956,6 +1228,8 @@ def do_sermons(request):
                 if bChange:
                     sermo.save()
 
+        # Step #3: init latin
+        SermonDescr.init_latin()
 
 
         lst_total.append("</tbody></table>")
@@ -973,7 +1247,6 @@ def do_sermons(request):
         msg = oErr.get_error_message()
         oErr.DoError("do_sermons")
         return reverse('home')
-
 
 def do_goldtogold(request):
     """Perform gold-to-gold relation repair -- NEW method that uses EqualGold"""
@@ -2602,7 +2875,10 @@ class BasicPart(View):
                         form_kwargs = self.get_form_kwargs(prefix)
                         if self.add:
                             # Saving a NEW item
-                            formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                            if 'initial' in formsetObj:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                            else:
+                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
                         else:
                             # Saving an EXISTING item
                             instance = self.get_instance(prefix)
@@ -2828,13 +3104,18 @@ class BasicPart(View):
                     # Saving a NEW item
                     formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
                 else:
+                    # Possibly initial (default) values
+                    if 'initial' in formsetObj:
+                        initial = formsetObj['initial']
+                    else:
+                        initial = None
                     # show the data belonging to the current [obj]
                     instance = self.get_instance(prefix)
                     qs = self.get_queryset(prefix)
                     if qs == None:
                         formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                     else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
                 # Process all the forms in the formset
                 ordered_forms = self.process_formset(prefix, request, formset)
                 if ordered_forms:
@@ -3309,6 +3590,7 @@ class ManuscriptEdit(BasicPart):
         # context['isnew'] = bNew
 
         context['afternewurl'] = reverse('search_manuscript')
+        context['afterdelurl'] = get_previous_page(self.request)
 
         return context
 
@@ -3720,6 +4002,8 @@ class SermonDetails(PassimDetails):
             goldid = self.qd['goldcopy']
             gold = SermonGold.objects.filter(id=goldid).first()
 
+            include_keyword_copy = False
+
             if gold != None:
                 # Copy all relevant information to obj
                 obj = self.object
@@ -3731,21 +4015,30 @@ class SermonDetails(PassimDetails):
                 if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
                 # (4) copy author
                 if gold.author != None: obj.author = gold.author
-                # (5) copy keywords
-                kwlist = [x['id'] for x in obj.keywords.all().values('id')]
-                for kw in gold.keywords.all():
-                    # Check if it is already there
-                    if kw.id not in kwlist:
-                        # Add it in the proper way
-                        srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
-                        srm_kw.save()
-                # (6) copy signatures
-                for gold_sig in gold.goldsignatures.all():
-                    # Check if it is already there
-                    srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
-                    if srm_sig == None:
-                        srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
-                        srm_sig.save()
+
+                if include_keyword_copy:
+                    # (5) copy keywords
+                    kwlist = [x['id'] for x in obj.keywords.all().values('id')]
+                    for kw in gold.keywords.all():
+                        # Check if it is already there
+                        if kw.id not in kwlist:
+                            # Add it in the proper way
+                            srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
+                            srm_kw.save()
+
+                # (6) copy signatures from *all* gold sermons in the equality set
+                # [6.a] get my gold equality set
+                geq = gold.equal
+                # [6.b] get all gold sermons in this equality set
+                qs_geq = SermonGold.objects.filter(equal=geq)
+                # [6.c] Walk all gold sermons in the equality set
+                for obj_geq in qs_geq:
+                    for gold_sig in obj_geq.goldsignatures.all():
+                        # Check if it is already there
+                        srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
+                        if srm_sig == None:
+                            srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
+                            srm_sig.save()
                 # Now save the adapted sermon
                 obj.save()
             # And in all cases: make sure we redirect to the 'clean' GET page
@@ -3841,6 +4134,7 @@ class SermonListView(ListView):
     paginate_by = 20
     template_name = 'seeker/sermon_list.html'
     entrycount = 0
+    basketview = False
     bDoTime = True
     bFilter = False     # Status of the filter
     page_function = "ru.passim.seeker.search_paged_start"
@@ -3852,6 +4146,7 @@ class SermonListView(ListView):
                    {'name': 'Locus', 'order': '', 'type': 'str'},
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
+    filters = SERMON_SEARCH_FILTERS
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -3888,8 +4183,15 @@ class SermonListView(ListView):
             # context['page_obj'].number = initial['page']
             page_num = int(initial['page'])
             context['page_obj'] = context['paginator'].page( page_num)
+            # Make sure to adapt the object_list
+            context['object_list'] = context['page_obj']
         context['has_filter'] = self.bFilter
+        context['filters'] = self.filters
+        context['filter_manuscript'] = next(x['enabled']  for x in self.filters if x['id'] == "filter_manuscript")
 
+        # Find out who the user is
+        profile = Profile.get_user_profile(self.request.user.username)
+        context['basketsize'] = 0 if profile == None else profile.basketsize
 
         # Set the title of the application
         context['title'] = "Sermons"
@@ -3921,6 +4223,21 @@ class SermonListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
+        def enable_filter(filter_id, head_id=None):
+            for item in self.filters:
+                if filter_id in item['id']:
+                    item['enabled'] = True
+                    # Break from my loop
+                    break
+            # Check if this one has a head
+            if head_id != None and head_id != "":
+                for item in self.filters:
+                    if head_id in item['id']:
+                        item['enabled'] = True
+                        # Break from this sub-loop
+                        break
+            return True
+
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
 
@@ -3929,77 +4246,22 @@ class SermonListView(ListView):
         get = get.copy()
         self.qd = get
 
-        self.bHasFormset = (len(get) > 0)
-
         # Fix the sort-order
         get['sortOrder'] = 'name'
 
-        if self.bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            sermoForm = SermonForm(self.qd, prefix='sermo')
-
-            if sermoForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = sermoForm.cleaned_data
-
-                # Check for author name -- which is in the typeahead parameter
-                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
-                    val = oFields['author']
-                    lstQ.append(Q(author=val))
-                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
-                    val = adapt_search(oFields['authorname'])
-                    lstQ.append(Q(author__name__iregex=val))
-
-                # Check for incipit string
-                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                    val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(srchincipit__iregex=val))
-
-                # Check for explicit string
-                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                    val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(srchexplicit__iregex=val))
-
-                # Check for explicit string
-                if 'manuidno' in oFields and oFields['manuidno'] != "" and oFields['manuidno'] != None: 
-                    val = adapt_search(oFields['manuidno'])
-                    lstQ.append(Q(manu__idno__iregex=val))
-
-                # Check for Sermon Clavis [signature]
-                if 'sigclavis' in oFields and oFields['sigclavis'] != "" and oFields['sigclavis'] != None: 
-                    val = adapt_search(oFields['sigclavis'])
-                    lstQ.append(Q(sermonsignatures__code__iregex=val))
-                    editype = "cl"
-                    lstQ.append(Q(sermonsignatures__editype=editype))
-
-                # Check for Sermon Gryson [signature]
-                if 'siggryson' in oFields and oFields['siggryson'] != "" and oFields['siggryson'] != None: 
-                    val = adapt_search(oFields['siggryson'])
-                    lstQ.append(Q(sermonsignatures__code__iregex=val))
-                    editype = "gr"
-                    lstQ.append(Q(sermonsignatures__editype=editype))
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = SermonDescr.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = SermonDescr.objects.filter(*lstQ).distinct()
-                    self.bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-
-                # Just show everything
-                qs = SermonDescr.objects.all().distinct()
-
+        # Get the queryset and the filters
+        if self.basketview:
+            # We should show the contents of the basket
+            # (1) Reset the filters
+            for item in self.filters: item['enabled'] = False
+            # (2) Indicate we have no filters
+            self.bFilter = False
+            # (3) Set the queryset
+            profile = Profile.get_user_profile(self.request.user.username)
+            qs = profile.basketitems.all()
         else:
-            # Just show everything
-            qs = SermonDescr.objects.all().distinct()
+            # Show the contents of the filters
+            self.filters, self.bFilter, qs = search_sermon(self.filters, self.qd)
 
         # Do sorting: Start with an initial order
         order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
@@ -4046,6 +4308,66 @@ class SermonListView(ListView):
         return self.get(request, *args, **kwargs)
 
 
+class BasketView(SermonListView):
+    basketview = True
+
+
+class BasketUpdate(BasicPart):
+    """Update contents of the basket"""
+
+    MainModel = SermonDescr
+    template_name = "seeker/basket_buttons.html"
+    entrycount = 0
+    filters = SERMON_SEARCH_FILTERS
+    bFilter = False
+
+    def add_to_context(self, context):
+        # Get the operation
+        if 'operation' in self.qd:
+            operation = self.qd['operation']
+        else:
+            return context
+
+        # Get our profile
+        profile = Profile.get_user_profile(self.request.user.username)
+        if profile != None:
+
+            # Get the queryset
+            self.filters, self.bFilter, qs =  search_sermon(self.filters, self.qd)
+
+            # Action depends on the operation specified
+            if operation == "create":
+                # Remove anything there
+                Basket.objects.filter(profile=profile).delete()
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        Basket.objects.create(profile=profile, sermon=item)
+            elif operation == "add":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        Basket.objects.create(profile=profile, sermon=item)
+            elif operation == "remove":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        Basket.objects.filter(profile=profile,sermon=item).delete()
+            elif operation == "reset":
+                # Remove everything from our basket
+                Basket.objects.filter(profile=profile).delete()
+
+            # Adapt the basket size
+            basketsize = profile.basketitems.count()
+            profile.basketsize = basketsize
+            profile.save()
+            context['basketsize'] = basketsize
+
+        # Return the updated context
+        return context
+    
+
+
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
 
@@ -4057,6 +4379,15 @@ class SermonLinkset(BasicPart):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+
+    def add_to_context(self, context):
+        x = 1
+        #for fs in context['stog_formset']:
+        #    for form in fs:
+        #        gold = form['gold']
+        #        geq = gold.equal_goldsermons.all()
+        #        qs = geq
+        return context
 
 
 class SermonSignset(BasicPart):
@@ -5015,7 +5346,7 @@ class SermonGoldLinkset(BasicPart):
                                          form=EqualGoldLinkForm, min_num=0,
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False}]
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
 
     def custom_init(self):
         x = 1
@@ -5255,6 +5586,11 @@ class SermonGoldEdit(PassimDetails):
         # Set the 'afternew' URL
         self.afternewurl = reverse('search_gold')
 
+        # Create a new equality set to which we add this Gold sermon
+        geq = EqualGold.objects.create()
+        instance.equal = geq
+        instance.save()
+
         # Get the list of signatures
         signatures = form.cleaned_data['signature'].strip()
         if signatures != "":
@@ -5267,6 +5603,12 @@ class SermonGoldEdit(PassimDetails):
                 # Add signature
                 obj = Signature(code=sigcode, editype=editype, gold=instance)
                 obj.save()
+
+        # Get the list of editions
+        edi_list = form.cleaned_data['editionlist']
+        # Copy these editions and link those copies to the Gold Sermon instance
+        for edi in edi_list:
+            edi_copy = Edition.objects.create(name=edi.name, gold=instance)
 
         # Get the list of keywords
         keywords = form.cleaned_data['keyword'].strip()

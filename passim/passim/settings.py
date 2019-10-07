@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Add your apps here to enable them
+    'django_select2',
     'passim.seeker',
 ]
 

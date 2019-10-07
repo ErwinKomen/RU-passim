@@ -1,6 +1,10 @@
 ﻿{% extends "layout.html" %}
 {% load i18n %}
 
+{% block scripts %}
+  {{sermoForm.media.css}}
+{% endblock %}
+
 {% block breadcrumbs %}
   {% include 'breadcrumb_list.html' %}
 {% endblock %}
@@ -20,8 +24,8 @@
           <div class="row">
             <div class="col-md-2 col-md-offset-10 text-right">
               <span class="">
-                <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
-                  <span class="glyphicon glyphicon-search"></span>
+                <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
+                  <span class="glyphicon glyphicon-filter"></span>
                 </a>
               </span>
             </div>
@@ -35,60 +39,251 @@
           <div class="hidden search_paged_start">
             <input name="page" type="text" />
           </div>
-          <!-- Search tab -->
-          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_search">
-            <div class="panel panel-default">
-                <div>
 
-                  <!-- Search interface: what sermons to look for and what are the results -->
-                  <div class="row">
-                    <div id="sermon_search" class="col-sm-10 col-sm-offset-1">
-                      <p>Manifestation sermon to look for:</p>
+          <!-- Filter tab -->
+          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
+            <div class="panel panel-default">
+              <!-- Filter interface -->
+              <div class="row" id="filter_badges">
+                <div class="col-md-2">
+                  <h4>Selected filters</h4>
+                </div>
+                <div class="col-md-10">
+                  <!-- Main filters -->
+                  <div>
+                    <h4>
+                    {% for filter in filters %}
+                      {% if not filter.head_id %}
+                        <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                      {% endif %}
+                    {% endfor %}
+                    </h4>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row" id="sermon_filter_specs">
+                <!-- The column with the different filter sections -->
+                <div class="col-md-10">
+                  <div class="panel panel-default ">
+
+                    <!-- Intro -->
+                    <div><h5>Sermon filters: </h5></div>
+
+                    <!-- One or more authors -->
+                    <div id="filter_author" class="{% if not sermoForm.authorname.value and not sermoForm.authorlist.value %}hidden{% endif %}">
                       <table style="width: 100%;">
-                        <tr><td>Author</td>
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Author</td>
                           <td style="width: 100%;">
-                            <div class="author-key hidden">{{sermoForm.author}}</div>
-                            <div>{{sermoForm.authorname}}</div>
+                            <span>{{sermoForm.authorname}}</span>
+                            <span> or select: </span>
+                            <span>{{sermoForm.authorlist}}</span>
                           </td>
                         </tr>
-                        <tr><td>Incipit</td><td>{{sermoForm.incipit}}</td></tr>
-                        <tr><td>Explicit</td><td>{{sermoForm.explicit}}</td></tr>
-                        <tr><td>Title</td><td>{{sermoForm.title}}</td></tr>
-
-                        <!-- Empty row 
-                        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>-->
-
-                        <tr><td>Gryson</td><td style="width: 100%;">{{sermoForm.siggryson}}</td></tr>
-                        <tr><td>Clavis</td><td style="width: 100%;">{{sermoForm.sigclavis}}</td></tr>
-                        <tr><td>Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
-                        <tr><td>Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
-
-                        <!-- My own idea -->
-                        <tr><td>Manuscript</td><td>{{sermoForm.manuidno}}</td></tr>
-
-                        <!-- Empty row -->
-                        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
                       </table>
                     </div>
-                  </div>
 
+                    <!-- One or more incipits -->
+                    <div id="filter_incipit" class="{% if not sermoForm.incipit.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Incipit</td><td style="width: 100%;">{{sermoForm.incipit}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more explicits -->
+                    <div id="filter_explicit" class="{% if not sermoForm.explicit.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Explicit</td><td style="width: 100%;">{{sermoForm.explicit}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more titles -->
+                    <div id="filter_title" class="{% if not sermoForm.title.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Title</td><td style="width: 100%;">{{sermoForm.title}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more signatures -->
+                    <div id="filter_signature" class="{% if not sermoForm.signature.value and not sermoForm.siglist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Gryson or Clavis:</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{sermoForm.signature}}</span>
+                            <span> or select: </span>
+                            <span>{{sermoForm.siglist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more feasts -->
+                    <div id="filter_feast" class="{% if not sermoForm.feast.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more keywords -->
+                    <div id="filter_keyword" class="{% if not sermoForm.keyword.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
+                      </table>
+                    </div>
+
+                  </div>
                 </div>
 
-                <div class="row">
-                  <div class="col-md-2 col-md-offset-10 text-right">
-                    <!-- Room to reset the search criteria -->
-                    <span>
-                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
-                    </span>
-                    <!-- Submit the search form -->
-                    <span>
-                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);" >Search</a>
-                    </span>
+                <!-- Basket operation buttons -->
+                {% if entrycount > 0 %}
+                  <div id="basket_buttons" class="col-md-2 text-right">
+                    {% include 'seeker/basket_buttons.html' %}
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Row with buttons and stuff for manuscript -->
+              <div id="filter_manuscript" class="row {% if not filter_manuscript %}hidden{% endif %}"
+                   targetid="manuscript_filter_specs">
+
+                  <!-- Sub filters for Manuscript -->
+                  <div class="col-md-10 col-sm-offset-2">
+
+                    <!-- Sub filters from Manuscript -->
+                    <div>
+                      {% for filter in filters %}
+                        {% if filter.head_id == "filter_manuscript" %}
+                          <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+
+                  </div>
+
+              </div>
+
+              <div class="row" id="manuscript_filter_specs">
+                <div class="col-md-10">
+                  <div class="panel panel-default ">
+                    <!-- Introduction to these filters -->
+                    <div><h5>Manuscript filters: </h5></div>
+
+                    <!-- One or more manuids -->
+                    <div id="filter_manuid" class="{% if not sermoForm.manuidno.value and  not sermoForm.manuidlist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Shelfmark</td>
+                          <td style="width: 100%;">
+                            <span>{{sermoForm.manuidno}}</span>
+                            <span> or select: </span>
+                            <span>{{sermoForm.manuidlist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular country -->
+                    <div id="filter_country" class="{% if not sermoForm.country.value and not sermoForm.country_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Country:</td>
+                          <td style="width: 100%;">
+                            <div class="country-key hidden">{{sermoForm.country}}</div>
+                            <div>{{sermoForm.country_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular city -->
+                    <div id="filter_city" class="{% if not sermoForm.city.value and not sermoForm.city_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">City:</td>
+                          <td style="width: 100%;">
+                            <div class="city-key hidden">{{sermoForm.city}}</div>
+                            <div>{{sermoForm.city_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular library -->
+                    <div id="filter_library" class="{% if not sermoForm.library.value and not sermoForm.libname_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Library:</td>
+                          <td style="width: 100%;">
+                            <div class="library-key hidden">{{sermoForm.library}}</div>
+                            <div>{{sermoForm.libname_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular origin -->
+                    <div id="filter_origin" class="{% if not sermoForm.origin.value and not sermoForm.origin_ta.value %}hidden{% endif %}" >
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Origin:</td>
+                          <td style="width: 100%;">
+                            <div class="origin-key hidden">{{sermoForm.origin}}</div>
+                            <div>{{sermoForm.origin_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular provenance -->
+                    <div id="filter_provenance" class="{% if not sermoForm.prov.value and not sermoForm.prov_ta.value %}hidden{% endif %}" >
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Provenance:</td>
+                          <td style="width: 100%;">
+                            <div class="country-key hidden">{{sermoForm.prov}}</div>
+                            <div>{{sermoForm.prov_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- The date range -->
+                    <div id="filter_daterange" class="{% if not sermoForm.date_from.value and not sermoForm.date_until.value %} hidden {% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Date range:</td>
+                          <td style="width: 100%;">
+                            <span>from:</span>
+                            <span >{{sermoForm.date_from}}</span>
+                            <span>until:</span>
+                            <span >{{sermoForm.date_until}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
                   </div>
                 </div>
+              </div>
 
+              <!-- Row with buttons-->
+              <div class="row">
+                <div class="col-md-2 col-md-offset-10 text-right">
+                  <!-- Room to reset the search criteria -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
+                  </span>
+                  <!-- Submit the search form -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
+
         </form>
 
         <!-- List tab -->
@@ -134,6 +329,7 @@
                     </thead>
                     <tbody>
                     {% for sermon in object_list %}
+                      {% if sermon.manu %}
                       <tr class="dict-entry clickable"
                           onclick="ru.passim.seeker.goto_url('{% url 'sermon_details' sermon.id %}')">
                         <td class="hidden"> {{ sermon.id }}</td>
@@ -183,7 +379,7 @@
                         <!-- Show the status of this item -->
                         <td class="tdnowrap"><span class="badge" title="{{sermon.get_stype_display}}">{{sermon.stype|slice:":1"}}</span></td>
                       </tr>
-
+                      {% endif %}
                     {% endfor %}
                     </tbody>
                   </table>
@@ -230,3 +426,7 @@
 </script>
 
 {% endblock content %}
+
+{% block endcontent %} 
+  {{sermoForm.media.js }} 
+{% endblock %}

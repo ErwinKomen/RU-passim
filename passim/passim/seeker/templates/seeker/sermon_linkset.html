@@ -52,22 +52,34 @@
                 <td style="width: 100%;">
                   <div class="hidden"><input id="id_stog-{{forloop.counter0}}-gold" name="stog-{{forloop.counter0}}-gold" value="{{linkform.instance.gold.id}}" /></div>
                   <div class="view-mode">
-                    <span>
-                      <a class="btn btn-xs jumbo-1" 
-                         OUD_targeturl="{% url 'get_gold' linkform.instance.gold.id %}"
-                         OUD_onclick="ru.passim.seeker.base_sermon(this, 'edit');" 
+                    <!-- Main link -->
+                    <div>
+                      <span>
+                        <a class="btn btn-xs jumbo-1" 
+                           href="{% url 'sermon_details' object_id %}?goldcopy={{linkform.instance.gold.id}}"
+                           title="Copy Gold Sermon information to this Sermon (incipit, explicit, Gryson, Clavis, editions etc)">
+                          <span class="glyphicon glyphicon-share-alt"></span>
+                        </a>
+                      </span>
+                      <span>
+                        <a href="{% url 'gold_details' linkform.instance.gold.id %}" target="_blank">
+                          {% include 'seeker/sermon_view.html' with msitem=linkform.instance.gold %}
+                        </a>
+                      </span>
+                    </div>
+                    <!-- In the same equality set -->
+                    {% for link in linkform.instance.gold.equal.equal_goldsermons.all %}
+                      {% if link.id != linkform.instance.gold.id %}
+                        <div>
+                          <span>
+                            <a href="{% url 'gold_details' link.id %}" target="_blank">
+                              {% include 'seeker/sermon_view.html' with msitem=link %}
+                            </a>
+                          </span>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
 
-                         href="{% url 'sermon_details' object_id %}?goldcopy={{linkform.instance.gold.id}}"
-
-                         title="Copy Gold Sermon information to this Sermon (incipit, explicit, Gryson, Clavis, editions etc)">
-                        <span class="glyphicon glyphicon-share-alt"></span>
-                      </a>
-                    </span>
-                    <span>
-                      <a href="{% url 'gold_details' linkform.instance.gold.id %}" target="_blank">
-                        {% include 'seeker/sermon_view.html' with msitem=linkform.instance.gold %}
-                      </a>
-                    </span>
                   </div>
                   <div class="edit-mode hidden selected clickable"
                        data-toggle="modal" 

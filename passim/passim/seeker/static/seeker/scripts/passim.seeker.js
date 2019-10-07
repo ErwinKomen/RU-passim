@@ -494,13 +494,106 @@ var ru = (function ($, ru) {
             window.location.href = loc_urlStore;
           } else if (sUrlShow !== undefined && sUrlShow !== "") {
             // window.location.href = sUrlShow;
-            history.pushState(null, null, sUrlShow);
+            // history.pushState(null, null, sUrlShow);
           }
 
           // Make sure typeahead is re-established
           ru.passim.init_typeahead();
+
+          // Switch filters
+          $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
+
+          // Make modal draggable
+          $(".modal-header").on("mousedown", function (mousedownEvt) {
+            var $draggable = $(this),
+                x = mousedownEvt.pageX - $draggable.offset().left,
+                y = mousedownEvt.pageY - $draggable.offset().top;
+
+            $("body").on("mousemove.draggable", function (mousemoveEvt) {
+              $draggable.closest(".modal-dialog").offset({
+                "left": mousemoveEvt.pageX - x,
+                "top": mousemoveEvt.pageY - y
+              });
+            });
+            $("body").one("mouseup", function () {
+              $("body").off("mousemove.draggable");
+            });
+            $draggable.closest(".modal").one("bs.modal.hide", function () {
+              $("body").off("mousemove.draggable");
+            });
+          });
+
+/*          $(".modal-dialog").draggable({
+            "handle": ".modal-header"
+          })*/
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * filter_click
+       *    What happens when clicking a badge filter
+       *
+       */
+      filter_click: function (el) {
+        var target = null,
+            specs = null;
+
+        try {
+          target = $(this).attr("targetid");
+          if (target !== undefined && target !== null && target !== "") {
+            target = $("#" + target);
+            // Action depends on checking or not
+            if ($(this).hasClass("on")) {
+              // it is on, switch it off
+              $(this).removeClass("on");
+              $(this).removeClass("jumbo-3");
+              $(this).addClass("jumbo-1");
+              // Must hide it and reset target
+              $(target).addClass("hidden");
+
+              // Check if target has a targetid
+              specs = $(target).attr("targetid");
+              if (specs !== undefined && specs !== "") {
+                // Reset related badges
+                $(target).find("span.badge").each(function (idx, elThis) {
+                  var subtarget = "";
+
+                  $(elThis).removeClass("on");
+                  $(elThis).removeClass("jumbo-3");
+                  $(elThis).removeClass("jumbo-2");
+                  $(elThis).addClass("jumbo-1");
+                  subtarget = $(elThis).attr("targetid");
+                  if (subtarget !== undefined && subtarget !== "") {
+                    $("#" + subtarget).addClass("hidden");
+                  }
+                });
+                // Re-define the target
+                target = $("#" + specs);
+              } 
+
+              $(target).find("input").each(function (idx, elThis) {
+                $(elThis).val("");
+              });
+              // Also reset all select 2 items
+              $(target).find("select").each(function (idx, elThis) {
+                $(elThis).val("").trigger("change");
+              });
+
+            } else {
+              // Must show target
+              $(target).removeClass("hidden");
+              // it is off, switch it on
+              $(this).addClass("on");
+              $(this).removeClass("jumbo-1");
+              $(this).addClass("jumbo-3");
+            }
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_click", ex);
         }
       },
 
@@ -560,6 +653,76 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_basket
+       *    Perform a basket action
+       *
+       */
+      do_basket: function (elStart) {
+        var frm = null,
+            targeturl = "",
+            operation = "",
+            targetid = "",
+            target = null,
+            data = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Get the data from the form
+          data = frm.serializeArray();
+          // The url is in the ajaxurl
+          targeturl = $(elStart).attr("ajaxurl");
+          // Get the operation
+          operation = $(elStart).attr("operation");
+          // Get the targetid
+          targetid = $(elStart).attr("targetid");
+
+          // validation
+          if (targeturl === undefined || targeturl === "" || operation === undefined || operation === "" ||
+              targetid === undefined || targetid === "") { return; }
+
+          // Where to go to 
+          target = $('#' + targetid);
+
+          // Add operation to data
+          data.push({ "name": "operation", "value": operation });
+
+          // Call the ajax POST method
+          // Issue a post
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Show the HTML target
+                  $(target).html(response['html']);
+                  // Possibly do some initialisations again??
+
+                  // Make sure events are re-established
+                  // ru.passim.seeker.init_events();
+                  ru.passim.init_typeahead();
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(target).html(response.msg);
+                  } else {
+                    $(target).html("An error has occurred");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_basket", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *
@@ -592,17 +755,31 @@ var ru = (function ($, ru) {
             lFormRow = [];
 
         try {
-          // Get to the form
-          frm = $(elStart).closest('form');
-          // Remove additional rows
-          lFormRow = $(frm).find("tr.form-row").not(".empty-form");
-          for (idx = lFormRow.length - 1; idx > 0; idx--) {
-            // Remove this row
-            lFormRow[idx].remove();
-          }
+          // Clear filters
+          $(".badge.filter").each(function (idx, elThis) {
+            var target;
 
-          // Clear the fields in the first row
-          $(frm).find("input:not([readonly]).searching").val("");
+            target = $(elThis).attr("targetid");
+            if (target !== undefined && target !== null && target !== "") {
+              target = $("#" + target);
+              // Action depends on checking or not
+              if ($(elThis).hasClass("on")) {
+                // it is on, switch it off
+                $(elThis).removeClass("on");
+                $(elThis).removeClass("jumbo-3");
+                $(elThis).addClass("jumbo-1");
+                // Must hide it and reset target
+                $(target).addClass("hidden");
+                $(target).find("input").each(function (idx, elThis) {
+                  $(elThis).val("");
+                });
+                // Also reset all select 2 items
+                $(target).find("select").each(function (idx, elThis) {
+                  $(elThis).val("").trigger("change");
+                });
+              }
+            }
+          });
 
         } catch (ex) {
           private_methods.errMsg("search_clear", ex);
@@ -1863,7 +2040,7 @@ var ru = (function ($, ru) {
                     switch (response.status) {
                       case "ready":
                       case "ok":
-                        // Do we have an afterurl?
+                        // Do we have afterdelurl afterurl?
                         // If an 'afternewurl' is specified, go there
                         if ('afterdelurl' in response && response['afterdelurl'] !== "") {
                           window.location = response['afterdelurl'];
@@ -2428,6 +2605,9 @@ var ru = (function ($, ru) {
               $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
               // Possibly set a default value
               td = $(el).parent('td');
+              if (td.length === 0) {
+                td = $(el).parent("div").parent("td");
+              }
               if (td.length === 1) {
                 val = $(td).attr("defaultvalue");
                 if (val !== undefined && val !== "") {
@@ -2437,13 +2617,19 @@ var ru = (function ($, ru) {
             }
           });
           newElement.find('select').each(function (idx, el) {
+            var td = null;
+
             if ($(el).attr("name") !== undefined) {
-              // Get the name of this element, adapting it on the fly
-              var name = $(el).attr("name").replace("__prefix__", total.toString());
-              // Produce a new id for this element
-              var id = $(el).attr("id").replace("__prefix__", total.toString());
-              // Adapt this element's name and id, unchecking it
-              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              td = $(el).parent('td');
+              if (td.length === 0) { td = $(el).parent("div").parent("td"); }
+              if (td.length === 0 || (td.length === 1 && $(td).attr("defaultvalue") === undefined)) {
+                // Get the name of this element, adapting it on the fly
+                var name = $(el).attr("name").replace("__prefix__", total.toString());
+                // Produce a new id for this element
+                var id = $(el).attr("id").replace("__prefix__", total.toString());
+                // Adapt this element's name and id, unchecking it
+                $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              }
             }
           });
 

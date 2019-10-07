@@ -46,6 +46,7 @@ urlpatterns = [
 
     url(r'^tools/clavis/$', passim.seeker.views.do_clavis, name='do_clavis'),
     url(r'^tools/goldtogold/$', passim.seeker.views.do_goldtogold, name='do_goldtogold'),
+    url(r'^tools/goldsearch/$', passim.seeker.views.do_goldsearch, name='do_goldsearch'),
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
     url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),
@@ -90,6 +91,9 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
+
+    url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
+    url(r'^basket/show', BasketView.as_view(), name='basket_show'),
 
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
@@ -140,6 +144,9 @@ urlpatterns = [
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
+
+    # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
+    url(r'^select2/', include('django_select2.urls')),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),

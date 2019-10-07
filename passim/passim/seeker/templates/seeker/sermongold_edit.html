@@ -1,5 +1,10 @@
 ﻿{% load i18n %}
 
+{% block scripts %}
+  {{goldForm.media.css}}
+{% endblock %}
+
+
 <!-- SermonGold information -->
 <form>
   {% csrf_token %}
@@ -109,6 +114,15 @@
         </td>
       </tr>
 
+      <!-- Edition(s) -->
+      <tr class="edit-new hidden">
+        <td class="hoverable" valign="top">Edition(s)</td>
+        <td valign="top">
+          <div class="view-mode">{{goldForm.instance.editionlist}}</div>
+          <div class="edit-mode hidden">{{goldForm.editionlist}}</div>
+        </td>
+      </tr>
+
     </table>
       <!-- A button to show/hide the table of literature -->
       <span><a role="button" class="btn btn-xs jumbo-1" targetid="sermongold_litset" title="Show/Hide literature references" onclick="ru.passim.seeker.toggle_click(this);">Literature</a></span>
@@ -120,4 +134,7 @@
       </div>
 </form>
 
-    
+
+{% block endcontent %} 
+  {{goldForm.media.js }} 
+{% endblock %}

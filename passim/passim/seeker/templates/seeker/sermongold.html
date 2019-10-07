@@ -5,6 +5,10 @@
   {% include 'breadcrumb_list.html' %}
 {% endblock %}
 
+{% block scripts %}
+  {{goldForm.media.css}}
+{% endblock %}
+
 {% block content %}
 
   <div>
@@ -263,3 +267,7 @@
 </script>
 
 {% endblock content %}
+
+{% block endcontent %} 
+  {{goldForm.media.js }} 
+{% endblock %}

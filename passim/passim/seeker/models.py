@@ -201,10 +201,19 @@ def getText(nodeStart):
     return ' '.join(rc)
 
 def get_searchable(sText):
+    sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
+
+    # Move to lower case
     sText = sText.lower()
-    sText = sText.replace("<", "")
-    sText = sText.replace(">", "")
-    sText = sText.replace("_", "")
+
+    # Remove punctuation with nothing
+    sText = re.sub(sRemove, "", sText)
+    #sText = sText.replace("<", "")
+    #sText = sText.replace(">", "")
+    #sText = sText.replace("_", "")
+
+    # Make sure to TRIM the text
+    sText = sText.strip()
     return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
@@ -940,6 +949,11 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    # [1] Current size of the user's basket
+    basketsize = models.IntegerField("Basket size", default=0)
+    # Many-to-many field for the contents of a search basket per user
+    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
+
     def __str__(self):
         sStack = self.stack
         return sStack
@@ -1016,6 +1030,17 @@ class Profile(models.Model):
         else:
             # Return the stack as object (list)
             return json.loads(profile.stack)
+
+    def get_user_profile(username):
+        # Sanity check
+        if username == "":
+            # Rebuild the stack
+            return None
+        # Get the user
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        profile = Profile.objects.filter(user=user).first()
+        return profile
 
 
 class Visit(models.Model):
@@ -2065,6 +2090,7 @@ class Litref(models.Model):
         if self.short == "":
             self.read_zotero()
         return adapt_markdown(self.short, lowercase=False)
+
 
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
@@ -3736,6 +3762,19 @@ class SermonSignature(models.Model):
         return response
 
     
+class Basket(models.Model):
+    """The basket is the user's vault of search results (sermondescr items)"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="basket_contents")
+    # [1] The user
+    profile = models.ForeignKey(Profile, related_name="basket_contents")
+
+    def __str__(self):
+        combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
+        return combi
+
+
 class ProvenanceMan(models.Model):
 
     # [1] The provenance
