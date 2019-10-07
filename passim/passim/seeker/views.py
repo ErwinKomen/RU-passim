@@ -40,7 +40,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
-    Litref, LitrefMan, LitrefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Basket, Litref, LitrefMan, LitrefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys, os
@@ -4503,35 +4503,35 @@ class SermonLitset(BasicPart):
                 oAdd['pages'] = item.pages
                 lref_list.append(oAdd)
                 
-                # Set the sort order TH: werkt
-                lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
+        # Set the sort order TH: werkt
+        lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
                 
-                # Remove duplicates 
-                unique_litref_list=[]
+        # Remove duplicates 
+        unique_litref_list=[]
                 
-                previous = None
-                for item in lref_list:
-                    # Keep the first
-                    if previous == None:
-                        unique_litref_list.append(item)
-                    # Try to compare current item to previous
-                    elif previous != None:
-                        # Are they the same?
-                        if item['reference_id'] == previous['reference_id'] and \
-                           item['pages'] == previous['pages']:
-                            # They are the same, no need to copy
-                            pass
+        previous = None
+        for item in lref_list:
+            # Keep the first
+            if previous == None:
+                unique_litref_list.append(item)
+            # Try to compare current item to previous
+            elif previous != None:
+                # Are they the same?
+                if item['reference_id'] == previous['reference_id'] and \
+                    item['pages'] == previous['pages']:
+                    # They are the same, no need to copy
+                    pass
                             
-                       # elif previous == None: 
-                        #    unique_litref_list.append(item)
-                        else:
-                            # Add this item to the new list
-                            unique_litref_list.append(item)
+                # elif previous == None: 
+                #    unique_litref_list.append(item)
+                else:
+                    # Add this item to the new list
+                    unique_litref_list.append(item)
 
-                    # assign previous
-                    previous = item
+            # assign previous
+            previous = item
                 
-                litref_list = unique_litref_list
+        litref_list = unique_litref_list
         
         context['lref_list'] = litref_list
        
