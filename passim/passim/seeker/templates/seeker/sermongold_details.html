@@ -27,6 +27,18 @@
               {% include 'seeker/sermongold_edit.html' %}
             </div>
 
+            <!-- A button to show/hide the table of literature -->
+            <div>
+              <a role="button" class="btn btn-xs jumbo-1" targetid="sermongold_litset" title="Show/Hide literature references" onclick="ru.passim.seeker.toggle_click(this);">Literature</a>
+            </div>
+    
+            <!-- The set of literature references belonging to this manuscript --> 
+            <div class="row">&nbsp;</div>
+            <div id="sermongold_litset" class="post-load hidden" targeturl="{% url 'gold_litset' pk=goldForm.instance.id %}">
+              <!-- The wait symbol will be overwritten -->
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+             
             <!-- SermonGold signatures (Gryson, Clavis): zero-to-many -->
             <div class="row">&nbsp;</div>
             <div id="sermongold_signset" class="post-load" targeturl="{% url 'gold_signset' pk=goldForm.instance.id %}" >
@@ -62,8 +74,6 @@
               </div>
             </div>
               
-              <!-- Room for the literature attached to this gold sermon -->
-             
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
             {% if goldForm.instance.id and is_passim_editor %}
               <div id="sermongold-links-{{goldForm.instance.id}}">

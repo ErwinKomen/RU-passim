@@ -4122,6 +4122,7 @@ class SermonEdit(BasicPart):
         context['msitem'] = instance
 
         # Make sure to pass on the manuscript_id
+        context['afternewurl'] = ""
         manuscript_id = None
         if 'manuscript_id' in self.qd:
             manuscript_id = self.qd['manuscript_id']
@@ -4135,7 +4136,7 @@ class SermonEdit(BasicPart):
 
         return context
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
 
         # Check if this is a new one
         if self.add:
@@ -5346,7 +5347,7 @@ class SermonGoldEqualset(BasicPart):
                         self.gold = gold
         return bNeedSaving
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
         # The instance here is the geq-instance, so an instance of SermonGold
         # Now make sure all related material is updated
 
@@ -5430,7 +5431,7 @@ class SermonGoldLinkset(BasicPart):
                         bNeedSaving = True
         return bNeedSaving
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
         # The instance here is the glink-instance, so an instance of EqualGoldLink
         # Now make sure all related material is updated
 
@@ -6456,7 +6457,7 @@ class SourceEdit(BasicPart):
 
         return context
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
 
         # There's is no real return value needed here 
         return True
