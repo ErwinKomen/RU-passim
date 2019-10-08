@@ -80,10 +80,7 @@
             {% if is_passim_editor %}
               <span id="add_author" class="pull-right">
                 {% csrf_token %}
-                <a class="btn btn-xs jumbo-3" role="button" 
-                    targeturl="{% url 'location_edit' %}"
-                    targetid="location_new"
-                    onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                <a class="btn btn-xs jumbo-3" role="button" href="{% url 'location_details' %}" >
                   <span class="glyphicon glyphicon-plus"></span>Add a location
                 </a>
               </span>
@@ -127,7 +124,9 @@
                   <td style="min-width: 120px;"><span class="location-type tdnowrap">{{location.loctype.name}}</span></td>
                   <td style="width: 100%;">
                     <span class="location-partof">
-                      {{location.partof}}
+                      {% for loc in location.above %}
+                        <span class="badge loctype-{{loc.loctype.name}}" title="{{loc.loctype.name}}">{{loc.name}}</span>
+                      {% endfor %}
                     </span>
                   </td>
                   <!-- Buttons for this location-->

@@ -1,6 +1,10 @@
 ﻿{% extends "layout.html" %}
 {% load i18n %}
 
+{% block scripts %}
+  {{locForm.media.css}}
+{% endblock %}
+
 {% block breadcrumbs %}
   <div class="breadcrumbs">
   {% include 'breadcrumb_list.html' %}
@@ -33,13 +37,6 @@
               {% include 'seeker/location_edit.html' %}
             </div>
 
-            <!-- relations with containers -->
-            <h4>This location is part of:</h4>
-            <div id="location_relset" class="post-load" targeturl="{% url 'loc_relset' pk=locForm.instance.id %}">
-              <!-- The wait symbol will be overwritten -->
-              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-            </div>
-
           </div>
 
         </div>
@@ -66,3 +63,7 @@
 </script>
 
 {% endblock content %}
+
+{% block endcontent %} 
+  {{locForm.media.js }} 
+{% endblock %}

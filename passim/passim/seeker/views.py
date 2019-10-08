@@ -2849,7 +2849,7 @@ class BasicPart(View):
                                 # Store the instance id in the data
                                 self.data[prefix + '_instanceid'] = instance.id
                                 # Any action after saving this form
-                                self.after_save(prefix, instance)
+                                self.after_save(prefix, instance=instance, form=formObj['forminstance'])
                             # Also get the cleaned data from the form
                             formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
                         else:
@@ -3206,7 +3206,7 @@ class BasicPart(View):
     def before_delete(self, prefix=None, instance=None):
         return True
 
-    def after_save(self, prefix, instance=None):
+    def after_save(self, prefix, instance=None, form=None):
         return True
 
     def add_to_context(self, context):
@@ -3506,6 +3506,7 @@ class PassimDetails(DetailView):
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
         context['instance'] = instance
+        context['options'] = json.dumps({"isnew": (instance == None)})
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
@@ -3696,6 +3697,13 @@ class LocationDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
+        # Add the list of relations in which I am contained
+        contained_locations = []
+        if instance != None:
+            contained_locations = instance.hierarchy(include_self=False)
+        context['contained_locations'] = contained_locations
+
+        # The standard information
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
@@ -3720,6 +3728,35 @@ class LocationEdit(BasicPart):
             pass
 
         return bNeedSaving
+
+    def after_save(self, prefix, instance = None, form = None):
+        bStatus = True
+        if prefix == "loc":
+            # Check if there is a locationlist
+            if 'locationlist' in form.cleaned_data:
+                locationlist = form.cleaned_data['locationlist']
+
+                # Get all the containers inside which [instance] is contained
+                current_qs = Location.objects.filter(container_locrelations__contained=instance)
+                # Walk the new list
+                for item in locationlist:
+                    #if item.id not in current_ids:
+                    if item not in current_qs:
+                        # Add it to the containers
+                        LocationRelation.objects.create(contained=instance, container=item)
+                # Update the current list
+                current_qs = Location.objects.filter(container_locrelations__contained=instance)
+                # Walk the current list
+                remove_list = []
+                for item in current_qs:
+                    if item not in locationlist:
+                        # Add it to the list of to-be-fremoved
+                        remove_list.append(item.id)
+                # Remove them from the container
+                if len(remove_list) > 0:
+                    LocationRelation.objects.filter(contained=instance, container__id__in=remove_list).delete()
+
+        return bStatus
 
     def add_to_context(self, context):
 

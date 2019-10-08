@@ -1873,6 +1873,9 @@ var ru = (function ($, ru) {
               }
               break;
             case "save":
+              // Do we have an afterurl?
+              afterurl = $(el).attr("afterurl");
+
               // Show waiting symbol
               $(elTr).find(".waiting").removeClass("hidden");
 
@@ -1944,6 +1947,11 @@ var ru = (function ($, ru) {
                         break;
                       case "ready":
                       case "ok":
+                        // First check for afterurl
+                        if (afterurl !== undefined && afterurl !== "") {
+                          // Make sure we go to the afterurl
+                          window.location = afterurl;
+                        }
                         if ("html" in response) {
                           // Show the HTML in the targetid
                           $(targetid).html(response['html']);

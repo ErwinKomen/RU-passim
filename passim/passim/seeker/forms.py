@@ -512,6 +512,7 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
+
 class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
@@ -711,7 +712,6 @@ class LibraryForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
-
 class SermonGoldFtextlinkForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -783,7 +783,18 @@ class ManuscriptForm(forms.ModelForm):
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
 
 
+class LocationWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.loctype)
+        return sLabel
+
+
 class LocationForm(forms.ModelForm):
+    locationlist = ModelMultipleChoiceField(queryset=None, required=False,
+                            widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -800,7 +811,17 @@ class LocationForm(forms.ModelForm):
         # All fields are required
         # Get the instance
         if 'instance' in kwargs:
+            # Set the items that *may* be shown
             instance = kwargs['instance']
+            qs = Location.objects.exclude(id=instance.id).order_by('loctype__level', 'name')
+            self.fields['locationlist'].queryset = qs
+            self.fields['locationlist'].widget.queryset = qs
+
+            # Set the list of initial items
+            my_list = [x.id for x in instance.hierarchy(False)]
+            self.initial['locationlist'] = my_list
+        else:
+            self.fields['locationlist'].queryset = Location.objects.all().order_by('loctype__level', 'name')
 
 
 class LocationRelForm(forms.ModelForm):

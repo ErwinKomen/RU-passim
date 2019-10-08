@@ -1182,10 +1182,12 @@ class Location(models.Model):
         # Return the list of locations
         return " | ".join(lst_back)
 
-    def hierarchy(self):
+    def hierarchy(self, include_self=True):
         """give a list of locations (and their type) of which I am part"""
 
-        lst_main = [self]
+        lst_main = []
+        if include_self:
+            lst_main.append(self)
 
         def get_above(loc, lst_this):
             """Perform depth-first recursive procedure above"""
@@ -1203,6 +1205,8 @@ class Location(models.Model):
         # Return the list of locations
         return lst_main
 
+    def above(self):
+        return self.hierarchy(False)
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
