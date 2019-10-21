@@ -207,8 +207,8 @@ class SermonForm(forms.ModelForm):
     # Helper fields for SermonDescr fields
     authorname  = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
-    nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
+    #nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
+    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
@@ -246,7 +246,7 @@ class SermonForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'subtitle', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'manu',
+        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
                   #, 'clavis', 'gryson', 'keyword']
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -285,12 +285,13 @@ class SermonForm(forms.ModelForm):
             instance = kwargs['instance']
             # If there is an instance, then check the author specification
             sAuthor = "" if not instance.author else instance.author.name
-            # If there is an instance, then check the nickname specification
-            sNickName = "" if not instance.nickname else instance.nickname.name
+
+            ## If there is an instance, then check the nickname specification
+            #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
-            self.fields['nickname_ta'].initial = sNickName
-            self.fields['nickname_ta'].required = False
+            #self.fields['nickname_ta'].initial = sNickName
+            #self.fields['nickname_ta'].required = False
 
 
 class SermonDescrSignatureForm(forms.ModelForm):

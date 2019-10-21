@@ -4081,8 +4081,9 @@ class SermonDetails(PassimDetails):
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
         else:
-            # Pass on all the linked-gold editions
+            # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
             sedi_list = []
+            goldauthors = []
             # Visit all linked gold sermons
             for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
                 # Access the gold sermon
@@ -4092,7 +4093,11 @@ class SermonDetails(PassimDetails):
                     name = edi.name
                     if name not in sedi_list:
                         sedi_list.append({'name': name})
+                # Does this one have an author?
+                if gold.author != None:
+                    goldauthors.append(gold.author)
             context['sedi_list'] = sedi_list
+            context['goldauthors'] = goldauthors
 
         return context
 
@@ -4404,7 +4409,6 @@ class BasketUpdate(BasicPart):
         # Return the updated context
         return context
     
-
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
