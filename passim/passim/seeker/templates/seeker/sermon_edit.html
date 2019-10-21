@@ -106,8 +106,8 @@
       <!-- Title -->
       <tr class="form-row">
         <td class="hoverable">Title</td>
-        <td>
-          <div class="view-mode">{% if sermoForm.title.value %}{{sermoForm.title.value}}{% else %}-{% endif %}</div>
+        <td >
+          <div class="view-mode" style="font-variant: small-caps;">{% if sermoForm.title.value %}{{sermoForm.title.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sermoForm.title}}</div>
           {% endif %}
@@ -118,7 +118,7 @@
       <tr class="form-row">
         <td class="hoverable">Sub title</td>
         <td>
-          <div class="view-mode">{% if sermoForm.subtitle.value %}{{sermoForm.subtitle.value}}{% else %}-{% endif %}</div>
+          <div class="view-mode" style="font-variant: small-caps;">{% if sermoForm.subtitle.value %}{{sermoForm.subtitle.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="edit-mode hidden">{{sermoForm.subtitle}}</div>
           {% endif %}
