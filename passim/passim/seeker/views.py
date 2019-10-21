@@ -209,7 +209,7 @@ def process_visit(request, name, is_menu, **kwargs):
     # return json.dumps(p_list)
     return p_list
 
-def get_previous_page(request):
+def get_previous_page(request, top=False):
     """Find the previous page for this user"""
 
     username = "anonymous" if request.user == None else request.user.username
@@ -218,22 +218,25 @@ def get_previous_page(request):
         p_list = Profile.get_stack(username)
         if len(p_list) < 2:
             prevpage = request.META.get('HTTP_REFERER') 
+        elif top:
+            p_item = p_list[len(p_list)-1]
+            prevpage = p_item['url']
         else:
             p_item = p_list[len(p_list)-2]
             prevpage = p_item['url']
-            # Possibly add arguments
-            if 'kwargs' in p_item:
-                # First strip off any arguments (anything after ?) in the url
-                if "?" in prevpage:
-                    prevpage = prevpage.split("?")[0]
-                bFirst = True
-                for k,v in p_item['kwargs'].items():
-                    if bFirst:
-                        addsign = "?"
-                        bFirst = False
-                    else:
-                        addsign = "&"
-                    prevpage = "{}{}{}={}".format(prevpage, addsign, k, v)
+        # Possibly add arguments
+        if 'kwargs' in p_item:
+            # First strip off any arguments (anything after ?) in the url
+            if "?" in prevpage:
+                prevpage = prevpage.split("?")[0]
+            bFirst = True
+            for k,v in p_item['kwargs'].items():
+                if bFirst:
+                    addsign = "?"
+                    bFirst = False
+                else:
+                    addsign = "&"
+                prevpage = "{}{}{}={}".format(prevpage, addsign, k, v)
     else:
         prevpage = request.META.get('HTTP_REFERER') 
     # Return the path
@@ -2849,7 +2852,7 @@ class BasicPart(View):
                                 # Store the instance id in the data
                                 self.data[prefix + '_instanceid'] = instance.id
                                 # Any action after saving this form
-                                self.after_save(prefix, instance)
+                                self.after_save(prefix, instance=instance, form=formObj['forminstance'])
                             # Also get the cleaned data from the form
                             formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
                         else:
@@ -3206,7 +3209,7 @@ class BasicPart(View):
     def before_delete(self, prefix=None, instance=None):
         return True
 
-    def after_save(self, prefix, instance=None):
+    def after_save(self, prefix, instance=None, form=None):
         return True
 
     def add_to_context(self, context):
@@ -3375,9 +3378,6 @@ class PassimDetails(DetailView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # context['prevpage'] = get_previous_page(self.request) # self.previous
 
-        # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
-
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         initial = get.copy()
@@ -3423,6 +3423,8 @@ class PassimDetails(DetailView):
                     msg = oErr.get_error_message()
                     # Create an errors object
                     context['errors'] = {'delete':  msg }
+
+                context['afterdelurl'] = get_previous_page(self.request, True)
                 # And return the complied context
                 return context
             
@@ -3506,9 +3508,13 @@ class PassimDetails(DetailView):
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
         context['instance'] = instance
+        context['options'] = json.dumps({"isnew": (instance == None)})
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
 
         # Return the calculated context
         return context
@@ -3696,6 +3702,13 @@ class LocationDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
+        # Add the list of relations in which I am contained
+        contained_locations = []
+        if instance != None:
+            contained_locations = instance.hierarchy(include_self=False)
+        context['contained_locations'] = contained_locations
+
+        # The standard information
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
@@ -3720,6 +3733,35 @@ class LocationEdit(BasicPart):
             pass
 
         return bNeedSaving
+
+    def after_save(self, prefix, instance = None, form = None):
+        bStatus = True
+        if prefix == "loc":
+            # Check if there is a locationlist
+            if 'locationlist' in form.cleaned_data:
+                locationlist = form.cleaned_data['locationlist']
+
+                # Get all the containers inside which [instance] is contained
+                current_qs = Location.objects.filter(container_locrelations__contained=instance)
+                # Walk the new list
+                for item in locationlist:
+                    #if item.id not in current_ids:
+                    if item not in current_qs:
+                        # Add it to the containers
+                        LocationRelation.objects.create(contained=instance, container=item)
+                # Update the current list
+                current_qs = Location.objects.filter(container_locrelations__contained=instance)
+                # Walk the current list
+                remove_list = []
+                for item in current_qs:
+                    if item not in locationlist:
+                        # Add it to the list of to-be-fremoved
+                        remove_list.append(item.id)
+                # Remove them from the container
+                if len(remove_list) > 0:
+                    LocationRelation.objects.filter(contained=instance, container__id__in=remove_list).delete()
+
+        return bStatus
 
     def add_to_context(self, context):
 
@@ -4044,8 +4086,9 @@ class SermonDetails(PassimDetails):
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
         else:
-            # Pass on all the linked-gold editions
+            # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
             sedi_list = []
+            goldauthors = []
             # Visit all linked gold sermons
             for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
                 # Access the gold sermon
@@ -4055,7 +4098,11 @@ class SermonDetails(PassimDetails):
                     name = edi.name
                     if name not in sedi_list:
                         sedi_list.append({'name': name})
+                # Does this one have an author?
+                if gold.author != None:
+                    goldauthors.append(gold.author)
             context['sedi_list'] = sedi_list
+            context['goldauthors'] = goldauthors
 
         return context
 
@@ -4085,6 +4132,7 @@ class SermonEdit(BasicPart):
         context['msitem'] = instance
 
         # Make sure to pass on the manuscript_id
+        context['afternewurl'] = ""
         manuscript_id = None
         if 'manuscript_id' in self.qd:
             manuscript_id = self.qd['manuscript_id']
@@ -4098,7 +4146,7 @@ class SermonEdit(BasicPart):
 
         return context
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
 
         # Check if this is a new one
         if self.add:
@@ -4366,7 +4414,6 @@ class BasketUpdate(BasicPart):
         # Return the updated context
         return context
     
-
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
@@ -5344,7 +5391,7 @@ class SermonGoldEqualset(BasicPart):
                         self.gold = gold
         return bNeedSaving
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
         # The instance here is the geq-instance, so an instance of SermonGold
         # Now make sure all related material is updated
 
@@ -5428,7 +5475,7 @@ class SermonGoldLinkset(BasicPart):
                         bNeedSaving = True
         return bNeedSaving
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
         # The instance here is the glink-instance, so an instance of EqualGoldLink
         # Now make sure all related material is updated
 
@@ -5746,6 +5793,8 @@ class AuthorEdit(PassimDetails):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
+
+        context['afterdelurl'] = get_previous_page(self.request)
         return context
 
 
@@ -5763,7 +5812,7 @@ class AuthorListView(ListView):
         context = super(AuthorListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.GET
+        initial = self.request.GET if self.request.method == "GET" else self.request.POST
         search_form = AuthorSearchForm(initial)
 
         context['searchform'] = search_form
@@ -6443,7 +6492,7 @@ class SourceEdit(BasicPart):
 
         return context
 
-    def after_save(self, prefix, instance = None):
+    def after_save(self, prefix, instance = None, form = None):
 
         # There's is no real return value needed here 
         return True

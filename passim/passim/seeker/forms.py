@@ -207,8 +207,8 @@ class SermonForm(forms.ModelForm):
     # Helper fields for SermonDescr fields
     authorname  = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
-    nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
+    #nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
+    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
@@ -246,7 +246,7 @@ class SermonForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'subtitle', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'quote', 'manu',
+        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
                   #, 'clavis', 'gryson', 'keyword']
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -285,12 +285,13 @@ class SermonForm(forms.ModelForm):
             instance = kwargs['instance']
             # If there is an instance, then check the author specification
             sAuthor = "" if not instance.author else instance.author.name
-            # If there is an instance, then check the nickname specification
-            sNickName = "" if not instance.nickname else instance.nickname.name
+
+            ## If there is an instance, then check the nickname specification
+            #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
-            self.fields['nickname_ta'].initial = sNickName
-            self.fields['nickname_ta'].required = False
+            #self.fields['nickname_ta'].initial = sNickName
+            #self.fields['nickname_ta'].required = False
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -506,41 +507,6 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
-class SermonGoldEditionForm(forms.ModelForm):
-    litref = forms.CharField(required=False)
-    litref_ta = forms.CharField(label=_("Reference"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))    
-    class Meta:
-        ATTRS_FOR_FORMS = {'class': 'form-control'};
-
-        model = EdirefSG
-        fields = ['reference', 'sermon_gold', 'pages']
-        widgets={'pages':     forms.TextInput(attrs={'placeholder': 'Page range...', 'style': 'width: 100%;'})
-                 }
-        
-    def __init__(self, *args, **kwargs):
-        # Start by executing the standard handling
-        super(SermonGoldEditionForm, self).__init__(*args, **kwargs)
-        self.fields['reference'].required = False
-        self.fields['litref'].required = False
-        self.fields['litref_ta'].required = False
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # Check if the initial reference should be added
-            if instance.reference != None:
-                self.fields['litref_ta'].initial = instance.reference.get_full()
-
-    def clean(self):
-        cleaned_data = super(SermonGoldEditionForm, self).clean()
-        litref = cleaned_data.get("litref")
-        reference = cleaned_data.get("reference")
-        if reference == None and (litref == None or litref == ""):
-            #litref_ta = cleaned_data.get("litref_ta")
-            #obj = Litref.objects.filter(full=litref_ta).first()
-            #if obj == None:
-            raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
-
 class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
@@ -739,7 +705,6 @@ class LibraryForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
-
 class SermonGoldFtextlinkForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -811,7 +776,18 @@ class ManuscriptForm(forms.ModelForm):
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
 
 
+class LocationWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.loctype)
+        return sLabel
+
+
 class LocationForm(forms.ModelForm):
+    locationlist = ModelMultipleChoiceField(queryset=None, required=False,
+                            widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -828,7 +804,17 @@ class LocationForm(forms.ModelForm):
         # All fields are required
         # Get the instance
         if 'instance' in kwargs:
+            # Set the items that *may* be shown
             instance = kwargs['instance']
+            qs = Location.objects.exclude(id=instance.id).order_by('loctype__level', 'name')
+            self.fields['locationlist'].queryset = qs
+            self.fields['locationlist'].widget.queryset = qs
+
+            # Set the list of initial items
+            my_list = [x.id for x in instance.hierarchy(False)]
+            self.initial['locationlist'] = my_list
+        else:
+            self.fields['locationlist'].queryset = Location.objects.all().order_by('loctype__level', 'name')
 
 
 class LocationRelForm(forms.ModelForm):

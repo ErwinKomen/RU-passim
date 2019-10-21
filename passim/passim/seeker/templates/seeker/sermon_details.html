@@ -33,6 +33,42 @@
               {% include 'seeker/sermon_edit.html' %}
             </div>
 
+            <!-- Show information of Gold-Sermon-linked authors-->
+            <div>
+              <table class="func-view">
+                <tbody>
+                  <tr class="form-row">
+                    <td>Author[s] (SermonGold)</td>
+                    <td>
+                      {% if goldauthors|length == 0 %}
+                        <span>(none)</span>
+                      {% else %}
+                        {% for author in goldauthors %}
+                          <span>{{author.name}}</span>
+                        {% endfor %}
+                      {% endif %}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+
+            <!-- Post-fetched information -->
+            <div class="row">
+              <!-- A button to show/hide the table of literature -->
+              <div class="col-md-6">
+                <a role="button" class="btn btn-xs jumbo-1" targetid="sermon_litset" title="Show/Hide literature references" onclick="ru.passim.seeker.toggle_click(this);">Literature</a>
+              </div>
+            </div>
+    
+            <!-- The set of literature references belonging to this manuscript --> 
+            <div class="row">&nbsp;</div>
+            <div id="sermon_litset" class="post-load hidden" targeturl="{% url 'sermon_litset' pk=sermoForm.instance.id %}">
+              <!-- The wait symbol will be overwritten -->
+              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+            </div>
+
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
             {% if sermoForm.instance.id and is_passim_editor %}
               <div id="sermongold-links-{{sermoForm.instance.id}}">

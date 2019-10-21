@@ -97,10 +97,6 @@
                       <span id="add_search_criteria" class="pull-right">
                         <!-- Completely manual sermon adding -->
                         <a class="btn btn-xs jumbo-3" role="button" 
-                           PREVIOUS_targetid="sermon_new"
-                           PREVIOUS_targeturl="{% url 'sermon_edit' %}?manuscript_id={{manuForm.instance.id}}"
-                           PREVIOUS_onclick="ru.passim.seeker.manu_edit(this, 'new');"
-                           ATTEMPT_href="{% url 'sermon_details' %}?manuscript_id={{manuForm.instance.id}}"
                            onclick="document.getElementById('create_new_sermon').submit();"
                            >
                           <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript

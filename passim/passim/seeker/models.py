@@ -1182,10 +1182,12 @@ class Location(models.Model):
         # Return the list of locations
         return " | ".join(lst_back)
 
-    def hierarchy(self):
+    def hierarchy(self, include_self=True):
         """give a list of locations (and their type) of which I am part"""
 
-        lst_main = [self]
+        lst_main = []
+        if include_self:
+            lst_main.append(self)
 
         def get_above(loc, lst_this):
             """Perform depth-first recursive procedure above"""
@@ -1203,6 +1205,8 @@ class Location(models.Model):
         # Return the list of locations
         return lst_main
 
+    def above(self):
+        return self.hierarchy(False)
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -3508,6 +3512,7 @@ class SermonDescr(models.Model):
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
     # [0-1] But most often we only start out with having just a nickname of the author
+    # NOTE: THE NICKNAME IS NO LONGER IN USE (oct/2019)
     nickname = models.ForeignKey(Nickname, null=True, blank=True, on_delete = models.SET_NULL, related_name="nickname_sermons")
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
