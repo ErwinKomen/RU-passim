@@ -68,10 +68,10 @@ table tbody tr:hover {
   cursor: pointer;*/
   /*  */
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, span.clickable:hover {
   cursor: pointer;
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbody tr td span.clickable:hover {
   background-color: lightgoldenrodyellow ;
 }
 
@@ -1159,6 +1159,17 @@ span.badge.sim-link {
 }
 span.badge.use-link {
   background-color: mediumorchid;
+}
+
+/* Badges with background color for location types */
+span.badge.loctype-city {
+  background-color: darkblue;
+}
+span.badge.loctype-country {
+  background-color: darkgreen;
+}
+span.badge.loctype-region_high {
+  background-color: darkgoldenrod;
 }
 
 a.nostyle:link, a.nostyle:visited {

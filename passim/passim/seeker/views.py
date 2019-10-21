@@ -6467,7 +6467,7 @@ class SourceEdit(BasicPart):
     """The details of one manuscript"""
 
     MainModel = SourceInfo
-    template_name = 'seeker/source_edit.html'  
+    template_name = 'seeker/source_edit.html'
     title = "SourceInfo" 
     afternewurl = ""
     # One form is attached to this 
