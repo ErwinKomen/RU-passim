@@ -174,16 +174,44 @@
               <thead><tr><th class="hidden">id</th><th>&nbsp;</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
               <tbody>
               {% for author in object_list %}
-                <tr class="dict-entry clickable"
-                    onclick="ru.passim.seeker.goto_url('{% url 'author_details' author.id %}')">
+                <tr class="dict-entry">
                   <td class="hidden"> {{ author.id }}</td>
-                  <td class="author-abbr tdnowrap" style="min-width: 100px;">{% if author.abbr %}{{author.abbr}}{% endif %}</td>
-                  <td style="width: 100%;">
-                    <span class="author-name">{{author.name}}</span>
+                  <td class="author-abbr tdnowrap" style="min-width: 100px;" >{% if author.abbr %}{{author.abbr}}{% endif %}</td>
+                  <td style="width: 100%;" class="ms editable">
+                    <span class="author-name clickable" onclick="ru.passim.seeker.goto_url('{% url 'author_details' author.id %}')">{{author.name}}</span>
+                    <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+                    {% if is_passim_editor %}
+                      <div class="delete-confirm hidden selected">
+                        <form>
+                          {% csrf_token %}
+                          <span>Are you sure you would like to delete this author?</span>
+                          <span>
+                            <!-- The button to cancel deletion -->
+                            <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                                onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                            <!-- The actual delete button-->
+                            <a mode="delete" title="Delete this author" class="btn btn-xs jumbo-3"
+                                afterurl="{% url 'author_search' %}"
+                                targetid="sermon_edit"
+                                targeturl="{% if author.id %}{% url 'author_edit' author.id %}{% endif %}">
+                              Delete
+                            </a>
+                          </span>
+                        </form>
+                      </div>
+                    {% endif %}
+
                   </td>
 
                   <!-- Short indications for this author-->
-                  <td style="min-width: 80px;">
+                  <td style="min-width: 80px;" >
+                    {% if is_passim_editor %}
+                      <!-- Put the delete button completely to the right-->
+                      <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
+                         onclick="ru.passim.seeker.delete_confirm(this);">
+                        <span class="glyphicon glyphicon-remove" title="Delete this author"></span>
+                      </a>
+                    {% endif %}
                   </td>
                 </tr>
 

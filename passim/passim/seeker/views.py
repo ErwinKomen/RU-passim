@@ -209,7 +209,7 @@ def process_visit(request, name, is_menu, **kwargs):
     # return json.dumps(p_list)
     return p_list
 
-def get_previous_page(request):
+def get_previous_page(request, top=False):
     """Find the previous page for this user"""
 
     username = "anonymous" if request.user == None else request.user.username
@@ -218,22 +218,25 @@ def get_previous_page(request):
         p_list = Profile.get_stack(username)
         if len(p_list) < 2:
             prevpage = request.META.get('HTTP_REFERER') 
+        elif top:
+            p_item = p_list[len(p_list)-1]
+            prevpage = p_item['url']
         else:
             p_item = p_list[len(p_list)-2]
             prevpage = p_item['url']
-            # Possibly add arguments
-            if 'kwargs' in p_item:
-                # First strip off any arguments (anything after ?) in the url
-                if "?" in prevpage:
-                    prevpage = prevpage.split("?")[0]
-                bFirst = True
-                for k,v in p_item['kwargs'].items():
-                    if bFirst:
-                        addsign = "?"
-                        bFirst = False
-                    else:
-                        addsign = "&"
-                    prevpage = "{}{}{}={}".format(prevpage, addsign, k, v)
+        # Possibly add arguments
+        if 'kwargs' in p_item:
+            # First strip off any arguments (anything after ?) in the url
+            if "?" in prevpage:
+                prevpage = prevpage.split("?")[0]
+            bFirst = True
+            for k,v in p_item['kwargs'].items():
+                if bFirst:
+                    addsign = "?"
+                    bFirst = False
+                else:
+                    addsign = "&"
+                prevpage = "{}{}{}={}".format(prevpage, addsign, k, v)
     else:
         prevpage = request.META.get('HTTP_REFERER') 
     # Return the path
@@ -3375,9 +3378,6 @@ class PassimDetails(DetailView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # context['prevpage'] = get_previous_page(self.request) # self.previous
 
-        # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
-
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         initial = get.copy()
@@ -3423,6 +3423,8 @@ class PassimDetails(DetailView):
                     msg = oErr.get_error_message()
                     # Create an errors object
                     context['errors'] = {'delete':  msg }
+
+                context['afterdelurl'] = get_previous_page(self.request, True)
                 # And return the complied context
                 return context
             
@@ -3510,6 +3512,9 @@ class PassimDetails(DetailView):
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
 
         # Return the calculated context
         return context
@@ -5764,6 +5769,8 @@ class AuthorEdit(PassimDetails):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
+
+        context['afterdelurl'] = get_previous_page(self.request)
         return context
 
 
@@ -5781,7 +5788,7 @@ class AuthorListView(ListView):
         context = super(AuthorListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.GET
+        initial = self.request.GET if self.request.method == "GET" else self.request.POST
         search_form = AuthorSearchForm(initial)
 
         context['searchform'] = search_form

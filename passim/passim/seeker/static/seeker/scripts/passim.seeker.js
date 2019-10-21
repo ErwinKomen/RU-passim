@@ -2008,7 +2008,7 @@ var ru = (function ($, ru) {
               afterurl = $(el).attr("afterurl");
 
               // Check if we are under a delete-confirm
-              if ($(el).closest("div[delete-confirm]").length === 0) {
+              if (!$(el).closest("div").hasClass("delete-confirm")) {
                 // Ask for confirmation
                 // NOTE: we cannot be more specific than "item", since this can be manuscript or sermongold
                 if (!confirm("Do you really want to remove this item?")) {
@@ -2226,6 +2226,10 @@ var ru = (function ($, ru) {
         try {
           // Find the [.delete-row] to be shown
           elDiv = $(el).closest("tr").find(".delete-confirm").first();
+          if (elDiv.length === 0) {
+            // Try goint to the next <tr>
+            elDiv = $(el).closest("tr").next("tr.delete-confirm");
+          }
           $(elDiv).removeClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_confirm", ex);
