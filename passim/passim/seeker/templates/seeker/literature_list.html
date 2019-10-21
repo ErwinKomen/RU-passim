@@ -8,9 +8,43 @@
 {% endblock %}
 
 {% block content %}
-
-    {% if object_list %}
+    {% if edition_list %}
       <div class="panel panel-default">
+        <h3>Edition references</h3>
+        <div class="row">
+            <div class="col-sm-3"><span>Found: </span><span>{{entrycount_edition}}</span></div>
+            <div class="col-sm-1"><span id="waitingsign" class="glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span></div>
+            <div class="col-sm-8">
+            <span class="step-links pull-right">
+
+            
+
+            </span>
+            </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <table class="table table-hover">
+              <thead><tr><th class="hidden">id</th><th>Short reference</th><th>Full reference</th><th><!-- Buttons --></th></tr></thead>
+              <tbody>
+              
+               {% for litref in edition_list %}  
+                
+                <tr class="dict-entry">
+                  <td><span class="short reference tdnowrap"><a name="{{litref.pk}}"></a>{{litref.get_short_markdown|safe}}</span></td>
+                  <td><span class="full reference">{{litref.get_full_markdown|safe}}</span></td>
+                </tr>
+
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <p>No information on sources has been found.</p>
+    {% endif %}
+    {% if object_list %}
+      
 
         <h3>Literature references</h3>
         <div class="row">
@@ -19,7 +53,7 @@
             <div class="col-sm-8">
             <span class="step-links pull-right">
 
-            {% include 'pagination.html' %}
+            
 
             </span>
             </div>
@@ -44,16 +78,11 @@
         </div>
       {% else %}
         <p>No information on sources has been found.</p>
-      {% endif %}
-
+    {% endif %}
+    
       <div class="pagination">
           <span class="step-links">
-
-          {% include 'pagination.html' %}
-
           </span>
-      </div>
-
       </div>
 
 {% endblock content %}

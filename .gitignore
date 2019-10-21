@@ -294,3 +294,6 @@ ModelManifest.xml
 /passimproject/css/bootstrap.css
 /passimproject/js/bootstrap.js
 /passimproject/js/jquery-1.10.2.js
+/passim/static/django_select2/django_select2.js
+/passim/static/seeker/scripts/like_button.js
+/passim/static/seeker/scripts/_references.js

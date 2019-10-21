@@ -1868,7 +1868,7 @@ class Litref(models.Model):
                             
                             # In other cases with editors
                             else:
-                                result = "{}, _{}_ ({}), {}, ({})".format(editors, title, series, publisher, year)
+                                result = "{}, _{}_ ({}), {}, {}".format(editors, title, series, publisher, year)
                         
                         # Fourth step: Make a full reference for a catalog (book) 
                         elif extra == "cat":
@@ -3800,6 +3800,15 @@ class LitrefSG(models.Model):
     reference = models.ForeignKey(Litref, related_name="reference_litrefs_2")
     # [1] The SermonGold to which the literature item refers
     sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_litrefs")
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+class EdirefSG(models.Model):
+    """The link between an edition item and a SermonGold"""
+    # [1] The edition item
+    reference = models.ForeignKey(Litref, related_name = "reference_edition")
+    # [1] The SermonGold to which the literature item refers
+    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_editions")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 

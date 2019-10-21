@@ -63,6 +63,19 @@ a.list-group-item-info:hover {
   background-color: lightgoldenrodyellow !important;
 }
 table tbody tr:hover {
+  /* 
+  background-color: lightblue !important;
+  cursor: pointer;*/
+  /*  */
+}
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover {
+  cursor: pointer;
+}
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover {
+  background-color: lightgoldenrodyellow ;
+}
+
+table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }
 
@@ -84,10 +97,32 @@ div.inline-group a.add-related {
     padding-right: 15px;
 }
 
+.panel-news {
+  margin-top: 5px;
+	/* margin-bottom:20px;
+	background-color:#fff;
+	-webkit-box-shadow:0 1px 1px rgba(0,0,0,0.05);
+	box-shadow:0 1px 1px rgba(0,0,0,0.05);
+    */
+	border-radius:4px;
+	border:1px solid #ddd;
+}
+
 .panel-function {
     margin-right: 10px;
     background-color: lightyellow;
     display: inline-block;
+}
+
+.panel-wide {
+    margin-left: 0px;
+    margin-right: 0px;
+    cursor: pointer; 
+}
+
+.panel-none {
+  border: 0 !important;
+  box-shadow: none;
 }
 
 /* navbar */
@@ -274,6 +309,27 @@ p {
     text-decoration-line: none;
 }
 
+/* Patch for Google Chrome */
+/* */
+.glyphicon {
+  position: relative;
+  top: 1px;
+  display: inline-block;
+  font-family: 'Glyphicons Halflings';
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.5;     /* This is the correct measure for btn-xs */
+
+  -webkit-font-smoothing: antialiased;
+  /*-moz-osx-font-smoothing: grayscale; */
+}
+
+/* If the remove glyphicon is *not* in a button, it should be aligned differently */
+a:not(.btn) span.glyphicon-remove {
+   padding-left: 5px; 
+   margin-right: -8px;
+}
+
 .glyphicon-refresh-animate {
     animation: spin .7s infinite linear;
     -webkit-animation: spin2 .7s infinite linear;
@@ -372,6 +428,17 @@ svg g.lithium-node:hover > text {
 .glyphicon-plus {
     color: mediumseagreen;
 }
+.glyphicon-remove {
+  color: red;
+}
+/*
+.glyphicon-arrow-left {
+  color: darkred;
+}*/
+.glyphicon-ok, .glyphicon-edit, .glyphicon-pencil {
+  color: green;
+}
+
 
 .result-part .row {
     margin-right: 20px;
@@ -405,6 +472,7 @@ svg g.lithium-node:hover > text {
   font-family: monospace;
   color: darkblue;
 }
+
 
 .arg-type select {
     font-size: 11px;
@@ -518,6 +586,14 @@ form .panel-heading.row {
     cursor: wait;
 }
 
+td.editable, span.editable {
+  cursor: pointer;
+}
+td.editable:hover, span.editable:hover {
+  background-color: lightyellow;
+  color: darkgreen;
+}
+
 .main-arrow {
   stroke: black;
   stroke-width: 1px;
@@ -526,14 +602,14 @@ form .panel-heading.row {
 a.jumbotron:visited {color:inherit;}
 a.jumbotron:hover {
     text-decoration: none;
-    cursor: pointer; cursor: hand;
+    cursor: pointer;
 }
 .jumbotron p {
     font-size: 12px;
 }
 
 /* Specify how a keyword should be shown */
-kw {
+.kw {
   font-family: monospace;
   color: darkblue;
   background-color: whitesmoke;
@@ -946,6 +1022,13 @@ table.result-list tr:hover {
   width: 100%;
 }
 
+tr .selected, tr.selected {
+  background-color: lightgreen;
+}
+tr .selected:hover, table tbody tr .selected td.clickable:hover, tr.selected td.clickable:hover {
+  background-color: greenyellow !important;
+}
+
 table.compact-table, 
 table.compact-table tr, 
 table.compact-table td,
@@ -1001,3 +1084,150 @@ table.compact-table td:hover {
 .sermon-nickname {
   color: darkred;
 }
+
+div.selected {
+  background-color: lightcyan;
+}
+
+/* Type ahead stuff 
+   NOTE: this is now [.tt-menu]
+.tt-dropdown-menu {
+  max-height: 150px;
+  overflow-y: auto;
+}*/
+
+.tt-menu { /* UPDATE: newer versions use tt-menu instead of tt-dropdown-menu */
+  width: 422px;
+  margin-top: 12px;
+  padding: 4px 4px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  box-shadow: 0 3px 5px rgba(0,0,0,.2);
+  /* Make sure handles appear */
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/*
+.tt-query, .tt-hint, .ttinput {
+    width: 396px;
+    height: 30px;
+    padding: 3px 4px;
+    font-size: 14px;
+    line-height: 16px;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    outline: none;
+}*/
+
+/* Not currently used */
+.tt-hint {
+    color: #999;
+}
+
+div > span.twitter-typeahead {
+  display: inherit !important;
+}
+
+/* Adapt the standard modal to my own */
+.modal-dialog {
+    width: 80%;
+    margin: 30px auto;
+  }
+.modal-header {
+  cursor: move;
+}
+
+td.hightlighted {
+  background-color: yellow;
+}
+
+/* Badges with background color for link types */
+span.badge.eqs-link {
+  background-color: darkblue;
+}
+span.badge.prt-link {
+  background-color: lightgreen;
+}
+span.badge.neq-link {
+  background-color: darkgoldenrod;
+}
+span.badge.sim-link {
+  background-color: darkgreen;
+}
+span.badge.use-link {
+  background-color: mediumorchid;
+}
+
+a.nostyle:link, a.nostyle:visited {
+    text-decoration: inherit;
+    color: inherit;
+    cursor: inherit;
+}
+
+td a.nostyle {
+  display: block;
+}
+
+.signature {
+  /* font-family: monospace; */
+  font-size: smaller;
+  color: darkblue;
+}
+
+div.view-mode a {
+  text-decoration: none;
+  color: inherit;
+}
+
+
+/* Filter switches */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 22px;
+}
+/* Hide default HTML checkbox */
+.switch input, .badge.filter input { opacity: 0; width: 0; height: 0;}
+/* Slider of the switch */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 15px;
+  width: 15px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider { background-color: #2196F3; }
+
+input:focus + .slider {  box-shadow: 0 0 1px #2196F3; }
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {   border-radius: 34px; }
+
+.slider.round:before {   border-radius: 50%; }

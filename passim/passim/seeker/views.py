@@ -40,7 +40,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
-    Basket, Litref, LitrefMan, LitrefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
 import sys, os
@@ -4451,17 +4451,23 @@ class SermonEdiset(BasicPart):
 
     def add_to_context(self, context):
 
-        # Pass on all the linked-gold editions
+        # Pass on all the linked-gold editions to the sermons
         sedi_list = []
         # Visit all linked gold sermons
         for linked in SermonDescrGold.objects.filter(sermon=self.obj, linktype=LINK_EQUAL):
             # Access the gold sermon
             gold = linked.gold
-            # Get all the editions of this gold sermon
-            for edi in gold.goldeditions.all():
-                name = edi.name
-                if name not in sedi_list:
-                    sedi_list.append({'name': name})
+            
+            # Get all the editions references of this gold sermon 
+            for item in EdirefSG.objects.filter(sermon_gold_id = gold):
+                
+                oAdd = {}
+                oAdd['reference_id'] = item.reference.id
+                oAdd['short'] = item.reference.short
+                oAdd['reference'] = item.reference
+                oAdd['pages'] = item.pages
+                sedi_list.append(oAdd)
+       
         context['sedi_list'] = sedi_list
 
         return context
@@ -4493,7 +4499,7 @@ class SermonLitset(BasicPart):
         for linked in SermonDescrGold.objects.filter(sermon=self.obj, linktype=LINK_EQUAL):
             # Access the gold sermon
             gold = linked.gold
-            # Get all the literature references of this gold sermon TH nu naar Litref SG
+            # Get all the literature references of this gold sermon 
             for item in LitrefSG.objects.filter(sermon_gold_id = gold):
                 
                 oAdd = {}
@@ -4844,6 +4850,40 @@ class ManuscriptProvset(BasicPart):
 
         return has_changed
 
+class SermonGoldEdiset(BasicPart):
+    """The set of critical text editions from one gold sermon""" 
+
+    MainModel = SermonGold
+    template_name = 'seeker/sermongold_ediset.html'
+    title = "SermonGoldEditions"
+    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
+                                         form = SermonGoldEditionForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GediFormSet, 'prefix': 'gedi', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "gedi":
+            # List the editions for this SermonGold correctly
+            qs = EdirefSG.objects.filter(sermon_gold=self.obj).order_by('reference__short')
+        return qs
+    
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        # Check if a new reference should be processed
+        litref_id = form.cleaned_data['litref']
+        if litref_id != "":
+            if instance.id == None or instance.reference == None or instance.reference.id == None or \
+                instance.reference.id != int(litref_id):
+                # Find the correct litref
+                litref = Litref.objects.filter(id=litref_id).first()
+                if litref != None:
+                    # Adapt the value of the instance 
+                    instance.reference = litref
+                    has_changed = True
+            
+        return has_changed   
 
 class ManuscriptLitset(BasicPart):
     """The set of literature references from one manuscript"""
@@ -4852,15 +4892,10 @@ class ManuscriptLitset(BasicPart):
     template_name = 'seeker/manuscript_litset.html'
     title = "ManuscriptLiterature"
     MlitFormSet = inlineformset_factory(Manuscript, LitrefMan,
-                                         form=ManuscriptLitrefForm, min_num=0,
+                                         form = ManuscriptLitrefForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False}]
-
-   #def custom_init(self):
-        # Ad-hoc: refresh literature references
-   #    Litref.sync_zotero()
-   #    return True
 
     def get_queryset(self, prefix):
         qs = None
@@ -5422,18 +5457,7 @@ class SermonGoldSignset(BasicPart):
         return context
 
 
-class SermonGoldEdiset(BasicPart):
-    """The set of critical text editions from one gold sermon"""
-
-    MainModel = SermonGold
-    template_name = 'seeker/sermongold_ediset.html'
-    title = "SermonGoldEditions"
-    GediFormSet = inlineformset_factory(SermonGold, Edition,
-                                         form=SermonGoldEditionForm, min_num=0,
-                                         fk_name = "gold",
-                                         extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GediFormSet, 'prefix': 'gedi', 'readonly': False}]
-
+# Hier moet SermonGoldEdiset weer terugkomen
 
 class SermonGoldKwset(BasicPart):
     """The set of keywords from one gold sermon"""
@@ -6425,8 +6449,8 @@ class SourceEdit(BasicPart):
         return True
 
 class LitRefListView(ListView):
-    """Listview of literature references"""
-
+    """Listview of edition and literature references"""
+       
     model = Litref
     paginate_by = 2000
     template_name = 'seeker/literature_list.html'
@@ -6439,8 +6463,10 @@ class LitRefListView(ListView):
         # Get parameters
         initial = self.request.GET
 
-        # Determine the count 
+        # Determine the count for literature references
         context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        
 
         # Set the prefix
         context['app_prefix'] = APP_PREFIX
@@ -6455,6 +6481,12 @@ class LitRefListView(ListView):
 
         # Set the title of the application
         context['title'] = "Passim literature info"
+
+        # Change name of the qs for edition references 
+        context['edition_list'] = self.get_editionset() 
+
+        # Determine the count for edition references
+        context['entrycount_edition'] = self.entrycount_edition
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
@@ -6473,7 +6505,8 @@ class LitRefListView(ListView):
         Paginate by specified value in default class property value.
         """
         return self.paginate_by
-  
+    
+    # Queryset literature references
     def get_queryset(self):
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
@@ -6491,6 +6524,25 @@ class LitRefListView(ListView):
 
         # Determine the length
         self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+    # Queryset edition references
+    def get_editionset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        # Calculate the final qs for the manuscript litrefs
+        ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
+       
+        # Sort and filter all editions
+        qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
+
+        # Determine the length
+        self.entrycount_edition = len(qs)
 
         # Return the resulting filtered and sorted queryset
         return qs

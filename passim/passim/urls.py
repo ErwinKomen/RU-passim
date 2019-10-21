@@ -102,7 +102,8 @@ urlpatterns = [
     url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
 
     url(r'^literature/list', LitRefListView.as_view(), name='literature_list'),
-    
+    # url(r'^literature/list', EdiRefListView.as_view(), name='edition_list'), TH nog hierboven kwijt
+
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),

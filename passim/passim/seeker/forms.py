@@ -478,15 +478,9 @@ class SermonGoldSignatureForm(forms.ModelForm):
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
 
+# TH: hier moet SermonGoldEditionForm weer teruggeplaatst worden.
 
-class SermonGoldEditionForm(forms.ModelForm):
-    class Meta:
-        ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-        model = Edition
-        fields = ['name', 'gold']
-        widgets={'name':     forms.TextInput(attrs={'class': 'typeahead searching editions input-sm', 'placeholder': 'Critical text edition...', 'style': 'width: 100%;'})
-                 }
 
 
 class SermonGoldKeywordForm(forms.ModelForm):
@@ -511,6 +505,41 @@ class SermonGoldKeywordForm(forms.ModelForm):
             if instance.keyword != None:
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
+
+class SermonGoldEditionForm(forms.ModelForm):
+    litref = forms.CharField(required=False)
+    litref_ta = forms.CharField(label=_("Reference"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))    
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = EdirefSG
+        fields = ['reference', 'sermon_gold', 'pages']
+        widgets={'pages':     forms.TextInput(attrs={'placeholder': 'Page range...', 'style': 'width: 100%;'})
+                 }
+        
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldEditionForm, self).__init__(*args, **kwargs)
+        self.fields['reference'].required = False
+        self.fields['litref'].required = False
+        self.fields['litref_ta'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial reference should be added
+            if instance.reference != None:
+                self.fields['litref_ta'].initial = instance.reference.get_full()
+
+    def clean(self):
+        cleaned_data = super(SermonGoldEditionForm, self).clean()
+        litref = cleaned_data.get("litref")
+        reference = cleaned_data.get("reference")
+        if reference == None and (litref == None or litref == ""):
+            #litref_ta = cleaned_data.get("litref_ta")
+            #obj = Litref.objects.filter(full=litref_ta).first()
+            #if obj == None:
+            raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
 
 class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
@@ -547,7 +576,6 @@ class SermonGoldLitrefForm(forms.ModelForm):
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
             raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
-
 
 class ManuscriptProvForm(forms.ModelForm):
     name = forms.CharField(label=_("Name"), required=False, 

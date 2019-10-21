@@ -1,17 +1,18 @@
 ﻿{% load i18n %}
 
 <div class="">
-
-    <!-- This div is updated when the sermon_linkset is saved -->
+      
     <table class="func-view" style="width: 100%;">
-      <thead>
-        <tr><th>#</th><th class="tdnowrap">Edition</th></tr>
-      </thead>
+      <thead><tr><th>#</th><th class="tdnowrap">Edition</th><th>Pages</th></tr></thead>
       <tbody>
-        {% for item in sedi_list %}
-          <tr><td>{{forloop.counter}}</td><td>{{item.name}}</td></tr>
+        {% for litref in sedi_list %}
+            <tr class="dict-entry">
+                <td>{{forloop.counter}}</td>
+                <td><span class="short reference">{{litref.reference.get_short_markdown|safe}}</span></td>
+                <td><span class="pages">{{litref.pages|default_if_none:""}}</span></td>
+            </tr>
         {% endfor %}
       </tbody>
     </table>
-
 </div>
+

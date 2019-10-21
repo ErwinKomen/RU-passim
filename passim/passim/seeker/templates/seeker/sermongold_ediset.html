@@ -1,77 +1,84 @@
 ﻿{% load i18n %}
 
-<div id="gedi_formset" >
-  <form action="">
-    {% csrf_token %}
-    <!-- Need to have the management stuff for 'gedi' -->
-    {{ gedi_formset.management_form }}
+<div id="gedi_formset" class="row">
 
-    <div class="">
-      {% if not is_passim_editor and gedi_formset|length == 0 %}
-        <p>No critical editions defined for this gold sermon</p>
-      {% else %}
-        <!-- Table of critical editions for the current gold sermon -->
-        <table class="func-view" style="width: 100%;">
-          <thead>
-            <tr><th colspan="2">#</th><th class="tdnowrap">Edition</th><th>&nbsp;</th></tr>
-          </thead>
-          <tbody>
-            {% for ediform in gedi_formset %}
-              {% if ediform.instance.editype == item.type %}
+  <div id="gedi_formset_main">
+    <form action="">
+      {% csrf_token %}
+      <!-- Need to have the management stuff for 'gedi' -->
+      {{ gedi_formset.management_form }}
+
+      <div class="col-md-12">
+        {% if not is_passim_editor and gedi_formset|length == 0 %}
+          <p>No critical editions defined for this gold sermon</p>
+        {% else %}
+          <!-- Table of critical editions for the current gold sermon -->
+          <table class="func-view" style="width: 100%;">
+            <thead>
+              <tr><th colspan="2">#</th><th class="tdnowrap">Edition</th><th>Pages</th><th>&nbsp;</th></tr>
+            </thead>
+            <tbody>
+              {% for litrform in gedi_formset %}
                 <tr class="form-row">
-                  <!-- A 1-based counter for the forms in this set-->
-                  <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
+                    <!-- A 1-based counter for the forms in this set-->
+                    <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
 
-                  <!-- Hidden but essential: the id of this edition -->
-                  <td class="hidden">{{ediform.id}}</td>
+                    <!-- Hidden but essential: the id of this edition -->
+                    <td class="hidden">{{litrform.id}}</td>
 
-                  <!-- A button to edit or save this edition -->
-                  <td valign="top" class="clickable"  style="min-width: 20px;">
-                    {% if is_passim_editor %}
-                      <div class="view-mode">
-                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this edition">
-                          <span class="glyphicon glyphicon-pencil"></span>
-                        </a>
-                      </div>
-                      <div class="edit-mode hidden">
-                        <a title="Save changes to this edition"
+                    <!-- A button to edit or save this edition -->
+                    <td valign="top" class="clickable"  style="min-width: 20px;">
+                      {% if is_passim_editor %}
+                        <div class="view-mode">
+                          <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this edition">
+                            <span class="glyphicon glyphicon-pencil"></span>
+                          </a>
+                        </div>
+                        <div class="edit-mode hidden">
+                          <a title="Save changes to this edition"
                             onclick="ru.passim.seeker.formset_update(this);"
                             targetid="sermongold_ediset"
                             targeturl="{% url 'gold_ediset' pk=object_id %}">
-                          <span class="glyphicon glyphicon-ok"></span>
-                        </a>
-                      </div>
-                    {% endif %}
+                           <span class="glyphicon glyphicon-ok"></span>
+                          </a>
+                        </div>
+                      {% endif %}
                   </td>
 
-                  <!-- The edition -->
+                  <!-- The reference of the edition -->
                   <td  style="width: 100%;">
-                    <div class="view-mode">{{ediform.name.value}}</div>
-                    <div class="edit-mode hidden">{{ediform.name}}</div>
-
-                    <!-- Confirmation of delete -->
-                    {% if is_passim_editor %}
-                      <div class="delete-confirm hidden">
-                        <span>Do you really want to delete this edition?</span>
-                        <span>
-                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
-                        </span>
-                        <span class="hidden">{{ediform.DELETE}}</span>
-                        <span>
-                          <a class="btn btn-xs jumbo-4" 
-                              onclick="ru.passim.seeker.formset_update(this, 'delete');"
-                              targetid="sermongold_ediset"
-                              targeturl="{% url 'gold_ediset' pk=object_id %}">Delete</a>
-                        </span>
+                      <div class="hidden">
+                        <input name="gedi-{{forloop.counter0}}-sermon_gold" value="{{litrform.instance.sermon_gold.id}}" />
+                        <input name="gedi-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                       </div>
-                    {% endif %}
-                  </td>
+                      <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
 
-                  <!-- The gold target -->
-                  <td class="hidden">
-                    <input id="id_gedi-{{forloop.counter0}}-gold" name="gedi-{{forloop.counter0}}-gold" value="{{ediform.instance.gold.id}}" />
+                      <div class="litref-key hidden">{{litrform.litref}}</div>
+                      <div class="edit-mode hidden">{{litrform.litref_ta}}</div>                    
+                      <!-- Confirmation of delete -->
+                      {% if is_passim_editor %}
+                        <div class="delete-confirm hidden">
+                          <span>Do you really want to delete this edition?</span>
+                          <span>
+                            <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                          </span>
+                          <span class="hidden">{{ediform.DELETE}}</span>
+                          <span>
+                            <a class="btn btn-xs jumbo-4" 
+                                onclick="ru.passim.seeker.formset_update(this, 'delete');"
+                                targetid="sermongold_ediset"
+                                targeturl="{% url 'gold_ediset' pk=object_id %}">Delete</a>
+                          </span>
+                        </div>
+                      {% endif %}
                   </td>
-
+                  
+                  <!-- The specific set of pages of the edition reference -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode">{{litrform.instance.pages|default_if_none:""}}</div>
+                    <div class="edit-mode hidden">{{litrform.pages}}</div>
+                  </td>   
+                  
                   <!-- A delete button -->
                   <td title="Delete this edition" style="vertical-align: middle; width: 20px; " class="clickable">
                     {% if is_passim_editor %}
@@ -79,74 +86,80 @@
                     {% endif %}
                   </td>
                 </tr>
-              {% endif %}
+               
+              {% endfor %}
 
-            {% endfor %}
+              {% if is_passim_editor %}
+                <!-- Empty row with specifications -->
+                <tr class="form-row empty-form">
+                  <!-- A 1-based counter for the forms in this set-->
+                  <td style="min-width: 20px;"><span>__counter__</span></td>
 
-            {% if is_passim_editor %}
-              <!-- Empty row with specifications -->
-              <tr class="form-row empty-form">
-                <!-- A 1-based counter for the forms in this set-->
-                <td style="min-width: 20px;"><span>__counter__</span></td>
-
-                <!-- A button to edit or save this edition -->
-                <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
-                  <div class="view-mode hidden">
-                    <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this edition">
-                      <span class="glyphicon glyphicon-pencil"></span>
-                    </a>
-                  </div>
-                  <div class="edit-mode">
-                    <a title="Save changes to this edition"
-                        onclick="ru.passim.seeker.formset_update(this);"
-                        targetid="sermongold_ediset"
-                        targeturl="{% url 'gold_ediset' pk=object_id %}">
+                  <!-- A button to edit or save this edition -->
+                  <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                    <div class="view-mode hidden">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this edition">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                      </a>
+                    </div>
+                    <div class="edit-mode">
+                      <a title="Save changes to this edition"
+                          onclick="ru.passim.seeker.formset_update(this);"
+                          targetid="sermongold_ediset"
+                          targeturl="{% url 'gold_ediset' pk=object_id %}">
                       <span class="glyphicon glyphicon-ok"></span>
-                    </a>
-                  </div>
-                </td>
+                      </a>
+                    </div>
+                  </td>
 
-                <!-- The edition -->
-                <td  style="width: 100%;">
-                  <div class="view-mode hidden">{{gedi_formset.empty_form.name.value}}</div>
-                  <div class="edit-mode">{{gedi_formset.empty_form.name}}</div>
-                  <!-- Confirmation of delete -->
-                  <div class="delete-confirm hidden">
-                    <span>Do you really want to delete this edition?</span>
-                    <span>
-                      <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                  <!-- The edition itself --> 
+                  <td  style="width: 100%;">
+                      <div class="hidden">
+                        <input id="id_gedi-__counter__-reference" name="gedi-__counter__-reference" />
+                        <input id="id_gedi-__counter__-sermon_gold" name="gedi-__counter__-sermon_gold" value="{{litrform.instance.sermon_gold.id}}" />
+                      </div>
+                      <div class="view-mode hidden">{% if gedi_formset.empty_form.instance.reference %}{{gedi_formset.empty_form.instance.reference.get_full_markdown}}{% else %}-{% endif %}</div>
+                      <div class="litref-key hidden">{{gedi_formset.empty_form.litref}}</div>
+                      <div class="edit-mode">{{gedi_formset.empty_form.litref_ta}}</div>
+                      <!-- Confirmation of delete -->
+                      <div class="delete-confirm hidden">
+                        <span>Do you really want to delete this edition?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                        </span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4 delete-row" extra="gedi">Delete</a>
+                        </span>
+                      </div>
+                  </td>
+                  
+                  <!-- The specific set of pages of the edition  -->
+                  <td  style="min-width: 150px;">
+                    <div class="view-mode hidden">-</div>
+                    <div class="edit-mode">{{gedi_formset.empty_form.pages}}</div>
+                  </td>
+
+                  <!-- A delete button -->
+                  <td title="Delete this edition" style="vertical-align: middle; width: 20px; " class="clickable">
+                    <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                  </td>
+                </tr>
+
+                <!-- Add row -->
+                <tr class="add-row">
+                  <td colspan="5">
+                    <span id="add_gold_edition">
+                      <a href="#" title="Add an edition to this gold sermon"><span class="glyphicon glyphicon-plus">&nbsp;</span>Edition</a>
                     </span>
-                    <span>
-                      <a class="btn btn-xs jumbo-4 delete-row" extra="gedi">Delete</a>
-                    </span>
-                  </div>
-                </td>
-
-                <!-- The gold target -->
-                <td class="hidden" defaultvalue="{{object_id}}">
-                  <input id="id_gedi-__counter__-gold" name="gedi-__counter__-gold"  />
-                </td>
-
-                <!-- A delete button -->
-                <td title="Delete this edition" style="vertical-align: middle; width: 20px; " class="clickable">
-                  <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-                </td>
-              </tr>
-
-              <!-- Add row -->
-              <tr class="add-row">
-                <td colspan="5">
-                  <span id="add_gold_edition">
-                    <a href="#" title="Add an edition to this gold sermon"><span class="glyphicon glyphicon-plus">&nbsp;</span>Edition</a>
-                  </span>
-                </td>
-              </tr>
-            {% endif %}
-          </tbody>
-        </table>
-      {% endif %}
-    </div>
-
-    <div id="error_location"></div>
-  </form>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        {% endif %}
+      
+        <div id="error_location"></div>
+       </div>
+    </form>
+  </div>
 </div>
