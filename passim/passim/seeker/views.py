@@ -4519,6 +4519,7 @@ class SermonEdiset(BasicPart):
 
         return context
 
+
 class SermonLitset(BasicPart):
     """The set of literature references from SermonGold(s) and Manuscript passed over to each Sermon"""
 
@@ -4589,6 +4590,7 @@ class SermonLitset(BasicPart):
         context['lref_list'] = litref_list
        
         return context
+
 
 class ManuscriptDetails(PassimDetails):
     """Editable manuscript details"""
@@ -4897,6 +4899,7 @@ class ManuscriptProvset(BasicPart):
 
         return has_changed
 
+
 class SermonGoldEdiset(BasicPart):
     """The set of critical text editions from one gold sermon""" 
 
@@ -4930,7 +4933,8 @@ class SermonGoldEdiset(BasicPart):
                     instance.reference = litref
                     has_changed = True
             
-        return has_changed   
+        return has_changed  
+     
 
 class ManuscriptLitset(BasicPart):
     """The set of literature references from one manuscript"""
@@ -5504,8 +5508,6 @@ class SermonGoldSignset(BasicPart):
         return context
 
 
-# Hier moet SermonGoldEdiset weer terugkomen
-
 class SermonGoldKwset(BasicPart):
     """The set of keywords from one gold sermon"""
 
@@ -5711,6 +5713,7 @@ class SermonGoldEdit(PassimDetails):
 
         return context
 
+
 class SermonGoldLitset(BasicPart):
     """The set of literature references from one SermonGold"""
 
@@ -5744,6 +5747,7 @@ class SermonGoldLitset(BasicPart):
                     has_changed = True
             
         return has_changed
+
 
 class AuthorDetails(PassimDetails):
     """The details of one author"""
@@ -6496,6 +6500,7 @@ class SourceEdit(BasicPart):
 
         # There's is no real return value needed here 
         return True
+
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""
