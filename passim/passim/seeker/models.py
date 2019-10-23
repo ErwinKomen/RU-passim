@@ -3813,6 +3813,7 @@ class LitrefSG(models.Model):
 
 class EdirefSG(models.Model):
     """The link between an edition item and a SermonGold"""
+
     # [1] The edition item
     reference = models.ForeignKey(Litref, related_name = "reference_edition")
     # [1] The SermonGold to which the literature item refers

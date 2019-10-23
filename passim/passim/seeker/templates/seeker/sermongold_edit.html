@@ -41,7 +41,7 @@
           <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" 
              targetid="" oldtargetid="sermon_edit"
              targeturl="{% if goldForm.instance.id %}{% url 'gold_edit' goldForm.instance.id %}{% endif %}">
-            <span class="glyphicon glyphicon-remove" title="Delete this sermon"></span>
+            <span class="glyphicon glyphicon-remove" title="Delete this gold sermon"></span>
           </a>
           {% endif %}
         </td>
@@ -115,6 +115,7 @@
       </tr>
 
       <!-- Edition(s) -->
+      <!-- NOTE: this has been surpassed by EdirefSG, so the code below should be removed in due course -->
       <tr class="edit-new hidden">
         <td class="hoverable" valign="top">Edition(s)</td>
         <td valign="top">

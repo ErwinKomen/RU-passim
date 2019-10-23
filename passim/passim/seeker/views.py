@@ -3365,6 +3365,10 @@ class PassimDetails(DetailView):
         """Action to be performed after saving an item preliminarily, and before saving completely"""
         return True, "" 
 
+    def after_save(self, form, instance):
+        """Actions to be performed after saving"""
+        return True, "" 
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
         return context
@@ -3435,6 +3439,10 @@ class PassimDetails(DetailView):
                     context['errors'] = {'delete':  msg }
 
                 context['afterdelurl'] = get_previous_page(self.request, True)
+
+                # Possibly add to context by the calling function
+                context = self.add_to_context(context, instance)
+
                 # And return the complied context
                 return context
             
@@ -3445,6 +3453,7 @@ class PassimDetails(DetailView):
                 # Saving a new item
                 frm = mForm(initial, prefix=prefix)
                 bNew = True
+                self.add = True
             else:
                 # Editing an existing one
                 frm = mForm(initial, prefix=prefix, instance=instance)
@@ -3466,6 +3475,9 @@ class PassimDetails(DetailView):
                     if frm.changed_data != None:
                         details['changes'] = action_model_changes(frm, instance)
                     Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
+
+                    # Any action(s) after saving
+                    bResult, msg = self.after_save(frm, instance)
                 else:
                     context['errors'] = {'save': msg }
             else:
@@ -5611,6 +5623,16 @@ class SermonGoldDetails(PassimDetails):
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         # self.afternewurl = reverse('search_gold')
+
+        if instance.equal == None:
+            # Create a new equality set to which we add this Gold sermon
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
+        # Make sure we do a page redirect
+        self.newRedirect = True
+        self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
+
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -5674,9 +5696,10 @@ class SermonGoldEdit(PassimDetails):
         self.afternewurl = reverse('search_gold')
 
         # Create a new equality set to which we add this Gold sermon
-        geq = EqualGold.objects.create()
-        instance.equal = geq
-        instance.save()
+        if instance.equal == None:
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
 
         # Get the list of signatures
         signatures = form.cleaned_data['signature'].strip()
@@ -5691,11 +5714,13 @@ class SermonGoldEdit(PassimDetails):
                 obj = Signature(code=sigcode, editype=editype, gold=instance)
                 obj.save()
 
-        # Get the list of editions
-        edi_list = form.cleaned_data['editionlist']
-        # Copy these editions and link those copies to the Gold Sermon instance
-        for edi in edi_list:
-            edi_copy = Edition.objects.create(name=edi.name, gold=instance)
+        # EXTINCT: use EdirefSG instead!!
+        # -------------------------------
+        ## Get the list of editions
+        #edi_list = form.cleaned_data['editionlist']
+        ## Copy these editions and link those copies to the Gold Sermon instance
+        #for edi in edi_list:
+        #    edi_copy = Edition.objects.create(name=edi.name, gold=instance)
 
         # Get the list of keywords
         keywords = form.cleaned_data['keyword'].strip()
@@ -5718,12 +5743,29 @@ class SermonGoldEdit(PassimDetails):
         # Return positively
         return True, "" 
 
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Nothing here yet
+            pass
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        # Check if editions have been added
 
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon edit", False)
         context['prevpage'] = get_previous_page(self.request)
+
+        context['afterdelurl'] = reverse('search_gold')
 
         return context
 
