@@ -215,7 +215,7 @@
                   <td class="tdnowrap">
                     {% if author.author_goldsermons.count %}
                       <span class="badge jumbo-2" title="linked gold sermons" >
-                        <a href="{% url 'search_gold' %}?author={{author.id}}">
+                        <a href="{% url 'search_gold' %}?gold-author={{author.id}}">
                         {{author.author_goldsermons.count}}
                         </a>
                       </span>
@@ -223,7 +223,7 @@
 
                     {% if author.author_sermons.count %}
                       <span class="badge jumbo-1" title="linked sermon descriptions" >
-                        <a href="{% url 'sermon_list' %}?author={{author.id}}">
+                        <a href="{% url 'sermon_list' %}?sermo-author={{author.id}}">
                         {{author.author_sermons.count}}
                           </a>
                       </span>

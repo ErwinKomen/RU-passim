@@ -3582,7 +3582,7 @@ class SermonDescr(models.Model):
             sAuthor = self.nickname.name
         else:
             sAuthor = "-"
-        sSignature = "{}/{}".formate(sAuthor,self.locus)
+        sSignature = "{}/{}".format(sAuthor,self.locus)
         return sSignature
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):

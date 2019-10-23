@@ -516,6 +516,7 @@ def search_sermon(filters, qd):
     qs = None
     oErr = ErrHandle()
     bFilter = False
+    sermoForm = None
     try:
         def enable_filter(filter_id, head_id=None):
             for item in filters:
@@ -548,14 +549,23 @@ def search_sermon(filters, qd):
 
                 # Process the criteria from this form 
                 oFields = sermoForm.cleaned_data
-
+                
                 # Check for author name -- which is in the typeahead parameter
                 auth_q = ""
                 if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
                     enable_filter("author")
                     # lstQ.append(Q(author=val))
-                    auth_q = Q(Author=val)
+                    auth_q = Q(author=val)
+                elif 'author' in oFields and oFields['author'] != None:
+                    val = oFields['author']
+                    # Do *NOT* enable the filter, because this option comes from elsewhere
+                    enable_filter("author")
+                    #sermoForm['authorname'].initial = val.name
+                    #sermoForm.initial['authorname'] = val.name
+                    qd['sermo-authorname'] = val.name
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(author=val)
                 elif has_string_value('authorname', oFields): 
                     val = oFields['authorname']
                     enable_filter("author")
@@ -716,7 +726,7 @@ def search_sermon(filters, qd):
         qs = None
         bFilter = False
     # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs
+    return filters, bFilter, qs, qd
 
 def search_collection(request):
     """Search for a collection"""
@@ -4195,13 +4205,17 @@ class SermonListView(ListView):
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
     filters = SERMON_SEARCH_FILTERS
+    initial = None
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(SermonListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.POST if self.request.POST else self.request.GET
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
 
         # Add a form that defines search criteria for a sermon
         # If there was a previous form, then its values are in 'initial', and they are taken over
@@ -4209,7 +4223,7 @@ class SermonListView(ListView):
         context['sermoForm'] = SermonForm(initial, prefix=prefix)
         # Make sure we evaluate the form, to get cleaned_data
         bFormOkay = context['sermoForm'].is_valid()
-
+        
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
 
@@ -4309,8 +4323,8 @@ class SermonListView(ListView):
             qs = profile.basketitems.all()
         else:
             # Show the contents of the filters
-            self.filters, self.bFilter, qs = search_sermon(self.filters, self.qd)
-
+            self.filters, self.bFilter, qs, self.initial = search_sermon(self.filters, self.qd)
+        
         # Do sorting: Start with an initial order
         order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
         bAscending = True
@@ -4381,7 +4395,7 @@ class BasketUpdate(BasicPart):
         if profile != None:
 
             # Get the queryset
-            self.filters, self.bFilter, qs =  search_sermon(self.filters, self.qd)
+            self.filters, self.bFilter, qs, ini =  search_sermon(self.filters, self.qd)
 
             # Action depends on the operation specified
             if operation == "create":

@@ -174,6 +174,13 @@ class LitrefAdmin(admin.ModelAdmin):
     list_filter = ['itemid']
 
 
+class SermonDescrAdmin(admin.ModelAdmin):
+    """SermonDescr"""
+
+    list_display = ['id', 'siglist', 'title', 'author']
+    search_fields = ['id', 'siglist']
+
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -191,6 +198,8 @@ admin.site.register(Location, LocationAdmin)
 admin.site.register(SourceInfo, SourceInfoAdmin)
 admin.site.register(Litref, LitrefAdmin)
 admin.site.register(LitrefMan)
+admin.site.register(SermonDescr, SermonDescrAdmin)
+admin.site.register(SermonGold)
 
 admin.site.register(Report, ReportAdmin)
 
