@@ -8,8 +8,9 @@
         {% for litref in sedi_list %}
             <tr class="dict-entry">
                 <td>{{forloop.counter}}</td>
-                <td><span class="short reference">{{litref.reference.get_short_markdown|safe}}</span></td>
+                <td><span class="short reference"><a href="{% url 'literature_list' %}#edi_{{litref.reference.pk}}">{{litref.reference.get_short_markdown|safe}}</a></span></td>
                 <td><span class="pages">{{litref.pages|default_if_none:""}}</span></td>
+             
             </tr>
         {% endfor %}
       </tbody>

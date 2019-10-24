@@ -1,8 +1,8 @@
 ﻿{% load i18n %}
 
-<div id="mlit_formset" class="panel panel-wide panel-default">
+<div id="mlit_formset" class="row">
 
-  <div class="row" id="mlit_formset_main">
+  <div id="mlit_formset_main">
     <form action="">
       {% csrf_token %}
       <!-- Need to have the management stuff for 'mlit' -->
@@ -50,7 +50,7 @@
                       <input name="mlit-{{forloop.counter0}}-manuscript" value="{{litrform.instance.manuscript.id}}" />
                       <input name="mlit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                     </div>
-                    <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
+                    <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#lit_{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
                     
                     <div class="litref-key hidden">{{litrform.litref}}</div>
                     <div class="edit-mode hidden">{{litrform.litref_ta}}</div>

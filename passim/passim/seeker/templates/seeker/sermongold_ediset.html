@@ -51,7 +51,7 @@
                         <input name="gedi-{{forloop.counter0}}-sermon_gold" value="{{litrform.instance.sermon_gold.id}}" />
                         <input name="gedi-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                       </div>
-                      <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
+                      <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#edi_{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
 
                       <div class="litref-key hidden">{{litrform.litref}}</div>
                       <div class="edit-mode hidden">{{litrform.litref_ta}}</div>                    
@@ -62,7 +62,7 @@
                           <span>
                             <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                           </span>
-                          <span class="hidden">{{ediform.DELETE}}</span>
+                          <span class="hidden">{{litrform.DELETE}}</span>
                           <span>
                             <a class="btn btn-xs jumbo-4" 
                                 onclick="ru.passim.seeker.formset_update(this, 'delete');"
@@ -118,7 +118,7 @@
                         <input id="id_gedi-__counter__-reference" name="gedi-__counter__-reference" />
                         <input id="id_gedi-__counter__-sermon_gold" name="gedi-__counter__-sermon_gold" value="{{litrform.instance.sermon_gold.id}}" />
                       </div>
-                      <div class="view-mode hidden">{% if gedi_formset.empty_form.instance.reference %}{{gedi_formset.empty_form.instance.reference.get_full_markdown}}{% else %}-{% endif %}</div>
+                      <div class="view-mode hidden">{% if gedi_formset.empty_form.instance.reference %}{{gedi_formset.empty_form.instance.reference.get_full_markdown}}{% else %}-{% endif %}</div> 
                       <div class="litref-key hidden">{{gedi_formset.empty_form.litref}}</div>
                       <div class="edit-mode">{{gedi_formset.empty_form.litref_ta}}</div>
                       <!-- Confirmation of delete -->

@@ -49,7 +49,7 @@
                     <input name="sglit-{{forloop.counter0}}-sermon_gold" value="{{litrform.instance.sermon_gold.id}}" />
                     <input name="sglit-{{forloop.counter0}}-reference" value="{{litrform.instance.reference.id}}" />
                   </div>
-                  <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
+                  <div class="view-mode">{% if litrform.instance.reference %}<a href="{% url 'literature_list' %}#lit_{{litrform.instance.reference.pk}}">{{litrform.instance.reference.get_short_markdown|safe}}</a>{% else %}-{% endif %}</div>
                     
                   <div class="litref-key hidden">{{litrform.litref}}</div>
                   <div class="edit-mode hidden">{{litrform.litref_ta}}</div>

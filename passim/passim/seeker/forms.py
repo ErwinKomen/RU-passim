@@ -504,7 +504,7 @@ class SermonGoldEditionForm(forms.ModelForm):
             instance = kwargs['instance']
             # Check if the initial reference should be added
             if instance.reference != None:
-                self.fields['litref_ta'].initial = instance.reference.get_full()
+                self.fields['litref_ta'].initial = instance.reference.get_short() # TH hier aanpassen? 
 
     def clean(self):
         cleaned_data = super(SermonGoldEditionForm, self).clean()

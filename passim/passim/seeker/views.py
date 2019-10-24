@@ -1772,7 +1772,7 @@ def get_litrefs(request):
         try:
             sName = request.GET.get('name', '')
             lstQ = []
-            lstQ.append(Q(full__icontains=sName))
+            lstQ.append(Q(full__icontains=sName)|Q(short__icontains=sName))
             litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'id')
             results = []
             for co in litrefs:
