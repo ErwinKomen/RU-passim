@@ -1207,6 +1207,7 @@ class Location(models.Model):
 
     def above(self):
         return self.hierarchy(False)
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -3581,7 +3582,7 @@ class SermonDescr(models.Model):
             sAuthor = self.nickname.name
         else:
             sAuthor = "-"
-        sSignature = "{}/{}".formate(sAuthor,self.locus)
+        sSignature = "{}/{}".format(sAuthor,self.locus)
         return sSignature
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
@@ -3798,6 +3799,7 @@ class LitrefMan(models.Model):
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
+
 class LitrefSG(models.Model):
     """The link between a literature item and a SermonGold"""
     
@@ -3808,14 +3810,17 @@ class LitrefSG(models.Model):
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
+
 class EdirefSG(models.Model):
     """The link between an edition item and a SermonGold"""
+
     # [1] The edition item
     reference = models.ForeignKey(Litref, related_name = "reference_edition")
     # [1] The SermonGold to which the literature item refers
     sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_editions")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
 
 class NewsItem(models.Model):
     """A news-item that can be displayed for a limited time"""

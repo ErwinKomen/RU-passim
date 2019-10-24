@@ -130,29 +130,26 @@
         <!-- List tab -->
         <div class="" id="tab_list">
           <div class="panel panel-default">
-            <form>
+            <!-- <form> -->
               <h3>
                 <span>Gold sermons</span>
                 {% if is_passim_editor %}
                   <span id="add_sermongold" class="pull-right">
                       {% csrf_token %}
                       <a class="btn btn-xs jumbo-3" role="button" 
-                          targeturl="{% url 'gold_edit' %}"
-                          targetid="sermongold_new"
-                          onclick="ru.passim.seeker.manu_edit(this, 'new');">
+                         onclick="document.getElementById('create_new_gold').submit();" >
                         <span class="glyphicon glyphicon-plus"></span>Add a gold sermon
                       </a>
                   </span>
                 {% endif %}
               </h3>
-            </form>
+            <!-- </form> -->
 
-            <div class="row subform">
-              <div class="col-md-offset-1 col-md-10">
-                <div id="sermongold_new">
-                  <!-- Room to create a new sermongold instance-->
-                </div>
-              </div>
+            <!-- Room to have the form-link to create a new sermon for this manuscript -->
+            <div class="hidden" >
+              <form action="{% url 'gold_details' %}" method="post" id="create_new_gold">
+                {% csrf_token %}
+              </form>
             </div>
 
             {% if object_list %}

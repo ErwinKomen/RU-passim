@@ -171,7 +171,15 @@
         <div class="row">
           <div class="col-md-12">
             <table class="table table-hover">
-              <thead><tr><th class="hidden">id</th><th>&nbsp;</th><th>Author name</th><th><!-- Buttons --></th></tr></thead>
+              <thead>
+                <tr>
+                  <th class="hidden">id</th>
+                  <th>&nbsp;</th>
+                  <th>Author name</th>
+                  <th title="Number of links from Sermon Descriptions and Gold Sermons">Links</th>
+                  <th><!-- Buttons --></th>
+                </tr>
+              </thead>
               <tbody>
               {% for author in object_list %}
                 <tr class="dict-entry">
@@ -201,6 +209,25 @@
                       </div>
                     {% endif %}
 
+                  </td>
+
+                  <!-- Number of links from sermon description and gold sermons -->
+                  <td class="tdnowrap">
+                    {% if author.author_goldsermons.count %}
+                      <span class="badge jumbo-2" title="linked gold sermons" >
+                        <a href="{% url 'search_gold' %}?gold-author={{author.id}}">
+                        {{author.author_goldsermons.count}}
+                        </a>
+                      </span>
+                    {% endif %}
+
+                    {% if author.author_sermons.count %}
+                      <span class="badge jumbo-1" title="linked sermon descriptions" >
+                        <a href="{% url 'sermon_list' %}?sermo-author={{author.id}}">
+                        {{author.author_sermons.count}}
+                          </a>
+                      </span>
+                    {% endif %}
                   </td>
 
                   <!-- Short indications for this author-->

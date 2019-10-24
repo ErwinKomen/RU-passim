@@ -516,6 +516,7 @@ def search_sermon(filters, qd):
     qs = None
     oErr = ErrHandle()
     bFilter = False
+    sermoForm = None
     try:
         def enable_filter(filter_id, head_id=None):
             for item in filters:
@@ -548,14 +549,23 @@ def search_sermon(filters, qd):
 
                 # Process the criteria from this form 
                 oFields = sermoForm.cleaned_data
-
+                
                 # Check for author name -- which is in the typeahead parameter
                 auth_q = ""
                 if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
                     enable_filter("author")
                     # lstQ.append(Q(author=val))
-                    auth_q = Q(Author=val)
+                    auth_q = Q(author=val)
+                elif 'author' in oFields and oFields['author'] != None:
+                    val = oFields['author']
+                    # Do *NOT* enable the filter, because this option comes from elsewhere
+                    enable_filter("author")
+                    #sermoForm['authorname'].initial = val.name
+                    #sermoForm.initial['authorname'] = val.name
+                    qd['sermo-authorname'] = val.name
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(author=val)
                 elif has_string_value('authorname', oFields): 
                     val = oFields['authorname']
                     enable_filter("author")
@@ -716,7 +726,7 @@ def search_sermon(filters, qd):
         qs = None
         bFilter = False
     # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs
+    return filters, bFilter, qs, qd
 
 def search_collection(request):
     """Search for a collection"""
@@ -3355,6 +3365,10 @@ class PassimDetails(DetailView):
         """Action to be performed after saving an item preliminarily, and before saving completely"""
         return True, "" 
 
+    def after_save(self, form, instance):
+        """Actions to be performed after saving"""
+        return True, "" 
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
         return context
@@ -3425,6 +3439,10 @@ class PassimDetails(DetailView):
                     context['errors'] = {'delete':  msg }
 
                 context['afterdelurl'] = get_previous_page(self.request, True)
+
+                # Possibly add to context by the calling function
+                context = self.add_to_context(context, instance)
+
                 # And return the complied context
                 return context
             
@@ -3435,6 +3453,7 @@ class PassimDetails(DetailView):
                 # Saving a new item
                 frm = mForm(initial, prefix=prefix)
                 bNew = True
+                self.add = True
             else:
                 # Editing an existing one
                 frm = mForm(initial, prefix=prefix, instance=instance)
@@ -3456,6 +3475,9 @@ class PassimDetails(DetailView):
                     if frm.changed_data != None:
                         details['changes'] = action_model_changes(frm, instance)
                     Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
+
+                    # Any action(s) after saving
+                    bResult, msg = self.after_save(frm, instance)
                 else:
                     context['errors'] = {'save': msg }
             else:
@@ -4195,13 +4217,17 @@ class SermonListView(ListView):
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
     filters = SERMON_SEARCH_FILTERS
+    initial = None
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(SermonListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.POST if self.request.POST else self.request.GET
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
 
         # Add a form that defines search criteria for a sermon
         # If there was a previous form, then its values are in 'initial', and they are taken over
@@ -4209,7 +4235,7 @@ class SermonListView(ListView):
         context['sermoForm'] = SermonForm(initial, prefix=prefix)
         # Make sure we evaluate the form, to get cleaned_data
         bFormOkay = context['sermoForm'].is_valid()
-
+        
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
 
@@ -4309,8 +4335,8 @@ class SermonListView(ListView):
             qs = profile.basketitems.all()
         else:
             # Show the contents of the filters
-            self.filters, self.bFilter, qs = search_sermon(self.filters, self.qd)
-
+            self.filters, self.bFilter, qs, self.initial = search_sermon(self.filters, self.qd)
+        
         # Do sorting: Start with an initial order
         order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
         bAscending = True
@@ -4381,7 +4407,7 @@ class BasketUpdate(BasicPart):
         if profile != None:
 
             # Get the queryset
-            self.filters, self.bFilter, qs =  search_sermon(self.filters, self.qd)
+            self.filters, self.bFilter, qs, ini =  search_sermon(self.filters, self.qd)
 
             # Action depends on the operation specified
             if operation == "create":
@@ -4519,6 +4545,7 @@ class SermonEdiset(BasicPart):
 
         return context
 
+
 class SermonLitset(BasicPart):
     """The set of literature references from SermonGold(s) and Manuscript passed over to each Sermon"""
 
@@ -4589,6 +4616,7 @@ class SermonLitset(BasicPart):
         context['lref_list'] = litref_list
        
         return context
+
 
 class ManuscriptDetails(PassimDetails):
     """Editable manuscript details"""
@@ -4897,6 +4925,7 @@ class ManuscriptProvset(BasicPart):
 
         return has_changed
 
+
 class SermonGoldEdiset(BasicPart):
     """The set of critical text editions from one gold sermon""" 
 
@@ -4930,7 +4959,8 @@ class SermonGoldEdiset(BasicPart):
                     instance.reference = litref
                     has_changed = True
             
-        return has_changed   
+        return has_changed  
+     
 
 class ManuscriptLitset(BasicPart):
     """The set of literature references from one manuscript"""
@@ -5504,8 +5534,6 @@ class SermonGoldSignset(BasicPart):
         return context
 
 
-# Hier moet SermonGoldEdiset weer terugkomen
-
 class SermonGoldKwset(BasicPart):
     """The set of keywords from one gold sermon"""
 
@@ -5595,6 +5623,16 @@ class SermonGoldDetails(PassimDetails):
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         # self.afternewurl = reverse('search_gold')
+
+        if instance.equal == None:
+            # Create a new equality set to which we add this Gold sermon
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
+        # Make sure we do a page redirect
+        self.newRedirect = True
+        self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
+
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -5658,9 +5696,10 @@ class SermonGoldEdit(PassimDetails):
         self.afternewurl = reverse('search_gold')
 
         # Create a new equality set to which we add this Gold sermon
-        geq = EqualGold.objects.create()
-        instance.equal = geq
-        instance.save()
+        if instance.equal == None:
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
 
         # Get the list of signatures
         signatures = form.cleaned_data['signature'].strip()
@@ -5675,11 +5714,13 @@ class SermonGoldEdit(PassimDetails):
                 obj = Signature(code=sigcode, editype=editype, gold=instance)
                 obj.save()
 
-        # Get the list of editions
-        edi_list = form.cleaned_data['editionlist']
-        # Copy these editions and link those copies to the Gold Sermon instance
-        for edi in edi_list:
-            edi_copy = Edition.objects.create(name=edi.name, gold=instance)
+        # EXTINCT: use EdirefSG instead!!
+        # -------------------------------
+        ## Get the list of editions
+        #edi_list = form.cleaned_data['editionlist']
+        ## Copy these editions and link those copies to the Gold Sermon instance
+        #for edi in edi_list:
+        #    edi_copy = Edition.objects.create(name=edi.name, gold=instance)
 
         # Get the list of keywords
         keywords = form.cleaned_data['keyword'].strip()
@@ -5702,14 +5743,32 @@ class SermonGoldEdit(PassimDetails):
         # Return positively
         return True, "" 
 
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Nothing here yet
+            pass
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        # Check if editions have been added
 
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon edit", False)
         context['prevpage'] = get_previous_page(self.request)
 
+        context['afterdelurl'] = reverse('search_gold')
+
         return context
+
 
 class SermonGoldLitset(BasicPart):
     """The set of literature references from one SermonGold"""
@@ -5744,6 +5803,7 @@ class SermonGoldLitset(BasicPart):
                     has_changed = True
             
         return has_changed
+
 
 class AuthorDetails(PassimDetails):
     """The details of one author"""
@@ -6496,6 +6556,7 @@ class SourceEdit(BasicPart):
 
         # There's is no real return value needed here 
         return True
+
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""

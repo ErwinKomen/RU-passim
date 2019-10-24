@@ -290,8 +290,6 @@ class SermonForm(forms.ModelForm):
             #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
-            #self.fields['nickname_ta'].initial = sNickName
-            #self.fields['nickname_ta'].required = False
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -540,6 +538,7 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
+
 class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
@@ -575,6 +574,7 @@ class SermonGoldLitrefForm(forms.ModelForm):
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
             raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
+
 
 class ManuscriptProvForm(forms.ModelForm):
     name = forms.CharField(label=_("Name"), required=False, 
