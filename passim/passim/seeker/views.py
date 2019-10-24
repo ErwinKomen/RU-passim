@@ -4485,7 +4485,7 @@ class SermonLinkset(BasicPart):
                                          form=SermonDescrGoldForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
 
     def add_to_context(self, context):
         x = 1
