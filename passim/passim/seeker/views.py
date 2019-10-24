@@ -809,8 +809,41 @@ def do_clavis(request):
                 code = obj.code
                 if r_number.match(code):
                     # This is only a number
-                    obj.code = "CPPM {}".format(code)
+                    obj.code = "CPPM I {}".format(code)
                     obj.save()
+                else:
+                    # Break it up into spaced items
+                    arCode = code.split(" ")
+                    if len(arCode) > 1:
+                        if arCode[1] != "I":
+                            if len(arCode) > 2:
+                                iStop = True
+                            arCode[0] = arCode[0] + " I"
+                            obj.code = " ".join(arCode)
+                            obj.save()
+                    
+    # Walk the whole gold-signature list
+    with transaction.atomic():
+        for obj in SermonSignature.objects.all():
+            # Check the type
+            if obj.editype == "cl":
+                # This is clavis -- get the code
+                code = obj.code
+                if r_number.match(code):
+                    # This is only a number
+                    obj.code = "CPPM I {}".format(code)
+                    obj.save()
+                else:
+                    # Break it up into spaced items
+                    arCode = code.split(" ")
+                    if len(arCode) > 1:
+                        if arCode[1] != "I":
+                            if len(arCode) > 2:
+                                iStop = True
+                            arCode[0] = arCode[0] + " I"
+                            obj.code = " ".join(arCode)
+                            obj.save()
+
     # Return an appropriate page
     return home(request)
 
