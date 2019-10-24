@@ -5330,12 +5330,12 @@ class SermonGoldSelect(BasicPart):
                 # (2) Process incipit
                 if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
                     val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(incipit__iregex=val))
+                    lstQ.append(Q(srchincipit__iregex=val))
 
                 # (3) Process explicit
                 if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
                     val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(explicit__iregex=val))
+                    lstQ.append(Q(srchexplicit__iregex=val))
 
                 # (4) Process signature
                 if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
