@@ -216,6 +216,7 @@ def get_previous_page(request, top=False):
     if username != "anonymous" and request.user.username != "":
         # Get the current path list
         p_list = Profile.get_stack(username)
+        p_item = []
         if len(p_list) < 2:
             prevpage = request.META.get('HTTP_REFERER') 
         elif top:
