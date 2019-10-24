@@ -1783,10 +1783,10 @@ def get_litrefs(request):
             sName = request.GET.get('name', '')
             lstQ = []
             lstQ.append(Q(full__icontains=sName)|Q(short__icontains=sName))
-            litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'id')
-            results = []
+            litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'short', 'id')
+            results = [] 
             for co in litrefs:
-                name = co['full']
+                name = "{} {}".format(co['full'], co['short'])
                 co_json = {'name': name, 'id': co['id'] }
                 results.append(co_json)
             data = json.dumps(results)
