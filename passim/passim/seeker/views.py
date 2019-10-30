@@ -3072,6 +3072,8 @@ class BasicPart(View):
             # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
             if 'afternewurl' in context and self.add:
                 self.data['afternewurl'] = context['afternewurl']
+            else:
+                self.data['afternewurl'] = ""
             if 'afterdelurl' in context:
                 self.data['afterdelurl'] = context['afterdelurl']
 
@@ -3425,6 +3427,7 @@ class PassimDetails(DetailView):
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # context['prevpage'] = get_previous_page(self.request) # self.previous
+        context['afternewurl'] = ""
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
