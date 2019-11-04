@@ -1779,16 +1779,31 @@ class Litref(models.Model):
                                     result = "{} {} ({})".format(short_title, volume, year)
                                                                           
                         # Fifth step: make short reference for edition (book) 
-                        elif extra == "ed":
-                            if series_number != "":
-                                result = "{} {} ({})".format(short_title, series_number, year)
-                            # If there is no series number
-                            elif series_number =="":
-                                result = "{} ({})".format(short_title, year)
-                            # If there is a volume number
-                            elif volume != "":
-                                result = "{} {} ({})".format(short_title, volume, year)
+                        elif extra == "ed": 
+                            if short_title == "PL":
+                                if series_number != "":
+                                    result = "{} {}".format(short_title, series_number)
+                                # If there is no series number
+                                elif series_number == "" and volume == "":
+                                    result = "{}".format(short_title)
+                                # If there is a volume number
+                                elif volume != "":
+                                    result = "{} {}".format(short_title, volume)
+                            else:
+                                if series_number != "":
+                                    result = "{} {} ({})".format(short_title, series_number, year)
+                                # If there is no series number
+                                elif series_number == "" and volume == "":
+                                    result = "{} ({})".format(short_title, year)
+                                # If there is a volume number
+                                elif volume != "":
+                                    result = "{} {} ({})".format(short_title, volume, year)
                         
+                        # PL exception
+                        # elif extra == "ed" and short_title == "PL":
+                           #  if series_number != "":
+                           #      result = "{} {} ({})".format(short_title, series_number, year)
+                                
                         # Sixth step: make short reference for catalogue (book)
                         elif extra == "cat":
                             # If there is no short title
@@ -3446,6 +3461,8 @@ class Edition(models.Model):
     #     Note: when a SermonGold is removed, the edition that uses it is also removed
     #     This is because each Edition instance is uniquely associated with one SermonGold
     gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
+    # [0-1] Temporary field to store update information
+    update = models.CharField("Update info", default="-", max_length=LONG_STRING)
 
     def __str__(self):
         return self.name

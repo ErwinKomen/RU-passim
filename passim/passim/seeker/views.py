@@ -6659,4 +6659,104 @@ class LitRefListView(ListView):
         return qs
 
 
+def do_import_editions(request):
+    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
 
+    # Use double for-loop:
+    last_old_edi = ""
+    last_litref = None
+    count = 0
+    oErr = ErrHandle()
+    template_name = 'tools.html'
+    result_list = []
+    context = {'status': 'ok', 'tools_part': 'import_edition'}
+    try:
+        for edi in Edition.objects.all().order_by('name'):
+            edi.update = "NIETGEDAAN"
+            edi.save()
+
+            # DEBUG
+            if edi.id == 1253:
+                iStop = 1
+
+            # Split the old editions into old_edi and pages
+            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
+            if old_edi != None and old_edi != "":
+                litref = None
+                if old_edi != last_old_edi:
+                    # Compare the old editions with the new editions ("short"), using short without the year
+                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
+                        if old_edi == get_short_edit(litreftmp.short):
+                            litref = litreftmp
+                            last_litref = litreftmp
+                            break
+                else:
+                    litref = last_litref
+                # Continue...
+                if litref != None:
+                    # We can process him!
+                    gold_obj = edi.gold
+                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
+                    if esg == None:
+                        # Create EdirefSG record
+                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
+                    # Double check pages and add to new EdirefSG record
+                    if pages != None:
+                        esg.pages = pages
+                        esg.save()
+                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
+                    count += 1
+                    if status == "ok":
+                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
+                    else:
+                        edi.update = "PAGES: " + status
+                    edi.save()
+                    # Show it in the result list
+                    result_list.append({'part': count, 'result': edi.name})
+            #else: # Hier moet het nog anders. 
+        # All edition objects have been reviewed
+        context['result_list'] = result_list
+    except:
+        sMsg = oErr.get_error_message()
+        oErr.DoError("do_import_editions")
+        context['status'] = "error"
+        context['message'] = sMsg
+
+    # Render and return the page
+    return render(request, template_name, context)
+
+# Split pages and year from edition, keep stripped edition and the pages
+# The number of matches increase when the year in the name of the edition
+# and in the short reference from Zotero is not used.
+ 
+def get_old_edi(edi):
+    pages = None
+    result = None
+    status = "ok"
+    # Split up edition and pages part
+    arResult = edi.name.split(",")
+    # In case of no pages, split string to get rid of year 
+    if len(arResult) ==  1:
+        result_tmp1 = arResult[0].split("(")
+        result = result_tmp1[0].strip()
+    # In case there are pages
+    elif len(arResult) > 1: 
+        # Split string to get rid of year 
+        result_tmp1 = arResult[0].split("(")
+        result = result_tmp1[0].strip()
+        pages = arResult[1].strip()
+        if not re.match(r'^[\d\-]+$', pages): 
+            status = pages
+            pages = None
+
+    return result, pages, status
+
+# Strip off the year of the short reference in Litref, keep only first part (abbr and seriesnumber)
+
+def get_short_edit(short):
+    result = None
+    arResult = short.split("(")
+    if len(arResult) > 1:
+        result = arResult[0].strip()
+
+    return result
