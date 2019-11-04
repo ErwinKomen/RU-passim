@@ -6794,5 +6794,6 @@ def get_short_edit(short):
     arResult = short.split("(")
     if len(arResult) > 1:
         result = arResult[0].strip()
-
+    elif len(arResult) == 1:
+        result = arResult[0].strip()
     return result
