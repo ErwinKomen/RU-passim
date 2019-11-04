@@ -24,9 +24,16 @@
           <div class="row">
             <div class="col-md-2 col-md-offset-10 text-right">
               <span class="">
+                <!-- NEW: use filtering instead of 'searching' -->
+                <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
+                  <span class="glyphicon glyphicon-filter"></span>
+                </a>
+
+                <!-- CURRENT: still working, search specification -->
                 <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
                   <span class="glyphicon glyphicon-search"></span>
                 </a>
+
                 <!-- Allow uploading sermongold Excel files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_goldexcel" 
@@ -38,6 +45,129 @@
             </div>
           </div>
         </div>
+
+        <form  id="goldsermons_filter" method='post' action="{% url 'search_gold' %}" >
+          {% csrf_token %}
+          <!-- entrypoint for search_paged_start -->
+          <div class="hidden search_paged_start">
+            <input name="page" type="text" />
+          </div>
+
+          <!-- Filter tab -->
+          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
+            <div class="panel panel-default">
+              <!-- Filter interface -->
+              <div class="row" id="filter_badges">
+                <div class="col-md-2">
+                  <h4>Selected filters</h4>
+                </div>
+                <div class="col-md-10">
+                  <!-- Main filters -->
+                  <div>
+                    <h4>
+                    {% for filter in filters %}
+                      {% if not filter.head_id %}
+                        <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                      {% endif %}
+                    {% endfor %}
+                    </h4>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row" id="sermon_filter_specs">
+                <!-- The column with the different filter sections -->
+                <div class="col-md-10">
+                  <div class="panel panel-default ">
+
+                    <!-- Intro -->
+                    <div><h5>Gold sermon filters: </h5></div>
+
+                    <!-- One or more authors -->
+                    <div id="filter_author" class="{% if not goldForm.authorname.value and not goldForm.authorlist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Author</td>
+                          <td style="width: 100%;">
+                            <span>{{goldForm.authorname}}</span>
+                            <span> or select: </span>
+                            <span>{{goldForm.authorlist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more incipits -->
+                    <div id="filter_incipit" class="{% if not goldForm.incipit.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Incipit</td><td style="width: 100%;">{{goldForm.incipit}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more explicits -->
+                    <div id="filter_explicit" class="{% if not goldForm.explicit.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Explicit</td><td style="width: 100%;">{{goldForm.explicit}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more titles -->
+                    <div id="filter_title" class="{% if not goldForm.title.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Title</td><td style="width: 100%;">{{goldForm.title}}</td></tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more signatures -->
+                    <div id="filter_signature" class="{% if not goldForm.signature.value and not goldForm.siglist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Gryson or Clavis:</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{goldForm.signature}}</span>
+                            <span> or select: </span>
+                            <span>{{goldForm.siglist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One or more keywords -->
+                    <div id="filter_keyword" class="{% if not goldForm.keyword.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;">Keyword</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{goldForm.keyword}}</span>
+                            <span> or select: </span>
+                            <span>{{goldForm.kwlist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Row with buttons-->
+              <div class="row">
+                <div class="col-md-2 col-md-offset-10 text-right">
+                  <!-- Room to reset the search criteria -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
+                  </span>
+                  <!-- Submit the search form -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </form>
 
         <!-- The form spans the list + pagination information -->
         <form id="goldsermons_search" method='get' action="{% url 'search_gold' %}" >

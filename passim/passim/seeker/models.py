@@ -3049,6 +3049,14 @@ class SermonGold(models.Model):
         self.save()
 
     def editions(self):
+        """Combine all editions into one string: the editions are retrieved from litrefSG"""
+
+        lEdition = []
+        for item in self.sermon_gold_editions.all():
+            lEdition.append(item.reference.short)
+        return " | ".join(lEdition)
+
+    def editions_old(self):
         """Combine all editions into one string"""
 
         lEdition = []
@@ -3309,6 +3317,7 @@ class SermonGold(models.Model):
                         pass
 
                     # Process Editions (separated by ';')
+                    # NOTE: this needs to be emended to use LitrefSG
                     edition_lst = oGold['edition'].split(";")
                     for item in edition_lst:
                         item = item.strip()
@@ -3573,7 +3582,7 @@ class SermonDescr(models.Model):
     manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
 
     # Automatically created and processed fields
-    # [1] Every gold sermon has a list of signatures that are automatically created
+    # [1] Every sermondesc has a list of signatures that are automatically created
     siglist = models.TextField("List of signatures", default="[]")
 
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================

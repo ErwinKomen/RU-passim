@@ -65,6 +65,7 @@ bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
+# FILTER SPECIFICATIONS
 SERMON_SEARCH_FILTERS = [
         {"name": "Author",          "id": "filter_author",      "enabled": False},
         {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
@@ -82,6 +83,13 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False, "head_id": "filter_manuscript"},
         ]
+GOLD_SEARCH_FILTERS = [
+        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+        {"name": "Author",          "id": "filter_author",      "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+    ]
 
 
 def treat_bom(sHtml):
@@ -4334,20 +4342,20 @@ class SermonListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
-        def enable_filter(filter_id, head_id=None):
-            for item in self.filters:
-                if filter_id in item['id']:
-                    item['enabled'] = True
-                    # Break from my loop
-                    break
-            # Check if this one has a head
-            if head_id != None and head_id != "":
-                for item in self.filters:
-                    if head_id in item['id']:
-                        item['enabled'] = True
-                        # Break from this sub-loop
-                        break
-            return True
+        #def enable_filter(filter_id, head_id=None):
+        #    for item in self.filters:
+        #        if filter_id in item['id']:
+        #            item['enabled'] = True
+        #            # Break from my loop
+        #            break
+        #    # Check if this one has a head
+        #    if head_id != None and head_id != "":
+        #        for item in self.filters:
+        #            if head_id in item['id']:
+        #                item['enabled'] = True
+        #                # Break from this sub-loop
+        #                break
+        #    return True
 
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
@@ -5068,6 +5076,10 @@ class SermonGoldListView(ListView):
     template_name = 'seeker/sermongold.html'
     entrycount = 0
     bDoTime = True
+    filters = GOLD_SEARCH_FILTERS
+    bFilter = False     # Status of the filter
+    initial = None
+    page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
@@ -5081,12 +5093,17 @@ class SermonGoldListView(ListView):
         context = super(SermonGoldListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.GET
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
 
         # ONE-TIME adhoc = SermonGold.init_latin()
 
         # Add a files upload form
-        context['goldForm'] = SermonGoldForm(prefix='gold')
+        context['goldForm'] = SermonGoldForm(initial, prefix='gold')
+        # Make sure we evaluate the form, to get cleaned_data
+        bFormOkay = context['goldForm'].is_valid()
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
@@ -5107,6 +5124,8 @@ class SermonGoldListView(ListView):
 
         # Make sure we pass on the ordered heads
         context['order_heads'] = self.order_heads
+        context['has_filter'] = self.bFilter
+        context['filters'] = self.filters
 
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Gold sermons", False)
@@ -5127,6 +5146,20 @@ class SermonGoldListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
+        def enable_filter(filter_id, head_id=None):
+            for item in self.filters:
+                if filter_id in item['id']:
+                    item['enabled'] = True
+                    # Break from my loop
+                    break
+            # Check if this one has a head
+            if head_id != None and head_id != "":
+                for item in self.filters:
+                    if head_id in item['id']:
+                        item['enabled'] = True
+                        # Break from this sub-loop
+                        break
+            return True
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
 
@@ -5147,6 +5180,11 @@ class SermonGoldListView(ListView):
             # Get the formset from the input
             lstQ = []
 
+            # (1) Reset the filters
+            for item in self.filters: item['enabled'] = False
+            # (2) Indicate we have no filters
+            self.bFilter = False
+
             goldForm = SermonGoldForm(self.qd, prefix='gold')
 
             if goldForm.is_valid():
@@ -5155,39 +5193,126 @@ class SermonGoldListView(ListView):
                 oFields = goldForm.cleaned_data
 
                 # Check for author name -- which is in the typeahead parameter
-                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+                auth_q = ""
+                if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
                     val = oFields['author']
-                    lstQ.append(Q(author=val))
-                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
-                    val = adapt_search(oFields['authorname'])
-                    lstQ.append(Q(author__name__iregex=val))
+                    enable_filter("author")
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(author=val)
+                elif 'author' in oFields and oFields['author'] != None:
+                    val = oFields['author']
+                    # Do *NOT* enable the filter, because this option comes from elsewhere
+                    enable_filter("author")
+                    #sermoForm['authorname'].initial = val.name
+                    #sermoForm.initial['authorname'] = val.name
+                    qd['sermo-authorname'] = val.name
+                    # lstQ.append(Q(author=val))
+                    auth_q = Q(author=val)
+                elif has_string_value('authorname', oFields): 
+                    val = oFields['authorname']
+                    enable_filter("author")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        # lstQ.append(Q(author__name__iregex=val))
+                        auth_q = Q(author__name__iregex=val)
+                    else:
+                        # lstQ.append(Q(author__name__iexact=val))
+                        auth_q = Q(author__name__iexact=val)
+
+                # Check for list of specific authors
+                if has_list_value('authorlist', oFields):
+                    enable_filter("author")
+                    id_list = [x.id for x in oFields['authorlist']]
+                    # lstQ.append(Q(author__id__in=id_list))
+                    auth_q_lst = Q(author__id__in=id_list)
+                    if auth_q == "":
+                        lstQ.append(auth_q_lst)
+                    else:
+                        lstQ.append(auth_q | auth_q_lst)
+                elif auth_q != "":
+                    lstQ.append(auth_q)
 
                 # Check for incipit string
-                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                    val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(srchincipit__iregex=val))
+                if has_string_value('incipit', oFields): 
+                    val = oFields['incipit']
+                    enable_filter("incipit")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchincipit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchincipit__iexact=val))
 
                 # Check for explicit string
-                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                    val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(srchexplicit__iregex=val))
+                if has_string_value('explicit', oFields): 
+                    val = oFields['explicit']
+                    enable_filter("explicit")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        lstQ.append(Q(srchexplicit__iregex=val))
+                    else:
+                        lstQ.append(Q(srchexplicit__iexact=val))
 
-                # Check for SermonGold [signature]
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(goldsignatures__code__iregex=val))
+                # Check for *ANY* signature(s)
+                sig_q = ""
+                if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
+                    val = oFields['signatureid']
+                    enable_filter("signature")
+                    # lstQ.append(Q(sermonsignatures__id=val))
+                    sig_q = Q(goldsignatures__id=val)
+                elif has_string_value('signature', oFields):
+                    val = oFields['signature']
+                    enable_filter("signature")
+                    if "*" in val:
+                        val = adapt_search(val)
+                        # lstQ.append(Q(sermonsignatures__code__iregex=val))
+                        sig_q = Q(goldsignatures__code__iregex=val)
+                    else:
+                        # lstQ.append(Q(sermonsignatures__code__iexact=val))
+                        sig_q = Q(goldsignatures__code__iexact=val)
 
-                # Check for SermonGold [signature]
-                if 'keyword' in oFields and oFields['keyword'] != "" and oFields['keyword'] != None: 
-                    val = adapt_search(oFields['keyword'])
-                    lstQ.append(Q(keywords__name__iregex=val))
+                # Check for list of specific signatures
+                if has_list_value('siglist', oFields):
+                    enable_filter("signature")
+                    code_list = [x.code for x in oFields['siglist']]
+                    sig_q_lst = Q(goldsignatures__code__in=code_list)
+                    if sig_q == "":
+                        lstQ.append(sig_q_lst)
+                    else:
+                        lstQ.append(sig_q | sig_q_lst)
+                elif sig_q != "":
+                    lstQ.append(sig_q)
+
+                # Check for Keywords
+                kw_q = ""
+                if has_string_value('keyword', oFields): 
+                    val = oFields['keyword']
+                    enable_filter('keyword')
+                    if "*" in val:
+                        val = adapt_search(val)
+                        kw_q = Q(keywords__name__iregex=val)
+                    else:
+                        kw_q = Q(keywords__name__iexact=val)
+
+                # Check for list of specific keywords
+                if has_list_value('kwlist', oFields):
+                    enable_filter("keyword")
+                    code_list = [x.code for x in oFields['kwlist']]
+                    kw_q_lst = Q(keywords__name__in=code_list)
+                    if kw_q == "":
+                        lstQ.append(kw_q_lst)
+                    else:
+                        lstQ.append(kw_q | kw_q_lst)
+                elif kw_q != "":
+                    lstQ.append(kw_q)
 
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # Just show everything
                     qs = SermonGold.objects.all()
                 else:
+                    # There is a filter, so apply it
                     qs = SermonGold.objects.filter(*lstQ).distinct()
+                    self.bFilter = True
             else:
                 # TODO: communicate the error to the user???
 
@@ -5247,6 +5372,9 @@ class SermonGoldListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
 
 
 class SermonGoldSelect(BasicPart):
