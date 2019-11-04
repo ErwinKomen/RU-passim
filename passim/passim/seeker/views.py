@@ -809,8 +809,41 @@ def do_clavis(request):
                 code = obj.code
                 if r_number.match(code):
                     # This is only a number
-                    obj.code = "CPPM {}".format(code)
+                    obj.code = "CPPM I {}".format(code)
                     obj.save()
+                else:
+                    # Break it up into spaced items
+                    arCode = code.split(" ")
+                    if len(arCode) > 1:
+                        if arCode[1] != "I":
+                            if len(arCode) > 2:
+                                iStop = True
+                            arCode[0] = arCode[0] + " I"
+                            obj.code = " ".join(arCode)
+                            obj.save()
+                    
+    # Walk the whole gold-signature list
+    with transaction.atomic():
+        for obj in SermonSignature.objects.all():
+            # Check the type
+            if obj.editype == "cl":
+                # This is clavis -- get the code
+                code = obj.code
+                if r_number.match(code):
+                    # This is only a number
+                    obj.code = "CPPM I {}".format(code)
+                    obj.save()
+                else:
+                    # Break it up into spaced items
+                    arCode = code.split(" ")
+                    if len(arCode) > 1:
+                        if arCode[1] != "I":
+                            if len(arCode) > 2:
+                                iStop = True
+                            arCode[0] = arCode[0] + " I"
+                            obj.code = " ".join(arCode)
+                            obj.save()
+
     # Return an appropriate page
     return home(request)
 
@@ -3039,6 +3072,8 @@ class BasicPart(View):
             # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
             if 'afternewurl' in context and self.add:
                 self.data['afternewurl'] = context['afternewurl']
+            else:
+                self.data['afternewurl'] = ""
             if 'afterdelurl' in context:
                 self.data['afterdelurl'] = context['afterdelurl']
 
@@ -3392,6 +3427,7 @@ class PassimDetails(DetailView):
         context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # context['prevpage'] = get_previous_page(self.request) # self.previous
+        context['afternewurl'] = ""
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
@@ -4452,7 +4488,7 @@ class SermonLinkset(BasicPart):
                                          form=SermonDescrGoldForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
 
     def add_to_context(self, context):
         x = 1
@@ -5297,12 +5333,12 @@ class SermonGoldSelect(BasicPart):
                 # (2) Process incipit
                 if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
                     val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(incipit__iregex=val))
+                    lstQ.append(Q(srchincipit__iregex=val))
 
                 # (3) Process explicit
                 if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
                     val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(explicit__iregex=val))
+                    lstQ.append(Q(srchexplicit__iregex=val))
 
                 # (4) Process signature
                 if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
