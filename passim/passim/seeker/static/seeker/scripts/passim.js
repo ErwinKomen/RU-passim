@@ -521,7 +521,10 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".country-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".country-key input").last().val("");
           });
+
           // Type-ahead: CITY
           $(".form-row:not(.empty-form) .typeahead.cities, .manuscript-details .typeahead.cities").typeahead(
             { hint: true, highlight: true, minLength: 1 },
@@ -530,7 +533,10 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".city-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".city-key input").last().val("");
           });
+
           // Type-ahead: LIBRARY
           $(".form-row:not(.empty-form) .typeahead.libraries, .manuscript-details .typeahead.libraries").typeahead(
             { hint: true, highlight: true, minLength: 1 },
@@ -543,6 +549,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".library-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".library-key input").last().val("");
           });
 
           // Type-ahead: ORIGIN
@@ -558,6 +566,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".origin-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".origin-key input").last().val("");
           });
 
           // Type-ahead: LOCATION
@@ -573,6 +583,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".location-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".location-key input").last().val("");
           });
 
           // Type-ahead: LITREF
@@ -588,6 +600,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".litref-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".litref-key input").last().val("");
           });
 
           // Type-ahead: AUTHOR -- NOTE: not in a form-row, but in a normal 'row'
@@ -604,22 +618,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".author-key input").last().val(suggestion.id);
-          });
-
-          // Type-ahead: NICKNAME -- NOTE: not in a form-row, but in a normal 'row'
-          $(".row .typeahead.nicknames, tr .typeahead.nicknames").typeahead(
-            { hint: true, highlight: true, minLength: 1 },
-            {
-              name: 'nicknames', source: loc_nicknames, limit: 25, displayKey: "name",
-              templates: {
-                empty: '<p>This person will be added... <i>(on saving)</i></p>',
-                suggestion: function (item) {
-                  return '<div>' + item.name + '</div>';
-                }
-              }
-            }
-          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
-            $(this).closest("td").find(".nickname-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".author-key input").last().val("");
           });
 
           // Type-ahead: gldincipit -- NOTE: not in a form-row, but in a normal 'row'
@@ -636,6 +636,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".gldincipit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".gldincipit-key input").last().val("");
           });
 
           // Type-ahead: srmincipit -- NOTE: not in a form-row, but in a normal 'row'
@@ -652,6 +654,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".srmincipit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".srmincipit-key input").last().val("");
           });
 
           // Type-ahead: gldexplicit -- NOTE: not in a form-row, but in a normal 'row'
@@ -668,6 +672,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".gldexplicit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".gldexplicit-key input").last().val("");
           });
 
           // Type-ahead: srmexplicit -- NOTE: not in a form-row, but in a normal 'row'
@@ -684,6 +690,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".srmexplicit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".srmexplicit-key input").last().val("");
           });
 
           // Type-ahead: SIGNATURE (SermonGold) -- NOTE: not in a form-row, but in a normal 'row'
@@ -700,6 +708,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".signature-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".signature-key input").last().val("");
           });
 
           // Type-ahead: Gld Gryson Signature
@@ -716,6 +726,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".gldsiggryson-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".gldsiggryson-key input").last().val("");
           });
 
           // Type-ahead: Srm Clavis Signature
@@ -732,6 +744,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".gldsigclavis-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".gldsigclavis-key input").last().val("");
           });
 
           // Type-ahead: SRMSIGNATURE (SermonDescr) -- NOTE: not in a form-row, but in a normal 'row'
@@ -748,6 +762,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".srmsignature-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".srmsignature-key input").last().val("");
           });
 
           // Type-ahead: Srm Gryson Signature
@@ -764,6 +780,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".siggryson-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".siggryson-key input").last().val("");
           });
 
           // Type-ahead: Srm Clavis Signature
@@ -780,6 +798,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".sigclavis-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".sigclavis-key input").last().val("");
           });
 
           // Type-ahead: EDITION -- NOTE: not in a form-row, but in a normal 'row'
@@ -796,6 +816,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".edition-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".edition-key input").last().val("");
           });
 
           // Type-ahead: KEYWORD -- NOTE: not in a form-row, but in a normal 'row'
@@ -812,6 +834,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".keyword-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".keyword-key input").last().val("");
           });
 
           // Type-ahead: manuidno -- NOTE: not in a form-row, but in a normal 'row'
@@ -828,6 +852,8 @@ var ru = (function ($, ru) {
             }
           ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
             $(this).closest("td").find(".manuidno-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".manuidno-key input").last().val("");
           });
 
           // Make sure we know which element is pressed in typeahead

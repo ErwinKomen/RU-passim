@@ -30,7 +30,7 @@ from time import sleep
 
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
@@ -194,12 +194,147 @@ def action_model_changes(form, instance):
     return changes
 
 def has_string_value(field, obj):
-    response = (field in obj and obj[field] != None and obj[field] != "")
+    response = (field != None and field in obj and obj[field] != None and obj[field] != "")
     return response
 
 def has_list_value(field, obj):
-    response = (field in obj and obj[field] != None and len(obj[field]) > 0)
+    response = (field != None and field in obj and obj[field] != None and len(obj[field]) > 0)
     return response
+
+def has_obj_value(field, obj):
+    response = (field != None and field in obj and obj[field] != None)
+    return response
+
+def make_search_list(filters, oFields, search_list, qd):
+    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
+
+    def enable_filter(filter_id, head_id=None):
+        for item in filters:
+            if filter_id in item['id']:
+                item['enabled'] = True
+                # Break from my loop
+                break
+        # Check if this one has a head
+        if head_id != None and head_id != "":
+            for item in filters:
+                if head_id in item['id']:
+                    item['enabled'] = True
+                    # Break from this sub-loop
+                    break
+        return True
+
+    def get_value(obj, field, default=None):
+        if field in obj:
+            sBack = obj[field]
+        else:
+            sBack = default
+        return sBack
+
+    oErr = ErrHandle()
+
+    try:
+        # (1) Create default lstQ
+        lstQ = []
+
+        # (2) Reset the filters in the list we get
+        for item in filters: item['enabled'] = False
+    
+        # (3) Walk all sections
+        for part in search_list:
+            head_id = get_value(part, 'section')
+
+            # (4) Walk the list of defined searches
+            for search_item in part['filterlist']:
+                keyS = get_value(search_item, "keyS")
+                keyId = get_value(search_item, "keyId")
+                keyFk = get_value(search_item, "keyFk")
+                keyList = get_value(search_item, "keyList")
+                infield = get_value(search_item, "infield")
+                dbfield = get_value(search_item, "dbfield")
+                fkfield = get_value(search_item, "fkfield")
+                filter_type = get_value(search_item, "filter")
+                s_q = ""
+               
+                # Main differentiation: fkfield or dbfield
+                if fkfield:
+                    # We are dealing with a foreign key
+                    # Check for keyS
+                    if has_string_value(keyS, oFields):
+                        # Check for ID field
+                        if has_string_value(keyId, oFields):
+                            val = oFields[keyId]
+                            if not isinstance(val, int): 
+                                try:
+                                    val = val.id
+                                except:
+                                    pass
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{"{}__id".format(fkfield): val})
+                        elif has_obj_value(fkfield, oFields):
+                            val = oFields[fkfield]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{fkfield: val})
+                        else:
+                            val = oFields[keyS]
+                            enable_filter(filter_type, head_id)
+                            # we are dealing with a foreign key, so we should use keyFk
+                            if "*" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+                            else:
+                                s_q = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                    elif has_obj_value(fkfield, oFields):
+                        val = oFields[fkfield]
+                        enable_filter(filter_type, head_id)
+                        s_q = Q(**{fkfield: val})
+                        external = get_value(search_item, "external")
+                        if has_string_value(external, oFields):
+                            qd[external] = getattr(val, "name")
+                elif dbfield:
+                    # We are dealing with a plain direct field for the model
+                    # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
+                    # Check for keyS
+                    if has_string_value(keyS, oFields):
+                        # Check for ID field
+                        if has_string_value(keyId, oFields):
+                            val = oFields[keyId]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{"{}__id".format(dbfield): val})
+                        elif has_obj_value(keyFk, oFields):
+                            val = oFields[keyFk]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{dbfield: val})
+                        else:
+                            val = oFields[keyS]
+                            enable_filter(filter_type, head_id)
+                            if isinstance(val, int):
+                                s_q = Q(**{"{}".format(dbfield): val})
+                            elif "*" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(dbfield): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(dbfield): val})
+
+                # Check for list of specific signatures
+                if has_list_value(keyList, oFields):
+                    enable_filter(filter_type, head_id)
+                    code_list = [getattr(x, infield) for x in oFields[keyList]]
+                    if fkfield:
+                        # Now we need to look at the id's
+                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                    elif dbfield:
+                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
+                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
+
+                # Possibly add the result to the list
+                if s_q != "": lstQ.append(s_q)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("make_search_list")
+        lstQ = []
+
+    # Return what we have created
+    return filters, lstQ, qd
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -520,6 +655,75 @@ def sync_progress(request):
     return JsonResponse(data)
 
 def search_sermon(filters, qd):
+    """Create a queryset to search for a sermon"""
+
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyList': 'kwlist', 'infield': 'name' }
+            ]},
+        {'section': 'manuscript', 'filterlist': [
+            # {'filter': 'manuid',    'dbfield': 'manu__idno',                'keyS': 'manuidno',     'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            ]}
+         ]
+
+    qs = None
+    oErr = ErrHandle()
+    bFilter = False
+    sermoForm = None
+    try:
+        bHasFormset = (len(qd) > 0)
+
+        if bHasFormset:
+            # Get the formset from the input
+            lstQ = []
+
+            sermoForm = SermonForm(qd, prefix='sermo')
+
+            if sermoForm.is_valid():
+
+                # Process the criteria from this form 
+                oFields = sermoForm.cleaned_data
+
+                # Create the search based on the specification in searches
+                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # No filter: Just show everything
+                    qs = SermonDescr.objects.all()
+                else:
+                    # There is a filter: apply it
+                    qs = SermonDescr.objects.filter(*lstQ).distinct()
+                    bFilter = True
+            else:
+                # TODO: communicate the error to the user???
+
+                # Just show everything
+                qs = SermonDescr.objects.all().distinct()
+
+        else:
+            # Just show everything
+            qs = SermonDescr.objects.all().distinct()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("search_sermon")
+        qs = None
+        bFilter = False
+    # Return the resulting filtered and sorted queryset
+    return filters, bFilter, qs, qd
+
+def search_sermon_original(filters, qd):
     """Create a queryset to search for a sermon"""
 
     qs = None
@@ -4342,20 +4546,6 @@ class SermonListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
-        #def enable_filter(filter_id, head_id=None):
-        #    for item in self.filters:
-        #        if filter_id in item['id']:
-        #            item['enabled'] = True
-        #            # Break from my loop
-        #            break
-        #    # Check if this one has a head
-        #    if head_id != None and head_id != "":
-        #        for item in self.filters:
-        #            if head_id in item['id']:
-        #                item['enabled'] = True
-        #                # Break from this sub-loop
-        #                break
-        #    return True
 
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
@@ -4730,22 +4920,51 @@ class ManuscriptListView(ListView):
     template_name = 'seeker/manuscript.html'
     entrycount = 0
     bDoTime = True
+    bFilter = False
+    bHasFormset = False
+    initial = None
+    page_function = "ru.passim.seeker.search_paged_start"
+    filters = [ 
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
+        {"name": "Country",         "id": "filter_country",     "enabled": False},
+        {"name": "City",            "id": "filter_city",        "enabled": False},
+        {"name": "Library",         "id": "filter_library",     "enabled": False},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
+        {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
+                ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'manuid',    'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',   'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',      'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',   'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
+            ]}
+         ]
     # Define a formset for searching
     ManuFormset = formset_factory(SearchManuscriptForm, extra=0, min_num=1)
-
+    
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(ManuscriptListView, self).get_context_data(**kwargs)
 
         # Get parameters for the search
-        initial = self.request.GET
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
 
         # Determine the formset to be passed on
-        if self.bHasFormset:
-            manu_formset = self.ManuFormset(initial, prefix='manu')
-        else:
-            manu_formset = self.ManuFormset(prefix='manu')
-        context['manu_formset'] = manu_formset
+        #if self.bHasFormset:
+        #    manu_formset = self.ManuFormset(initial, prefix='manu')
+        #else:
+        #    manu_formset = self.ManuFormset(prefix='manu')
+        #context['manu_formset'] = manu_formset
+
+        # We pass on a FORM
+        context['manuForm'] = SearchManuForm(initial, prefix='manu')
 
         # Add a files upload form
         context['uploadform'] = UploadFilesForm()
@@ -4766,6 +4985,9 @@ class ManuscriptListView(ListView):
             context['paginateSize'] = int(initial['paginate_by'])
         else:
             context['paginateSize'] = paginateSize
+
+        context['has_filter'] = self.bFilter
+        context['filters'] = self.filters
 
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = process_visit(self.request, "Manuscripts", True)
@@ -4797,97 +5019,147 @@ class ManuscriptListView(ListView):
         get = get.copy()
         self.qd = get
 
-        self.bHasFormset = ('manu-TOTAL_FORMS' in get)
-
         # Fix the sort-order
         get['sortOrder'] = 'name'
 
-        if self.bHasFormset:
-            # Get the formset from the input
-            lstQ = []
+        method_to_use = "use_a_form"
 
-            manu_formset = self.ManuFormset(self.qd, prefix='manu')
+        if method_to_use == "use_a_form":
+            # Check if we are receiving a FORM or something else
+            bHasForm = ('manu-idno' in get)
+            if bHasForm:
+                # Get the form from the input
+                lstQ = []
 
-            # Process the formset
-            if manu_formset != None:
-                # Validate it
-                if manu_formset.is_valid():
-                    #  Everything okay, continue
-                    for sform in manu_formset:
-                        # Process the criteria from this form 
-                        oFields = sform.cleaned_data
-                        lstThisQ = []
+                # (2) Indicate we have no filters
+                self.bFilter = False
 
-                        # Check for Manuscript [name]
-                        if 'idno' in oFields and oFields['idno'] != "": 
-                            val = adapt_search(oFields['idno'])
-                            lstThisQ.append(Q(idno__iregex=val))
+                manuForm = SearchManuForm(self.qd, prefix='manu')
 
-                        # Check for Manuscript [name]
-                        if 'name' in oFields and oFields['name'] != "": 
-                            val = adapt_search(oFields['name'])
-                            lstThisQ.append(Q(name__iregex=val))
+                if manuForm.is_valid():
 
-                        # Check for Manuscript [idno]
-                        if 'gryson' in oFields and oFields['gryson'] != "": 
-                            val = adapt_search(oFields['gryson'])
-                            lstThisQ.append(Q(idno__iregex=val))
+                    # Process the criteria from this form 
+                    oFields = manuForm.cleaned_data
 
-                        # Check for Manuscript [idno]
-                        if 'clavis' in oFields and oFields['clavis'] != "": 
-                            val = adapt_search(oFields['clavis'])
-                            lstThisQ.append(Q(idno__iregex=val))
+                    self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
 
-                        # Check for country name
-                        if 'country' in oFields and oFields['country'] != "": 
-                            val = adapt_search(oFields['country'])
-                            lstThisQ.append(Q(library__country__name__iregex=val))
-
-                        # Check for city name
-                        if 'city' in oFields and oFields['city'] != "": 
-                            val = adapt_search(oFields['city'])
-                            lstThisQ.append(Q(library__city__name__iregex=val))
-
-                        # Check for library name
-                        if 'library' in oFields and oFields['library'] != "": 
-                            # Is this a number?
-                            val = oFields['library']
-                            if val.isdigit():
-                                lstThisQ.append(Q(library__id=val))
-                            else:
-                                val = adapt_search(val)
-                                lstThisQ.append(Q(library__name__iregex=val))
-
-                        # Now add these criterya to the overall lstQ
-                        if len(lstThisQ) > 0:
-                            lstQ.append(reduce(operator.and_, lstThisQ))
+                    # Calculate the final qs
+                    if len(lstQ) == 0:
+                        # Just show everything
+                        qs = Manuscript.objects.all()
+                    else:
+                        # There is a filter, so apply it
+                        qs = Manuscript.objects.filter(*lstQ).distinct()
+                        self.bFilter = True
                 else:
-                    # What to do when it is not valid?
-                    pass
+                    # TODO: communicate the error to the user???
+                    
 
-            # Calculate the final qs
-            if len(lstQ) == 0:
-                # Just show everything
-                qs = Manuscript.objects.all()
-            elif len(lstQ) == 1:
-                # criteria = reduce(operator.or_, lstQ)
+                    # Just show everything
+                    qs = Manuscript.objects.all().distinct()
+            elif 'library' in get:
+                lstQ = []
+                # Is this a number?
+                val = get['library']
+                if val.isdigit():
+                    lstQ.append(Q(library__id=val))
+                else:
+                    val = adapt_search(val)
+                    lstQ.append(Q(library__name__iregex=val))
                 qs = Manuscript.objects.filter(*lstQ).distinct()
             else:
-                criteria = reduce(operator.or_, lstQ)
-                qs = Manuscript.objects.filter(criteria).distinct()
-        elif 'library' in get:
-            lstQ = []
-            # Is this a number?
-            val = get['library']
-            if val.isdigit():
-                lstQ.append(Q(library__id=val))
-            else:
-                val = adapt_search(val)
-                lstQ.append(Q(library__name__iregex=val))
-            qs = Manuscript.objects.filter(*lstQ).distinct()
+                # Just show everything
+                qs = Manuscript.objects.all()
         else:
-            # Just show everything
-            qs = Manuscript.objects.all()
+
+            self.bHasFormset = ('manu-TOTAL_FORMS' in get)
+
+            if self.bHasFormset:
+                # Get the formset from the input
+                lstQ = []
+
+                manu_formset = self.ManuFormset(self.qd, prefix='manu')
+
+                # Process the formset
+                if manu_formset != None:
+                    # Validate it
+                    if manu_formset.is_valid():
+                        #  Everything okay, continue
+                        for sform in manu_formset:
+                            # Process the criteria from this form 
+                            oFields = sform.cleaned_data
+                            lstThisQ = []
+
+                            # Check for Manuscript [name]
+                            if 'idno' in oFields and oFields['idno'] != "": 
+                                val = adapt_search(oFields['idno'])
+                                lstThisQ.append(Q(idno__iregex=val))
+
+                            # Check for Manuscript [name]
+                            if 'name' in oFields and oFields['name'] != "": 
+                                val = adapt_search(oFields['name'])
+                                lstThisQ.append(Q(name__iregex=val))
+
+                            # Check for Manuscript [idno]
+                            if 'gryson' in oFields and oFields['gryson'] != "": 
+                                val = adapt_search(oFields['gryson'])
+                                lstThisQ.append(Q(idno__iregex=val))
+
+                            # Check for Manuscript [idno]
+                            if 'clavis' in oFields and oFields['clavis'] != "": 
+                                val = adapt_search(oFields['clavis'])
+                                lstThisQ.append(Q(idno__iregex=val))
+
+                            # Check for country name
+                            if 'country' in oFields and oFields['country'] != "": 
+                                val = adapt_search(oFields['country'])
+                                lstThisQ.append(Q(library__country__name__iregex=val))
+
+                            # Check for city name
+                            if 'city' in oFields and oFields['city'] != "": 
+                                val = adapt_search(oFields['city'])
+                                lstThisQ.append(Q(library__city__name__iregex=val))
+
+                            # Check for library name
+                            if 'library' in oFields and oFields['library'] != "": 
+                                # Is this a number?
+                                val = oFields['library']
+                                if val.isdigit():
+                                    lstThisQ.append(Q(library__id=val))
+                                else:
+                                    val = adapt_search(val)
+                                    lstThisQ.append(Q(library__name__iregex=val))
+
+                            # Now add these criterya to the overall lstQ
+                            if len(lstThisQ) > 0:
+                                lstQ.append(reduce(operator.and_, lstThisQ))
+                    else:
+                        # What to do when it is not valid?
+                        pass
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # Just show everything
+                    qs = Manuscript.objects.all()
+                elif len(lstQ) == 1:
+                    # criteria = reduce(operator.or_, lstQ)
+                    qs = Manuscript.objects.filter(*lstQ).distinct()
+                else:
+                    criteria = reduce(operator.or_, lstQ)
+                    qs = Manuscript.objects.filter(criteria).distinct()
+            elif 'library' in get:
+                lstQ = []
+                # Is this a number?
+                val = get['library']
+                if val.isdigit():
+                    lstQ.append(Q(library__id=val))
+                else:
+                    val = adapt_search(val)
+                    lstQ.append(Q(library__name__iregex=val))
+                qs = Manuscript.objects.filter(*lstQ).distinct()
+            else:
+                # Just show everything
+                qs = Manuscript.objects.all()
 
         # Set the sort order
         qs = qs.order_by('library__country__name', 
@@ -4910,6 +5182,9 @@ class ManuscriptListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
 
 
 class ManuscriptProvset(BasicPart):
@@ -5076,7 +5351,6 @@ class SermonGoldListView(ListView):
     template_name = 'seeker/sermongold.html'
     entrycount = 0
     bDoTime = True
-    filters = GOLD_SEARCH_FILTERS
     bFilter = False     # Status of the filter
     initial = None
     page_function = "ru.passim.seeker.search_paged_start"
@@ -5087,6 +5361,20 @@ class SermonGoldListView(ListView):
                    {'name': 'Editions', 'order': '', 'type': 'str'},
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
+    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+                {"name": "Author",          "id": "filter_author",      "enabled": False},
+                {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+                {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+                {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
+        ]
+
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
@@ -5146,20 +5434,6 @@ class SermonGoldListView(ListView):
         return self.request.GET.get('paginate_by', self.paginate_by)
   
     def get_queryset(self):
-        def enable_filter(filter_id, head_id=None):
-            for item in self.filters:
-                if filter_id in item['id']:
-                    item['enabled'] = True
-                    # Break from my loop
-                    break
-            # Check if this one has a head
-            if head_id != None and head_id != "":
-                for item in self.filters:
-                    if head_id in item['id']:
-                        item['enabled'] = True
-                        # Break from this sub-loop
-                        break
-            return True
         # Measure how long it takes
         if self.bDoTime: iStart = get_now_time()
 
@@ -5180,8 +5454,6 @@ class SermonGoldListView(ListView):
             # Get the formset from the input
             lstQ = []
 
-            # (1) Reset the filters
-            for item in self.filters: item['enabled'] = False
             # (2) Indicate we have no filters
             self.bFilter = False
 
@@ -5192,118 +5464,7 @@ class SermonGoldListView(ListView):
                 # Process the criteria from this form 
                 oFields = goldForm.cleaned_data
 
-                # Check for author name -- which is in the typeahead parameter
-                auth_q = ""
-                if has_string_value('author', oFields) and has_string_value('authorname', oFields): 
-                    val = oFields['author']
-                    enable_filter("author")
-                    # lstQ.append(Q(author=val))
-                    auth_q = Q(author=val)
-                elif 'author' in oFields and oFields['author'] != None:
-                    val = oFields['author']
-                    # Do *NOT* enable the filter, because this option comes from elsewhere
-                    enable_filter("author")
-                    #sermoForm['authorname'].initial = val.name
-                    #sermoForm.initial['authorname'] = val.name
-                    qd['sermo-authorname'] = val.name
-                    # lstQ.append(Q(author=val))
-                    auth_q = Q(author=val)
-                elif has_string_value('authorname', oFields): 
-                    val = oFields['authorname']
-                    enable_filter("author")
-                    if "*" in val:
-                        val = adapt_search(val)
-                        # lstQ.append(Q(author__name__iregex=val))
-                        auth_q = Q(author__name__iregex=val)
-                    else:
-                        # lstQ.append(Q(author__name__iexact=val))
-                        auth_q = Q(author__name__iexact=val)
-
-                # Check for list of specific authors
-                if has_list_value('authorlist', oFields):
-                    enable_filter("author")
-                    id_list = [x.id for x in oFields['authorlist']]
-                    # lstQ.append(Q(author__id__in=id_list))
-                    auth_q_lst = Q(author__id__in=id_list)
-                    if auth_q == "":
-                        lstQ.append(auth_q_lst)
-                    else:
-                        lstQ.append(auth_q | auth_q_lst)
-                elif auth_q != "":
-                    lstQ.append(auth_q)
-
-                # Check for incipit string
-                if has_string_value('incipit', oFields): 
-                    val = oFields['incipit']
-                    enable_filter("incipit")
-                    if "*" in val:
-                        val = adapt_search(val)
-                        lstQ.append(Q(srchincipit__iregex=val))
-                    else:
-                        lstQ.append(Q(srchincipit__iexact=val))
-
-                # Check for explicit string
-                if has_string_value('explicit', oFields): 
-                    val = oFields['explicit']
-                    enable_filter("explicit")
-                    if "*" in val:
-                        val = adapt_search(val)
-                        lstQ.append(Q(srchexplicit__iregex=val))
-                    else:
-                        lstQ.append(Q(srchexplicit__iexact=val))
-
-                # Check for *ANY* signature(s)
-                sig_q = ""
-                if has_string_value('signatureid', oFields) and has_string_value('signature', oFields):
-                    val = oFields['signatureid']
-                    enable_filter("signature")
-                    # lstQ.append(Q(sermonsignatures__id=val))
-                    sig_q = Q(goldsignatures__id=val)
-                elif has_string_value('signature', oFields):
-                    val = oFields['signature']
-                    enable_filter("signature")
-                    if "*" in val:
-                        val = adapt_search(val)
-                        # lstQ.append(Q(sermonsignatures__code__iregex=val))
-                        sig_q = Q(goldsignatures__code__iregex=val)
-                    else:
-                        # lstQ.append(Q(sermonsignatures__code__iexact=val))
-                        sig_q = Q(goldsignatures__code__iexact=val)
-
-                # Check for list of specific signatures
-                if has_list_value('siglist', oFields):
-                    enable_filter("signature")
-                    code_list = [x.code for x in oFields['siglist']]
-                    sig_q_lst = Q(goldsignatures__code__in=code_list)
-                    if sig_q == "":
-                        lstQ.append(sig_q_lst)
-                    else:
-                        lstQ.append(sig_q | sig_q_lst)
-                elif sig_q != "":
-                    lstQ.append(sig_q)
-
-                # Check for Keywords
-                kw_q = ""
-                if has_string_value('keyword', oFields): 
-                    val = oFields['keyword']
-                    enable_filter('keyword')
-                    if "*" in val:
-                        val = adapt_search(val)
-                        kw_q = Q(keywords__name__iregex=val)
-                    else:
-                        kw_q = Q(keywords__name__iexact=val)
-
-                # Check for list of specific keywords
-                if has_list_value('kwlist', oFields):
-                    enable_filter("keyword")
-                    code_list = [x.code for x in oFields['kwlist']]
-                    kw_q_lst = Q(keywords__name__in=code_list)
-                    if kw_q == "":
-                        lstQ.append(kw_q_lst)
-                    else:
-                        lstQ.append(kw_q | kw_q_lst)
-                elif kw_q != "":
-                    lstQ.append(kw_q)
+                self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
 
                 # Calculate the final qs
                 if len(lstQ) == 0:

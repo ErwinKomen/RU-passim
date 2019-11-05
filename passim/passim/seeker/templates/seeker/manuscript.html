@@ -1,6 +1,10 @@
 ﻿{% extends "layout.html" %}
 {% load i18n %}
 
+{% block scripts %}
+  {{manuForm.media.css}}
+{% endblock %}
+
 {% block breadcrumbs %}
   {% include 'breadcrumb_list.html' %}
 {% endblock %}
@@ -20,9 +24,18 @@
           <div class="row">
             <div class="col-md-2 col-md-offset-10 text-right">
               <span class="">
+                <!-- Filtering -->
+                <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
+                  <span class="glyphicon glyphicon-filter"></span>
+                </a>
+
+                <!-- OLD: searching -->
+                <!--
                 <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
                   <span class="glyphicon glyphicon-search"></span>
                 </a>
+                  -->
+
                 <!-- Allow uploading e-codex XML files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_ecodex" 
@@ -31,6 +44,7 @@
                     <span class="glyphicon glyphicon-upload"></span>
                   </a>
                 {% endif %}
+
                 <!-- Search results from e-codex -->
                 {% if is_passim_editor %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_search_ecodex" 
@@ -39,6 +53,7 @@
                     <span class="glyphicon glyphicon-music"></span>
                   </a>
                 {% endif %}
+
                 <!-- Allow uploading EAD XML files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-2" data-toggle="collapse" data-target="#tab_upload_ead" 
@@ -165,7 +180,160 @@
         {% endif %}
 
         <!-- The form spans the list + pagination information -->
-        <form id="manuscriptsearch" method='get' action="{% url 'search_manuscript' %}" >
+        <form id="manuscriptsearch" method='post' action="{% url 'search_manuscript' %}" >
+          {% csrf_token %}
+
+          <!-- entrypoint for search_paged_start -->
+          <div class="hidden search_paged_start">
+            <input name="page" type="text" />
+          </div>
+
+          <!-- Filter tab -->
+          <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
+            <div class="panel panel-default">
+              <!-- Filter interface -->
+              <div class="row" id="filter_badges">
+                <div class="col-md-2">
+                  <h4>Selected filters</h4>
+                </div>
+                <div class="col-md-10">
+                  <!-- Main filters -->
+                  <div>
+                    <h4>
+                    {% for filter in filters %}
+                      {% if not filter.head_id %}
+                        <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                      {% endif %}
+                    {% endfor %}
+                    </h4>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row" id="sermon_filter_specs">
+                <!-- The column with the different filter sections -->
+                <div class="col-md-10">
+                  <div class="panel panel-default ">
+
+                    <!-- Intro -->
+                    <div><h5>Manuscript filters: </h5></div>
+
+                    <!-- One or more manuids -->
+                    <div id="filter_manuid" class="{% if not manuForm.idno.value and  not manuForm.manuidlist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Shelfmark</td>
+                          <td style="width: 100%;">
+                            <span>{{manuForm.idno}}</span>
+                            <span> or select: </span>
+                            <span>{{manuForm.manuidlist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular country -->
+                    <div id="filter_country" class="{% if not manuForm.country.value and not manuForm.country_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Country:</td>
+                          <td style="width: 100%;">
+                            <div class="country-key hidden">{{manuForm.country}}</div>
+                            <div>{{manuForm.country_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular city -->
+                    <div id="filter_city" class="{% if not manuForm.city.value and not manuForm.city_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">City:</td>
+                          <td style="width: 100%;">
+                            <div class="city-key hidden">{{manuForm.city}}</div>
+                            <div>{{manuForm.city_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular library -->
+                    <div id="filter_library" class="{% if not manuForm.library.value and not manuForm.libname_ta.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Library:</td>
+                          <td style="width: 100%;">
+                            <div class="library-key hidden">{{manuForm.library}}</div>
+                            <div>{{manuForm.libname_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular origin -->
+                    <div id="filter_origin" class="{% if not manuForm.origin.value and not manuForm.origin_ta.value %}hidden{% endif %}" >
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Origin:</td>
+                          <td style="width: 100%;">
+                            <div class="origin-key hidden">{{manuForm.origin}}</div>
+                            <div>{{manuForm.origin_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- One particular provenance -->
+                    <div id="filter_provenance" class="{% if not manuForm.prov.value and not manuForm.prov_ta.value %}hidden{% endif %}" >
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Provenance:</td>
+                          <td style="width: 100%;">
+                            <div class="country-key hidden">{{manuForm.prov}}</div>
+                            <div>{{manuForm.prov_ta}}</div>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <!-- The date range -->
+                    <div id="filter_daterange" class="{% if not manuForm.date_from.value and not manuForm.date_until.value %} hidden {% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Date range:</td>
+                          <td style="width: 100%;">
+                            <span>from:</span>
+                            <span >{{manuForm.date_from}}</span>
+                            <span>until:</span>
+                            <span >{{manuForm.date_until}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Row with buttons-->
+              <div class="row">
+                <div class="col-md-2 col-md-offset-10 text-right">
+                  <!-- Room to reset the search criteria -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
+                  </span>
+                  <!-- Submit the search form -->
+                  <span>
+                    <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Search tab -->
           <div class="inert collapse" id="tab_search">
             <div class="panel panel-default">
@@ -408,3 +576,7 @@
 </script>
 
 {% endblock content %}
+
+{% block endcontent %} 
+  {{manuForm.media.js }} 
+{% endblock %}
