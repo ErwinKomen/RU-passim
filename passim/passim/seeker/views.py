@@ -2006,8 +2006,9 @@ def get_locations(request):
             locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
             results = []
             for co in locations:
-                name = "{} ({})".format(co['name'], co['loctype__name'])
-                co_json = {'name': name, 'id': co['id'] }
+                # name = "{} ({})".format(co['name'], co['loctype__name'])
+                name = co['name']
+                co_json = {'name': name, 'id': co['id'], 'loctype': co['loctype__name'] }
                 results.append(co_json)
             data = json.dumps(results)
         except:
@@ -4939,6 +4940,8 @@ class ManuscriptListView(ListView):
             {'filter': 'country',   'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',      'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',   'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance','fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
             {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
             ]}

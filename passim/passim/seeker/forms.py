@@ -713,6 +713,7 @@ class ManuscriptProvForm(forms.ModelForm):
                 self.fields['note'].initial = instance.provenance.note
                 if instance.provenance.location != None:
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
+                    # self.fields['location_ta'].initial = instance.provenance.location.name
 
 
 class ManuscriptLitrefForm(forms.ModelForm):
@@ -919,6 +920,7 @@ class LocationWidget(ModelSelect2MultipleWidget):
 
     def label_from_instance(self, obj):
         sLabel = "{} ({})".format(obj.name, obj.loctype)
+        # sLabel = obj.name
         return sLabel
 
 
