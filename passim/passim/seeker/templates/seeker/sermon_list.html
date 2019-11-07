@@ -129,7 +129,14 @@
                     <!-- One or more keywords -->
                     <div id="filter_keyword" class="{% if not sermoForm.keyword.value %}hidden{% endif %}">
                       <table style="width: 100%;">
-                        <tr class="form-row"><td style="min-width: 130px;">Keyword</td><td style="width: 100%;">{{sermoForm.keyword}}</td></tr>
+                        <tr class="form-row">
+                          <td style="min-width: 130px;">Keyword</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{sermoForm.keyword}}</span>
+                            <span> or select: </span>
+                            <span>{{sermoForm.kwlist}}</span>
+                          </td>
+                        </tr>
                       </table>
                     </div>
 

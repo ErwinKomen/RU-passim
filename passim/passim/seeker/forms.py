@@ -309,6 +309,10 @@ class SermonForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    keyword = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -369,6 +373,7 @@ class SermonForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
