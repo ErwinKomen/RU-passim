@@ -78,6 +78,8 @@ var ru = (function ($, ru) {
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
         base_url = "",
+        KEYS = {BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
+          END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46 },
         oSyncTimer = null;
 
 
@@ -860,6 +862,26 @@ var ru = (function ($, ru) {
           $(".form-row:not(.empty-form) .typeahead").on("keyup",
             function () {
               loc_elInput = $(this);
+            });
+
+          // Allow "Search on ENTER" from typeahead fields
+          $(".form-row:not(.empty-form) .searching").on("keypress",
+            function (evt) {
+              var key = evt.which,  // Get the KEY information
+                  start = null,
+                  button = null;
+
+              // Look for ENTER
+              if (key === KEYS.ENTER) {
+                // Find the 'Search' button
+                button = $(this).closest("form").find("a[role=button]").last();                
+                // Check for the inner text
+                if ($(button)[0].innerText === "Search") {
+                  // Found it
+                  $(button).click();
+                  evt.preventDefault();
+                }
+              }
             });
 
           // Make sure the twitter typeahead spans are maximized
