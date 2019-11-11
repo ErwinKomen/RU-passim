@@ -791,7 +791,7 @@ var ru = (function ($, ru) {
        *    Gather the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method, iPage) {
+      search_start: function (elStart, method, iPage, sOrder) {
         var frm = null,
             url = "",
             targetid = null,
@@ -823,6 +823,12 @@ var ru = (function ($, ru) {
                   $(this).val(iPage);
                 });
               }
+              // If there is a sort order, we need to process it
+              if (sOrder !== undefined) {
+                $(elStart).find("input[name=o]").each(function (el) {
+                  $(this).val(sOrder);
+                });
+              }
               // Now submit the form
               frm.submit();
               break;
@@ -840,6 +846,9 @@ var ru = (function ($, ru) {
               // Get the page we need to go to
               if (iPage === undefined) { iPage = 1; }
               data.push({ 'name': 'page', 'value': iPage });
+              if (sOrder !== undefined) {
+                data.push({ 'name': 'o', 'value': sOrder });
+              }
 
               // Issue a post
               $.post(targeturl, data, function (response) {
@@ -893,6 +902,23 @@ var ru = (function ($, ru) {
           ru.passim.seeker.search_start(elStart, 'submit', iPage)
         } catch (ex) {
           private_methods.errMsg("search_paged_start", ex);
+        }
+      },
+
+      /**
+       * search_ordered_start
+       *    Perform a simple 'submit' call to search_start
+       *
+       */
+      search_ordered_start: function (order) {
+        var elStart = null;
+
+        try {
+          // And then go to the first element within the form that is of any use
+          elStart = $(".search_ordered_start").first();
+          ru.passim.seeker.search_start(elStart, 'submit', 1, order)
+        } catch (ex) {
+          private_methods.errMsg("search_ordered_start", ex);
         }
       },
 

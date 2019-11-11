@@ -4577,9 +4577,12 @@ class SermonListView(ListView):
         order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
         bAscending = True
         sType = 'str'
-        if 'o' in self.qd:
+        if 'o' in self.qd and self.qd['o'] != "":
+            colnum = self.qd['o']
+            if '=' in colnum:
+                colnum = colnum.split('=')[1]
             order = []
-            iOrderCol = int(self.qd['o'])
+            iOrderCol = int(colnum)
             bAscending = (iOrderCol>0)
             iOrderCol = abs(iOrderCol)
             for order_item in self.order_cols[iOrderCol-1].split(";"):

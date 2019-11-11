@@ -40,6 +40,11 @@
             <input name="page" type="text" />
           </div>
 
+          <!-- entrypoint for search_ordered_start -->
+          <div class="hidden search_ordered_start">
+            <input name="o" type="text" />
+          </div>
+
           <!-- Filter tab -->
           <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
             <div class="panel panel-default">
@@ -327,7 +332,7 @@
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
-                              <a href=?{{hd.order}}>{{hd.name}}</a>
+                              <a class="clickable" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
                               {% endif %}
                             </div>
                           </th>
@@ -346,14 +351,14 @@
                                    {% elif sermon.nickname %}{{sermon.nickname.name}}
                                    {% else %}(unknown){% endif %}">
                           {% if sermon.author %}
-                            <span style="color: darkgreen;">{{sermon.author.name|truncatechars:12}}</span>
+                            <span style="color: darkgreen;font-size: small;">{{sermon.author.name|truncatechars:20}}</span>
                           {% elif sermon.nickname %}
-                            <span style="font-size:x-small; color: darkred;">{{sermon.nickname.name|truncatechars:12}}</span>
+                            <span style="font-size:small; color: darkred;">{{sermon.nickname.name|truncatechars:20}}</span>
                           {% else %}
                             <span><i>(unknown)</i></span>
                           {% endif %}
                         </td>
-                        <td class="sermon-signature tdnowrap" align="left" title="{{sermon.signatures}}">
+                        <td class="sermon-signature tdnowrap" style="font-size: small;" align="left" title="{{sermon.signatures}}">
                           <span>{{sermon.signatures|truncatechars:20}}</span>
                         </td>
                         <td style="width: 100%;">
@@ -365,13 +370,13 @@
                         <!-- Manuscript in which this sermon is situated -->
                         <td class="sermon-manuscript tdnowrap clickable" style="min-width: 100px;" align="left" title="{{sermon.manu.idno}}" >
                           <a href="{% url 'manuscript_details' sermon.manu.id %}" class="nostyle">
-                            <span>{{sermon.manu.idno|truncatechars:20}}</span>
+                            <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
                           </a>
                         </td>
                         
                         <!-- Locus in manuscript -->
                         <td class="sermon-locus tdnowrap">
-                          <span>{{sermon.locus}}</span>
+                          <span style="font-size: small;">{{sermon.locus}}</span>
                         </td>
 
                         <!-- Give an overview of the links *from* this sermon to others -->

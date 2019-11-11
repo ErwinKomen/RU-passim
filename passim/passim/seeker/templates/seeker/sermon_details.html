@@ -25,7 +25,14 @@
           <!-- Actual contents -->
           <div class="col-md-10">
 
-            <h3>Sermon details</h3>
+            <h3>
+              <span>Sermon details</span>
+              <span alternativeclass="pull-right" >
+                {% for sig in sermoForm.instance.sermonsignatures.all %}
+                  <span class="badge jumbo-1">{{sig.code}}</span>
+                {% endfor %}
+              </span>
+            </h3>
 
             <!-- SermonDescr Main information -->
             <div id="sermon_edit">
