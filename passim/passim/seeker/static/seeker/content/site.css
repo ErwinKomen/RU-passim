@@ -1161,6 +1161,15 @@ span.badge.use-link {
   background-color: mediumorchid;
 }
 
+span.badge.signature {
+  background-color: lightgray;
+  color: darkblue;
+  font-size: smaller;
+  padding: 2px 5px;
+  font-weight: normal;
+  border-radius: 5px;
+}
+
 /* Badges with background color for location types */
 span.badge.loctype-city {
   background-color: darkblue;

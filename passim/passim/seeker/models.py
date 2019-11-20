@@ -3048,6 +3048,12 @@ class SermonGold(models.Model):
             lSign.append(item.short())
         return " | ".join(lSign)
 
+    def get_signatures(self):
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return lSign
+
     def get_keywords(self):
         """Combine all keywords into one string"""
 
