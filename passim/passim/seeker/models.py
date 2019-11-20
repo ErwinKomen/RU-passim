@@ -89,12 +89,29 @@ class HelpChoice(models.Model):
 def get_current_datetime():
     return timezone.now()
 
-def adapt_search(val):
+def adapt_search(val, do_brackets = True):
     if val == None: return None
     # First trim
     val = val.strip()
+    if do_brackets:
+        arPart = val.split("[")
+        for idx, part in enumerate(arPart):
+            arPart[idx] = part.replace("]", "[]]")
+        val = "[[]".join(arPart)
     val = '^' + fnmatch.translate(val) + '$'
     return val
+
+def adapt_brackets(val):
+    """Change square brackets for better searching"""
+    if val == None: return None
+    # First trim
+    val = val.strip()
+    arPart = val.split("[")
+    for part in arPart:
+        part = part.replace("]", "[]]")
+    val = "[[]".join(arPart)
+    return val
+
 
 def adapt_latin(val):
     """Change the three dots into a unicode character"""
