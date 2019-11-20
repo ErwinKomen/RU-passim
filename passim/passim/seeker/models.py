@@ -87,6 +87,7 @@ class HelpChoice(models.Model):
         return help_text
 
 def get_current_datetime():
+    """Get the current time"""
     return timezone.now()
 
 def adapt_search(val, do_brackets = True):
@@ -112,7 +113,6 @@ def adapt_brackets(val):
     val = "[[]".join(arPart)
     return val
 
-
 def adapt_latin(val):
     """Change the three dots into a unicode character"""
 
@@ -131,6 +131,7 @@ def adapt_markdown(val, lowercase=True):
     return sBack
 
 def is_number(s_input):
+    """Check if s_input is a number consisting only of digits, possibly enclosed in brackets"""
     return re.match(r'^[[]?(\d+)[]]?', s_input)
 
 def get_linktype_abbr(sLinkType):
@@ -177,6 +178,7 @@ def get_crpp_date(dtThis):
     return sDate
 
 def get_now_time():
+    """Get the current time"""
     return time.clock()
 
 def obj_text(d):
@@ -3578,13 +3580,6 @@ class SermonDescr(models.Model):
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
-
-    ## [0-1] We would like to know the Clavis number (if available)
-    #clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
-    ## [0-1] We would like to know the Gryson number (if available)
-    #gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
-    ## [0-1] One keyword or more??
-    #keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 

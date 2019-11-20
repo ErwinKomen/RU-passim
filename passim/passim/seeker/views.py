@@ -667,7 +667,6 @@ def search_sermon(filters, qd):
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            # {'filter': 'manuid',    'dbfield': 'manu__idno',                'keyS': 'manuidno',     'keyList': 'manuidlist', 'infield': 'id'},
             {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
@@ -4936,6 +4935,8 @@ class ManuscriptListView(ListView):
         {"name": "Origin",          "id": "filter_origin",      "enabled": False},
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
+        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False},
+        {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
                 ]
     searches = [
         {'section': '', 'filterlist': [
@@ -4947,6 +4948,9 @@ class ManuscriptListView(ListView):
             {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
             {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
+            ]},
+        {'section': 'sermon', 'filterlist': [
+            {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             ]}
          ]
     # Define a formset for searching

@@ -121,6 +121,17 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return Manuscript.objects.all().order_by('idno').distinct()
 
 
+class SignatureWidget(ModelSelect2MultipleWidget):
+    model = Signature
+    search_fields = [ 'code__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        return Signature.objects.all().order_by('code').distinct()
+
+
 class SearchManuForm(forms.ModelForm):
     """Manuscript search form"""
 
@@ -144,6 +155,11 @@ class SearchManuForm(forms.ModelForm):
                                      widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                                      widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    signature   = forms.CharField(label=_("Signature"), required=False,
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -173,6 +189,7 @@ class SearchManuForm(forms.ModelForm):
         self.fields['yearstart'].required = False
         self.fields['yearfinish'].required = False
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -199,17 +216,6 @@ class SearchManuForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
-
-class SignatureWidget(ModelSelect2MultipleWidget):
-    model = Signature
-    search_fields = [ 'code__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.code
-
-    def get_queryset(self):
-        return Signature.objects.all().order_by('code').distinct()
 
 
 class KeywordWidget(ModelSelect2MultipleWidget):

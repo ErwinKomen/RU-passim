@@ -210,7 +210,7 @@
                 </div>
               </div>
               
-              <div class="row" id="sermon_filter_specs">
+              <div class="row" id="manuscript_filter_specs">
                 <!-- The column with the different filter sections -->
                 <div class="col-md-10">
                   <div class="panel panel-default ">
@@ -318,7 +318,52 @@
 
               </div>
 
-              <!-- Row with buttons-->
+              <!-- Row with buttons and stuff for sermon -->
+              <div id="filter_sermon" class="row {% if not filter_sermon %}hidden{% endif %}"
+                   targetid="sermon_filter_specs">
+
+                  <!-- Sub filters for Sermon -->
+                  <div class="col-md-10 col-sm-offset-2">
+
+                    <!-- Sub filters from Sermon -->
+                    <div>
+                      {% for filter in filters %}
+                        {% if filter.head_id == "filter_sermon" %}
+                          <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+
+                  </div>
+
+              </div>
+
+              <div class="row" id="sermon_filter_specs">
+                <div class="col-md-10">
+                  <div class="panel panel-default ">
+                    <!-- Introduction to these filters -->
+                    <div><h5>Sermon filters: </h5></div>
+
+                    <!-- One or more signatures -->
+                    <div id="filter_signature" class="{% if not manuForm.signature.value and not manuForm.siglist.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;" valign="top">Gryson or Clavis:</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{manuForm.signature}}</span>
+                            <span> or select: </span>
+                            <span>{{manuForm.siglist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row with buttons -->
               <div class="row">
                 <div class="col-md-2 col-md-offset-10 text-right">
                   <!-- Room to reset the search criteria -->
@@ -525,7 +570,7 @@
                             <!-- external link button -->
                             {% if man.url %}
                               <a role="button" class="btn btn-xs jumbo-1" title="External link"
-                                  href="{{man.url}}" target="_blank" >
+                                  href="{{man.url}}"  >
                                 <span class="glyphicon glyphicon-link"></span>
                               </a>
                             {% endif %}
