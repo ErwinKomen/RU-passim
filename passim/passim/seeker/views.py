@@ -336,6 +336,49 @@ def make_search_list(filters, oFields, search_list, qd):
     # Return what we have created
     return filters, lstQ, qd
 
+def make_ordering(qs, qd, orders, order_cols, order_heads):
+
+    oErr = ErrHandle()
+
+    try:
+        bAscending = True
+        sType = 'str'
+        order = []
+        if 'o' in qd and qd['o'] != "":
+            colnum = qd['o']
+            if '=' in colnum:
+                colnum = colnum.split('=')[1]
+            if colnum != "":
+                order = []
+                iOrderCol = int(colnum)
+                bAscending = (iOrderCol>0)
+                iOrderCol = abs(iOrderCol)
+                for order_item in order_cols[iOrderCol-1].split(";"):
+                    order.append(Lower(order_item))
+                sType = order_heads[iOrderCol-1]['type']
+                if bAscending:
+                    order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
+                else:
+                    # order = "-" + order
+                    order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+        else:
+            order.append(Lower(order_cols[0]))
+        if sType == 'str':
+            if len(order) > 0:
+                qs = qs.order_by(*order)
+            # qs = qs.order_by('editions__first__date_late')
+        else:
+            qs = qs.order_by(*order)
+        # Possibly reverse the order
+        if not bAscending:
+            qs = qs.reverse()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("make_ordering")
+        lstQ = []
+
+    return qs, order_heads
+
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
@@ -2463,7 +2506,6 @@ def get_gold(request, pk=None):
     mimetype = "application/json"
     return HttpResponse(json.dumps(data), mimetype)
 
-
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
 
@@ -3791,6 +3833,149 @@ class PassimDetails(DetailView):
         return context
 
 
+class BasicListView(ListView):
+    """Basic listview"""
+
+    paginate_by = 15
+    entrycount = 0
+    qd = None
+    bFilter = False
+    initial = None
+    listform = None
+    plural_name = ""
+    prefix = ""
+    order_default = []
+    order_cols = []
+    order_heads = []
+    filters = []
+    searches = []
+    page_function = None
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(BasicListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
+
+        # Need to load the correct form
+        if self.listform:
+            context['{}Form'.format(self.prefix)] = self.listform(initial, prefix=self.prefix)
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Need to pass on a pagination function
+        if self.page_function:
+            context['page_function'] = self.page_function
+
+        # Set the page number if needed
+        if 'page_obj' in context and 'page' in initial and initial['page'] != "":
+            # context['page_obj'].number = initial['page']
+            page_num = int(initial['page'])
+            context['page_obj'] = context['paginator'].page( page_num)
+            # Make sure to adapt the object_list
+            context['object_list'] = context['page_obj']
+
+        # Set the title of the application
+        context['title'] = self.plural_name
+
+        # Make sure we pass on the ordered heads
+        context['order_heads'] = self.order_heads
+        context['has_filter'] = self.bFilter
+        context['filters'] = self.filters
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['authenticated'] = context['is_authenticated'] 
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Editions", True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        # Allow others to add to context
+        context = self.add_to_context(context, initial)
+
+        # Return the calculated context
+        return context
+
+    def add_to_context(self, context, initial):
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasParameters = (len(get) > 0)
+
+        if self.bHasParameters:
+            lstQ = []
+            # Indicate we have no filters
+            self.bFilter = False
+
+            # Read the form with the information
+            thisForm = self.listform(self.qd, prefix=self.prefix)
+
+            if thisForm.is_valid():
+                # Process the criteria for this form
+                oFields = thisForm.cleaned_data
+
+                self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # Just show everything
+                    qs = self.model.objects.all()
+                else:
+                    # There is a filter, so apply it
+                    qs = self.model.objects.filter(*lstQ).distinct()
+                    self.bFilter = True
+            else:
+                # Just show everything
+                qs = self.model.objects.all().distinct()
+
+            # Do the ordering of the results
+            order = self.order_default
+            qs, self.order_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+        else:
+            # Just show everything
+            qs = self.model.objects.all().distinct()
+            order = self.order_default
+            qs, tmp_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
+    
+
 class ManuscriptEdit(BasicPart):
     """The details of one manuscript"""
 
@@ -4966,13 +5151,6 @@ class ManuscriptListView(ListView):
         else:
             initial = self.initial
 
-        # Determine the formset to be passed on
-        #if self.bHasFormset:
-        #    manu_formset = self.ManuFormset(initial, prefix='manu')
-        #else:
-        #    manu_formset = self.ManuFormset(prefix='manu')
-        #context['manu_formset'] = manu_formset
-
         # We pass on a FORM
         context['manuForm'] = SearchManuForm(initial, prefix='manu')
 
@@ -5353,17 +5531,20 @@ class ManuscriptExtset(BasicPart):
         return has_changed
 
 
-class SermonGoldListView(ListView):
+class SermonGoldListView(BasicListView):
     """Search and list manuscripts"""
     
     model = SermonGold
-    paginate_by = 20
+    listform = SermonGoldForm
+    prefix = "gold"
     template_name = 'seeker/sermongold.html'
-    entrycount = 0
-    bDoTime = True
-    bFilter = False     # Status of the filter
-    initial = None
+    paginate_by = 20
+    #entrycount = 0
+    #bDoTime = True
+    #bFilter = False     # Status of the filter
+    #initial = None
     page_function = "ru.passim.seeker.search_paged_start"
+    order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
@@ -5386,166 +5567,166 @@ class SermonGoldListView(ListView):
         ]
 
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(SermonGoldListView, self).get_context_data(**kwargs)
+    #def get_context_data(self, **kwargs):
+    #    # Call the base implementation first to get a context
+    #    context = super(SermonGoldListView, self).get_context_data(**kwargs)
 
-        # Get parameters for the search
-        if self.initial == None:
-            initial = self.request.POST if self.request.POST else self.request.GET
-        else:
-            initial = self.initial
+    #    # Get parameters for the search
+    #    if self.initial == None:
+    #        initial = self.request.POST if self.request.POST else self.request.GET
+    #    else:
+    #        initial = self.initial
 
-        # ONE-TIME adhoc = SermonGold.init_latin()
+    #    # ONE-TIME adhoc = SermonGold.init_latin()
 
-        # Add a files upload form
-        context['goldForm'] = SermonGoldForm(initial, prefix='gold')
-        # Make sure we evaluate the form, to get cleaned_data
-        bFormOkay = context['goldForm'].is_valid()
+    #    # Add a files upload form
+    #    context['goldForm'] = SermonGoldForm(initial, prefix='gold')
+    #    # Make sure we evaluate the form, to get cleaned_data
+    #    bFormOkay = context['goldForm'].is_valid()
 
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
+    #    # Determine the count 
+    #    context['entrycount'] = self.entrycount # self.get_queryset().count()
 
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
+    #    # Set the prefix
+    #    context['app_prefix'] = APP_PREFIX
 
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
+    #    # Make sure the paginate-values are available
+    #    context['paginateValues'] = paginateValues
 
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
+    #    if 'paginate_by' in initial:
+    #        context['paginateSize'] = int(initial['paginate_by'])
+    #    else:
+    #        context['paginateSize'] = paginateSize
 
-        # Set the title of the application
-        context['title'] = "Gold-Sermons"
+    #    # Set the title of the application
+    #    context['title'] = "Gold-Sermons"
 
-        # Make sure we pass on the ordered heads
-        context['order_heads'] = self.order_heads
-        context['has_filter'] = self.bFilter
-        context['filters'] = self.filters
+    #    # Make sure we pass on the ordered heads
+    #    context['order_heads'] = self.order_heads
+    #    context['has_filter'] = self.bFilter
+    #    context['filters'] = self.filters
 
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Gold sermons", False)
-        context['prevpage'] = get_previous_page(self.request)
+    #    # Process this visit and get the new breadcrumbs object
+    #    context['breadcrumbs'] = process_visit(self.request, "Gold sermons", False)
+    #    context['prevpage'] = get_previous_page(self.request)
 
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+    #    # Check this user: is he allowed to UPLOAD data?
+    #    context['authenticated'] = user_is_authenticated(self.request)
+    #    context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+    #    context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
-        # Return the calculated context
-        return context
+    #    # Return the calculated context
+    #    return context
 
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
+    #def get_paginate_by(self, queryset):
+    #    """
+    #    Paginate by specified value in querystring, or use default class property value.
+    #    """
+    #    return self.request.GET.get('paginate_by', self.paginate_by)
   
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
+    #def get_queryset(self):
+    #    # Measure how long it takes
+    #    if self.bDoTime: iStart = get_now_time()
 
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
+    #    # Get the parameters passed on with the GET or the POST request
+    #    get = self.request.GET if self.request.method == "GET" else self.request.POST
+    #    get = get.copy()
+    #    self.qd = get
 
-        self.bHasFormset = (len(get) > 0)
+    #    self.bHasFormset = (len(get) > 0)
 
-        sort_type = "exclude_signature"
-        sort_type = "ordered_columns"
+    #    sort_type = "exclude_signature"
+    #    sort_type = "ordered_columns"
 
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
+    #    # Fix the sort-order
+    #    get['sortOrder'] = 'name'
 
-        if self.bHasFormset:
-            # Get the formset from the input
-            lstQ = []
+    #    if self.bHasFormset:
+    #        # Get the formset from the input
+    #        lstQ = []
 
-            # (2) Indicate we have no filters
-            self.bFilter = False
+    #        # (2) Indicate we have no filters
+    #        self.bFilter = False
 
-            goldForm = SermonGoldForm(self.qd, prefix='gold')
+    #        goldForm = SermonGoldForm(self.qd, prefix='gold')
 
-            if goldForm.is_valid():
+    #        if goldForm.is_valid():
 
-                # Process the criteria from this form 
-                oFields = goldForm.cleaned_data
+    #            # Process the criteria from this form 
+    #            oFields = goldForm.cleaned_data
 
-                self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
+    #            self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
 
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # Just show everything
-                    qs = SermonGold.objects.all()
-                else:
-                    # There is a filter, so apply it
-                    qs = SermonGold.objects.filter(*lstQ).distinct()
-                    self.bFilter = True
-            else:
-                # TODO: communicate the error to the user???
+    #            # Calculate the final qs
+    #            if len(lstQ) == 0:
+    #                # Just show everything
+    #                qs = SermonGold.objects.all()
+    #            else:
+    #                # There is a filter, so apply it
+    #                qs = SermonGold.objects.filter(*lstQ).distinct()
+    #                self.bFilter = True
+    #        else:
+    #            # TODO: communicate the error to the user???
 
 
-                # Just show everything
-                qs = SermonGold.objects.all().distinct()
+    #            # Just show everything
+    #            qs = SermonGold.objects.all().distinct()
 
-        else:
-            # Just show everything
-            qs = SermonGold.objects.all().distinct()
+    #    else:
+    #        # Just show everything
+    #        qs = SermonGold.objects.all().distinct()
 
-        # Do sorting
-        if sort_type == "exclude_signature":
-            # Sort the 'normal' way on author/incipit/explicit
-            qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
-        elif sort_type == "ordered_columns":
-            # Start with an initial order
-            order = ['author__name', 'siglist', 'incipit', 'explicit']
-            bAscending = True
-            sType = 'str'
-            if 'o' in self.qd:
-                order = []
-                iOrderCol = int(self.qd['o'])
-                bAscending = (iOrderCol>0)
-                iOrderCol = abs(iOrderCol)
-                for order_item in self.order_cols[iOrderCol-1].split(";"):
-                    order.append(Lower(order_item))
-                sType = self.order_heads[iOrderCol-1]['type']
-                if bAscending:
-                    self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
-                else:
-                    # order = "-" + order
-                    self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
-            if sType == 'str':
-                qs = qs.order_by(*order)
-            else:
-                qs = qs.order_by(*order)
-            # Possibly reverse the order
-            if not bAscending:
-                qs = qs.reverse()
-        else:
-            # Sort the python way
-            qs = sorted(qs, key=lambda x: x.get_sermon_string())
+    #    # Do sorting
+    #    if sort_type == "exclude_signature":
+    #        # Sort the 'normal' way on author/incipit/explicit
+    #        qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
+    #    elif sort_type == "ordered_columns":
+    #        # Start with an initial order
+    #        order = ['author__name', 'siglist', 'incipit', 'explicit']
+    #        bAscending = True
+    #        sType = 'str'
+    #        if 'o' in self.qd:
+    #            order = []
+    #            iOrderCol = int(self.qd['o'])
+    #            bAscending = (iOrderCol>0)
+    #            iOrderCol = abs(iOrderCol)
+    #            for order_item in self.order_cols[iOrderCol-1].split(";"):
+    #                order.append(Lower(order_item))
+    #            sType = self.order_heads[iOrderCol-1]['type']
+    #            if bAscending:
+    #                self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
+    #            else:
+    #                # order = "-" + order
+    #                self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+    #        if sType == 'str':
+    #            qs = qs.order_by(*order)
+    #        else:
+    #            qs = qs.order_by(*order)
+    #        # Possibly reverse the order
+    #        if not bAscending:
+    #            qs = qs.reverse()
+    #    else:
+    #        # Sort the python way
+    #        qs = sorted(qs, key=lambda x: x.get_sermon_string())
 
-        # Time measurement
-        if self.bDoTime:
-            print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            # print("SermonGoldListView query: {}".format(qs.query))
-            iStart = get_now_time()
+    #    # Time measurement
+    #    if self.bDoTime:
+    #        print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+    #        # print("SermonGoldListView query: {}".format(qs.query))
+    #        iStart = get_now_time()
 
-        # Determine the length
-        self.entrycount = len(qs)
+    #    # Determine the length
+    #    self.entrycount = len(qs)
 
-        # Time measurement
-        if self.bDoTime:
-            print("SermonGoldListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+    #    # Time measurement
+    #    if self.bDoTime:
+    #        print("SermonGoldListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
 
-        # Return the resulting filtered and sorted queryset
-        return qs
+    #    # Return the resulting filtered and sorted queryset
+    #    return qs
 
-    def post(self, request, *args, **kwargs):
-        return self.get(request, *args, **kwargs)
+    #def post(self, request, *args, **kwargs):
+    #    return self.get(request, *args, **kwargs)
 
 
 class SermonGoldSelect(BasicPart):

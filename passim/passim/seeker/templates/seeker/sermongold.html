@@ -48,6 +48,11 @@
             <input name="page" type="text" />
           </div>
 
+          <!-- entrypoint for search_ordered_start -->
+          <div class="hidden search_ordered_start">
+            <input name="o" type="text" />
+          </div>
+
           <!-- Filter tab -->
           <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
             <div class="panel panel-default">
@@ -241,7 +246,7 @@
                   <div class="col-sm-8">
                   <span class="step-links pull-right">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
                   </div>
@@ -259,7 +264,7 @@
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
-                              <a href=?{{hd.order}}>{{hd.name}}</a>
+                              <a class="clickable" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
                               {% endif %}
                             </div>
                           </th>
@@ -312,7 +317,7 @@
               <div class="pagination">
                   <span class="step-links">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
               </div>

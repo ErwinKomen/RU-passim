@@ -1168,6 +1168,7 @@ span.badge.signature {
   padding: 2px 5px;
   font-weight: normal;
   border-radius: 5px;
+  margin: 1px;
 }
 
 /* Badges with background color for location types */
