@@ -664,7 +664,7 @@ def search_sermon(filters, qd):
             {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyList': 'kwlist', 'infield': 'name' }
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
             # {'filter': 'manuid',    'dbfield': 'manu__idno',                'keyS': 'manuidno',     'keyList': 'manuidlist', 'infield': 'id'},
