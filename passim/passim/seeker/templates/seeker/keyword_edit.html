@@ -1,0 +1,76 @@
+﻿{% load i18n %}
+
+<!-- Keyword information -->
+<form>
+  {% csrf_token %}
+    <table style="width: 100%;">
+      <tr>
+        <td colspan="2"  class="ms editable table">
+          <!-- Provide the necessary buttons: edit, cancel and save -->
+          <div>
+            {% if is_passim_editor %}
+              <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+              </a>
+            {% endif %}
+
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+
+            {% if is_passim_editor %}
+              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                 targeturl="{% if kwForm.instance.id %}{% url 'keyword_edit' kwForm.instance.id %}{% else %}{% url 'keyword_edit' %}{% endif %}" >
+                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+              </a>
+            {% endif %}
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="gold_err_msg" class="err-msg"></span>
+
+            {% if is_passim_editor %}
+              <!-- Put the delete button completely to the right-->
+              <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+                 onclick="ru.passim.seeker.delete_confirm(this);">
+                <span class="glyphicon glyphicon-remove" title="Delete this keyword"></span>
+              </a>
+            {% endif %}
+          </div>
+
+          <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+          {% if is_passim_editor %}
+            <div class="delete-confirm hidden selected">
+              <span>Are you sure you would like to delete this keyword?</span>
+              <span>
+                <!-- The button to cancel deletion -->
+                <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                   onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                <!-- The actual delete button-->
+                <a mode="delete" title="Delete this keyword" class="btn btn-xs jumbo-3"
+                   afterurl="{% url 'keyword_list' %}"
+                   targetid="sermon_edit"
+                   targeturl="{% if kwForm.instance.id %}{% url 'keyword_edit' kwForm.instance.id %}{% endif %}">
+                  Delete
+                </a>
+              </span>
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Room for the standard fields -->
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">Name</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{kwForm.name}}</div>
+          <div class="view-mode">{{kwForm.name.value}}</div>
+        </td>
+      </tr>
+
+    </table>
+</form>
+
+

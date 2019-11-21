@@ -103,6 +103,10 @@ urlpatterns = [
 
     url(r'^literature/list', LitRefListView.as_view(), name='literature_list'),
 
+    url(r'^keyword/list', KeywordListView.as_view(), name='keyword_list'),
+    url(r'^keyword/details(?:/(?P<pk>\d+))?/$', KeywordDetails.as_view(), name='keyword_details'),
+    url(r'^keyword/edit(?:/(?P<pk>\d+))?/$', KeywordEdit.as_view(), name='keyword_edit'),
+
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),

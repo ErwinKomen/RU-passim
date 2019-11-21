@@ -2900,6 +2900,16 @@ class Keyword(models.Model):
     def __str__(self):
         return self.name
 
+    def freqsermo(self):
+        """Frequency in manifestation sermons"""
+        freq = self.keywords_sermon.all().count()
+        return freq
+
+    def freqgold(self):
+        """Frequency in Gold sermons"""
+        freq = self.keywords_gold.all().count()
+        return freq
+
 
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
