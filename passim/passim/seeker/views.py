@@ -36,7 +36,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
@@ -3909,7 +3909,7 @@ class BasicListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Editions", True)
+        context['breadcrumbs'] = process_visit(self.request, self.plural_name, True)
         context['prevpage'] = get_previous_page(self.request)
 
         context['usebasket'] = self.basketview
@@ -4775,6 +4775,79 @@ class BasketUpdate(BasicPart):
         return context
     
 
+class KeywordDetails(PassimDetails):
+    """The details of one keyword"""
+
+    model = Keyword
+    mForm = KeywordForm
+    template_name = 'seeker/keyword_details.html'
+    template_post = 'seeker/keyword_details.html'
+    prefix = 'kw'
+    title = "KeywordDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('keyword_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Keyword details", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+class KeywordEdit(PassimDetails):
+    """The details of one keyword"""
+
+    model = Keyword
+    mForm = KeywordForm
+    template_name = 'seeker/keyword_edit.html'
+    template_post = 'seeker/keyword_edit.html'
+    prefix = 'kw'
+    title = "KeywordEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('keyword_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Keyword edit", False)
+
+        context['afterdelurl'] = get_previous_page(self.request)
+        return context
+
+
+class KeywordListView(BasicListView):
+    """Search and list keywords"""
+
+    model = Keyword
+    listform = KeywordForm
+    prefix = "kw"
+    paginate_by = 20
+    template_name = 'seeker/keyword_list.html'
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str'},
+                   {'name': 'Frequency', 'order': '', 'type': 'str'}]
+    filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
+        ]
+
+
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
 
@@ -4965,9 +5038,20 @@ class ManuscriptDetails(PassimDetails):
     prefix_type = "simple"
     rtype = "html"      # Load this as straight forward html
 
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set a redirect page
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('manuscript_details', kwargs={'pk': instance.id})
+        return True, "" 
+
     def add_to_context(self, context, instance):
 
-        # Get the instance
+        # Get the instance via self.object??
+        #   (or why not use the supplied 'instance'??)
         instance = self.object
 
         # Construct the hierarchical list
@@ -5011,18 +5095,24 @@ class ManuscriptDetails(PassimDetails):
         return context
 
 
-class ManuscriptListView(ListView):
+class ManuscriptListView(BasicListView):
     """Search and list manuscripts"""
     
     model = Manuscript
+    listform = SearchManuForm
     paginate_by = 20
-    template_name = 'seeker/manuscript.html'
-    entrycount = 0
-    bDoTime = True
-    bFilter = False
-    bHasFormset = False
-    initial = None
+    template_name = 'seeker/manuscript_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
+    prefix = "manu"
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
+    order_default = order_cols
+    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
+                   {'name': 'Library',  'order': 'o=2', 'type': 'str'},
+                   {'name': 'Name',     'order': 'o=3', 'type': 'str'},
+                   {'name': 'Items',    'order': '',    'type': 'int'},
+                   {'name': 'From',     'order': 'o=5', 'type': 'int'},
+                   {'name': 'Until',    'order': 'o=6', 'type': 'int'},
+                   {'name': 'Status',   'order': 'o=7', 'type': 'str'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
         {"name": "Country",         "id": "filter_country",     "enabled": False},
@@ -5049,241 +5139,15 @@ class ManuscriptListView(ListView):
             {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             ]}
          ]
-    # Define a formset for searching
-    ManuFormset = formset_factory(SearchManuscriptForm, extra=0, min_num=1)
-    
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(ManuscriptListView, self).get_context_data(**kwargs)
 
-        # Get parameters for the search
-        if self.initial == None:
-            initial = self.request.POST if self.request.POST else self.request.GET
-        else:
-            initial = self.initial
-
-        # We pass on a FORM
-        context['manuForm'] = SearchManuForm(initial, prefix='manu')
-
+    def add_to_context(self, context, initial):
         # Add a files upload form
         context['uploadform'] = UploadFilesForm()
 
         # Add a form to enter a URL
         context['searchurlform'] = SearchUrlForm()
 
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        context['has_filter'] = self.bFilter
-        context['filters'] = self.filters
-
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Manuscripts", True)
-        context['prevpage'] = get_previous_page(self.request)
-
-        # Set the title of the application
-        context['title'] = "Manuscripts"
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Return the calculated context
         return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
-
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
-
-        method_to_use = "use_a_form"
-
-        if method_to_use == "use_a_form":
-            # Check if we are receiving a FORM or something else
-            bHasForm = ('manu-idno' in get)
-            if bHasForm:
-                # Get the form from the input
-                lstQ = []
-
-                # (2) Indicate we have no filters
-                self.bFilter = False
-
-                manuForm = SearchManuForm(self.qd, prefix='manu')
-
-                if manuForm.is_valid():
-
-                    # Process the criteria from this form 
-                    oFields = manuForm.cleaned_data
-
-                    self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
-
-                    # Calculate the final qs
-                    if len(lstQ) == 0:
-                        # Just show everything
-                        qs = Manuscript.objects.all()
-                    else:
-                        # There is a filter, so apply it
-                        qs = Manuscript.objects.filter(*lstQ).distinct()
-                        self.bFilter = True
-                else:
-                    # TODO: communicate the error to the user???
-                    
-
-                    # Just show everything
-                    qs = Manuscript.objects.all().distinct()
-            elif 'library' in get:
-                lstQ = []
-                # Is this a number?
-                val = get['library']
-                if val.isdigit():
-                    lstQ.append(Q(library__id=val))
-                else:
-                    val = adapt_search(val)
-                    lstQ.append(Q(library__name__iregex=val))
-                qs = Manuscript.objects.filter(*lstQ).distinct()
-            else:
-                # Just show everything
-                qs = Manuscript.objects.all()
-        else:
-
-            self.bHasFormset = ('manu-TOTAL_FORMS' in get)
-
-            if self.bHasFormset:
-                # Get the formset from the input
-                lstQ = []
-
-                manu_formset = self.ManuFormset(self.qd, prefix='manu')
-
-                # Process the formset
-                if manu_formset != None:
-                    # Validate it
-                    if manu_formset.is_valid():
-                        #  Everything okay, continue
-                        for sform in manu_formset:
-                            # Process the criteria from this form 
-                            oFields = sform.cleaned_data
-                            lstThisQ = []
-
-                            # Check for Manuscript [name]
-                            if 'idno' in oFields and oFields['idno'] != "": 
-                                val = adapt_search(oFields['idno'])
-                                lstThisQ.append(Q(idno__iregex=val))
-
-                            # Check for Manuscript [name]
-                            if 'name' in oFields and oFields['name'] != "": 
-                                val = adapt_search(oFields['name'])
-                                lstThisQ.append(Q(name__iregex=val))
-
-                            # Check for Manuscript [idno]
-                            if 'gryson' in oFields and oFields['gryson'] != "": 
-                                val = adapt_search(oFields['gryson'])
-                                lstThisQ.append(Q(idno__iregex=val))
-
-                            # Check for Manuscript [idno]
-                            if 'clavis' in oFields and oFields['clavis'] != "": 
-                                val = adapt_search(oFields['clavis'])
-                                lstThisQ.append(Q(idno__iregex=val))
-
-                            # Check for country name
-                            if 'country' in oFields and oFields['country'] != "": 
-                                val = adapt_search(oFields['country'])
-                                lstThisQ.append(Q(library__country__name__iregex=val))
-
-                            # Check for city name
-                            if 'city' in oFields and oFields['city'] != "": 
-                                val = adapt_search(oFields['city'])
-                                lstThisQ.append(Q(library__city__name__iregex=val))
-
-                            # Check for library name
-                            if 'library' in oFields and oFields['library'] != "": 
-                                # Is this a number?
-                                val = oFields['library']
-                                if val.isdigit():
-                                    lstThisQ.append(Q(library__id=val))
-                                else:
-                                    val = adapt_search(val)
-                                    lstThisQ.append(Q(library__name__iregex=val))
-
-                            # Now add these criterya to the overall lstQ
-                            if len(lstThisQ) > 0:
-                                lstQ.append(reduce(operator.and_, lstThisQ))
-                    else:
-                        # What to do when it is not valid?
-                        pass
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # Just show everything
-                    qs = Manuscript.objects.all()
-                elif len(lstQ) == 1:
-                    # criteria = reduce(operator.or_, lstQ)
-                    qs = Manuscript.objects.filter(*lstQ).distinct()
-                else:
-                    criteria = reduce(operator.or_, lstQ)
-                    qs = Manuscript.objects.filter(criteria).distinct()
-            elif 'library' in get:
-                lstQ = []
-                # Is this a number?
-                val = get['library']
-                if val.isdigit():
-                    lstQ.append(Q(library__id=val))
-                else:
-                    val = adapt_search(val)
-                    lstQ.append(Q(library__name__iregex=val))
-                qs = Manuscript.objects.filter(*lstQ).distinct()
-            else:
-                # Just show everything
-                qs = Manuscript.objects.all()
-
-        # Set the sort order
-        qs = qs.order_by('library__country__name', 
-                         'library__city__name', 
-                         'library__name', 
-                         'idno')
-
-        # Time measurement
-        if self.bDoTime:
-            print("ManuscriptListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("ManuscriptListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("ManuscriptListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
-        return qs
-
-    def post(self, request, *args, **kwargs):
-        return self.get(request, *args, **kwargs)
 
 
 class ManuscriptProvset(BasicPart):
@@ -5450,10 +5314,6 @@ class SermonGoldListView(BasicListView):
     prefix = "gold"
     template_name = 'seeker/sermongold.html'
     paginate_by = 20
-    #entrycount = 0
-    #bDoTime = True
-    #bFilter = False     # Status of the filter
-    #initial = None
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']

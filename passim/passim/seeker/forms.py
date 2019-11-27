@@ -924,6 +924,9 @@ class ManuscriptForm(forms.ModelForm):
         super(ManuscriptForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['yearstart'].required = False
+        self.fields['yearfinish'].required = False
+        self.fields['name'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

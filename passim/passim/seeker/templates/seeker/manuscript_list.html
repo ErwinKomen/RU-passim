@@ -29,13 +29,6 @@
                   <span class="glyphicon glyphicon-filter"></span>
                 </a>
 
-                <!-- OLD: searching -->
-                <!--
-                <a class="btn btn-xs jumbo-3" data-toggle="collapse" data-target="#tab_search" role="button" title="Define your search...">
-                  <span class="glyphicon glyphicon-search"></span>
-                </a>
-                  -->
-
                 <!-- Allow uploading e-codex XML files -->
                 {% if is_passim_uploader %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_ecodex" 
@@ -186,6 +179,11 @@
           <!-- entrypoint for search_paged_start -->
           <div class="hidden search_paged_start">
             <input name="page" type="text" />
+          </div>
+
+          <!-- entrypoint for search_ordered_start -->
+          <div class="hidden search_ordered_start">
+            <input name="o" type="text" />
           </div>
 
           <!-- Filter tab -->
@@ -379,167 +377,76 @@
             </div>
           </div>
 
-          <!-- Search tab -->
-          <div class="inert collapse" id="tab_search">
-            <div class="panel panel-default">
-                <div>
-                  <!-- Include the formset's management -->
-                  {{manu_formset.management_form}}
-
-                  <!-- Search interface: what manuscript to look for and what are the results -->
-                  <div class="row">
-                    <div id="manu_search" class="col-sm-12">
-                      <p>Manuscript to look for:</p>
-                      <table style="width: 100%;">
-                        {% for sform in manu_formset %}
-                          <!-- One row for this form -->
-                          <tr class="form-row">
-                            <!-- Cell to signal what this is -->
-                            {% if forloop.first %}
-                              <td style="width: 50px;">&nbsp;</td>
-                            {% else %}
-                              <td valign="top" style="width: 50px;"><b>OR</b></td>
-                            {% endif %}
-                            <!-- Cell for choices -->
-                            <td>
-                              <table>
-                                <tr>
-                                  <td>Country</td><td style="width: 50%;">{{sform.country}}</td>
-                                  <td>-</td><td style="width: 50%;">-</td>
-                                </tr>
-                                <tr>
-                                  <td>City</td><td style="width: 50%;">{{sform.city}}</td>
-                                  <td title="Name or title">Title</td><td style="width: 50%;">{{sform.name}}</td>
-                                </tr>
-                                <tr>
-                                  <td>Library</td><td style="width: 50%;">{{sform.library}}</td>
-                                  <td title="Identifying number or string">Shelfmark</td><td style="width: 50%;">{{sform.idno}}</td>
-                                </tr>
-                                <tr><td colspan="2">&nbsp;</td></tr>
-                              </table>
-                            </td>
-                            <!-- Cell for deletion -->
-                            {% if forloop.first %}
-                              <td style="width: 50px;"></td>
-                            {% else %}
-                              <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
-                                <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-                              </td>
-                            {% endif %}
-                          </tr>
-                        {% endfor %}
-
-                        <!-- Empty row with related constituent specification-->
-                        <tr class="form-row empty-form">
-                          <!-- Cell to signal the relation -->
-                          <td valign="top" style="width: 50px;"><b>OR</b></td>
-                          <!-- Cell for choices -->
-                          <td>
-                            <table>
-                              <tr>
-                                <td>COUNTRY</td><td style="width: 50%;">{{manu_formset.empty_form.country}}</td>
-                                <td>SIGNATURE</td><td style="width: 50%;">{{manu_formset.empty_form.signature}}</td>
-                              </tr>
-                              <tr>
-                                <td>CITY</td><td style="width: 50%;">{{manu_formset.empty_form.city}}</td>
-                                <td>TITLE</td><td style="width: 50%;">{{manu_formset.empty_form.name}}</td>
-                              </tr>
-                              <tr>
-                                <td>LIBRARY</td><td style="width: 50%;">{{manu_formset.empty_form.library}}</td>
-                                <td title="Identifying number or string">IDNO</td><td style="width: 50%;">{{manu_formset.empty_form.idno}}</td>
-                              </tr>
-                                <tr><td colspan="2">&nbsp;</td></tr>
-                            </table>
-                          </td>
-                          <!-- Cell for deletion -->
-                          <td title="Delete this search criterion" align="center" style="vertical-align: top; cursor: pointer; width: 50px;">
-                            <a class="delete-row" extra="manu" counter=""><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
-                          </td>
-                        </tr>
-
-                        <!-- Row that contains the command to add one -->
-                        <tr class="add-row">
-                          <td colspan="3">
-                            <span id="add_search_criteria">
-                              <a class="btn btn-xs jumbo-3" role="button"><span class="glyphicon glyphicon-plus"></span>Add additional search field</a>
-                            </span>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-
-                <div class="row">
-                  <div class="col-md-2 col-md-offset-10 text-right">
-                    <!-- Room to reset the search criteria -->
-                    <span>
-                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);">Clear</a>
-                    </span>
-                    <!-- Submit the search form -->
-                    <span>
-                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
-                    </span>
-                  </div>
-                </div>
-
-            </div>
-          </div>
-
         </form>
 
         <!-- List tab -->
         <div class="" id="tab_list">
           <div class="panel panel-default">
-            {% if object_list %}
 
-              <form>
-                <h3>
-                  <span>Manuscripts</span>
-                  {% if is_passim_editor %}
+            <h3>
+              <span>Manuscripts</span>
+              {% if is_passim_editor %}
+                <span id="add_keyword" class="pull-right">
                     {% csrf_token %}
-                    <span id="add_manuscript" class="pull-right">
-                      <a class="btn btn-xs jumbo-3" role="button" 
-                          targetid="manuscript_new"
-                          targeturl="{% url 'manuscript_edit' %}"
-                          onclick="ru.passim.seeker.manu_edit(this, 'new');">
-                        <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
-                      </a>
-                    </span>
-                  {% endif %}
-                </h3>
+                    <a class="btn btn-xs jumbo-3" role="button" 
+                        onclick="document.getElementById('create_new_manu').submit();" >
+                      <span class="glyphicon glyphicon-plus"></span>Add a manuscript manually
+                    </a>
+                </span>
+              {% endif %}
+            </h3>
+
+            <!-- Room to have the form-link to create a new keyword -->
+            <div class="hidden" >
+              <form action="{% url 'manuscript_details' %}" method="post" id="create_new_manu">
+                {% csrf_token %}
               </form>
+            </div>
 
-              <div class="row subform">
-                <div class="col-md-offset-1 col-md-10">
-                  <div id="manuscript_new">
-                    <!-- Room to create a new manuscript instance-->
-                  </div>
-                </div>
-              </div>
-
+            {% if object_list %}
+              <!-- Top Pagination -->
               <div class="row">
                   <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
                   <div class="col-sm-8">
                   <span class="step-links pull-right">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
                   </div>
               </div>
+
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
-                    <thead><tr><th class="hidden">id</th><th>City</th><th>Library</th><th>Name</th><th>Items</th><th>From</th><th>Until</th><th>Status</th><th><!-- Buttons --></th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th class="hidden">id</th>
+                        {% for hd in order_heads %}
+                          <th class="sortable" scope="col">
+                            <div class="text">
+                              {% if hd.order == "" %}{{hd.name}}
+                              {% else %}
+                              <a class="clickable" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
+                              {% endif %}
+                            </div>
+                          </th>
+                        {% endfor %}
+                        <th><!-- Buttons --></th>
+                      </tr>                    
+                    </thead>
                     <tbody>
                     {% for man in object_list %}
                       <tr class="dict-entry">
                         <td class="hidden"> {{ man.id }}</td>
-                        <!-- City / Library / Manuscript name -->
+
+                        <!-- City -->
                         <td class="manuscript-city" align="left" title="{{man.library.lcity.name}}">{{man.library.lcity.name|truncatechars:12}}</td>
+
+                        <!-- Library name -->
                         <td class="manuscript-library" align="left" title="{{man.library.name}}">{{man.library.name|truncatechars:12}}</td>
+
+                        <!-- Manuscript IDNO and possible name (truncated) -->
                         <td style="width: 100%;" class="clickable" >
                           <a href="{% url 'manuscript_details' man.id %}" class="nostyle">
                             <span class="manuscript-idno">{{man.idno}}</span>
@@ -548,8 +455,10 @@
                             {% endif %}
                           </a>
                         </td>
+
                         <!-- Number of sermons -->
                         <td class="manuscript-date" align="right">{{man.manusermons.count}}</td>
+
                         <!-- Dates for this manuscript -->
                         <td class="manuscript-date" align="right">{{man.yearstart}}</td>
                         <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
@@ -558,22 +467,14 @@
                         <td class="tdnowrap"><span class="badge" title="{{man.get_stype_display}}">{{man.stype|slice:":1"}}</span></td>
 
                         <!-- Buttons for more information on this manuscript -->
-                        <td style="min-width: {% if make_use_of_buttons %}80px;{% else %}40px;{% endif %}">
-                          <!-- Information button -->
-                            {% if make_use_of_buttons %}
-                              <!-- information on this manuscript -->
-                              <a role="button" class="btn btn-xs jumbo-3" title="Information" 
-                                  href="{% url 'manuscript_edit' man.id %}">
-                                <span class="glyphicon glyphicon-info-sign"></span>
-                              </a>
-                            {% endif %}
-                            <!-- external link button -->
-                            {% if man.url %}
-                              <a role="button" class="btn btn-xs jumbo-1" title="External link"
-                                  href="{{man.url}}"  >
-                                <span class="glyphicon glyphicon-link"></span>
-                              </a>
-                            {% endif %}
+                        <td style="min-width: 40px;">
+                          <!-- external link button -->
+                          {% if man.url %}
+                            <a role="button" class="btn btn-xs jumbo-1" title="External link"
+                                href="{{man.url}}"  >
+                              <span class="glyphicon glyphicon-link"></span>
+                            </a>
+                          {% endif %}
                         </td>
                       </tr>
 
@@ -582,10 +483,12 @@
                   </table>
                 </div>
               </div>
+
+              <!-- Bottom pagination -->
               <div class="pagination">
                   <span class="step-links">
 
-                  {% include 'pagination.html' %}
+                  {% include 'paginationpost.html' %}
 
                   </span>
               </div>

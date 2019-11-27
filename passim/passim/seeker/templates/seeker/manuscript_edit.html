@@ -65,7 +65,7 @@
       <tr class="form-row">
         <td valign="top" style="width: 100px;"><b>Country</b></td>
         <td class="manuscript-country" align="left">
-          <div class="view-mode">{% if manuForm.country_ta %}{{manuForm.country_ta.value}}{% endif %}</div>
+          <div class="view-mode">{% if manuForm.country_ta and manuForm.country_ta.value %}{{manuForm.country_ta.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="country-key hidden">{{manuForm.country}}</div>
             <div class="edit-mode hidden">{{manuForm.country_ta}}</div>
@@ -75,30 +75,33 @@
       <tr class="form-row">
         <td valign="top"><b>City</b></td>
         <td class="manuscript-city" align="left">
-          <div class="view-mode">{% if manuForm.city_ta %}{{manuForm.city_ta.value}}{% endif %}</div>
+          <div class="view-mode">{% if manuForm.city_ta and manuForm.city_ta.value %}{{manuForm.city_ta.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="city-key hidden">{{manuForm.city}}</div>
             <div class="edit-mode hidden">{{manuForm.city_ta}}</div>
           {% endif %}
         </td>
       </tr>
+
       <tr class="form-row">
         <td valign="top"><b>Library</b></td>
         <td class="manuscript-library" align="left">
-          <div class="view-mode">{{manuForm.libname_ta.value}}</div>
+          <div class="view-mode">{% if manuForm.libname_ta and manuForm.libname_ta.value %}{{manuForm.libname_ta.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}
             <div class="library-key hidden">{{manuForm.library}}</div>
             <div class="edit-mode hidden">{{manuForm.libname_ta}}</div>
           {% endif %}
         </td>
       </tr>
+
       <tr class="form-row">
         <td valign="top"><b>Identifier</b></td>
         <td class="manuscript-name" align="left">
-          <div class="view-mode">{{manuForm.idno.value}}</div>
+          <div class="view-mode">{% if manuForm.idno.value %}{{manuForm.idno.value}}{% else %}-{% endif %}</div>
           {% if is_passim_editor %}<div class="edit-mode hidden">{{manuForm.idno}}</div>{% endif %}
         </td>
       </tr>
+
       <tr class="form-row">
         <td valign="top"><b>Title</b></td>
         <td class="manuscript-name" align="left">

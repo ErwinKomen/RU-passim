@@ -2135,11 +2135,11 @@ class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
     # [1] Name of the manuscript (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING)
+    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
     # [1] Date estimate: starting from this year
-    yearstart = models.IntegerField("Year from", null=False)
+    yearstart = models.IntegerField("Year from", null=False, default=100)
     # [1] Date estimate: finishing with this year
-    yearfinish = models.IntegerField("Year until", null=False)
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
