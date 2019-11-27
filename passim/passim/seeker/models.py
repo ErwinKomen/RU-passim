@@ -2724,6 +2724,29 @@ class Manuscript(models.Model):
         return oBack
     
 
+class Daterange(models.Model):
+    """Each manuscript can have a number of date ranges attached to it"""
+
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
+
+    # [0-1] An optional reference for this daterange
+    reference = models.ForeignKey(Litref, null=True, related_name="reference_dateranges", on_delete=models.SET_NULL)
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    # ========================================================================
+    # [1] Every daterange belongs to exactly one manuscript
+    #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
+    manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.yearstart, self.yearfinish)
+        return sBack
+
+
 class Author(models.Model):
     """We have a set of authors that are the 'golden' standard"""
 

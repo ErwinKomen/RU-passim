@@ -36,10 +36,11 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
+                                DaterangeForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
-    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
+    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -1364,6 +1365,58 @@ def do_provenance(request):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("do_provenance")
+        return reverse('home')
+
+def do_daterange(request):
+    """Copy data ranges from manuscripts to separate tables - if not already there"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Update from Manuscript to Daterange table"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Dateranges", True)
+
+        # Create list to be returned
+        result_list = []
+
+        # Visit all Manuscripts
+        qs = Manuscript.objects.all()
+        lst_add = []
+        for obj in qs:
+            # Check if there are any associated Dateranges
+            if obj.manuscript_dateranges.all().count() == 0:
+                # There are no date ranges yet: create just ONE
+                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
+                # Show that we added it
+                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
+                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
+                lst_add.append(sAdd)
+
+        # Wrapping it up
+        result_list.append(dict(part="Added", result= lst_add))
+        context['result_list'] = result_list
+
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_daterange")
         return reverse('home')
 
 def do_mext(request):
@@ -3909,6 +3962,7 @@ class BasicListView(ListView):
             context['object_list'] = context['page_obj']
 
         # Set the title of the application
+        self.plural_name = str(self.model._meta.verbose_name_plural)
         context['title'] = self.plural_name
 
         # Make sure we pass on the ordered heads
@@ -4030,6 +4084,11 @@ class ManuscriptEdit(BasicPart):
     # One form is attached to this 
     prefix = "manu"
     form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': False}]
+    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+                                         form=DaterangeForm, min_num=1,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
 
     def before_save(self, prefix, request, instance = None, form = None):
         bNeedSaving = False
@@ -5051,6 +5110,11 @@ class ManuscriptDetails(PassimDetails):
     prefix = "manu"
     prefix_type = "simple"
     rtype = "html"      # Load this as straight forward html
+    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+                                         form=DaterangeForm, min_num=1,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
@@ -5118,7 +5182,7 @@ class ManuscriptListView(BasicListView):
     template_name = 'seeker/manuscript_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
-    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'manuscript_dateranges__yearstart','manuscript_dateranges__yearfinish', 'stype']
     order_default = order_cols
     order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
                    {'name': 'Library',  'order': 'o=2', 'type': 'str'},

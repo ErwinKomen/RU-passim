@@ -1023,6 +1023,33 @@ class LocationRelForm(forms.ModelForm):
                 self.fields['partof_ta'].initial = instance.container.get_loc_name()
 
 
+class DaterangeForm(forms.ModelForm):
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Daterange
+        fields = ['yearstart', 'yearfinish', 'reference', 'pages']
+        widgets={'reference':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'pages':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearstart':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(DaterangeForm, self).__init__(*args, **kwargs)
+
+        # Set other parameters
+        self.fields['yearstart'].required = True
+        self.fields['yearfinish'].required = True
+        self.fields['reference'].required = False
+        self.fields['pages'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
     city = forms.CharField(label=_("City"), required=False)

@@ -32,6 +32,7 @@ var ru = (function ($, ru) {
           { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];

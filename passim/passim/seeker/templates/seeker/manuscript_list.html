@@ -460,8 +460,12 @@
                         <td class="manuscript-date" align="right">{{man.manusermons.count}}</td>
 
                         <!-- Dates for this manuscript -->
-                        <td class="manuscript-date" align="right">{{man.yearstart}}</td>
-                        <td class="manuscript-date" align="right">{{man.yearfinish}}</td>
+                        <td class="manuscript-date" align="right">
+                          {% for item in man.manuscript_dateranges.all %}<div>{{item.yearstart}}</div>{% endfor %}
+                        </td>
+                        <td class="manuscript-date" align="right">
+                          {% for item in man.manuscript_dateranges.all %}<div>{{item.yearfinish}}</div>{% endfor %}
+                        </td>
                         
                         <!-- Show the status of this item -->
                         <td class="tdnowrap"><span class="badge" title="{{man.get_stype_display}}">{{man.stype|slice:":1"}}</span></td>
