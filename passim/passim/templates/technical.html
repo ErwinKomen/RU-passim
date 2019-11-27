@@ -1,0 +1,80 @@
+﻿{% extends "layout.html" %}
+{% load staticfiles %}
+
+
+{% block content %}
+
+<div class="container body-content">
+  <div class="row">
+
+    <h2>{{ title }}</h2>
+
+    <div class="col-md-6">
+      <div>
+        <h3>Introduction</h3>
+        <p>The PASSIM application is a <a href="https://www.djangoproject.com/">Django</a> web application. 
+        Django is a high-level framework built on the Python programming language.
+        The web application consists of the following parts:
+        <ul>
+          <li><b>Front-end</b> - the 'HTML' pages that are 'served' to the user</li>
+          <li><b>Back-end</b> - the django/python program running on the Radboud university server</li>
+          <li><b>Database</b> - the place where the manuscripts, sermons and other information chunks are stored</li>
+        </ul>
+        </p>
+      </div>
+
+      <div>
+        <h3>Front-end</h3>
+        <p>The front-end is the system that the user interacts with first of all. It consists of the HTML pages the user looks at. 
+        And it also consists of the Javascript processing. Whenever the user loads a HTML page, Javascript code is loaded too.
+        Pressing buttons often results in the execution of a piece of Javascript code--something that takes place entirely on the user's browser.
+        Some pieces of Javascript send POST or GET requests to the back-end server, resulting in dynamically updated web pages.
+        </p>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div>
+        <h3>Back-end</h3>
+        <p>The back-end application is the one that makes use of the Django-Python framework.
+        The back-end is a process running on the 'Ponyland' server park of the Radboud University.
+        It is served through <em>uwsgi</em>.
+        The framework uses a 'model-view-controller' system: the model reflects the structure of the database, 
+        the controller determines what is shown to the user when, and the view consists of the HTML files that are served.
+        </p>
+        <p>
+        The back-end is the place where most of the work takes place for the Passim application.
+        While users are served HTML files, the buttons they press trigger requests to be sent to the server.
+        The Python functions that run there handle the requests and, if needed prepare other HTML pages that are then sent to the user's browser.
+        </p>
+        <p>The preparation of HTML pages in the Django framework makes use of a template system. 
+        The templates contain the rough sketch of the HTML pages, and the data-dependant context provide the information to fill in the details.
+        </p>
+      </div>
+
+      <div>
+        <h3>Database</h3>
+        <p>The Passim application uses an <a href="https://www.sqlite.org/">SQLite</a> database. 
+        This kind of database is contained in one file. This file resides somewhere on the server.
+        Regular back-ups of this file assure little loss of data, should a calamity occur.
+        </p>
+        <p>The structure of the database can best be seen by glancing through the 
+          <a href="https://github.com/ErwinKomen/RU-passim/blob/master/passim/passim/seeker/models.py">models.py</a> file of the Github place where the code is kept.
+          Each class based on <code>models.Model</code> represents one table in the database.
+          <!-- TODO: The overview below lists the tables that are currently used in the database, as well as their fields-->
+        </p>
+        <!-- This is where the database table will appear -->
+        <div>
+          <!-- LOAD DATABASE OVERVIEW -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <!-- add more general information -->
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -490,6 +490,20 @@ def more(request):
 
     return render(request,'more.html', context)
 
+def technical(request):
+    """Renders the technical-information page."""
+    assert isinstance(request, HttpRequest)
+    context =  {'title':'Technical',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "Technical", True)
+
+    return render(request,'technical.html', context)
+
 def bibliography(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)
