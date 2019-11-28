@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'reportlab',
     # Add your apps here to enable them
     'django_select2',
     'passim.seeker',

@@ -10,6 +10,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.db.models import Q
 import operator
+import io # voor PDF creatie 
 from functools import reduce
 from pyzotero import zotero
 
@@ -19,14 +20,28 @@ from django.forms import formset_factory, modelformset_factory, inlineformset_fa
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http import JsonResponse
+from django.http import FileResponse # voor PDF creatie 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
+
+from django.template import Context
+
 from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime
-from time import sleep
+from reportlab.pdfgen import canvas # voor PDF creatie
+from reportlab.lib.units import inch # voor PDF creatie
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Frame, PageBreak   # voor PDF creatie
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle # voor PDF creatie
+from reportlab.rl_config import defaultPageSize  # voor PDF creatie
+from reportlab.lib.pagesizes import A4, landscape
+from markdown import markdown # voor PDF creatie
+
+from time import sleep 
+
+
 
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
@@ -53,6 +68,11 @@ import openpyxl
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer # voor PDF creatie
+from reportlab.lib.styles import getSampleStyleSheet # voor PDF creatie
+from reportlab.rl_config import defaultPageSize # voor PDF creatie
+from reportlab.lib.units import inch # voor PDF creatie
 
 
 # Some constants that can be used
@@ -6612,9 +6632,7 @@ class LitRefListView(ListView):
 
         # Determine the count for literature references
         context['entrycount'] = self.entrycount # self.get_queryset().count()
-
         
-
         # Set the prefix
         context['app_prefix'] = APP_PREFIX
 
@@ -6797,3 +6815,160 @@ def get_short_edit(short):
     elif len(arResult) == 1:
         result = arResult[0].strip()
     return result
+
+
+
+def do_create_pdf_edi(request):
+    """This definition creates a pdf of all used edition (full) references."""
+        
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Edition references used in PASSIM:"
+    pageinfo = "Editions PASSIM"
+             
+    # Store name of the pdf file 
+    filename = "Edi_ref_PASSIM.pdf"
+            
+    # Calculate the final qs for the edition litrefs
+    ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
+       
+    # Sort and filter all editions
+    qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
+
+    # Create a list of objects
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.full
+        pdf_list.append(item)
+    
+    # Call create_pdf_passim function with arguments  
+    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+  
+    # And return the pdf
+    return response
+
+def do_create_pdf_lit(request):
+    """"This definition creates a pdf of all used literature (full) references."""
+         
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Literature references used in PASSIM:"
+    pageinfo = "Literature PASSIM"
+       
+    # Store name of the file    
+    filename = "Lit_ref_PASSIM.pdf"
+    
+    # Calculate the final qs for the manuscript litrefs
+    litref_ids_man = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
+    
+    # Calculate the final qs for the Gold sermon litrefs
+    litref_ids_sg = [x['reference'] for x in LitrefSG.objects.all().values('reference')]
+
+    # Combine the two qs into one and filter
+    litref_ids = chain(litref_ids_man, litref_ids_sg)
+    
+    # Hier worden short en full opgehaald?
+    qs = Litref.objects.filter(id__in=litref_ids).order_by('short') 
+    
+    # Create a list of objects 
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.full
+        pdf_list.append(item)
+        
+    # Call create_pdf_passim function with arguments  
+    response  = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+       
+    # And return the pdf
+    return response
+
+def create_pdf_passim(Title, pageinfo, filename, pdf_list):
+    """This definition creates a pdf for all passim requests."""
+     
+    # Define sizes of the pages in the pdf
+    PAGE_HEIGHT=defaultPageSize[1]; PAGE_WIDTH=defaultPageSize[0]
+    
+    # Store text and current date for information on date of the download
+    today = datetime.today()
+    today.strftime('%Y-%m-%d')
+       
+    # Set buffer   
+    buffer = io.BytesIO()
+
+    # Set the first page
+    def myFirstPage(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica-Bold',22)
+        canvas.drawCentredString(PAGE_WIDTH/2.0, PAGE_HEIGHT-80, Title)
+        canvas.setFont('Helvetica',10)
+        canvas.drawString(75,730, "Downloaded on: ")
+        canvas.drawString(150,730, today.strftime('%d-%m-%Y'))
+        canvas.setFont('Helvetica',9)
+        canvas.drawString(inch, 0.75 * inch, "Page 1 / %s" % pageinfo)
+        canvas.restoreState()
+    
+    # Set the second and later pages
+    def myLaterPages(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica',9)
+        canvas.drawString(inch, 0.75 * inch, "Page %d %s" % (doc.page, pageinfo))
+        canvas.restoreState()
+
+    # Create the HttpResponse object with the appropriate PDF headers. 
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+               
+    # Define style of the pdf
+    styles = getSampleStyleSheet()
+        
+    doc = SimpleDocTemplate(buffer)
+    Story = [Spacer(1,1.05*inch)]
+    style = styles["Normal"]
+    # Dit tzt afhankelijk maken van lit en edi, niet van manuscript TH: hier nog met Erwin over hebben
+
+    for line in pdf_list:
+        line_2 = markdown(line)
+        line_3 = line_2.replace("<em>", "<i>")
+        line_4 = line_3.replace("</em>", "</i>")
+        line_5 = markdown(line_4)
+          
+        lit_ref = (line_5) *1 
+        p = Paragraph(lit_ref, style, '-')
+        Story.append(p)
+        Story.append(Spacer(1,0.2*inch))
+    doc.build(Story, onFirstPage=myFirstPage, onLaterPages=myLaterPages)
+    
+    # Write the buffer to the PDF
+    response.write(buffer.getvalue())
+    # Close the buffer cleanly, and we're done.
+    buffer.close()
+       
+    # And return the pdf
+    return response
+
+def do_create_pdf_manu(request):
+    """This definition creates a pdf of all used edition (full) references."""
+  
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Manuscripts listed in PASSIM:"
+    pageinfo = "Manuscripts PASSIM"
+             
+    # Store name of the pdf file 
+    filename = "Manu_list_PASSIM.pdf"
+
+    # Calculate the qs for the manuscripts       
+
+    qs = Manuscript.objects.order_by('name')
+    
+    # Create a list of objects TH: aanpassen zoveel mogelijk hier, en zo min mogelijk in create_pdf_passim
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.name
+        pdf_list.append(item)
+
+    # Call create_pdf_passim function with arguments  
+    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+  
+    # And return the pdf
+    return response

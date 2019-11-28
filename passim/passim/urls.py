@@ -143,6 +143,11 @@ urlpatterns = [
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
     url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
+
+    url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
+    url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 
+    url(r'^api/import/pdf_manu/$', passim.seeker.views.do_create_pdf_manu, name='create_pdf_manu'), 
+    
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
 
