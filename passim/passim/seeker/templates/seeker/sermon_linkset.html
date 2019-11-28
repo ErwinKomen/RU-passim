@@ -62,7 +62,7 @@
                         </a>
                       </span>
                       <span>
-                        <a href="{% url 'gold_details' linkform.instance.gold.id %}" target="_blank">
+                        <a href="{% url 'gold_details' linkform.instance.gold.id %}">
                           {% include 'seeker/sermon_view.html' with msitem=linkform.instance.gold %}
                         </a>
                       </span>
@@ -72,7 +72,7 @@
                       {% if link.id != linkform.instance.gold.id %}
                         <div>
                           <span>
-                            <a href="{% url 'gold_details' link.id %}" target="_blank">
+                            <a href="{% url 'gold_details' link.id %}">
                               {% include 'seeker/sermon_view.html' with msitem=link %}
                             </a>
                           </span>

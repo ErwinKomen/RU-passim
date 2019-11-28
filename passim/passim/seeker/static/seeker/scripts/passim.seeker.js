@@ -32,6 +32,7 @@ var ru = (function ($, ru) {
           { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
@@ -791,7 +792,7 @@ var ru = (function ($, ru) {
        *    Gather the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method, iPage) {
+      search_start: function (elStart, method, iPage, sOrder) {
         var frm = null,
             url = "",
             targetid = null,
@@ -823,6 +824,12 @@ var ru = (function ($, ru) {
                   $(this).val(iPage);
                 });
               }
+              // If there is a sort order, we need to process it
+              if (sOrder !== undefined) {
+                $(elStart).find("input[name=o]").each(function (el) {
+                  $(this).val(sOrder);
+                });
+              }
               // Now submit the form
               frm.submit();
               break;
@@ -840,6 +847,9 @@ var ru = (function ($, ru) {
               // Get the page we need to go to
               if (iPage === undefined) { iPage = 1; }
               data.push({ 'name': 'page', 'value': iPage });
+              if (sOrder !== undefined) {
+                data.push({ 'name': 'o', 'value': sOrder });
+              }
 
               // Issue a post
               $.post(targeturl, data, function (response) {
@@ -893,6 +903,23 @@ var ru = (function ($, ru) {
           ru.passim.seeker.search_start(elStart, 'submit', iPage)
         } catch (ex) {
           private_methods.errMsg("search_paged_start", ex);
+        }
+      },
+
+      /**
+       * search_ordered_start
+       *    Perform a simple 'submit' call to search_start
+       *
+       */
+      search_ordered_start: function (order) {
+        var elStart = null;
+
+        try {
+          // And then go to the first element within the form that is of any use
+          elStart = $(".search_ordered_start").first();
+          ru.passim.seeker.search_start(elStart, 'submit', 1, order)
+        } catch (ex) {
+          private_methods.errMsg("search_ordered_start", ex);
         }
       },
 
@@ -2394,8 +2421,10 @@ var ru = (function ($, ru) {
        */
       tabular_deleterow: function () {
         var sId = "",
+            elDiv = null,
             elRow = null,
             elPrev = null,
+            elDel = null,   // The delete inbox
             sPrefix = "",
             elForms = "",
             counter = $(this).attr("counter"),
@@ -2403,6 +2432,7 @@ var ru = (function ($, ru) {
             data = [],
             frm = null,
             bCounter = false,
+            bHideOnDelete = false,
             iForms = 0,
             prefix = "simplerel",
             use_prev_row = false,   // Delete the previous row instead of the current one
@@ -2414,7 +2444,8 @@ var ru = (function ($, ru) {
           bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
           elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
           // Find out just where we are
-          sId = $(this).closest("div[id]").attr("id");
+          elDiv = $(this).closest("div[id]")
+          sId = $(elDiv).attr("id");
           // Find out how many forms there are right now
           iForms = $(elForms).val();
           frm = $(this).closest("form");
@@ -2424,7 +2455,8 @@ var ru = (function ($, ru) {
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
-            case "mprov_formset": 
+            case "mprov_formset":
+            case "mdr_formset":
             case "manu_search":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
@@ -2449,44 +2481,60 @@ var ru = (function ($, ru) {
             } else {
               // Only delete the current row
               elRow = $(this).closest("tr");
-              $(elRow).remove();
+              // Do we need to hide or delete?
+              if ($(elRow).hasClass("hide-on-delete")) {
+                bHideOnDelete = true;
+                $(elRow).addClass("hidden");
+              } else {
+                $(elRow).remove();
+              }
             }
-            // Decrease the amount of forms
-            iForms -= 1;
-            $(elForms).val(iForms);
 
-            // Re-do the numbering of the forms that are shown
-            $(".form-row").not(".empty-form").each(function (idx, elThisRow) {
-              var iCounter = 0, sRowId = "", arRowId = [];
-
-              iCounter = idx + 1;
-              // Adapt the ID attribute -- if it EXISTS
-              sRowId = $(elThisRow).attr("id");
-              if (sRowId !== undefined) {
-                arRowId = sRowId.split("-");
-                arRowId[1] = idx;
-                sRowId = arRowId.join("-");
-                $(elThisRow).attr("id", sRowId);
+            // Further action depends on whether the row just needs to be hidden
+            if (bHideOnDelete) {
+              // Row has been hidden: now find and set the DELETE checkbox
+              elDel = $(elRow).find("input:checkbox[name$='DELETE']");
+              if (elDel !== null) {
+                $(elDel).prop("checked", true);
               }
+            } else {
+              // Decrease the amount of forms
+              iForms -= 1;
+              $(elForms).val(iForms);
 
-              if (bCounter) {
-                // Adjust the number in the FIRST <td>
-                $(elThisRow).find("td").first().html(iCounter.toString());
-              }
+              // Re-do the numbering of the forms that are shown
+              $(elDiv).find(".form-row").not(".empty-form").each(function (idx, elThisRow) {
+                var iCounter = 0, sRowId = "", arRowId = [];
 
-              // Adjust the numbering of the INPUT and SELECT in this row
-              $(elThisRow).find("input, select").each(function (j, elInput) {
-                // Adapt the name of this input
-                var sName = $(elInput).attr("name");
-                if (sName !== undefined) {
-                  var arName = sName.split("-");
-                  arName[1] = idx;
-                  sName = arName.join("-");
-                  $(elInput).attr("name", sName);
-                  $(elInput).attr("id", "id_" + sName);
+                iCounter = idx + 1;
+                // Adapt the ID attribute -- if it EXISTS
+                sRowId = $(elThisRow).attr("id");
+                if (sRowId !== undefined) {
+                  arRowId = sRowId.split("-");
+                  arRowId[1] = idx;
+                  sRowId = arRowId.join("-");
+                  $(elThisRow).attr("id", sRowId);
                 }
+
+                if (bCounter) {
+                  // Adjust the number in the FIRST <td>
+                  $(elThisRow).find("td").first().html(iCounter.toString());
+                }
+
+                // Adjust the numbering of the INPUT and SELECT in this row
+                $(elThisRow).find("input, select").each(function (j, elInput) {
+                  // Adapt the name of this input
+                  var sName = $(elInput).attr("name");
+                  if (sName !== undefined) {
+                    var arName = sName.split("-");
+                    arName[1] = idx;
+                    sName = arName.join("-");
+                    $(elInput).attr("name", sName);
+                    $(elInput).attr("id", "id_" + sName);
+                  }
+                });
               });
-            });
+            }
 
             // The validation action depends on this id (or on the prefix)
             switch (sId) {

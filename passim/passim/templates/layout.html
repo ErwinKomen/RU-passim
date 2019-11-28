@@ -1,6 +1,17 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+  <!--
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-108165780-4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-108165780-4');
+    </script>
+    -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
@@ -23,15 +34,6 @@
     <!-- Original code -->
     <script src="{% static 'seeker/scripts/passim.js' %}"></script>
     <script src="{% static 'seeker/scripts/passim.seeker.js' %}"></script>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-108165780-4"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'UA-108165780-4');
-    </script>
 {% block scripts %}{% endblock %}
 </head>
 

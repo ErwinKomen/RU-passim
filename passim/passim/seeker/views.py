@@ -45,16 +45,17 @@ from time import sleep
 
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
                                 SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm
+                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
+                                DaterangeForm
 from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
-    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, \
+    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 import fnmatch
@@ -85,6 +86,7 @@ bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
+# FILTER SPECIFICATIONS
 SERMON_SEARCH_FILTERS = [
         {"name": "Author",          "id": "filter_author",      "enabled": False},
         {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
@@ -102,6 +104,13 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False, "head_id": "filter_manuscript"},
         ]
+GOLD_SEARCH_FILTERS = [
+        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+        {"name": "Author",          "id": "filter_author",      "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+    ]
 
 
 def treat_bom(sHtml):
@@ -206,12 +215,195 @@ def action_model_changes(form, instance):
     return changes
 
 def has_string_value(field, obj):
-    response = (field in obj and obj[field] != None and obj[field] != "")
+    response = (field != None and field in obj and obj[field] != None and obj[field] != "")
     return response
 
 def has_list_value(field, obj):
-    response = (field in obj and obj[field] != None and len(obj[field]) > 0)
+    response = (field != None and field in obj and obj[field] != None and len(obj[field]) > 0)
     return response
+
+def has_obj_value(field, obj):
+    response = (field != None and field in obj and obj[field] != None)
+    return response
+
+def make_search_list(filters, oFields, search_list, qd):
+    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
+
+    def enable_filter(filter_id, head_id=None):
+        for item in filters:
+            if filter_id in item['id']:
+                item['enabled'] = True
+                # Break from my loop
+                break
+        # Check if this one has a head
+        if head_id != None and head_id != "":
+            for item in filters:
+                if head_id in item['id']:
+                    item['enabled'] = True
+                    # Break from this sub-loop
+                    break
+        return True
+
+    def get_value(obj, field, default=None):
+        if field in obj:
+            sBack = obj[field]
+        else:
+            sBack = default
+        return sBack
+
+    oErr = ErrHandle()
+
+    try:
+        # (1) Create default lstQ
+        lstQ = []
+
+        # (2) Reset the filters in the list we get
+        for item in filters: item['enabled'] = False
+    
+        # (3) Walk all sections
+        for part in search_list:
+            head_id = get_value(part, 'section')
+
+            # (4) Walk the list of defined searches
+            for search_item in part['filterlist']:
+                keyS = get_value(search_item, "keyS")
+                keyId = get_value(search_item, "keyId")
+                keyFk = get_value(search_item, "keyFk")
+                keyList = get_value(search_item, "keyList")
+                infield = get_value(search_item, "infield")
+                dbfield = get_value(search_item, "dbfield")
+                fkfield = get_value(search_item, "fkfield")
+                filter_type = get_value(search_item, "filter")
+                s_q = ""
+               
+                # Main differentiation: fkfield or dbfield
+                if fkfield:
+                    # We are dealing with a foreign key
+                    # Check for keyS
+                    if has_string_value(keyS, oFields):
+                        # Check for ID field
+                        if has_string_value(keyId, oFields):
+                            val = oFields[keyId]
+                            if not isinstance(val, int): 
+                                try:
+                                    val = val.id
+                                except:
+                                    pass
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{"{}__id".format(fkfield): val})
+                        elif has_obj_value(fkfield, oFields):
+                            val = oFields[fkfield]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{fkfield: val})
+                        else:
+                            val = oFields[keyS]
+                            enable_filter(filter_type, head_id)
+                            # we are dealing with a foreign key, so we should use keyFk
+                            if "*" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+                            else:
+                                s_q = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                    elif has_obj_value(fkfield, oFields):
+                        val = oFields[fkfield]
+                        enable_filter(filter_type, head_id)
+                        s_q = Q(**{fkfield: val})
+                        external = get_value(search_item, "external")
+                        if has_string_value(external, oFields):
+                            qd[external] = getattr(val, "name")
+                elif dbfield:
+                    # We are dealing with a plain direct field for the model
+                    # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
+                    # Check for keyS
+                    if has_string_value(keyS, oFields):
+                        # Check for ID field
+                        if has_string_value(keyId, oFields):
+                            val = oFields[keyId]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{"{}__id".format(dbfield): val})
+                        elif has_obj_value(keyFk, oFields):
+                            val = oFields[keyFk]
+                            enable_filter(filter_type, head_id)
+                            s_q = Q(**{dbfield: val})
+                        else:
+                            val = oFields[keyS]
+                            enable_filter(filter_type, head_id)
+                            if isinstance(val, int):
+                                s_q = Q(**{"{}".format(dbfield): val})
+                            elif "*" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(dbfield): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(dbfield): val})
+
+                # Check for list of specific signatures
+                if has_list_value(keyList, oFields):
+                    enable_filter(filter_type, head_id)
+                    code_list = [getattr(x, infield) for x in oFields[keyList]]
+                    if fkfield:
+                        # Now we need to look at the id's
+                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                    elif dbfield:
+                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
+                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
+
+                # Possibly add the result to the list
+                if s_q != "": lstQ.append(s_q)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("make_search_list")
+        lstQ = []
+
+    # Return what we have created
+    return filters, lstQ, qd
+
+def make_ordering(qs, qd, orders, order_cols, order_heads):
+
+    oErr = ErrHandle()
+
+    try:
+        bAscending = True
+        sType = 'str'
+        order = []
+        if 'o' in qd and qd['o'] != "":
+            colnum = qd['o']
+            if '=' in colnum:
+                colnum = colnum.split('=')[1]
+            if colnum != "":
+                order = []
+                iOrderCol = int(colnum)
+                bAscending = (iOrderCol>0)
+                iOrderCol = abs(iOrderCol)
+                sType = order_heads[iOrderCol-1]['type']
+                for order_item in order_cols[iOrderCol-1].split(";"):
+                    if sType == 'str':
+                        order.append(Lower(order_item))
+                    else:
+                        order.append(order_item)
+                if bAscending:
+                    order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
+                else:
+                    # order = "-" + order
+                    order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+        else:
+            for order_item in order_cols[0].split(";"):
+                order.append(Lower(order_item))
+           #  order.append(Lower(order_cols[0]))
+        if sType == 'str':
+            if len(order) > 0:
+                qs = qs.order_by(*order)
+            # qs = qs.order_by('editions__first__date_late')
+        else:
+            qs = qs.order_by(*order)
+        # Possibly reverse the order
+        if not bAscending:
+            qs = qs.reverse()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("make_ordering")
+        lstQ = []
+
+    return qs, order_heads
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -321,6 +513,20 @@ def more(request):
     context['breadcrumbs'] = process_visit(request, "More", True)
 
     return render(request,'more.html', context)
+
+def technical(request):
+    """Renders the technical-information page."""
+    assert isinstance(request, HttpRequest)
+    context =  {'title':'Technical',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+
+    # Process this visit
+    context['breadcrumbs'] = process_visit(request, "Technical", True)
+
+    return render(request,'technical.html', context)
 
 def bibliography(request):
     """Renders the more page."""
@@ -532,6 +738,74 @@ def sync_progress(request):
     return JsonResponse(data)
 
 def search_sermon(filters, qd):
+    """Create a queryset to search for a sermon"""
+
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
+            ]},
+        {'section': 'manuscript', 'filterlist': [
+            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            ]}
+         ]
+
+    qs = None
+    oErr = ErrHandle()
+    bFilter = False
+    sermoForm = None
+    try:
+        bHasFormset = (len(qd) > 0)
+
+        if bHasFormset:
+            # Get the formset from the input
+            lstQ = []
+
+            sermoForm = SermonForm(qd, prefix='sermo')
+
+            if sermoForm.is_valid():
+
+                # Process the criteria from this form 
+                oFields = sermoForm.cleaned_data
+
+                # Create the search based on the specification in searches
+                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
+
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # No filter: Just show everything
+                    qs = SermonDescr.objects.all()
+                else:
+                    # There is a filter: apply it
+                    qs = SermonDescr.objects.filter(*lstQ).distinct()
+                    bFilter = True
+            else:
+                # TODO: communicate the error to the user???
+
+                # Just show everything
+                qs = SermonDescr.objects.all().distinct()
+
+        else:
+            # Just show everything
+            qs = SermonDescr.objects.all().distinct()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("search_sermon")
+        qs = None
+        bFilter = False
+    # Return the resulting filtered and sorted queryset
+    return filters, bFilter, qs, qd
+
+def search_sermon_original(filters, qd):
     """Create a queryset to search for a sermon"""
 
     qs = None
@@ -1114,6 +1388,58 @@ def do_provenance(request):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("do_provenance")
+        return reverse('home')
+
+def do_daterange(request):
+    """Copy data ranges from manuscripts to separate tables - if not already there"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Update from Manuscript to Daterange table"
+
+        # Process this visit
+        context['breadcrumbs'] = process_visit(request, "Dateranges", True)
+
+        # Create list to be returned
+        result_list = []
+
+        # Visit all Manuscripts
+        qs = Manuscript.objects.all()
+        lst_add = []
+        for obj in qs:
+            # Check if there are any associated Dateranges
+            if obj.manuscript_dateranges.all().count() == 0:
+                # There are no date ranges yet: create just ONE
+                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
+                # Show that we added it
+                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
+                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
+                lst_add.append(sAdd)
+
+        # Wrapping it up
+        result_list.append(dict(part="Added", result= lst_add))
+        context['result_list'] = result_list
+
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("do_daterange")
         return reverse('home')
 
 def do_mext(request):
@@ -1814,8 +2140,9 @@ def get_locations(request):
             locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
             results = []
             for co in locations:
-                name = "{} ({})".format(co['name'], co['loctype__name'])
-                co_json = {'name': name, 'id': co['id'] }
+                # name = "{} ({})".format(co['name'], co['loctype__name'])
+                name = co['name']
+                co_json = {'name': name, 'id': co['id'], 'loctype': co['loctype__name'] }
                 results.append(co_json)
             data = json.dumps(results)
         except:
@@ -2270,7 +2597,6 @@ def get_gold(request, pk=None):
         data['status'] = "error"
     mimetype = "application/json"
     return HttpResponse(json.dumps(data), mimetype)
-
 
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
@@ -2931,7 +3257,7 @@ class BasicPart(View):
                             # At least get the cleaned data from the form
                             formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
 
-
+                            # x = json.dumps(sorted(self.qd.items(), key=lambda kv: kv[0]), indent=2)
                     # Add instance to the context object
                     context[prefix + "Form"] = formObj['forminstance']
                 # Walk all the formset objects
@@ -3599,6 +3925,178 @@ class PassimDetails(DetailView):
         return context
 
 
+class BasicListView(ListView):
+    """Basic listview"""
+
+    paginate_by = 15
+    entrycount = 0
+    qd = None
+    bFilter = False
+    basketview = False
+    initial = None
+    listform = None
+    plural_name = ""
+    prefix = ""
+    order_default = []
+    order_cols = []
+    order_heads = []
+    filters = []
+    searches = []
+    page_function = None
+
+    def get_context_data(self, **kwargs):
+        # Call the base implementation first to get a context
+        context = super(BasicListView, self).get_context_data(**kwargs)
+
+        # Get parameters for the search
+        if self.initial == None:
+            initial = self.request.POST if self.request.POST else self.request.GET
+        else:
+            initial = self.initial
+
+        # Need to load the correct form
+        if self.listform:
+            context['{}Form'.format(self.prefix)] = self.listform(initial, prefix=self.prefix)
+
+        # Determine the count 
+        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+        # Set the prefix
+        context['app_prefix'] = APP_PREFIX
+
+        # Make sure the paginate-values are available
+        context['paginateValues'] = paginateValues
+
+        if 'paginate_by' in initial:
+            context['paginateSize'] = int(initial['paginate_by'])
+        else:
+            context['paginateSize'] = paginateSize
+
+        # Need to pass on a pagination function
+        if self.page_function:
+            context['page_function'] = self.page_function
+
+        # Set the page number if needed
+        if 'page_obj' in context and 'page' in initial and initial['page'] != "":
+            # context['page_obj'].number = initial['page']
+            page_num = int(initial['page'])
+            context['page_obj'] = context['paginator'].page( page_num)
+            # Make sure to adapt the object_list
+            context['object_list'] = context['page_obj']
+
+        # Set the title of the application
+        self.plural_name = str(self.model._meta.verbose_name_plural)
+        context['title'] = self.plural_name
+
+        # Make sure we pass on the ordered heads
+        context['order_heads'] = self.order_heads
+        context['has_filter'] = self.bFilter
+        context['filters'] = self.filters
+
+        # Check if user may upload
+        context['is_authenticated'] = user_is_authenticated(self.request)
+        context['authenticated'] = context['is_authenticated'] 
+        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, self.plural_name, True)
+        context['prevpage'] = get_previous_page(self.request)
+
+        context['usebasket'] = self.basketview
+
+        # Allow others to add to context
+        context = self.add_to_context(context, initial)
+
+        # Return the calculated context
+        return context
+
+    def add_to_context(self, context, initial):
+        return context
+
+    def get_paginate_by(self, queryset):
+        """
+        Paginate by specified value in default class property value.
+        """
+        return self.paginate_by
+
+    def get_basketqueryset(self):
+        """User-specific function to get a queryset based on a basket"""
+        return None
+  
+    def get_queryset(self):
+        # Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.qd = get
+
+        self.bHasParameters = (len(get) > 0)
+        bHasListFilters = False
+        if self.bHasParameters:
+            # y = [x for x in get ]
+            bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
+            if not bHasListFilters:
+                self.basketview = ("usebasket" in get and get['usebasket'] == "True")
+
+        # Get the queryset and the filters
+        if self.basketview:
+            self.basketview = True
+            # We should show the contents of the basket
+            # (1) Reset the filters
+            for item in self.filters: item['enabled'] = False
+            # (2) Indicate we have no filters
+            self.bFilter = False
+            # (3) Set the queryset -- this is listview-specific
+            qs = self.get_basketqueryset()
+
+            # Do the ordering of the results
+            order = self.order_default
+            qs, self.order_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+        elif self.bHasParameters:
+            self.basketview = False
+            lstQ = []
+            # Indicate we have no filters
+            self.bFilter = False
+
+            # Read the form with the information
+            thisForm = self.listform(self.qd, prefix=self.prefix)
+
+            if thisForm.is_valid():
+                # Process the criteria for this form
+                oFields = thisForm.cleaned_data
+
+                self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
+                # Calculate the final qs
+                if len(lstQ) == 0:
+                    # Just show everything
+                    qs = self.model.objects.all()
+                else:
+                    # There is a filter, so apply it
+                    qs = self.model.objects.filter(*lstQ).distinct()
+                    self.bFilter = True
+            else:
+                # Just show everything
+                qs = self.model.objects.all().distinct()
+
+            # Do the ordering of the results
+            order = self.order_default
+            qs, self.order_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+        else:
+            self.basketview = False
+            qs = self.model.objects.all().distinct()
+            order = self.order_default
+            qs, tmp_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+
+        # Determine the length
+        self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
+    
+
 class ManuscriptEdit(BasicPart):
     """The details of one manuscript"""
 
@@ -3609,6 +4107,11 @@ class ManuscriptEdit(BasicPart):
     # One form is attached to this 
     prefix = "manu"
     form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': False}]
+    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+                                         form=DaterangeForm, min_num=1,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
 
     def before_save(self, prefix, request, instance = None, form = None):
         bNeedSaving = False
@@ -4254,17 +4757,17 @@ class SermonEdit(BasicPart):
         return True
 
 
-class SermonListView(ListView):
+class SermonListView(BasicListView):
     """Search and list manuscripts"""
     
     model = SermonDescr
+    listform = SermonForm
+    prefix = "sermo"
     paginate_by = 20
     template_name = 'seeker/sermon_list.html'
-    entrycount = 0
     basketview = False
-    bDoTime = True
-    bFilter = False     # Status of the filter
     page_function = "ru.passim.seeker.search_paged_start"
+    order_default = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
@@ -4274,169 +4777,39 @@ class SermonListView(ListView):
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
     filters = SERMON_SEARCH_FILTERS
-    initial = None
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
+            ]},
+        {'section': 'manuscript', 'filterlist': [
+            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            ]}
+         ]
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(SermonListView, self).get_context_data(**kwargs)
-
-        # Get parameters for the search
-        if self.initial == None:
-            initial = self.request.POST if self.request.POST else self.request.GET
-        else:
-            initial = self.initial
-
-        # Add a form that defines search criteria for a sermon
-        # If there was a previous form, then its values are in 'initial', and they are taken over
-        prefix='sermo'
-        context['sermoForm'] = SermonForm(initial, prefix=prefix)
-        # Make sure we evaluate the form, to get cleaned_data
-        bFormOkay = context['sermoForm'].is_valid()
-        
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Need to pass on a pagination function
-        context['page_function'] = self.page_function
-        # Set the page number if needed
-        if 'page_obj' in context and 'page' in initial and initial['page'] != "":
-            # context['page_obj'].number = initial['page']
-            page_num = int(initial['page'])
-            context['page_obj'] = context['paginator'].page( page_num)
-            # Make sure to adapt the object_list
-            context['object_list'] = context['page_obj']
-        context['has_filter'] = self.bFilter
-        context['filters'] = self.filters
-        context['filter_manuscript'] = next(x['enabled']  for x in self.filters if x['id'] == "filter_manuscript")
-
+    def add_to_context(self, context, initial):
         # Find out who the user is
         profile = Profile.get_user_profile(self.request.user.username)
         context['basketsize'] = 0 if profile == None else profile.basketsize
 
-        # Set the title of the application
-        context['title'] = "Sermons"
-
-        # Make sure we pass on the ordered heads
-        context['order_heads'] = self.order_heads
-
-        # Process this visit and get the new breadcrumbs object
-        kwargs = {}
-        for k,v in initial.items():
-            if v != None and v != "" and k.lower() != "csrfmiddlewaretoken":
-                kwargs[k] = v
-
-        context['breadcrumbs'] = process_visit(self.request, "Sermons", False, **kwargs)
-        context['prevpage'] = get_previous_page(self.request)
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Return the calculated context
         return context
 
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        def enable_filter(filter_id, head_id=None):
-            for item in self.filters:
-                if filter_id in item['id']:
-                    item['enabled'] = True
-                    # Break from my loop
-                    break
-            # Check if this one has a head
-            if head_id != None and head_id != "":
-                for item in self.filters:
-                    if head_id in item['id']:
-                        item['enabled'] = True
-                        # Break from this sub-loop
-                        break
-            return True
-
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
-
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
-
-        # Get the queryset and the filters
+    def get_basketqueryset(self):
         if self.basketview:
-            # We should show the contents of the basket
-            # (1) Reset the filters
-            for item in self.filters: item['enabled'] = False
-            # (2) Indicate we have no filters
-            self.bFilter = False
-            # (3) Set the queryset
             profile = Profile.get_user_profile(self.request.user.username)
             qs = profile.basketitems.all()
         else:
-            # Show the contents of the filters
-            self.filters, self.bFilter, qs, self.initial = search_sermon(self.filters, self.qd)
-        
-        # Do sorting: Start with an initial order
-        order = ['author__name', 'nickname__name', 'siglist', 'incipit', 'explicit']
-        bAscending = True
-        sType = 'str'
-        if 'o' in self.qd:
-            order = []
-            iOrderCol = int(self.qd['o'])
-            bAscending = (iOrderCol>0)
-            iOrderCol = abs(iOrderCol)
-            for order_item in self.order_cols[iOrderCol-1].split(";"):
-                order.append(Lower(order_item))
-            sType = self.order_heads[iOrderCol-1]['type']
-            if bAscending:
-                self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
-            else:
-                # order = "-" + order
-                self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
-        if sType == 'str':
-            qs = qs.order_by(*order)
-        else:
-            qs = qs.order_by(*order)
-        # Possibly reverse the order
-        if not bAscending:
-            qs = qs.reverse()
-
-        # Time measurement
-        if self.bDoTime:
-            print("SermonListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            # print("SermonGoldListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("SermonListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
+            qs = SermonDescr.objects.all()
         return qs
-
-    def post(self, request, *args, **kwargs):
-        return self.get(request, *args, **kwargs)
 
 
 class BasketView(SermonListView):
@@ -4497,6 +4870,79 @@ class BasketUpdate(BasicPart):
         # Return the updated context
         return context
     
+
+class KeywordDetails(PassimDetails):
+    """The details of one keyword"""
+
+    model = Keyword
+    mForm = KeywordForm
+    template_name = 'seeker/keyword_details.html'
+    template_post = 'seeker/keyword_details.html'
+    prefix = 'kw'
+    title = "KeywordDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('keyword_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Keyword details", False)
+        context['prevpage'] = get_previous_page(self.request)
+        return context
+
+
+class KeywordEdit(PassimDetails):
+    """The details of one keyword"""
+
+    model = Keyword
+    mForm = KeywordForm
+    template_name = 'seeker/keyword_edit.html'
+    template_post = 'seeker/keyword_edit.html'
+    prefix = 'kw'
+    title = "KeywordEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('keyword_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = process_visit(self.request, "Keyword edit", False)
+
+        context['afterdelurl'] = get_previous_page(self.request)
+        return context
+
+
+class KeywordListView(BasicListView):
+    """Search and list keywords"""
+
+    model = Keyword
+    listform = KeywordForm
+    prefix = "kw"
+    paginate_by = 20
+    template_name = 'seeker/keyword_list.html'
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str'},
+                   {'name': 'Frequency', 'order': '', 'type': 'str'}]
+    filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
+        ]
+
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
@@ -4687,10 +5133,26 @@ class ManuscriptDetails(PassimDetails):
     prefix = "manu"
     prefix_type = "simple"
     rtype = "html"      # Load this as straight forward html
+    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+                                         form=DaterangeForm, min_num=1,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set a redirect page
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('manuscript_details', kwargs={'pk': instance.id})
+        return True, "" 
 
     def add_to_context(self, context, instance):
 
-        # Get the instance
+        # Get the instance via self.object??
+        #   (or why not use the supplied 'instance'??)
         instance = self.object
 
         # Construct the hierarchical list
@@ -4734,194 +5196,59 @@ class ManuscriptDetails(PassimDetails):
         return context
 
 
-class ManuscriptListView(ListView):
+class ManuscriptListView(BasicListView):
     """Search and list manuscripts"""
     
     model = Manuscript
+    listform = SearchManuForm
     paginate_by = 20
-    template_name = 'seeker/manuscript.html'
-    entrycount = 0
-    bDoTime = True
-    # Define a formset for searching
-    ManuFormset = formset_factory(SearchManuscriptForm, extra=0, min_num=1)
+    template_name = 'seeker/manuscript_list.html'
+    page_function = "ru.passim.seeker.search_paged_start"
+    prefix = "manu"
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
+    order_default = order_cols
+    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
+                   {'name': 'Library',  'order': 'o=2', 'type': 'str'},
+                   {'name': 'Name',     'order': 'o=3', 'type': 'str'},
+                   {'name': 'Items',    'order': '',    'type': 'int'},
+                   {'name': 'From',     'order': 'o=5', 'type': 'int'},
+                   {'name': 'Until',    'order': 'o=6', 'type': 'int'},
+                   {'name': 'Status',   'order': 'o=7', 'type': 'str'}]
+    filters = [ 
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
+        {"name": "Country",         "id": "filter_country",     "enabled": False},
+        {"name": "City",            "id": "filter_city",        "enabled": False},
+        {"name": "Library",         "id": "filter_library",     "enabled": False},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
+        {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
+        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False},
+        {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
+                ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'manuid',    'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',   'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',      'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',   'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance','fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
+            ]},
+        {'section': 'sermon', 'filterlist': [
+            {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            ]}
+         ]
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(ManuscriptListView, self).get_context_data(**kwargs)
-
-        # Get parameters for the search
-        initial = self.request.GET
-
-        # Determine the formset to be passed on
-        if self.bHasFormset:
-            manu_formset = self.ManuFormset(initial, prefix='manu')
-        else:
-            manu_formset = self.ManuFormset(prefix='manu')
-        context['manu_formset'] = manu_formset
-
+    def add_to_context(self, context, initial):
         # Add a files upload form
         context['uploadform'] = UploadFilesForm()
 
         # Add a form to enter a URL
         context['searchurlform'] = SearchUrlForm()
 
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Manuscripts", True)
-        context['prevpage'] = get_previous_page(self.request)
-
-        # Set the title of the application
-        context['title'] = "Manuscripts"
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Return the calculated context
         return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
-
-        self.bHasFormset = ('manu-TOTAL_FORMS' in get)
-
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
-
-        if self.bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            manu_formset = self.ManuFormset(self.qd, prefix='manu')
-
-            # Process the formset
-            if manu_formset != None:
-                # Validate it
-                if manu_formset.is_valid():
-                    #  Everything okay, continue
-                    for sform in manu_formset:
-                        # Process the criteria from this form 
-                        oFields = sform.cleaned_data
-                        lstThisQ = []
-
-                        # Check for Manuscript [name]
-                        if 'idno' in oFields and oFields['idno'] != "": 
-                            val = adapt_search(oFields['idno'])
-                            lstThisQ.append(Q(idno__iregex=val))
-
-                        # Check for Manuscript [name]
-                        if 'name' in oFields and oFields['name'] != "": 
-                            val = adapt_search(oFields['name'])
-                            lstThisQ.append(Q(name__iregex=val))
-
-                        # Check for Manuscript [idno]
-                        if 'gryson' in oFields and oFields['gryson'] != "": 
-                            val = adapt_search(oFields['gryson'])
-                            lstThisQ.append(Q(idno__iregex=val))
-
-                        # Check for Manuscript [idno]
-                        if 'clavis' in oFields and oFields['clavis'] != "": 
-                            val = adapt_search(oFields['clavis'])
-                            lstThisQ.append(Q(idno__iregex=val))
-
-                        # Check for country name
-                        if 'country' in oFields and oFields['country'] != "": 
-                            val = adapt_search(oFields['country'])
-                            lstThisQ.append(Q(library__country__name__iregex=val))
-
-                        # Check for city name
-                        if 'city' in oFields and oFields['city'] != "": 
-                            val = adapt_search(oFields['city'])
-                            lstThisQ.append(Q(library__city__name__iregex=val))
-
-                        # Check for library name
-                        if 'library' in oFields and oFields['library'] != "": 
-                            # Is this a number?
-                            val = oFields['library']
-                            if val.isdigit():
-                                lstThisQ.append(Q(library__id=val))
-                            else:
-                                val = adapt_search(val)
-                                lstThisQ.append(Q(library__name__iregex=val))
-
-                        # Now add these criterya to the overall lstQ
-                        if len(lstThisQ) > 0:
-                            lstQ.append(reduce(operator.and_, lstThisQ))
-                else:
-                    # What to do when it is not valid?
-                    pass
-
-            # Calculate the final qs
-            if len(lstQ) == 0:
-                # Just show everything
-                qs = Manuscript.objects.all()
-            elif len(lstQ) == 1:
-                # criteria = reduce(operator.or_, lstQ)
-                qs = Manuscript.objects.filter(*lstQ).distinct()
-            else:
-                criteria = reduce(operator.or_, lstQ)
-                qs = Manuscript.objects.filter(criteria).distinct()
-        elif 'library' in get:
-            lstQ = []
-            # Is this a number?
-            val = get['library']
-            if val.isdigit():
-                lstQ.append(Q(library__id=val))
-            else:
-                val = adapt_search(val)
-                lstQ.append(Q(library__name__iregex=val))
-            qs = Manuscript.objects.filter(*lstQ).distinct()
-        else:
-            # Just show everything
-            qs = Manuscript.objects.all()
-
-        # Set the sort order
-        qs = qs.order_by('library__country__name', 
-                         'library__city__name', 
-                         'library__name', 
-                         'idno')
-
-        # Time measurement
-        if self.bDoTime:
-            print("ManuscriptListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("ManuscriptListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("ManuscriptListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
-        return qs
 
 
 class ManuscriptProvset(BasicPart):
@@ -5080,14 +5407,16 @@ class ManuscriptExtset(BasicPart):
         return has_changed
 
 
-class SermonGoldListView(ListView):
+class SermonGoldListView(BasicListView):
     """Search and list manuscripts"""
     
     model = SermonGold
-    paginate_by = 20
+    listform = SermonGoldForm
+    prefix = "gold"
     template_name = 'seeker/sermongold.html'
-    entrycount = 0
-    bDoTime = True
+    paginate_by = 20
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
@@ -5095,178 +5424,19 @@ class SermonGoldListView(ListView):
                    {'name': 'Editions', 'order': '', 'type': 'str'},
                    {'name': 'Links', 'order': '', 'type': 'str'},
                    {'name': 'Status', 'order': '', 'type': 'str'}]
-
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(SermonGoldListView, self).get_context_data(**kwargs)
-
-        # Get parameters for the search
-        initial = self.request.GET
-
-        # ONE-TIME adhoc = SermonGold.init_latin()
-
-        # Add a files upload form
-        context['goldForm'] = SermonGoldForm(prefix='gold')
-
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Gold-Sermons"
-
-        # Make sure we pass on the ordered heads
-        context['order_heads'] = self.order_heads
-
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Gold sermons", False)
-        context['prevpage'] = get_previous_page(self.request)
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.qd = get
-
-        self.bHasFormset = (len(get) > 0)
-
-        sort_type = "exclude_signature"
-        sort_type = "ordered_columns"
-
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
-
-        if self.bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            goldForm = SermonGoldForm(self.qd, prefix='gold')
-
-            if goldForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = goldForm.cleaned_data
-
-                # Check for author name -- which is in the typeahead parameter
-                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
-                    val = oFields['author']
-                    lstQ.append(Q(author=val))
-                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
-                    val = adapt_search(oFields['authorname'])
-                    lstQ.append(Q(author__name__iregex=val))
-
-                # Check for incipit string
-                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                    val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(srchincipit__iregex=val))
-
-                # Check for explicit string
-                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                    val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(srchexplicit__iregex=val))
-
-                # Check for SermonGold [signature]
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(goldsignatures__code__iregex=val))
-
-                # Check for SermonGold [signature]
-                if 'keyword' in oFields and oFields['keyword'] != "" and oFields['keyword'] != None: 
-                    val = adapt_search(oFields['keyword'])
-                    lstQ.append(Q(keywords__name__iregex=val))
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # Just show everything
-                    qs = SermonGold.objects.all()
-                else:
-                    qs = SermonGold.objects.filter(*lstQ).distinct()
-            else:
-                # TODO: communicate the error to the user???
-
-
-                # Just show everything
-                qs = SermonGold.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = SermonGold.objects.all().distinct()
-
-        # Do sorting
-        if sort_type == "exclude_signature":
-            # Sort the 'normal' way on author/incipit/explicit
-            qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
-        elif sort_type == "ordered_columns":
-            # Start with an initial order
-            order = ['author__name', 'siglist', 'incipit', 'explicit']
-            bAscending = True
-            sType = 'str'
-            if 'o' in self.qd:
-                order = []
-                iOrderCol = int(self.qd['o'])
-                bAscending = (iOrderCol>0)
-                iOrderCol = abs(iOrderCol)
-                for order_item in self.order_cols[iOrderCol-1].split(";"):
-                    order.append(Lower(order_item))
-                sType = self.order_heads[iOrderCol-1]['type']
-                if bAscending:
-                    self.order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
-                else:
-                    # order = "-" + order
-                    self.order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
-            if sType == 'str':
-                qs = qs.order_by(*order)
-            else:
-                qs = qs.order_by(*order)
-            # Possibly reverse the order
-            if not bAscending:
-                qs = qs.reverse()
-        else:
-            # Sort the python way
-            qs = sorted(qs, key=lambda x: x.get_sermon_string())
-
-        # Time measurement
-        if self.bDoTime:
-            print("SermonGoldListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            # print("SermonGoldListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("SermonGoldListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
-        return qs
+    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
+                {"name": "Author",          "id": "filter_author",      "enabled": False},
+                {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+                {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+                {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
+        ]
 
 
 class SermonGoldSelect(BasicPart):

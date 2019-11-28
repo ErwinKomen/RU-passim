@@ -110,6 +110,17 @@ class SearchManuscriptForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
 
 
+class ManuidWidget(ModelSelect2MultipleWidget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        return Manuscript.objects.all().order_by('idno').distinct()
+
+
 class SignatureWidget(ModelSelect2MultipleWidget):
     model = Signature
     search_fields = [ 'code__icontains' ]
@@ -121,15 +132,101 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
-class ManuidWidget(ModelSelect2MultipleWidget):
-    model = Manuscript
-    search_fields = [ 'idno__icontains']
+class SearchManuForm(forms.ModelForm):
+    """Manuscript search form"""
+
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+
+    country     = forms.CharField(required=False)
+    country_ta  = forms.CharField(label=_("Country"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city        = forms.CharField(required=False)
+    city_ta     = forms.CharField(label=_("City"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    prov        = forms.CharField(required=False)
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    signature   = forms.CharField(label=_("Signature"), required=False,
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Manuscript
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype']
+        widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
+                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
+                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
+                 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SearchManuForm, self).__init__(*args, **kwargs)
+        
+        # NONE of the fields are required in the SEARCH form!
+        self.fields['stype'].required = False
+        self.fields['name'].required = False
+        self.fields['yearstart'].required = False
+        self.fields['yearfinish'].required = False
+        self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check if a library is specified
+            library = instance.library
+            if library != None:
+                # In this case: get the city and the country
+                city = library.get_city_name()
+                country = library.get_country_name()
+                if (country == None or country == "") and city != None and city != "":
+                    # We have a city, but the country is not specified...
+                    lstQ = []
+                    lstQ.append(Q(loctype__name="country"))
+                    lstQ.append(Q(relations_location=library.lcity))
+                    obj = Location.objects.filter(*lstQ).first()
+                    if obj != None:
+                        country = obj.name
+                # Put them in the fields
+                self.fields['city_ta'].initial = city
+                self.fields['country_ta'].initial = country
+                # Also: make sure we put the library NAME in the initial
+                self.fields['libname_ta'].initial = library.name
+            # Look after origin
+            origin = instance.origin
+            self.fields['origname_ta'].initial = "" if origin == None else origin.name
+
+
+class KeywordWidget(ModelSelect2MultipleWidget):
+    model = Keyword
+    search_fields = [ 'name__icontains' ]
 
     def label_from_instance(self, obj):
-        return obj.idno
+        return obj.name
 
     def get_queryset(self):
-        return Manuscript.objects.all().order_by('idno').distinct()
+        return Keyword.objects.all().order_by('name').distinct()
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
@@ -207,19 +304,21 @@ class SermonForm(forms.ModelForm):
     # Helper fields for SermonDescr fields
     authorname  = forms.CharField(label=_("Author"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
-    #nickname_ta = forms.CharField(label=_("Alternative"), required=False, 
-    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching nicknames input-sm', 'placeholder': 'Other author...', 'style': 'width: 100%;'}))
+    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;'}))
-    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
-    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;'}))
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    keyword = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -238,9 +337,9 @@ class SermonForm(forms.ModelForm):
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
     date_from   = forms.IntegerField(label=_("Date start"), required = False,
-                                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;'}))
+                                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
-                                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;'}))
+                                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -249,13 +348,13 @@ class SermonForm(forms.ModelForm):
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
                   #, 'clavis', 'gryson', 'keyword']
-        widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+        widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'locus':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;'}),
-                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -265,10 +364,10 @@ class SermonForm(forms.ModelForm):
                  #'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
-                 'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -280,6 +379,7 @@ class SermonForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -290,6 +390,33 @@ class SermonForm(forms.ModelForm):
             #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+
+
+class KeywordForm(forms.ModelForm):
+    """Keyword list"""
+
+    keyword_ta = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Keyword
+        fields = ['name']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(KeywordForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -360,13 +487,22 @@ class SermonDescrKeywordForm(forms.ModelForm):
 
 class SermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
-        widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
-        widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    # OLD:
     editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=EditionExistingWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;'}))
+                            widget=EditionExistingWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
     # FUTURE: once model 'Edition' has become attached with ManyToMany to SermonGold
     #editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
     #                        widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
@@ -379,7 +515,7 @@ class SermonGoldForm(forms.ModelForm):
         widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
-                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace'}),
+                 'bibliography': forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -388,6 +524,11 @@ class SermonGoldForm(forms.ModelForm):
         super(SermonGoldForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+
+        # OLD:
         self.fields['editionlist'].queryset = Edition.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
@@ -609,6 +750,7 @@ class ManuscriptProvForm(forms.ModelForm):
                 self.fields['note'].initial = instance.provenance.note
                 if instance.provenance.location != None:
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
+                    # self.fields['location_ta'].initial = instance.provenance.location.name
 
 
 class ManuscriptLitrefForm(forms.ModelForm):
@@ -782,6 +924,9 @@ class ManuscriptForm(forms.ModelForm):
         super(ManuscriptForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['stype'].required = False
+        self.fields['yearstart'].required = False
+        self.fields['yearfinish'].required = False
+        self.fields['name'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -815,6 +960,7 @@ class LocationWidget(ModelSelect2MultipleWidget):
 
     def label_from_instance(self, obj):
         sLabel = "{} ({})".format(obj.name, obj.loctype)
+        # sLabel = obj.name
         return sLabel
 
 
@@ -875,6 +1021,33 @@ class LocationRelForm(forms.ModelForm):
             # Check if the initial name should be added
             if instance.container != None:
                 self.fields['partof_ta'].initial = instance.container.get_loc_name()
+
+
+class DaterangeForm(forms.ModelForm):
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Daterange
+        fields = ['yearstart', 'yearfinish', 'reference', 'pages']
+        widgets={'reference':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'pages':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearstart':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(DaterangeForm, self).__init__(*args, **kwargs)
+
+        # Set other parameters
+        self.fields['yearstart'].required = True
+        self.fields['yearfinish'].required = True
+        self.fields['reference'].required = False
+        self.fields['pages'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
 
 
 class SearchCollectionForm(forms.Form):

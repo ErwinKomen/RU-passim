@@ -87,13 +87,30 @@ class HelpChoice(models.Model):
         return help_text
 
 def get_current_datetime():
+    """Get the current time"""
     return timezone.now()
 
-def adapt_search(val):
+def adapt_search(val, do_brackets = True):
     if val == None: return None
     # First trim
     val = val.strip()
+    if do_brackets:
+        arPart = val.split("[")
+        for idx, part in enumerate(arPart):
+            arPart[idx] = part.replace("]", "[]]")
+        val = "[[]".join(arPart)
     val = '^' + fnmatch.translate(val) + '$'
+    return val
+
+def adapt_brackets(val):
+    """Change square brackets for better searching"""
+    if val == None: return None
+    # First trim
+    val = val.strip()
+    arPart = val.split("[")
+    for part in arPart:
+        part = part.replace("]", "[]]")
+    val = "[[]".join(arPart)
     return val
 
 def adapt_latin(val):
@@ -114,6 +131,7 @@ def adapt_markdown(val, lowercase=True):
     return sBack
 
 def is_number(s_input):
+    """Check if s_input is a number consisting only of digits, possibly enclosed in brackets"""
     return re.match(r'^[[]?(\d+)[]]?', s_input)
 
 def get_linktype_abbr(sLinkType):
@@ -160,6 +178,7 @@ def get_crpp_date(dtThis):
     return sDate
 
 def get_now_time():
+    """Get the current time"""
     return time.clock()
 
 def obj_text(d):
@@ -2116,11 +2135,11 @@ class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
     # [1] Name of the manuscript (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING)
+    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
     # [1] Date estimate: starting from this year
-    yearstart = models.IntegerField("Year from", null=False)
+    yearstart = models.IntegerField("Year from", null=False, default=100)
     # [1] Date estimate: finishing with this year
-    yearfinish = models.IntegerField("Year until", null=False)
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -2705,6 +2724,63 @@ class Manuscript(models.Model):
         return oBack
     
 
+class Daterange(models.Model):
+    """Each manuscript can have a number of date ranges attached to it"""
+
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
+
+    # [0-1] An optional reference for this daterange
+    reference = models.ForeignKey(Litref, null=True, related_name="reference_dateranges", on_delete=models.SET_NULL)
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    # ========================================================================
+    # [1] Every daterange belongs to exactly one manuscript
+    #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
+    manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.yearstart, self.yearfinish)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Perform the actual saving
+        response = super(Daterange, self).save(force_insert, force_update, using, update_fields)
+        # Possibly adapt the dates of the related manuscript
+        self.adapt_manu_dates()
+        # Return the response on saving
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        response = super(Daterange, self).delete(using, keep_parents)
+        # Possibly adapt the dates of the related manuscript
+        self.adapt_manu_dates()
+        # Return the response on saving
+        return response
+
+    def adapt_manu_dates(self):
+        manu_start = self.manuscript.yearstart
+        manu_finish = self.manuscript.yearfinish
+        current_start = 3000
+        current_finish = 0
+        for dr in self.manuscript.manuscript_dateranges.all():
+            if dr.yearstart < current_start: current_start = dr.yearstart
+            if dr.yearfinish > current_finish: current_finish = dr.yearfinish
+        # Need any changes?
+        bNeedSaving = False
+        if manu_start != current_start:
+            self.manuscript.yearstart = current_start
+            bNeedSaving = True
+        if manu_finish != current_finish:
+            self.manuscript.yearfinish = current_finish
+            bNeedSaving = True
+        if bNeedSaving: self.manuscript.save()
+        return True
+
+
 class Author(models.Model):
     """We have a set of authors that are the 'golden' standard"""
 
@@ -2881,6 +2957,16 @@ class Keyword(models.Model):
     def __str__(self):
         return self.name
 
+    def freqsermo(self):
+        """Frequency in manifestation sermons"""
+        freq = self.keywords_sermon.all().count()
+        return freq
+
+    def freqgold(self):
+        """Frequency in Gold sermons"""
+        freq = self.keywords_gold.all().count()
+        return freq
+
 
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
@@ -3029,6 +3115,12 @@ class SermonGold(models.Model):
             lSign.append(item.short())
         return " | ".join(lSign)
 
+    def get_signatures(self):
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return lSign
+
     def get_keywords(self):
         """Combine all keywords into one string"""
 
@@ -3049,6 +3141,14 @@ class SermonGold(models.Model):
         self.save()
 
     def editions(self):
+        """Combine all editions into one string: the editions are retrieved from litrefSG"""
+
+        lEdition = []
+        for item in self.sermon_gold_editions.all():
+            lEdition.append(item.reference.short)
+        return " | ".join(lEdition)
+
+    def editions_old(self):
         """Combine all editions into one string"""
 
         lEdition = []
@@ -3309,6 +3409,7 @@ class SermonGold(models.Model):
                         pass
 
                     # Process Editions (separated by ';')
+                    # NOTE: this needs to be emended to use LitrefSG
                     edition_lst = oGold['edition'].split(";")
                     for item in edition_lst:
                         item = item.strip()
@@ -3553,13 +3654,6 @@ class SermonDescr(models.Model):
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
 
-    ## [0-1] We would like to know the Clavis number (if available)
-    #clavis = models.CharField("Clavis number", null=True, blank=True, max_length=LONG_STRING)
-    ## [0-1] We would like to know the Gryson number (if available)
-    #gryson = models.CharField("Gryson number", null=True, blank=True, max_length=LONG_STRING)
-    ## [0-1] One keyword or more??
-    #keyword = models.CharField("Keyword", null=True, blank=True, max_length=LONG_STRING)
-
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
@@ -3573,7 +3667,7 @@ class SermonDescr(models.Model):
     manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
 
     # Automatically created and processed fields
-    # [1] Every gold sermon has a list of signatures that are automatically created
+    # [1] Every sermondesc has a list of signatures that are automatically created
     siglist = models.TextField("List of signatures", default="[]")
 
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================

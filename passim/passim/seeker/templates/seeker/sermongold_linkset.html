@@ -55,7 +55,7 @@
                   <div class="view-mode">
                     {% for link in linkform.instance.dst.equal_goldsermons.all %}
                       <div>
-                        <a href="{% url 'gold_details' link.id %}" target="_blank">
+                        <a href="{% url 'gold_details' link.id %}">
                           {% include 'seeker/sermongold_view.html' with msitem=link %}
                         </a>
                       </div>
