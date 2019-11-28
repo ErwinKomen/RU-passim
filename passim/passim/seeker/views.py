@@ -356,6 +356,9 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
         bAscending = True
         sType = 'str'
         order = []
+        colnum = ""
+        # reset 'used' feature for all heads
+        for item in order_heads: item['used'] = None
         if 'o' in qd and qd['o'] != "":
             colnum = qd['o']
             if '=' in colnum:
@@ -365,6 +368,10 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 iOrderCol = int(colnum)
                 bAscending = (iOrderCol>0)
                 iOrderCol = abs(iOrderCol)
+
+                # Set the column that it is in use
+                order_heads[iOrderCol-1]['used'] = 1
+                # Get the type
                 sType = order_heads[iOrderCol-1]['type']
                 for order_item in order_cols[iOrderCol-1].split(";"):
                     if sType == 'str':
@@ -376,6 +383,12 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 else:
                     # order = "-" + order
                     order_heads[iOrderCol-1]['order'] = 'o={}'.format(iOrderCol)
+
+                # Reset the sort order to ascending for all others
+                for idx, item in enumerate(order_heads):
+                    if idx != iOrderCol - 1:
+                        # Reset this sort order
+                        order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
             for order_item in order_cols[0].split(";"):
                 order.append(Lower(order_item))
@@ -394,7 +407,7 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
         oErr.DoError("make_ordering")
         lstQ = []
 
-    return qs, order_heads
+    return qs, order_heads, colnum
 
 def process_visit(request, name, is_menu, **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -4192,6 +4205,7 @@ class BasicListView(ListView):
     order_heads = []
     filters = []
     searches = []
+    sort_order = ""
     page_function = None
 
     def get_context_data(self, **kwargs):
@@ -4233,6 +4247,8 @@ class BasicListView(ListView):
             context['page_obj'] = context['paginator'].page( page_num)
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
+
+        context['sortOrder'] = self.sort_order
 
         # Set the title of the application
         self.plural_name = str(self.model._meta.verbose_name_plural)
@@ -4301,7 +4317,7 @@ class BasicListView(ListView):
 
             # Do the ordering of the results
             order = self.order_default
-            qs, self.order_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+            qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         elif self.bHasParameters:
             self.basketview = False
             lstQ = []
@@ -4330,12 +4346,13 @@ class BasicListView(ListView):
 
             # Do the ordering of the results
             order = self.order_default
-            qs, self.order_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+            qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         else:
             self.basketview = False
             qs = self.model.objects.all().distinct()
             order = self.order_default
-            qs, tmp_heads = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+            qs, tmp_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+        self.sort_order = colnum
 
         # Determine the length
         self.entrycount = len(qs)
