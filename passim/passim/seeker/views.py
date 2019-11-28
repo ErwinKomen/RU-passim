@@ -354,9 +354,12 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 iOrderCol = int(colnum)
                 bAscending = (iOrderCol>0)
                 iOrderCol = abs(iOrderCol)
-                for order_item in order_cols[iOrderCol-1].split(";"):
-                    order.append(Lower(order_item))
                 sType = order_heads[iOrderCol-1]['type']
+                for order_item in order_cols[iOrderCol-1].split(";"):
+                    if sType == 'str':
+                        order.append(Lower(order_item))
+                    else:
+                        order.append(order_item)
                 if bAscending:
                     order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
                 else:
@@ -3234,7 +3237,7 @@ class BasicPart(View):
                             # At least get the cleaned data from the form
                             formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
 
-
+                            # x = json.dumps(sorted(self.qd.items(), key=lambda kv: kv[0]), indent=2)
                     # Add instance to the context object
                     context[prefix + "Form"] = formObj['forminstance']
                 # Walk all the formset objects
@@ -5182,7 +5185,7 @@ class ManuscriptListView(BasicListView):
     template_name = 'seeker/manuscript_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
-    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'manuscript_dateranges__yearstart','manuscript_dateranges__yearfinish', 'stype']
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
     order_default = order_cols
     order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
                    {'name': 'Library',  'order': 'o=2', 'type': 'str'},

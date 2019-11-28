@@ -161,11 +161,11 @@
                 <tbody>
                   <!-- Allows up to three date ranges-->
                   {% for mdrform in mdr_formset %}
-                    <tr class="form-row">
+                    <tr class="form-row hide-on-delete">
                       <!-- A 1-based counter for the forms in this set-->
                       <td style="min-width: 20px;"><span>{{forloop.counter}}</span></td>
 
-                      <!-- Hidden but essential: the id of this litref -->
+                      <!-- Hidden but essential: the id of this manuscript-daterange -->
                       <td class="hidden">{{mdrform.id}}</td>
 
                       <!-- From and Until -->
@@ -173,7 +173,20 @@
                       <td style="min-width: 80px;">{{mdrform.yearfinish}}</td>
 
                       <!-- Literature reference -->
-                      <td style="width: 100%;">{{mdrform.reference}}</td>
+                      <td style="width: 100%;">
+                        <div>{{mdrform.reference}}</div>
+                        <!-- Confirmation of delete -->
+                        <div class="delete-confirm hidden">
+                          <span>Do you really want to delete the link to this daterange?</span>
+                          <span>
+                            <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                          </span>
+                          <span class="hidden">{{mdrform.DELETE}}</span>
+                          <span>
+                            <a class="btn btn-xs jumbo-4 delete-row" extra="mdr">Delete</a>
+                          </span>
+                        </div>
+                      </td>
 
                       <!-- Pages -->
                       <td style="min-width: 100px;">{{mdrform.pages}}</td>

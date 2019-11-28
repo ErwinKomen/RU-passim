@@ -2746,6 +2746,40 @@ class Daterange(models.Model):
         sBack = "{}-{}".format(self.yearstart, self.yearfinish)
         return sBack
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Perform the actual saving
+        response = super(Daterange, self).save(force_insert, force_update, using, update_fields)
+        # Possibly adapt the dates of the related manuscript
+        self.adapt_manu_dates()
+        # Return the response on saving
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        response = super(Daterange, self).delete(using, keep_parents)
+        # Possibly adapt the dates of the related manuscript
+        self.adapt_manu_dates()
+        # Return the response on saving
+        return response
+
+    def adapt_manu_dates(self):
+        manu_start = self.manuscript.yearstart
+        manu_finish = self.manuscript.yearfinish
+        current_start = 3000
+        current_finish = 0
+        for dr in self.manuscript.manuscript_dateranges.all():
+            if dr.yearstart < current_start: current_start = dr.yearstart
+            if dr.yearfinish > current_finish: current_finish = dr.yearfinish
+        # Need any changes?
+        bNeedSaving = False
+        if manu_start != current_start:
+            self.manuscript.yearstart = current_start
+            bNeedSaving = True
+        if manu_finish != current_finish:
+            self.manuscript.yearfinish = current_finish
+            bNeedSaving = True
+        if bNeedSaving: self.manuscript.save()
+        return True
+
 
 class Author(models.Model):
     """We have a set of authors that are the 'golden' standard"""
