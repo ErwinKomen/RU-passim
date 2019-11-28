@@ -9,40 +9,49 @@ from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.db.models import Q
-import operator
-import io # voor PDF creatie 
-from functools import reduce
-from pyzotero import zotero
-
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
 from django.forms.models import model_to_dict
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.http import JsonResponse
-from django.http import FileResponse # voor PDF creatie 
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
-
 from django.template import Context
-
 from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
+
+# General imports
 from datetime import datetime
-from reportlab.pdfgen import canvas # voor PDF creatie
-from reportlab.lib.units import inch # voor PDF creatie
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Frame, PageBreak   # voor PDF creatie
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle # voor PDF creatie
-from reportlab.rl_config import defaultPageSize  # voor PDF creatie
-from reportlab.lib.pagesizes import A4, landscape
-from markdown import markdown # voor PDF creatie
-
+import operator
+from functools import reduce
+from pyzotero import zotero
 from time import sleep 
+import fnmatch
+import sys, os
+import base64
+import json
+import csv, re
+import requests
+import demjson
+import openpyxl
+from openpyxl.utils.cell import get_column_letter
+from io import StringIO
+from itertools import chain
 
+# ======== imports for PDF creation ==========
+import io  
+from markdown import markdown 
+from reportlab.lib.units import inch 
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle 
+from reportlab.lib.units import inch 
+from reportlab.pdfgen import canvas 
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Frame, PageBreak   
+from reportlab.rl_config import defaultPageSize  
 
-
+# ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
@@ -57,24 +66,6 @@ from passim.seeker.models import get_current_datetime, process_lib_entries, adap
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
-
-import fnmatch
-import sys, os
-import base64
-import json
-import csv, re
-import requests
-import demjson
-import openpyxl
-from openpyxl.utils.cell import get_column_letter
-from io import StringIO
-from itertools import chain
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer # voor PDF creatie
-from reportlab.lib.styles import getSampleStyleSheet # voor PDF creatie
-from reportlab.rl_config import defaultPageSize # voor PDF creatie
-from reportlab.lib.units import inch # voor PDF creatie
-
 
 # Some constants that can be used
 paginateSize = 20
@@ -1946,657 +1937,264 @@ def do_goldtogold_ORIGINAL(request):
         oErr.DoError("goldtogold")
         return reverse('home')
 
-@csrf_exempt
-def get_countries(request):
-    """Get a list of countries for autocomplete"""
+def do_import_editions(request):
+    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
 
-    data = 'fail'
-    method = "useLocation"
-    if request.is_ajax():
-        oErr = ErrHandle()
-        try:
-            sName = request.GET.get('country', '')
-            if sName == "": sName = request.GET.get('country_ta', "")
-            lstQ = []
-            lstQ.append(Q(name__icontains=sName))
-            if method == "useLocation":
-                loctype = LocationType.find("country")
-                lstQ.append(Q(loctype=loctype))
-                countries = Location.objects.filter(*lstQ).order_by('name')
-            else:
-                countries = Country.objects.filter(*lstQ).order_by('name')
-            results = []
-            for co in countries:
-                co_json = {'name': co.name, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_countries")
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
+    # Use double for-loop:
+    last_old_edi = ""
+    last_litref = None
+    count = 0
+    oErr = ErrHandle()
+    template_name = 'tools.html'
+    result_list = []
+    context = {'status': 'ok', 'tools_part': 'import_edition'}
+    try:
+        for edi in Edition.objects.all().order_by('name'):
+            edi.update = "NIETGEDAAN"
+            edi.save()
 
-@csrf_exempt
-def get_cities(request):
-    """Get a list of cities for autocomplete"""
+            # DEBUG
+            if edi.id == 1253:
+                iStop = 1
 
-    data = 'fail'
-    method = "useLocation"
-    if request.is_ajax():
-        oErr = ErrHandle()
-        try:
-            # Get the user-specified 'country' and 'city' strings
-            country = request.GET.get('country', "")
-            if country == "": country = request.GET.get('country_ta', "")
-            city = request.GET.get("city", "")
-            if city == "": city = request.GET.get('city_ta', "")
-
-            # build the query
-            lstQ = []
-            if method == "useLocation":
-                # Start as broad as possible: country
-                qs_loc = None
-                if country != "":
-                    loctype_country = LocationType.find("country")
-                    lstQ.append(Q(name=country))
-                    lstQ.append(Q(loctype=loctype_country))
-                    qs_country = Location.objects.filter(*lstQ)
-                    # Fine-tune on city...
-                    loctype_city = LocationType.find("city")
-                    lstQ = []
-                    lstQ.append(Q(name__icontains=city))
-                    lstQ.append(Q(loctype=loctype_city))
-                    lstQ.append(Q(relations_location__in=qs_country))
-                    cities = Location.objects.filter(*lstQ)
+            # Split the old editions into old_edi and pages
+            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
+            if old_edi != None and old_edi != "":
+                litref = None
+                if old_edi != last_old_edi:
+                    # Compare the old editions with the new editions ("short"), using short without the year
+                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
+                        if old_edi == get_short_edit(litreftmp.short):
+                            litref = litreftmp
+                            last_litref = litreftmp
+                            break
                 else:
-                    loctype_city = LocationType.find("city")
-                    lstQ.append(Q(name__icontains=city))
-                    lstQ.append(Q(loctype=loctype_city))
-                    cities = Location.objects.filter(*lstQ)
-            elif method == "slowLocation":
-                # First of all: city...
-                loctype_city = LocationType.find("city")
-                lstQ.append(Q(name__icontains=city))
-                lstQ.append(Q(loctype=loctype_city))
-                # Do we have a *country* specification?
-                if country != "":
-                    loctype_country = LocationType.find("country")
-                    lstQ.append(Q(relations_location__name=country))
-                    lstQ.append(Q(relations_location__loctype=loctype_country))
-                # Combine everything
-                cities = Location.objects.filter(*lstQ).order_by('name')
-            else:
-                if country != "":
-                    lstQ.append(Q(country__name__icontains=country))
-                lstQ.append(Q(name__icontains=city))
-                cities = City.objects.filter(*lstQ).order_by('name')
-            results = []
-            for co in cities:
-                co_json = {'name': co.name, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_cities")
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
+                    litref = last_litref
+                # Continue...
+                if litref != None:
+                    # We can process him!
+                    gold_obj = edi.gold
+                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
+                    if esg == None:
+                        # Create EdirefSG record
+                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
+                    # Double check pages and add to new EdirefSG record
+                    if pages != None:
+                        esg.pages = pages
+                        esg.save()
+                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
+                    count += 1
+                    if status == "ok":
+                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
+                    else:
+                        edi.update = "PAGES: " + status
+                    edi.save()
+                    # Show it in the result list
+                    result_list.append({'part': count, 'result': edi.name})
+            #else: # Hier moet het nog anders. 
+        # All edition objects have been reviewed
+        context['result_list'] = result_list
+    except:
+        sMsg = oErr.get_error_message()
+        oErr.DoError("do_import_editions")
+        context['status'] = "error"
+        context['message'] = sMsg
+
+    # Render and return the page
+    return render(request, template_name, context)
+
+def get_old_edi(edi):
+    """Split pages and year from edition, keep stripped edition and the pages
+    The number of matches increase when the year in the name of the edition
+    and in the short reference from Zotero is not used.
+    """
+ 
+    pages = None
+    result = None
+    status = "ok"
+    # Split up edition and pages part
+    arResult = edi.name.split(",")
+    # In case of no pages, split string to get rid of year 
+    if len(arResult) ==  1:
+        result_tmp1 = arResult[0].split("(")
+        result = result_tmp1[0].strip()
+    # In case there are pages
+    elif len(arResult) > 1: 
+        # Split string to get rid of year 
+        result_tmp1 = arResult[0].split("(")
+        result = result_tmp1[0].strip()
+        pages = arResult[1].strip()
+        if not re.match(r'^[\d\-]+$', pages): 
+            status = pages
+            pages = None
+
+    return result, pages, status
+
+def get_short_edit(short):
+    # Strip off the year of the short reference in Litref, keep only first part (abbr and seriesnumber)
+
+    result = None
+    arResult = short.split("(")
+    if len(arResult) > 1:
+        result = arResult[0].strip()
+    elif len(arResult) == 1:
+        result = arResult[0].strip()
+    return result
+
+def do_create_pdf_edi(request):
+    """This definition creates a pdf of all used edition (full) references."""
+        
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Edition references used in PASSIM:"
+    pageinfo = "Editions PASSIM"
+             
+    # Store name of the pdf file 
+    filename = "Edi_ref_PASSIM.pdf"
+            
+    # Calculate the final qs for the edition litrefs
+    ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
+       
+    # Sort and filter all editions
+    qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
+
+    # Create a list of objects
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.full
+        pdf_list.append(item)
     
-@csrf_exempt
-def get_libraries(request):
-    """Get a list of libraries for autocomplete"""
+    # Call create_pdf_passim function with arguments  
+    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+  
+    # And return the pdf
+    return response
 
-    data = 'fail'
-    if request.is_ajax():
-        oErr = ErrHandle()
-        try:
-            # Get the user-specified 'country' and 'city' strings
-            country = request.GET.get('country', "")
-            if country == "": country = request.GET.get('country_ta', "")
-            city = request.GET.get("city", "")
-            if city == "": city = request.GET.get('city_ta', "")
-            lib = request.GET.get("library", "")
-            if lib == "": lib = request.GET.get('libname_ta', "")
-
-            # build the query
-            lstQ = []
-            # Start as broad as possible: country
-            qs_loc = None
-            if country != "":
-                loctype_country = LocationType.find("country")
-                lstQ.append(Q(name=country))
-                lstQ.append(Q(loctype=loctype_country))
-                qs_country = Location.objects.filter(*lstQ)
-                # What about city?
-                if city == "":
-                    qs_loc = qs_country
-                else:
-                    loctype_city = LocationType.find("city")
-                    lstQ = []
-                    lstQ.append(Q(name__icontains=city))
-                    lstQ.append(Q(loctype=loctype_city))
-                    lstQ.append(Q(relations_location__in=qs_country))
-                    qs_loc = Location.objects.filter(*lstQ)
-            elif city != "":
-                loctype_city = LocationType.find("city")
-                lstQ.append(Q(name__icontains=city))
-                lstQ.append(Q(loctype=loctype_city))
-                qs_loc = Location.objects.filter(*lstQ)
-
-            # Start out with the idea to look for a library by name:
-            lstQ = []
-            if lib != "": lstQ.append(Q(name__icontains=lib))
-            if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
-
-            # Combine everything
-            libraries = Library.objects.filter(*lstQ).order_by('name').values('name','id') 
-            results = []
-            for co in libraries:
-                co_json = {'name': co['name'], 'id': co['id'] }
-                results.append(co_json)
-            data = json.dumps(results)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_libraries")
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_origins(request):
-    """Get a list of origin names for autocomplete"""
-
-    data = 'fail'
-    if request.is_ajax():
-        sName = request.GET.get('name', '')
-        lstQ = []
-        lstQ.append(Q(name__icontains=sName))
-        origins = Origin.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in origins:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_locations(request):
-    """Get a list of location names for autocomplete"""
-
-    data = 'fail'
-    if request.is_ajax():
-        oErr = ErrHandle()
-        try:
-            sName = request.GET.get('name', '')
-            lstQ = []
-            lstQ.append(Q(name__icontains=sName))
-            locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
-            results = []
-            for co in locations:
-                # name = "{} ({})".format(co['name'], co['loctype__name'])
-                name = co['name']
-                co_json = {'name': name, 'id': co['id'], 'loctype': co['loctype__name'] }
-                results.append(co_json)
-            data = json.dumps(results)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_locations")
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_litrefs(request):
-    """Get a list of literature references for autocomplete"""
+def do_create_pdf_lit(request):
+    """"This definition creates a pdf of all used literature (full) references."""
+         
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Literature references used in PASSIM:"
+    pageinfo = "Literature PASSIM"
+       
+    # Store name of the file    
+    filename = "Lit_ref_PASSIM.pdf"
     
-    data = 'fail'
-    if request.is_ajax():
-        oErr = ErrHandle()
-        try:
-            sName = request.GET.get('name', '')
-            lstQ = []
-            lstQ.append(Q(full__icontains=sName)|Q(short__icontains=sName))
-            litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'short', 'id')
-            results = [] 
-            for co in litrefs:
-                name = "{} {}".format(co['full'], co['short'])
-                co_json = {'name': name, 'id': co['id'] }
-                results.append(co_json)
-            data = json.dumps(results)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_litrefs")
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
+    # Calculate the final qs for the manuscript litrefs
+    litref_ids_man = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
+    
+    # Calculate the final qs for the Gold sermon litrefs
+    litref_ids_sg = [x['reference'] for x in LitrefSG.objects.all().values('reference')]
 
-def get_manuscripts(request):
-    """Get a list of manuscripts"""
+    # Combine the two qs into one and filter
+    litref_ids = chain(litref_ids_man, litref_ids_sg)
+    
+    # Hier worden short en full opgehaald?
+    qs = Litref.objects.filter(id__in=litref_ids).order_by('short') 
+    
+    # Create a list of objects 
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.full
+        pdf_list.append(item)
+        
+    # Call create_pdf_passim function with arguments  
+    response  = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+       
+    # And return the pdf
+    return response
 
-    data = 'fail'
-    errHandle = ErrHandle()
-    # Only allow AJAX calls with POST
-    if request.is_ajax() and request.method == "POST":
-        get = request.POST
-        # Get parameters city and library
-        city = get.get("city", "")
-        lib = get.get("library", "")
+def create_pdf_passim(Title, pageinfo, filename, pdf_list):
+    """This definition creates a pdf for all passim requests."""
+     
+    # Define sizes of the pages in the pdf
+    PAGE_HEIGHT=defaultPageSize[1]; PAGE_WIDTH=defaultPageSize[0]
+    
+    # Store text and current date for information on date of the download
+    today = datetime.today()
+    today.strftime('%Y-%m-%d')
+       
+    # Set buffer   
+    buffer = io.BytesIO()
 
-        url = "{}/Manuscrits/manuscritforetablissement".format(cnrs_url)
-        data = "idEtab={}&idVille={}".format(lib, city)
-        data = {"idEtab": lib, "idVille": city}
-        #data = []
-        #data.append({'name': 'idEtab', 'value': lib})
-        #data.append({'name': 'idVille', 'value': city})
-        try:
-            r = requests.post(url, data=data)
-        except:
-            sMsg = errHandle.get_error_message()
-            errHandle.DoError("Request problem")
-            return False
-        if r.status_code == 200:
-            # Return positively
-            reply = demjson.decode(r.text.replace("\t", " "))
-            if reply != None and "items" in reply:
-                results = []
-                for item in reply['items']:
-                    if item['name'] != "":
-                        results.append(item['name'])
-                data = json.dumps(results)
-    else:
-        data = "Request is not ajax"
-    # Prepare and return data
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
+    # Set the first page
+    def myFirstPage(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica-Bold',22)
+        canvas.drawCentredString(PAGE_WIDTH/2.0, PAGE_HEIGHT-80, Title)
+        canvas.setFont('Helvetica',10)
+        canvas.drawString(75,730, "Downloaded on: ")
+        canvas.drawString(150,730, today.strftime('%d-%m-%Y'))
+        canvas.setFont('Helvetica',9)
+        canvas.drawString(inch, 0.75 * inch, "Page 1 / %s" % pageinfo)
+        canvas.restoreState()
+    
+    # Set the second and later pages
+    def myLaterPages(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica',9)
+        canvas.drawString(inch, 0.75 * inch, "Page %d %s" % (doc.page, pageinfo))
+        canvas.restoreState()
 
-def download_file(url):
-    """Download a file from the indicated URL"""
+    # Create the HttpResponse object with the appropriate PDF headers. 
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+               
+    # Define style of the pdf
+    styles = getSampleStyleSheet()
+        
+    doc = SimpleDocTemplate(buffer)
+    Story = [Spacer(1,1.05*inch)]
+    style = styles["Normal"]
+    # Dit tzt afhankelijk maken van lit en edi, niet van manuscript TH: hier nog met Erwin over hebben
 
-    bResult = True
-    sResult = ""
-    errHandle = ErrHandle()
-    # Get the filename from the url
-    name = url.split("/")[-1]
-    # Set the output directory
-    outdir = os.path.abspath(os.path.join(MEDIA_DIR, "e-codices"))
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-    # Create a filename where we can store it
-    filename = os.path.abspath(os.path.join(outdir, name))
-    try:
-        r = requests.get(url)
-    except:
-        sMsg = errHandle.get_error_message()
-        errHandle.DoError("Request problem")
-        return False, sMsg
-    if r.status_code == 200:
-        # Read the response
-        sText = r.text
-        # Write away
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(sText)
-        sResult = filename
-    else:
-        bResult = False
-        sResult = "download_file received status {} for {}".format(r.status_code, url)
-    # Return the result
-    return bResult, sResult
+    for line in pdf_list:
+        line_2 = markdown(line)
+        line_3 = line_2.replace("<em>", "<i>")
+        line_4 = line_3.replace("</em>", "</i>")
+        line_5 = markdown(line_4)
+          
+        lit_ref = (line_5) *1 
+        p = Paragraph(lit_ref, style, '-')
+        Story.append(p)
+        Story.append(Spacer(1,0.2*inch))
+    doc.build(Story, onFirstPage=myFirstPage, onLaterPages=myLaterPages)
+    
+    # Write the buffer to the PDF
+    response.write(buffer.getvalue())
+    # Close the buffer cleanly, and we're done.
+    buffer.close()
+       
+    # And return the pdf
+    return response
 
-@csrf_exempt
-def get_manuidnos(request):
-    """Get a list of manuscript identifiers for autocomplete"""
+def do_create_pdf_manu(request):
+    """This definition creates a pdf of all used edition (full) references."""
+  
+    # Store title, and pageinfo (for at the bottom of the page) 
+    Title = "Manuscripts listed in PASSIM:"
+    pageinfo = "Manuscripts PASSIM"
+             
+    # Store name of the pdf file 
+    filename = "Manu_list_PASSIM.pdf"
 
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            idno = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(idno__icontains=idno))
-            items = Manuscript.objects.filter(*lstQ).order_by("idno").distinct()
-            results = []
-            for co in items:
-                co_json = {'name': co.idno, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
+    # Calculate the qs for the manuscripts       
 
-@csrf_exempt
-def get_authors(request):
-    """Get a list of authors for autocomplete"""
+    qs = Manuscript.objects.order_by('name')
+    
+    # Create a list of objects TH: aanpassen zoveel mogelijk hier, en zo min mogelijk in create_pdf_passim
+    pdf_list = []
+    for obj in qs:
+        item = {}
+        item = obj.name
+        pdf_list.append(item)
 
-    data = 'fail'
-    if request.is_ajax():
-        author = request.GET.get("name", "")
-        lstQ = []
-        lstQ.append(Q(name__icontains=author)|Q(abbr__icontains=author))
-        authors = Author.objects.filter(*lstQ).order_by('name')
-        results = []
-        for co in authors:
-            co_json = {'name': co.name, 'id': co.id }
-            results.append(co_json)
-        data = json.dumps(results)
-    else:
-        data = "Request is not ajax"
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_nicknames(request):
-    """Get a list of nicknames for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(name__icontains=author))
-            authors = Nickname.objects.filter(*lstQ).order_by('name')
-            results = []
-            for co in authors:
-                co_json = {'name': co.name, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_gldincipits(request):
-    """Get a list of Gold-sermon incipits for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(srchincipit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
-            # items = SermonGold.objects.order_by("incipit").distinct()
-            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
-            results = []
-            for idx, co in enumerate(items):
-                val = co['srchincipit']
-                co_json = {'name': val, 'id': idx }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_srmincipits(request):
-    """Get a list of manifestation-sermon incipits for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(srchincipit__icontains=author))
-            items = SermonDescr.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
-            results = []
-            for idx, co in enumerate(items):
-                val = co['srchincipit']
-                co_json = {'name': val, 'id': idx }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_gldexplicits(request):
-    """Get a list of Gold-sermon explicits for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(srchexplicit__icontains=author))
-            items = SermonGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
-            results = []
-            for idx, co in enumerate(items):
-                val = co['srchexplicit']
-                co_json = {'name': val, 'id': idx }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_srmexplicits(request):
-    """Get a list of Manifestation-sermon explicits for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(srchexplicit__icontains=author))
-            items = SermonDescr.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
-            results = []
-            for idx, co in enumerate(items):
-                val = co['srchexplicit']
-                co_json = {'name': val, 'id': idx }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_gldsignatures(request):
-    """Get a list of signature codes (SermonDescr) for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            # Get the editype, if that is specified
-            editype = request.GET.get("type", "")
-            # Get the complete code line, which could use semicolon-separation
-            codeline = request.GET.get("name", "")
-            codelist = codeline.split(";")
-            codename = "" if len(codelist) == 0 else codelist[-1].strip()
-            lstQ = []
-            lstQ.append(Q(code__icontains=codename))
-            if editype != "":
-                lstQ.append(Q(editype=editype))
-            items = Signature.objects.filter(*lstQ).order_by("code").distinct()
-            results = []
-            for co in items:
-                co_json = {'name': co.code, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_srmsignatures(request):
-    """Get a list of signature codes (for SermonDescr) for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            codename = request.GET.get("name", "")
-            editype = request.GET.get("type", "")
-            lstQ = []
-            lstQ.append(Q(code__icontains=codename))
-            if editype != "":
-                lstQ.append(Q(editype=editype))
-            items = SermonSignature.objects.filter(*lstQ).order_by("code").distinct()
-            results = []
-            for co in items:
-                co_json = {'name': co.code, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_editions(request):
-    """Get a list of edition codes for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            author = request.GET.get("name", "")
-            lstQ = []
-            lstQ.append(Q(name__icontains=author))
-            items = Edition.objects.filter(*lstQ).order_by("name").distinct()
-            results = []
-            for co in items:
-                co_json = {'name': co.name, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_keywords(request):
-    """Get a list of keywords for autocomplete"""
-
-    oErr = ErrHandle()
-    try:
-        data = 'fail'
-        if request.is_ajax():
-            # Get the complete code line, which could use semicolon-separation
-            kwline = request.GET.get("name", "")
-            kwlist = kwline.split(";")
-            kw = "" if len(kwlist) == 0 else kwlist[-1].strip()
-            lstQ = []
-            lstQ.append(Q(name__icontains=kw))
-            items = Keyword.objects.filter(*lstQ).order_by("name").distinct()
-            results = []
-            for co in items:
-                co_json = {'name': co.name, 'id': co.id }
-                results.append(co_json)
-            data = json.dumps(results)
-        else:
-            data = "Request is not ajax"
-    except:
-        msg = oErr.get_error_message()
-        data = "error: {}".format(msg)
-    mimetype = "application/json"
-    return HttpResponse(data, mimetype)
-
-@csrf_exempt
-def get_gold(request, pk=None):
-    """Get details of one particular gold sermon"""
-
-    oErr = ErrHandle()
-    data = {'status': 'fail'}
-    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
-    try:
-        if request.is_ajax() and user_is_authenticated(request):
-            # Get the id of the gold sermon
-            qd = request.GET if request.method == "GET" else request.POST
-            goldid = qd.get("goldid", "")
-            bFound = False
-            if goldid == "" and pk != None:
-                obj = SermonGold.objects.filter(id=pk).first()
-                bFound = True
-            else:
-                signature = Signature.objects.filter(id=goldid).first()
-                if signature==None:
-                    data['msg'] = "Signature not found"
-                    data['status'] = "error"
-                else:
-                    obj = signature.gold
-                    bFound = True
-            if obj == None:
-                data['msg'] = "Gold not found"
-                data['status'] = "error"
-            elif bFound:
-                # Copy all relevant information
-                info = {}
-                d = model_to_dict(obj)
-                for field in fields:
-                    info[field] = d[field]  
-                # Add the authorname
-                authorname = ""
-                if obj.author != None:
-                    authorname = obj.author.name                  
-                info['authorname'] = authorname
-
-                # Copy keywords
-                info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
-
-                # Copy signatures
-                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
-
-                data['data'] = info
-
-                data['status'] = "ok"
-        else:
-            data['msg'] = "Request is not ajax"
-            data['status'] = "error"
-    except: 
-        msg = oErr.get_error_message()
-        data['msg'] = msg
-        data['status'] = "error"
-    mimetype = "application/json"
-    return HttpResponse(json.dumps(data), mimetype)
+    # Call create_pdf_passim function with arguments  
+    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
+  
+    # And return the pdf
+    return response
 
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
@@ -2997,80 +2595,77 @@ def import_gold(request):
     # Return the information
     return JsonResponse(data)
 
-@csrf_exempt
-def import_authors(request):
-    """Import a CSV file or a JSON file that contains author names"""
+def get_manuscripts(request):
+    """Get a list of manuscripts"""
 
+    data = 'fail'
+    errHandle = ErrHandle()
+    # Only allow AJAX calls with POST
+    if request.is_ajax() and request.method == "POST":
+        get = request.POST
+        # Get parameters city and library
+        city = get.get("city", "")
+        lib = get.get("library", "")
 
-    # Initialisations
-    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
-    arErr = []
-    error_list = []
-    transactions = []
-    data = {'status': 'ok', 'html': ''}
-    template_name = 'seeker/import_authors.html'
-    obj = None
-    data_file = ""
-    bClean = False
-    username = request.user.username
-
-    # Check if the user is authenticated and if it is POST
-    if not request.user.is_authenticated  or request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            # NOTE: from here a breakpoint may be inserted!
-            print('valid form')
-            # Get the contents of the imported file
-            data_file = request.FILES['file_source']
-            filename = data_file.name
-
-            # Get the source file
-            if data_file == None or data_file == "":
-                arErr.append("No source file specified for the selected project")
-            else:
-                # Check the extension
-                arFile = filename.split(".")
-                extension = arFile[len(arFile)-1]
-
-                # Further processing depends on the extension
-                if extension == "json":
-                    # This is a JSON file
-                    oResult = Author.read_json(username, data_file, arErr)
-                else:
-                    # Read the list of authors as CSV
-                    oResult = Author.read_csv(username, data_file, arErr)
-
-                # Determine a status code
-                statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
-                if oResult == None:
-                    arErr.append("There was an error. No authors have been added")
-
-            # Get a list of errors
-            error_list = [str(item) for item in arErr]
-
-            # Create the context
-            context = dict(
-                statuscode=statuscode,
-                results=oResult,
-                error_list=error_list
-                )
-
-            if len(arErr) == 0:
-                # Get the HTML response
-                data['html'] = render_to_string(template_name, context, request)
-            else:
-                data['html'] = "Please log in before continuing"
-
-
-        else:
-            data['html'] = 'invalid form: {}'.format(form.errors)
-            data['status'] = "error"
+        url = "{}/Manuscrits/manuscritforetablissement".format(cnrs_url)
+        data = "idEtab={}&idVille={}".format(lib, city)
+        data = {"idEtab": lib, "idVille": city}
+        #data = []
+        #data.append({'name': 'idEtab', 'value': lib})
+        #data.append({'name': 'idVille', 'value': city})
+        try:
+            r = requests.post(url, data=data)
+        except:
+            sMsg = errHandle.get_error_message()
+            errHandle.DoError("Request problem")
+            return False
+        if r.status_code == 200:
+            # Return positively
+            reply = demjson.decode(r.text.replace("\t", " "))
+            if reply != None and "items" in reply:
+                results = []
+                for item in reply['items']:
+                    if item['name'] != "":
+                        results.append(item['name'])
+                data = json.dumps(results)
     else:
-        data['html'] = 'Only use POST and make sure you are logged in'
-        data['status'] = "error"
- 
-    # Return the information
-    return JsonResponse(data)
+        data = "Request is not ajax"
+    # Prepare and return data
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+def download_file(url):
+    """Download a file from the indicated URL"""
+
+    bResult = True
+    sResult = ""
+    errHandle = ErrHandle()
+    # Get the filename from the url
+    name = url.split("/")[-1]
+    # Set the output directory
+    outdir = os.path.abspath(os.path.join(MEDIA_DIR, "e-codices"))
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    # Create a filename where we can store it
+    filename = os.path.abspath(os.path.join(outdir, name))
+    try:
+        r = requests.get(url)
+    except:
+        sMsg = errHandle.get_error_message()
+        errHandle.DoError("Request problem")
+        return False, sMsg
+    if r.status_code == 200:
+        # Read the response
+        sText = r.text
+        # Write away
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(sText)
+        sResult = filename
+    else:
+        bResult = False
+        sResult = "download_file received status {} for {}".format(r.status_code, url)
+    # Return the result
+    return bResult, sResult
 
 def search_ecodex(request):
     arErr = []
@@ -3146,6 +2741,661 @@ def search_ecodex(request):
             data['status'] = "error"
     else:
         data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
+@csrf_exempt
+def get_countries(request):
+    """Get a list of countries for autocomplete"""
+
+    data = 'fail'
+    method = "useLocation"
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('country', '')
+            if sName == "": sName = request.GET.get('country_ta', "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=sName))
+            if method == "useLocation":
+                loctype = LocationType.find("country")
+                lstQ.append(Q(loctype=loctype))
+                countries = Location.objects.filter(*lstQ).order_by('name')
+            else:
+                countries = Country.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in countries:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_countries")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_cities(request):
+    """Get a list of cities for autocomplete"""
+
+    data = 'fail'
+    method = "useLocation"
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            # Get the user-specified 'country' and 'city' strings
+            country = request.GET.get('country', "")
+            if country == "": country = request.GET.get('country_ta', "")
+            city = request.GET.get("city", "")
+            if city == "": city = request.GET.get('city_ta', "")
+
+            # build the query
+            lstQ = []
+            if method == "useLocation":
+                # Start as broad as possible: country
+                qs_loc = None
+                if country != "":
+                    loctype_country = LocationType.find("country")
+                    lstQ.append(Q(name=country))
+                    lstQ.append(Q(loctype=loctype_country))
+                    qs_country = Location.objects.filter(*lstQ)
+                    # Fine-tune on city...
+                    loctype_city = LocationType.find("city")
+                    lstQ = []
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    lstQ.append(Q(relations_location__in=qs_country))
+                    cities = Location.objects.filter(*lstQ)
+                else:
+                    loctype_city = LocationType.find("city")
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    cities = Location.objects.filter(*lstQ)
+            elif method == "slowLocation":
+                # First of all: city...
+                loctype_city = LocationType.find("city")
+                lstQ.append(Q(name__icontains=city))
+                lstQ.append(Q(loctype=loctype_city))
+                # Do we have a *country* specification?
+                if country != "":
+                    loctype_country = LocationType.find("country")
+                    lstQ.append(Q(relations_location__name=country))
+                    lstQ.append(Q(relations_location__loctype=loctype_country))
+                # Combine everything
+                cities = Location.objects.filter(*lstQ).order_by('name')
+            else:
+                if country != "":
+                    lstQ.append(Q(country__name__icontains=country))
+                lstQ.append(Q(name__icontains=city))
+                cities = City.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in cities:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_cities")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+    
+@csrf_exempt
+def get_libraries(request):
+    """Get a list of libraries for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            # Get the user-specified 'country' and 'city' strings
+            country = request.GET.get('country', "")
+            if country == "": country = request.GET.get('country_ta', "")
+            city = request.GET.get("city", "")
+            if city == "": city = request.GET.get('city_ta', "")
+            lib = request.GET.get("library", "")
+            if lib == "": lib = request.GET.get('libname_ta', "")
+
+            # build the query
+            lstQ = []
+            # Start as broad as possible: country
+            qs_loc = None
+            if country != "":
+                loctype_country = LocationType.find("country")
+                lstQ.append(Q(name=country))
+                lstQ.append(Q(loctype=loctype_country))
+                qs_country = Location.objects.filter(*lstQ)
+                # What about city?
+                if city == "":
+                    qs_loc = qs_country
+                else:
+                    loctype_city = LocationType.find("city")
+                    lstQ = []
+                    lstQ.append(Q(name__icontains=city))
+                    lstQ.append(Q(loctype=loctype_city))
+                    lstQ.append(Q(relations_location__in=qs_country))
+                    qs_loc = Location.objects.filter(*lstQ)
+            elif city != "":
+                loctype_city = LocationType.find("city")
+                lstQ.append(Q(name__icontains=city))
+                lstQ.append(Q(loctype=loctype_city))
+                qs_loc = Location.objects.filter(*lstQ)
+
+            # Start out with the idea to look for a library by name:
+            lstQ = []
+            if lib != "": lstQ.append(Q(name__icontains=lib))
+            if qs_loc != None: lstQ.append(Q(location__in=qs_loc))
+
+            # Combine everything
+            libraries = Library.objects.filter(*lstQ).order_by('name').values('name','id') 
+            results = []
+            for co in libraries:
+                co_json = {'name': co['name'], 'id': co['id'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_libraries")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_origins(request):
+    """Get a list of origin names for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        sName = request.GET.get('name', '')
+        lstQ = []
+        lstQ.append(Q(name__icontains=sName))
+        origins = Origin.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in origins:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_locations(request):
+    """Get a list of location names for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('name', '')
+            lstQ = []
+            lstQ.append(Q(name__icontains=sName))
+            locations = Location.objects.filter(*lstQ).order_by('name').values('name', 'loctype__name', 'id')
+            results = []
+            for co in locations:
+                # name = "{} ({})".format(co['name'], co['loctype__name'])
+                name = co['name']
+                co_json = {'name': name, 'id': co['id'], 'loctype': co['loctype__name'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_locations")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_litrefs(request):
+    """Get a list of literature references for autocomplete"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sName = request.GET.get('name', '')
+            lstQ = []
+            lstQ.append(Q(full__icontains=sName)|Q(short__icontains=sName))
+            litrefs = Litref.objects.filter(*lstQ).order_by('short').values('full', 'short', 'id')
+            results = [] 
+            for co in litrefs:
+                name = "{} {}".format(co['full'], co['short'])
+                co_json = {'name': name, 'id': co['id'] }
+                results.append(co_json)
+            data = json.dumps(results)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_litrefs")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_manuidnos(request):
+    """Get a list of manuscript identifiers for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            idno = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(idno__icontains=idno))
+            items = Manuscript.objects.filter(*lstQ).order_by("idno").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.idno, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_authors(request):
+    """Get a list of authors for autocomplete"""
+
+    data = 'fail'
+    if request.is_ajax():
+        author = request.GET.get("name", "")
+        lstQ = []
+        lstQ.append(Q(name__icontains=author)|Q(abbr__icontains=author))
+        authors = Author.objects.filter(*lstQ).order_by('name')
+        results = []
+        for co in authors:
+            co_json = {'name': co.name, 'id': co.id }
+            results.append(co_json)
+        data = json.dumps(results)
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_nicknames(request):
+    """Get a list of nicknames for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            authors = Nickname.objects.filter(*lstQ).order_by('name')
+            results = []
+            for co in authors:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_gldincipits(request):
+    """Get a list of Gold-sermon incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
+            # items = SermonGold.objects.order_by("incipit").distinct()
+            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_srmincipits(request):
+    """Get a list of manifestation-sermon incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = SermonDescr.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_gldexplicits(request):
+    """Get a list of Gold-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = SermonGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchexplicit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_srmexplicits(request):
+    """Get a list of Manifestation-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = SermonDescr.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchexplicit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_gldsignatures(request):
+    """Get a list of signature codes (SermonDescr) for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            # Get the editype, if that is specified
+            editype = request.GET.get("type", "")
+            # Get the complete code line, which could use semicolon-separation
+            codeline = request.GET.get("name", "")
+            codelist = codeline.split(";")
+            codename = "" if len(codelist) == 0 else codelist[-1].strip()
+            lstQ = []
+            lstQ.append(Q(code__icontains=codename))
+            if editype != "":
+                lstQ.append(Q(editype=editype))
+            items = Signature.objects.filter(*lstQ).order_by("code").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.code, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_srmsignatures(request):
+    """Get a list of signature codes (for SermonDescr) for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            codename = request.GET.get("name", "")
+            editype = request.GET.get("type", "")
+            lstQ = []
+            lstQ.append(Q(code__icontains=codename))
+            if editype != "":
+                lstQ.append(Q(editype=editype))
+            items = SermonSignature.objects.filter(*lstQ).order_by("code").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.code, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_editions(request):
+    """Get a list of edition codes for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(name__icontains=author))
+            items = Edition.objects.filter(*lstQ).order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_keywords(request):
+    """Get a list of keywords for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            # Get the complete code line, which could use semicolon-separation
+            kwline = request.GET.get("name", "")
+            kwlist = kwline.split(";")
+            kw = "" if len(kwlist) == 0 else kwlist[-1].strip()
+            lstQ = []
+            lstQ.append(Q(name__icontains=kw))
+            items = Keyword.objects.filter(*lstQ).order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_gold(request, pk=None):
+    """Get details of one particular gold sermon"""
+
+    oErr = ErrHandle()
+    data = {'status': 'fail'}
+    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
+    try:
+        if request.is_ajax() and user_is_authenticated(request):
+            # Get the id of the gold sermon
+            qd = request.GET if request.method == "GET" else request.POST
+            goldid = qd.get("goldid", "")
+            bFound = False
+            if goldid == "" and pk != None:
+                obj = SermonGold.objects.filter(id=pk).first()
+                bFound = True
+            else:
+                signature = Signature.objects.filter(id=goldid).first()
+                if signature==None:
+                    data['msg'] = "Signature not found"
+                    data['status'] = "error"
+                else:
+                    obj = signature.gold
+                    bFound = True
+            if obj == None:
+                data['msg'] = "Gold not found"
+                data['status'] = "error"
+            elif bFound:
+                # Copy all relevant information
+                info = {}
+                d = model_to_dict(obj)
+                for field in fields:
+                    info[field] = d[field]  
+                # Add the authorname
+                authorname = ""
+                if obj.author != None:
+                    authorname = obj.author.name                  
+                info['authorname'] = authorname
+
+                # Copy keywords
+                info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
+
+                # Copy signatures
+                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
+
+                data['data'] = info
+
+                data['status'] = "ok"
+        else:
+            data['msg'] = "Request is not ajax"
+            data['status'] = "error"
+    except: 
+        msg = oErr.get_error_message()
+        data['msg'] = msg
+        data['status'] = "error"
+    mimetype = "application/json"
+    return HttpResponse(json.dumps(data), mimetype)
+
+@csrf_exempt
+def import_authors(request):
+    """Import a CSV file or a JSON file that contains author names"""
+
+
+    # Initialisations
+    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'seeker/import_authors.html'
+    obj = None
+    data_file = ""
+    bClean = False
+    username = request.user.username
+
+    # Check if the user is authenticated and if it is POST
+    if not request.user.is_authenticated  or request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            # NOTE: from here a breakpoint may be inserted!
+            print('valid form')
+            # Get the contents of the imported file
+            data_file = request.FILES['file_source']
+            filename = data_file.name
+
+            # Get the source file
+            if data_file == None or data_file == "":
+                arErr.append("No source file specified for the selected project")
+            else:
+                # Check the extension
+                arFile = filename.split(".")
+                extension = arFile[len(arFile)-1]
+
+                # Further processing depends on the extension
+                if extension == "json":
+                    # This is a JSON file
+                    oResult = Author.read_json(username, data_file, arErr)
+                else:
+                    # Read the list of authors as CSV
+                    oResult = Author.read_csv(username, data_file, arErr)
+
+                # Determine a status code
+                statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                if oResult == None:
+                    arErr.append("There was an error. No authors have been added")
+
+            # Get a list of errors
+            error_list = [str(item) for item in arErr]
+
+            # Create the context
+            context = dict(
+                statuscode=statuscode,
+                results=oResult,
+                error_list=error_list
+                )
+
+            if len(arErr) == 0:
+                # Get the HTML response
+                data['html'] = render_to_string(template_name, context, request)
+            else:
+                data['html'] = "Please log in before continuing"
+
+
+        else:
+            data['html'] = 'invalid form: {}'.format(form.errors)
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in'
         data['status'] = "error"
  
     # Return the information
@@ -6883,262 +7133,3 @@ class LitRefListView(ListView):
         return qs
 
 
-def do_import_editions(request):
-    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
-
-    # Use double for-loop:
-    last_old_edi = ""
-    last_litref = None
-    count = 0
-    oErr = ErrHandle()
-    template_name = 'tools.html'
-    result_list = []
-    context = {'status': 'ok', 'tools_part': 'import_edition'}
-    try:
-        for edi in Edition.objects.all().order_by('name'):
-            edi.update = "NIETGEDAAN"
-            edi.save()
-
-            # DEBUG
-            if edi.id == 1253:
-                iStop = 1
-
-            # Split the old editions into old_edi and pages
-            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
-            if old_edi != None and old_edi != "":
-                litref = None
-                if old_edi != last_old_edi:
-                    # Compare the old editions with the new editions ("short"), using short without the year
-                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
-                        if old_edi == get_short_edit(litreftmp.short):
-                            litref = litreftmp
-                            last_litref = litreftmp
-                            break
-                else:
-                    litref = last_litref
-                # Continue...
-                if litref != None:
-                    # We can process him!
-                    gold_obj = edi.gold
-                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
-                    if esg == None:
-                        # Create EdirefSG record
-                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
-                    # Double check pages and add to new EdirefSG record
-                    if pages != None:
-                        esg.pages = pages
-                        esg.save()
-                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
-                    count += 1
-                    if status == "ok":
-                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
-                    else:
-                        edi.update = "PAGES: " + status
-                    edi.save()
-                    # Show it in the result list
-                    result_list.append({'part': count, 'result': edi.name})
-            #else: # Hier moet het nog anders. 
-        # All edition objects have been reviewed
-        context['result_list'] = result_list
-    except:
-        sMsg = oErr.get_error_message()
-        oErr.DoError("do_import_editions")
-        context['status'] = "error"
-        context['message'] = sMsg
-
-    # Render and return the page
-    return render(request, template_name, context)
-
-# Split pages and year from edition, keep stripped edition and the pages
-# The number of matches increase when the year in the name of the edition
-# and in the short reference from Zotero is not used.
- 
-def get_old_edi(edi):
-    pages = None
-    result = None
-    status = "ok"
-    # Split up edition and pages part
-    arResult = edi.name.split(",")
-    # In case of no pages, split string to get rid of year 
-    if len(arResult) ==  1:
-        result_tmp1 = arResult[0].split("(")
-        result = result_tmp1[0].strip()
-    # In case there are pages
-    elif len(arResult) > 1: 
-        # Split string to get rid of year 
-        result_tmp1 = arResult[0].split("(")
-        result = result_tmp1[0].strip()
-        pages = arResult[1].strip()
-        if not re.match(r'^[\d\-]+$', pages): 
-            status = pages
-            pages = None
-
-    return result, pages, status
-
-# Strip off the year of the short reference in Litref, keep only first part (abbr and seriesnumber)
-
-def get_short_edit(short):
-    result = None
-    arResult = short.split("(")
-    if len(arResult) > 1:
-        result = arResult[0].strip()
-    elif len(arResult) == 1:
-        result = arResult[0].strip()
-    return result
-
-
-
-def do_create_pdf_edi(request):
-    """This definition creates a pdf of all used edition (full) references."""
-        
-    # Store title, and pageinfo (for at the bottom of the page) 
-    Title = "Edition references used in PASSIM:"
-    pageinfo = "Editions PASSIM"
-             
-    # Store name of the pdf file 
-    filename = "Edi_ref_PASSIM.pdf"
-            
-    # Calculate the final qs for the edition litrefs
-    ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
-       
-    # Sort and filter all editions
-    qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
-
-    # Create a list of objects
-    pdf_list = []
-    for obj in qs:
-        item = {}
-        item = obj.full
-        pdf_list.append(item)
-    
-    # Call create_pdf_passim function with arguments  
-    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
-  
-    # And return the pdf
-    return response
-
-def do_create_pdf_lit(request):
-    """"This definition creates a pdf of all used literature (full) references."""
-         
-    # Store title, and pageinfo (for at the bottom of the page) 
-    Title = "Literature references used in PASSIM:"
-    pageinfo = "Literature PASSIM"
-       
-    # Store name of the file    
-    filename = "Lit_ref_PASSIM.pdf"
-    
-    # Calculate the final qs for the manuscript litrefs
-    litref_ids_man = [x['reference'] for x in LitrefMan.objects.all().values('reference')]
-    
-    # Calculate the final qs for the Gold sermon litrefs
-    litref_ids_sg = [x['reference'] for x in LitrefSG.objects.all().values('reference')]
-
-    # Combine the two qs into one and filter
-    litref_ids = chain(litref_ids_man, litref_ids_sg)
-    
-    # Hier worden short en full opgehaald?
-    qs = Litref.objects.filter(id__in=litref_ids).order_by('short') 
-    
-    # Create a list of objects 
-    pdf_list = []
-    for obj in qs:
-        item = {}
-        item = obj.full
-        pdf_list.append(item)
-        
-    # Call create_pdf_passim function with arguments  
-    response  = create_pdf_passim(Title, pageinfo, filename, pdf_list)
-       
-    # And return the pdf
-    return response
-
-def create_pdf_passim(Title, pageinfo, filename, pdf_list):
-    """This definition creates a pdf for all passim requests."""
-     
-    # Define sizes of the pages in the pdf
-    PAGE_HEIGHT=defaultPageSize[1]; PAGE_WIDTH=defaultPageSize[0]
-    
-    # Store text and current date for information on date of the download
-    today = datetime.today()
-    today.strftime('%Y-%m-%d')
-       
-    # Set buffer   
-    buffer = io.BytesIO()
-
-    # Set the first page
-    def myFirstPage(canvas, doc):
-        canvas.saveState()
-        canvas.setFont('Helvetica-Bold',22)
-        canvas.drawCentredString(PAGE_WIDTH/2.0, PAGE_HEIGHT-80, Title)
-        canvas.setFont('Helvetica',10)
-        canvas.drawString(75,730, "Downloaded on: ")
-        canvas.drawString(150,730, today.strftime('%d-%m-%Y'))
-        canvas.setFont('Helvetica',9)
-        canvas.drawString(inch, 0.75 * inch, "Page 1 / %s" % pageinfo)
-        canvas.restoreState()
-    
-    # Set the second and later pages
-    def myLaterPages(canvas, doc):
-        canvas.saveState()
-        canvas.setFont('Helvetica',9)
-        canvas.drawString(inch, 0.75 * inch, "Page %d %s" % (doc.page, pageinfo))
-        canvas.restoreState()
-
-    # Create the HttpResponse object with the appropriate PDF headers. 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
-               
-    # Define style of the pdf
-    styles = getSampleStyleSheet()
-        
-    doc = SimpleDocTemplate(buffer)
-    Story = [Spacer(1,1.05*inch)]
-    style = styles["Normal"]
-    # Dit tzt afhankelijk maken van lit en edi, niet van manuscript TH: hier nog met Erwin over hebben
-
-    for line in pdf_list:
-        line_2 = markdown(line)
-        line_3 = line_2.replace("<em>", "<i>")
-        line_4 = line_3.replace("</em>", "</i>")
-        line_5 = markdown(line_4)
-          
-        lit_ref = (line_5) *1 
-        p = Paragraph(lit_ref, style, '-')
-        Story.append(p)
-        Story.append(Spacer(1,0.2*inch))
-    doc.build(Story, onFirstPage=myFirstPage, onLaterPages=myLaterPages)
-    
-    # Write the buffer to the PDF
-    response.write(buffer.getvalue())
-    # Close the buffer cleanly, and we're done.
-    buffer.close()
-       
-    # And return the pdf
-    return response
-
-def do_create_pdf_manu(request):
-    """This definition creates a pdf of all used edition (full) references."""
-  
-    # Store title, and pageinfo (for at the bottom of the page) 
-    Title = "Manuscripts listed in PASSIM:"
-    pageinfo = "Manuscripts PASSIM"
-             
-    # Store name of the pdf file 
-    filename = "Manu_list_PASSIM.pdf"
-
-    # Calculate the qs for the manuscripts       
-
-    qs = Manuscript.objects.order_by('name')
-    
-    # Create a list of objects TH: aanpassen zoveel mogelijk hier, en zo min mogelijk in create_pdf_passim
-    pdf_list = []
-    for obj in qs:
-        item = {}
-        item = obj.name
-        pdf_list.append(item)
-
-    # Call create_pdf_passim function with arguments  
-    response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
-  
-    # And return the pdf
-    return response
