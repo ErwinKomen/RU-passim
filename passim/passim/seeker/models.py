@@ -3617,6 +3617,26 @@ class ManuscriptExt(models.Model):
     def short(self):
         return self.url
 
+class Collection(models.Model):
+    """A collection can contain one or more sermons (SermonDescr)"""
+    
+    # [1] Each collection has only 1 name 
+    #name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
+
+    # [1] Each collecttion has only 1 owner
+    #owner = models.ForeignKey(Profile)
+        
+    # [0-n] Link to one or more SermonDescr instances or gold?
+    #sermons = models.ManyToManyField(SermonDescr, through="CollectionSermonDescr", related_name="collection_sermondescr")
+        
+    # [0-1] Each collection can be marked a "read only" by certain users TH: yes or no? 
+    #readonly = models.TextField("ReadOnly", null=True, blank=True)
+    
+    # [0-1] Each collection can have one description
+    #descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
+
+    # Link to a description or bibliography (url) TH: wat is hiervan de bedoeling? Literature? Lijkt mij niet nodig dit veld
+    #url = models.URLField("Web info", null=True, blank=True)
 
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
@@ -3960,5 +3980,4 @@ class NewsItem(models.Model):
       self.saved = datetime.now()
       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
       return response
-
 

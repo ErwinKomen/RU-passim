@@ -93,6 +93,7 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
+    # url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonCollection.as_view(), name='sermon_collection'),
 
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/show', BasketView.as_view(), name='basket_show'),
