@@ -62,10 +62,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                DaterangeForm
+                                ManuscriptKeywordForm, DaterangeForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
-    Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
+    ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 # Some constants that can be used
@@ -5484,6 +5484,7 @@ class ManuscriptListView(BasicListView):
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
                 ]
     searches = [
@@ -5494,6 +5495,7 @@ class ManuscriptListView(BasicListView):
             {'filter': 'library',   'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance','fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',   'fkfield': 'keywords',            'keyS': 'keyword',      'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
             {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
             {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
             ]},
@@ -5665,6 +5667,39 @@ class ManuscriptExtset(BasicPart):
     def before_save(self, prefix, request, instance = None, form = None):
         has_changed = False
         # NOTE: no drastic things here yet
+        return has_changed
+
+
+class ManuscriptKwset(BasicPart):
+    """The set of keywords from one manuscript"""
+
+    MainModel = Manuscript
+    template_name = 'seeker/manuscript_kwset.html'
+    title = "ManuscriptKeywords"
+    MkwFormSet = inlineformset_factory(Manuscript, ManuscriptKeyword,
+                                         form=ManuscriptKeywordForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': MkwFormSet, 'prefix': 'mkw', 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "mkw":
+            # Get the chosen keyword
+            obj = form.cleaned_data['keyword']
+            if obj == None:
+                # Get the value entered for the keyword
+                kw = form['name'].data
+                # Check if this is an existing Keyword
+                obj = Keyword.objects.filter(name__iexact=kw).first()
+                if obj == None:
+                    # Create it
+                    obj = Keyword(name=kw.lower())
+                    obj.save()
+                # Now set the instance value correctly
+                instance.keyword = obj
+                has_changed = True
+
         return has_changed
 
 

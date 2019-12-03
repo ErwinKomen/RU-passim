@@ -70,6 +70,7 @@ urlpatterns = [
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
     url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),
     url(r'^manuscript/litset(?:/(?P<pk>\d+))?/$', ManuscriptLitset.as_view(), name='manu_litset'),
+    url(r'^manuscript/kwset(?:/(?P<pk>\d+))?/$', ManuscriptKwset.as_view(), name='manu_kwset'),
 
     url(r'^location/list', LocationListView.as_view(), name='location_list'),
     url(r'^location/details(?:/(?P<pk>\d+))?/$', LocationDetailsView.as_view(), name='location_details'),

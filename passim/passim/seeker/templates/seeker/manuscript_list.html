@@ -310,6 +310,19 @@
                       </table>
                     </div>
 
+                    <!-- One or more keywords -->
+                    <div id="filter_keyword" class="{% if not manuForm.keyword.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;">Keyword</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{manuForm.keyword}}</span>
+                            <span> or select: </span>
+                            <span>{{manuForm.kwlist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
 
                   </div>
                 </div>

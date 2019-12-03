@@ -132,6 +132,17 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
+class KeywordWidget(ModelSelect2MultipleWidget):
+    model = Keyword
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Keyword.objects.all().order_by('name').distinct()
+
+
 class SearchManuForm(forms.ModelForm):
     """Manuscript search form"""
 
@@ -160,6 +171,10 @@ class SearchManuForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    keyword = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -190,6 +205,7 @@ class SearchManuForm(forms.ModelForm):
         self.fields['yearfinish'].required = False
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -216,17 +232,6 @@ class SearchManuForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
-
-class KeywordWidget(ModelSelect2MultipleWidget):
-    model = Keyword
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Keyword.objects.all().order_by('name').distinct()
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
@@ -808,6 +813,30 @@ class ManuscriptExtForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+
+
+class ManuscriptKeywordForm(forms.ModelForm):
+    name = forms.CharField(label=_("Keyword"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptKeyword
+        fields = ['manuscript', 'keyword']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptKeywordForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['keyword'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.keyword != None:
+                kw = instance.keyword.name
+                self.fields['name'].initial = kw
 
 
 class OriginForm(forms.ModelForm):

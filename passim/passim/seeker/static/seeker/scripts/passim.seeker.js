@@ -31,6 +31,7 @@ var ru = (function ($, ru) {
           { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
@@ -2457,6 +2458,7 @@ var ru = (function ($, ru) {
             case "gsign_formset":
             case "mprov_formset":
             case "mdr_formset":
+            case "mkw_formset":
             case "manu_search":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {

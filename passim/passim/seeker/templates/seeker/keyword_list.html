@@ -197,6 +197,11 @@
                               <span class="badge jumbo-2 clickable" 
                                     title="Frequency in gold sermons">{{kwitem.freqgold}}</span></a>
                           {% endif %}
+                          {% if kwitem.freqmanu %}
+                            <a href="{% url 'search_manuscript' %}?manu-kwlist={{kwitem.id}}">
+                              <span class="badge jumbo-3 clickable" 
+                                    title="Frequency in manuscripts">{{kwitem.freqmanu}}</span></a>
+                          {% endif %}
                         </td>
 
                       </tr>

@@ -2131,6 +2131,31 @@ class Litref(models.Model):
         return adapt_markdown(self.short, lowercase=False)
 
 
+class Keyword(models.Model):
+    """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
+
+    # [1] Obligatory text of a keyword
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+
+    def freqsermo(self):
+        """Frequency in manifestation sermons"""
+        freq = self.keywords_sermon.all().count()
+        return freq
+
+    def freqgold(self):
+        """Frequency in Gold sermons"""
+        freq = self.keywords_gold.all().count()
+        return freq
+
+    def freqmanu(self):
+        """Frequency in Manuscripts"""
+        freq = self.keywords_manu.all().count()
+        return freq
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -2176,7 +2201,10 @@ class Manuscript(models.Model):
        
     # [m] Many-to-many: one manuscript can have a series of literature references
     litrefs = models.ManyToManyField("Litref", through="LitrefMan")
-       
+
+     # [0-n] Many-to-many: keywords per SermonDescr
+    keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
+
     def __str__(self):
         return self.name
 
@@ -2946,26 +2974,6 @@ class Nickname(models.Model):
             hit = qs[0]
         # Return what we found or created
         return hit
-
-
-class Keyword(models.Model):
-    """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
-
-    # [1] Obligatory text of a keyword
-    name = models.CharField("Name", max_length=LONG_STRING)
-
-    def __str__(self):
-        return self.name
-
-    def freqsermo(self):
-        """Frequency in manifestation sermons"""
-        freq = self.keywords_sermon.all().count()
-        return freq
-
-    def freqgold(self):
-        """Frequency in Gold sermons"""
-        freq = self.keywords_gold.all().count()
-        return freq
 
 
 class EqualGold(models.Model):
@@ -3815,6 +3823,17 @@ class SermonDescrKeyword(models.Model):
     sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw")
     # [1] ...and a keyword instance
     keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptKeyword(models.Model):
+    """Relation between a Manuscript and a Keyword"""
+
+    # [1] The link is between a Manuscript instance ...
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
