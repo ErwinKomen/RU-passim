@@ -222,18 +222,19 @@ def make_search_list(filters, oFields, search_list, qd):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
     def enable_filter(filter_id, head_id=None):
-        for item in filters:
-            if filter_id in item['id']:
-                item['enabled'] = True
-                # Break from my loop
-                break
-        # Check if this one has a head
-        if head_id != None and head_id != "":
+        if not "_hidden" in filter_id:
             for item in filters:
-                if head_id in item['id']:
+                if filter_id in item['id']:
                     item['enabled'] = True
-                    # Break from this sub-loop
+                    # Break from my loop
                     break
+            # Check if this one has a head
+            if head_id != None and head_id != "":
+                for item in filters:
+                    if head_id in item['id']:
+                        item['enabled'] = True
+                        # Break from this sub-loop
+                        break
         return True
 
     def get_value(obj, field, default=None):
@@ -5018,18 +5019,18 @@ class SermonListView(BasicListView):
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'manuscript','fkfield': 'manu',                      'keyS': 'manu',         'keyFk': 'manu',        'infield': 'id'},
-            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'manu_hidden', 'fkfield': 'manu',                      'keyS': 'manu',         'keyFk': 'manu', 'infield': 'id'},
+            {'filter': 'manuid',      'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',     'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',        'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',     'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'daterange',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange',   'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
             ]}
          ]
 
