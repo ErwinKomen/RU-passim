@@ -4144,7 +4144,9 @@ class BasicListView(ListView):
 
         # Need to load the correct form
         if self.listform:
-            context['{}Form'.format(self.prefix)] = self.listform(initial, prefix=self.prefix)
+            frm = self.listform(initial, prefix=self.prefix)
+            if frm.is_valid():
+                context['{}Form'.format(self.prefix)] = frm
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
