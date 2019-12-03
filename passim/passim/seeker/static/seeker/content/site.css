@@ -75,6 +75,15 @@ table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbod
   background-color: lightgoldenrodyellow ;
 }
 
+th div a.clickable.ordered {
+  color: darkgoldenrod;
+}
+
+th div a.clickable.ordered:hover {
+  color: darkgoldenrod;
+  background-color: lightgoldenrodyellow;
+}
+
 table tbody tr td.hoverable:hover {
   background-color: lightgoldenrodyellow !important;
 }

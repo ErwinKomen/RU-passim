@@ -751,6 +751,8 @@ class ManuscriptProvForm(forms.ModelForm):
                 if instance.provenance.location != None:
                     self.fields['location_ta'].initial = instance.provenance.location.get_loc_name()
                     # self.fields['location_ta'].initial = instance.provenance.location.name
+                    # Make sure the location is set to the correct number
+                    self.fields['location'].initial = instance.provenance.location.id
 
 
 class ManuscriptLitrefForm(forms.ModelForm):

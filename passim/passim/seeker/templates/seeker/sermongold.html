@@ -50,7 +50,7 @@
 
           <!-- entrypoint for search_ordered_start -->
           <div class="hidden search_ordered_start">
-            <input name="o" type="text" />
+            <input name="o" type="text" value="{{sortOrder}}" />
           </div>
 
           <!-- basket switched on or not -->
@@ -269,7 +269,7 @@
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
-                              <a class="clickable" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
+                              <a class="clickable {% if hd.used %}ordered{% endif %}" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
                               {% endif %}
                             </div>
                           </th>
