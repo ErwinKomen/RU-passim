@@ -425,6 +425,29 @@ def process_visit(request, name, is_menu, **kwargs):
     # return json.dumps(p_list)
     return p_list
 
+def get_breadcrumbs(request, name, is_menu, lst_crumb, **kwargs):
+    """Process one visit and return updated breadcrumbs"""
+
+    # Initialisations
+    p_list = []
+    p_list.append({'name': 'Home', 'url': reverse('home')})
+    # Find out who this is
+    username = "anonymous" if request.user == None else request.user.username
+    if username != "anonymous" and request.user.username != "":
+        # Add the visit
+        currenturl = request.get_full_path()
+        Visit.add(username, name, currenturl, is_menu, **kwargs)
+        # Set the full path, dependent on the arguments we get
+        for crumb in lst_crumb:
+            if len(crumb) == 2:
+                p_list.append(dict(name=crumb[0], url=crumb[1]))
+            else:
+                pass
+        # Also add the final one
+        p_list.append(dict(name=name, url=currenturl))
+    # Return the breadcrumbs
+    return p_list
+
 def get_previous_page(request, top=False):
     """Find the previous page for this user"""
 
@@ -3447,7 +3470,6 @@ class BasicPart(View):
         if self.checkAuthentication(request):
             # Build the context
             context = dict(object_id = pk, savedate=None)
-            # context['prevpage'] = get_prevpage(request)     #  self.previous
             context['authenticated'] = user_is_authenticated(request)
             context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
             context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
@@ -4266,8 +4288,11 @@ class BasicListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, self.plural_name, True)
-        context['prevpage'] = get_previous_page(self.request)
+        # context['breadcrumbs'] = process_visit(self.request, self.plural_name, True)
+        # context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, self.plural_name, True)
 
         context['usebasket'] = self.basketview
 
@@ -4493,8 +4518,11 @@ class LocationListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Locations", True)
-        context['prevpage'] = get_previous_page(self.request)
+        #context['breadcrumbs'] = process_visit(self.request, "Locations", True)
+        #context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Locations", True)
 
         # Return the calculated context
         return context
@@ -4560,8 +4588,14 @@ class LocationDetailsView(PassimDetails):
         # The standard information
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        #context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
+        #context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('location_list')
+        current_name = "Location details"
+        if instance:
+            current_name = "Location [{}]".format(instance.name)
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
         return context
 
 
@@ -4711,8 +4745,12 @@ class OriginListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Origins", True)
-        context['prevpage'] = get_previous_page(self.request)
+        #context['breadcrumbs'] = process_visit(self.request, "Origins", True)
+        #context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        current_name = "Origins"
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
 
         # Return the calculated context
         return context
@@ -4771,8 +4809,14 @@ class OriginDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Origin edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        #context['breadcrumbs'] = process_visit(self.request, "Origin edit", False)
+        #context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('origin_list')
+        current_name = "Origin details"
+        if instance:
+            current_name = "Origin [{}]".format(instance.name)
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
         return context
 
 
@@ -4866,8 +4910,28 @@ class SermonDetails(PassimDetails):
         """Add to the existing context"""
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Sermon details", False)
-        context['prevpage'] = get_previous_page(self.request)
+        #context['breadcrumbs'] = process_visit(self.request, "Sermon details", False)
+        #context['prevpage'] = get_previous_page(self.request)
+        # Static breadcrumbs should be:
+        # Manuscripts >> Manuscript [idno] >> Manuscript sermons >> Sermon [author/title]
+        prevpage = reverse('search_sermon')
+        context['prevpage'] = prevpage
+        # Start creating a list of breadcrumbs
+        crumbs = []
+        crumbs.append(['Manuscripts', reverse('search_manuscript')])
+        # Which manuscript do we belong to?
+
+        # Figure out what the sermon details are
+        current_name = "Sermon details"
+        if instance:
+            lDetails = []
+            if instance.author: lDetails.append(instance.author.name)
+            if instance.title: lDetails.append(instance.title)
+            if len(lDetails) > 0:
+                current_name = "Sermon [{}]".format(", ".join(lDetails))
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, 
+                                                 [['Manuscripts', reverse('search_manuscript')],
+                                                  ['Sermons', prevpage]])
 
         # New:
         if instance == None:
@@ -5454,9 +5518,29 @@ class ManuscriptDetails(PassimDetails):
         context['maxdepth'] = maxdepth
         #context['isnew'] = bNew
 
+        # Figure out what the identity of this manuscript is
+        manu_name = "Manuscript details"
+        if instance == "None":
+            manu_name = "New manuscript"
+        else:
+            if instance.idno:
+                manu_name = "{}".format(instance.idno)
+            elif instance.name:
+                manu_name = "Manuscript [{}]".format(instance.name)
+            elif instance.library:
+                manu_name = "Manuscript from: [{}]".format(instance.library.name)
+            else:
+                manu_name = "Manuscript (unidentified)"
+
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Manuscript details", False)
-        context['prevpage'] = get_previous_page(self.request)
+
+        # OLD: context['breadcrumbs'] = process_visit(self.request, manu_name, False)
+        # OLD: context['prevpage'] = get_previous_page(self.request)
+        # New approach
+        prevpage = reverse('search_manuscript')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, manu_name, False, 
+                                                 [['Manuscripts', prevpage]])
 
         context['afternewurl'] = reverse('search_manuscript')
 
