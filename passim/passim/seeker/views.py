@@ -8,7 +8,7 @@ from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch, Count
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
@@ -24,7 +24,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 # General imports
 from datetime import datetime
-import operator
+import operator 
+from operator import itemgetter
 from functools import reduce
 from pyzotero import zotero
 from time import sleep 
@@ -2042,7 +2043,7 @@ def get_short_edit(short):
     return result
 
 def do_create_pdf_edi(request):
-    """This definition creates a pdf of all used edition (full) references."""
+    """This definition creates the input for the pdf with all all used edition (full) references."""
         
     # Store title, and pageinfo (for at the bottom of the page) 
     Title = "Edition references used in PASSIM:"
@@ -2071,7 +2072,7 @@ def do_create_pdf_edi(request):
     return response
 
 def do_create_pdf_lit(request):
-    """"This definition creates a pdf of all used literature (full) references."""
+    """"This definition creates the input for the pdf with all used literature (full) references."""
          
     # Store title, and pageinfo (for at the bottom of the page) 
     Title = "Literature references used in PASSIM:"
@@ -2170,9 +2171,9 @@ def create_pdf_passim(Title, pageinfo, filename, pdf_list):
     return response
 
 def do_create_pdf_manu(request):
-    """This definition creates a pdf of all used edition (full) references."""
+    """This definition creates the input for the pdf with all manuscripts in the passim database."""
   
-    # Store title, and pageinfo (for at the bottom of the page) 
+    # Store title, and pageinfo (for at the bottom of each page) 
     Title = "Manuscripts listed in PASSIM:"
     pageinfo = "Manuscripts PASSIM"
              
@@ -2180,15 +2181,74 @@ def do_create_pdf_manu(request):
     filename = "Manu_list_PASSIM.pdf"
 
     # Calculate the qs for the manuscripts       
-
-    qs = Manuscript.objects.order_by('name')
+    qs = Manuscript.objects.all()
     
-    # Create a list of objects TH: aanpassen zoveel mogelijk hier, en zo min mogelijk in create_pdf_passim
-    pdf_list = []
+    # Create temporary list and add relevant fields to the list
+    pdf_list_temp = []
     for obj in qs:
-        item = {}
-        item = obj.name
-        pdf_list.append(item)
+        # Count all items for each manuscript
+        count = obj.manusermons.all().count() # 
+        
+        # Handle empty origin fields
+        origin = None if obj.origin == None else obj.origin.name
+        
+        # Retrieve all provenances for each manuscript
+        qs_prov = obj.manuscripts_provenances.all()
+        
+        # Iterate through the queryset, place name and location 
+        # for each provenance together 
+        prov_texts = []
+        for prov in qs_prov:
+            prov = prov.provenance
+            prov_text = prov.name
+            if prov.location:
+                prov_text = "{} ({})".format(prov_text, prov.location.name)
+            prov_texts.append(prov_text)
+        # Join all provenances together
+        provenance = ", ".join(prov_texts)
+        # Store all relevant items in a dictionary and append to the list
+        item = dict(name=obj.name, idno=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish,
+                stype=obj.get_stype_display(), libname=obj.library.name, city=obj.library.city.name, origin=origin, provenance=provenance,
+                count=count)
+        pdf_list_temp.append(item)
+             
+    # Sort the list on city and yearstart
+    pdf_list_sorted = sorted(pdf_list_temp, key=itemgetter('city', 'yearstart')) 
+        
+    # Create five strings and add to pdf_list (to be processed in create_pdf_passim)
+    pdf_list=[]
+    for dict_item in pdf_list_sorted:
+       
+       # The first string contains the name of the city, library and id code of the manuscript     
+       string_1 = dict_item['city'] + ", "+ dict_item['libname'] + ", "+ dict_item['idno']
+       
+       # The second string contains the start and end year of the manuscript and the number of items of the manuscript
+       string_2 = 'Date: ' + str(dict_item['yearstart']) + "-" + str(dict_item['yearfinish']) + ', items: ' + str(dict_item['count'])
+       
+       # The third string contains the status of the manuscript: manual, imported or edited
+       string_3 = 'Status: ' + dict_item['stype']
+       
+       # The fourth string contains the origin of the manuscript
+       if dict_item['origin'] == None:
+          origin = ""
+       else:
+          origin = dict_item['origin']
+              
+       string_4 = 'Origin: ' + origin
+        
+       # The fifth string contains the provenances of the manuscript
+       if dict_item['provenance'] == None:
+          provenance = ""
+       else:
+          provenance = dict_item['provenance']
+
+       string_5 = 'Provenances: '+ provenance
+       
+       # The strings are combined into one with markddown line breaks so that each string is placed on a new line in the pdf
+       combined = string_1 + "<br />" + string_2 + "<br />" + string_3 + "<br />" + string_4 + "<br />" + string_5
+       
+       # The new combined strings are placed in a new list, to be used in the create_pdf_passim function.        
+       pdf_list.append(combined)
 
     # Call create_pdf_passim function with arguments  
     response = create_pdf_passim(Title, pageinfo, filename, pdf_list)
