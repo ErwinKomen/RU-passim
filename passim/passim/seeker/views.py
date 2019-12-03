@@ -222,19 +222,18 @@ def make_search_list(filters, oFields, search_list, qd):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
     def enable_filter(filter_id, head_id=None):
-        if not "_hidden" in filter_id:
+        for item in filters:
+            if filter_id in item['id']:
+                item['enabled'] = True
+                # Break from my loop
+                break
+        # Check if this one has a head
+        if head_id != None and head_id != "":
             for item in filters:
-                if filter_id in item['id']:
+                if head_id in item['id']:
                     item['enabled'] = True
-                    # Break from my loop
+                    # Break from this sub-loop
                     break
-            # Check if this one has a head
-            if head_id != None and head_id != "":
-                for item in filters:
-                    if head_id in item['id']:
-                        item['enabled'] = True
-                        # Break from this sub-loop
-                        break
         return True
 
     def get_value(obj, field, default=None):
@@ -4826,7 +4825,8 @@ class SermonDetails(PassimDetails):
                 if manu_id == None: manu_id = "(unknown ms)"
                 manu_url = reverse('manuscript_details', kwargs={'pk': manu.id})
                 crumbs.append(['{}'.format(manu_id), manu_url])
-                manu_sermons = "{}?sermo-manu={}".format(reverse('sermon_list'), manu.id )
+               #  manu_sermons = "{}?sermo-manu={}".format(reverse('sermon_list'), manu.id )
+                manu_sermons = "{}?sermo-manuidlist={}".format(reverse('sermon_list'), manu.id )
         crumbs.append(['Manuscript sermons', manu_sermons])
         # Figure out what the sermon details are
         current_name = "Sermon details"
@@ -5024,7 +5024,6 @@ class SermonListView(BasicListView):
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manu_hidden', 'fkfield': 'manu',                      'keyS': 'manu',         'keyFk': 'manu', 'infield': 'id'},
             {'filter': 'manuid',      'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',     'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',        'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
