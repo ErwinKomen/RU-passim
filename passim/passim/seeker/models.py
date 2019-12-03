@@ -3617,6 +3617,7 @@ class ManuscriptExt(models.Model):
     def short(self):
         return self.url
 
+
 class Collection(models.Model):
     """A collection can contain one or more sermons (SermonDescr)"""
     

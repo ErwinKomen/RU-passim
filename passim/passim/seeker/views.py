@@ -63,7 +63,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 DaterangeForm
-from passim.seeker.models import get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
+from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
@@ -426,7 +426,7 @@ def process_visit(request, name, is_menu, **kwargs):
     # return json.dumps(p_list)
     return p_list
 
-def get_breadcrumbs(request, name, is_menu, lst_crumb, **kwargs):
+def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
     # Initialisations
@@ -498,7 +498,7 @@ def home(request):
     context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "Home", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
 
     # Create the list of news-items
     lstQ = []
@@ -524,7 +524,7 @@ def contact(request):
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "Contact", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "Contact", True)
 
     return render(request,'contact.html', context)
 
@@ -538,7 +538,7 @@ def more(request):
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "More", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "More", True)
 
     return render(request,'more.html', context)
 
@@ -552,7 +552,7 @@ def technical(request):
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "Technical", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
 
     return render(request,'technical.html', context)
 
@@ -613,7 +613,7 @@ def bibliography(request):
     context['reference_list'] = reference_list
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "Bibliography", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "Bibliography", True)
 
     return render(request,'bibliography.html', context)
 
@@ -628,7 +628,7 @@ def about(request):
     context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
 
     # Process this visit
-    context['breadcrumbs'] = process_visit(request, "About", True)
+    context['breadcrumbs'] = get_breadcrumbs(request, "About", True)
 
     return render(request,'about.html', context)
 
@@ -1192,7 +1192,7 @@ def do_stype(request):
         context['tools_part'] = "Repair Stype definitions"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Stype", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Stype", True)
 
         # Create list to be returned
         result_list = []
@@ -1259,7 +1259,7 @@ def do_locations(request):
         context['tools_part'] = "Establish location definitions"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Locations", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Locations", True)
 
         # Create list to be returned
         result_list = []
@@ -1384,7 +1384,7 @@ def do_provenance(request):
         context['tools_part'] = "Tweak Manuscript-Provenance connections"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Provenance", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Provenance", True)
 
         # Create list to be returned
         result_list = []
@@ -1441,7 +1441,7 @@ def do_daterange(request):
         context['tools_part'] = "Update from Manuscript to Daterange table"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Dateranges", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
 
         # Create list to be returned
         result_list = []
@@ -1493,7 +1493,7 @@ def do_mext(request):
         context['tools_part'] = "Copy Manuscript links to externals"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Mext", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Mext", True)
 
         # Create list to be returned
         result_list = []
@@ -1547,7 +1547,7 @@ def do_goldsearch(request):
         context['tools_part'] = "Re-create Gold sermon searching (incipit/explicit)"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Sermons", True)
 
         # Start up processing
         added = 0
@@ -1599,7 +1599,7 @@ def do_sermons(request):
         context['tools_part'] = "Repair manuscript-sermons"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "Sermons", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "Sermons", True)
     
         # Start up processing
         added = 0
@@ -1692,7 +1692,7 @@ def do_goldtogold(request):
         context['tools_part'] = "Repair gold-to-gold links"
 
         # Process this visit
-        context['breadcrumbs'] = process_visit(request, "GoldToGold", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "GoldToGold", True)
 
         added = 0
         lst_total = []
@@ -1799,164 +1799,6 @@ def do_goldtogold(request):
                         lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
                             (idx+1), item['src'].id, item['dst'].id, linktype, "add", "" ))
         # y = [o for o in lst_prt_add if o['src'].id == 708]
-        lst_total.append("</tbody></table>")
-
-        # Create list to be returned
-        result_list = []
-        result_list.append({'part': 'Number of added relations', 'result': added})
-        # result_list.append({'part': 'All additions', 'result': json.dumps(lst_total)})
-        result_list.append({'part': 'All additions', 'result': "\n".join(lst_total)})
-
-        context['result_list'] = result_list
-    
-        # Render and return the page
-        return render(request, template_name, context)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("goldtogold")
-        return reverse('home')
-
-def do_goldtogold_ORIGINAL(request):
-    """Perform gold-to-gold relation repair"""
-
-    oErr = ErrHandle()
-    try:
-        assert isinstance(request, HttpRequest)
-        # Specify the template
-        template_name = 'tools.html'
-        # Define the initial context
-        context =  {'title':'RU-passim-tools',
-                    'year':get_current_datetime().year,
-                    'pfx': APP_PREFIX,
-                    'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
-
-        # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
-
-        # Indicate the necessary tools sub-part
-        context['tools_part'] = "Repair gold-to-gold links"
-
-        # Process this visit
-        context['breadcrumbs'] = process_visit(request, "GoldToGold", True)
-
-        added = 0
-        lst_total = []
-        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th><th>Path</th></tr>")
-        lst_total.append("<tbody>")
-
-        method = "goldspread" 
-
-        # Step #1: remove all unnecessary links
-        oErr.Status("{} step #1".format(method))
-        qs = SermonGoldSame.objects.all()
-        lst_delete = []
-        for relation in qs:
-            if relation.src == relation.dst:
-                lst_delete.append(relation.id)
-        oErr.Status("Step 1: removing {} links".format(len(lst_delete)))
-        if len(lst_delete) > 0:
-            SermonGoldSame.objects.filter(Q(id__in=lst_delete)).delete()
-
-        # Step #2: create groups of equals
-        oErr.Status("{} step #2".format(method))
-        lst_group = []      # List of groups, where each group is a list of equal-related gold-sermons
-        qs_eqs = SermonGoldSame.objects.filter(linktype=LINK_EQUAL ).order_by('src')
-        for idx, relation in enumerate(qs_eqs):
-            src = relation.src
-            dst = relation.dst
-            # Find out in which group this one fits
-            bGroup = False
-            for group in lst_group:
-                # Find a connection within this group
-                for obj in group:
-                    id = obj.id
-                    if id == src.id or id == dst.id:
-                        # We found the group
-                        bGroup = True
-                        break
-                if bGroup:
-                    # Add them if needed
-                    if relation.src not in group: group.append(relation.src)
-                    if relation.dst not in group: group.append(relation.dst)
-                    # And then break from the larger one
-                    break
-            # Did we fit this into a group?
-            if not bGroup:
-                # Create a new group with two members
-                group = [relation.src, relation.dst]
-                lst_group.append(group)
-        # Create a list of objects that have been done
-        lst_done = []
-        for group in lst_group:
-            for obj in group:
-                lst_done.append(obj.id)
-        # Add individuals to the list of groups if they have not yet been 'done'
-        for obj in SermonGold.objects.exclude(id__in=lst_done):
-            lst_group.append([obj])
-                    
-        # Step #3: spread 'equals' within each group
-        oErr.Status("{} step #3".format(method))
-        lst_add = []    # List of equals relations to be added
-        for group in lst_group:
-            # Consider each id in group
-            for src in group:
-                # Check for all possible destination id's
-                for dst in group:
-                    # Make sure they're not equal
-                    if src.id != dst.id:
-                        # Check if this relation exists
-                        obj = qs.filter(src=src, dst=dst).first()
-                        if obj == None:
-                            lst_add.append({'src': src, 'dst': dst})
-        with transaction.atomic():
-            for idx, item in enumerate(lst_add):
-                obj = SermonGoldSame(linktype=LINK_EQUAL, src=item['src'], dst=item['dst'])
-                obj.save()
-                lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
-                    (idx+1), item['src'].siglist, item['dst'].siglist, LINK_EQUAL, "add", "" ))
-
-        # Step #4: spread 'partial' links within groups of equals
-        oErr.Status("{} step #4".format(method))
-        for linktype in LINK_PRT:
-            lst_prt_add = []    # List of partially equals relations to be added
-            qs_prt = SermonGoldSame.objects.filter(linktype=linktype).order_by('src__id')
-            for group in lst_group:
-                # DEBUGGING - check the length of this group
-                if len(group) == 1:
-                    iStop = True
-
-                # Get a list of existing 'partially equals' destination links from the current group
-                qs_grp_prt = qs_prt.filter(Q(src__in=group))
-                if len(qs_grp_prt) > 0:
-                    # Make a list of unique destination gold objects
-                    lst_dst = []
-                    for obj in qs_grp_prt:
-                        dst = obj.dst
-                        if dst not in lst_dst: lst_dst.append(dst)
-                    # Make a list of relations that need to be added
-                    for src in group:
-                        for dst in lst_dst:
-                            # Make sure relations are not equal
-                            if src.id != dst.id:
-                                # Check if the relation already is there
-                                obj = qs_prt.filter(src=src, dst=dst).first()
-                                if obj == None:
-                                    lst_prt_add.append({'src': src, 'dst': dst})
-                                # Check if the reverse relation is already there
-                                obj = qs_prt.filter(src=dst, dst=src).first()
-                                if obj == None:
-                                    lst_prt_add.append({'src': dst, 'dst': src})
-            # Add all the relations in lst_prt_add
-            with transaction.atomic():
-                for idx, item in enumerate(lst_prt_add):
-                    obj = SermonGoldSame(linktype=linktype, src=item['src'], dst=item['dst'])
-                    obj.save()
-                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
-                        (idx+1), item['src'].siglist, item['dst'].siglist, linktype, "add", "" ))
-
-
         lst_total.append("</tbody></table>")
 
         # Create list to be returned
@@ -4333,7 +4175,8 @@ class BasicListView(ListView):
         context['sortOrder'] = self.sort_order
 
         # Set the title of the application
-        self.plural_name = str(self.model._meta.verbose_name_plural)
+        if self.plural_name =="":
+            self.plural_name = str(self.model._meta.verbose_name_plural)
         context['title'] = self.plural_name
 
         # Make sure we pass on the ordered heads
@@ -4348,8 +4191,6 @@ class BasicListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        # context['breadcrumbs'] = process_visit(self.request, self.plural_name, True)
-        # context['prevpage'] = get_previous_page(self.request)
         prevpage = reverse('home')
         context['prevpage'] = prevpage
         context['breadcrumbs'] = get_breadcrumbs(self.request, self.plural_name, True)
@@ -4578,8 +4419,6 @@ class LocationListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        #context['breadcrumbs'] = process_visit(self.request, "Locations", True)
-        #context['prevpage'] = get_previous_page(self.request)
         prevpage = reverse('home')
         context['prevpage'] = prevpage
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Locations", True)
@@ -4648,14 +4487,14 @@ class LocationDetailsView(PassimDetails):
         # The standard information
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        #context['breadcrumbs'] = process_visit(self.request, "Location edit", False)
-        #context['prevpage'] = get_previous_page(self.request)
         prevpage = reverse('location_list')
+        crumbs = []
+        crumbs.append(['Locations', prevpage])
         current_name = "Location details"
         if instance:
             current_name = "Location [{}]".format(instance.name)
         context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -4805,8 +4644,6 @@ class OriginListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        #context['breadcrumbs'] = process_visit(self.request, "Origins", True)
-        #context['prevpage'] = get_previous_page(self.request)
         prevpage = reverse('home')
         current_name = "Origins"
         context['prevpage'] = prevpage
@@ -4869,14 +4706,14 @@ class OriginDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        #context['breadcrumbs'] = process_visit(self.request, "Origin edit", False)
-        #context['prevpage'] = get_previous_page(self.request)
         prevpage = reverse('origin_list')
+        crumbs = []
+        crumbs.append(['Origins', prevpage])
         current_name = "Origin details"
         if instance:
             current_name = "Origin [{}]".format(instance.name)
         context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -4970,17 +4807,24 @@ class SermonDetails(PassimDetails):
         """Add to the existing context"""
 
         # Process this visit and get the new breadcrumbs object
-        #context['breadcrumbs'] = process_visit(self.request, "Sermon details", False)
-        #context['prevpage'] = get_previous_page(self.request)
-        # Static breadcrumbs should be:
-        # Manuscripts >> Manuscript [idno] >> Manuscript sermons >> Sermon [author/title]
-        prevpage = reverse('search_sermon')
+        #   Static breadcrumbs should be:
+        #       Manuscripts >> Manuscript [idno] >> Manuscript sermons >> Sermon [author/title]
+        prevpage = reverse('sermon_list')
         context['prevpage'] = prevpage
         # Start creating a list of breadcrumbs
         crumbs = []
         crumbs.append(['Manuscripts', reverse('search_manuscript')])
-        # Which manuscript do we belong to?
-
+        manu_sermons = prevpage
+        if instance:
+            # Which manuscript do we belong to?
+            manu = instance.manu
+            if manu:
+                manu_id = manu.idno
+                if manu_id == None: manu_id = "(unknown ms)"
+                manu_url = reverse('manuscript_details', kwargs={'pk': manu.id})
+                crumbs.append(['{}'.format(manu_id), manu_url])
+                manu_sermons = "{}?sermo-manu={}".format(reverse('sermon_list'), manu.id )
+        crumbs.append(['Manuscript sermons', manu_sermons])
         # Figure out what the sermon details are
         current_name = "Sermon details"
         if instance:
@@ -4989,9 +4833,7 @@ class SermonDetails(PassimDetails):
             if instance.title: lDetails.append(instance.title)
             if len(lDetails) > 0:
                 current_name = "Sermon [{}]".format(", ".join(lDetails))
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, 
-                                                 [['Manuscripts', reverse('search_manuscript')],
-                                                  ['Sermons', prevpage]])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # New:
         if instance == None:
@@ -5157,6 +4999,7 @@ class SermonListView(BasicListView):
     paginate_by = 20
     template_name = 'seeker/sermon_list.html'
     basketview = False
+    plural_name = "Sermons"
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
@@ -5179,6 +5022,7 @@ class SermonListView(BasicListView):
             ]},
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'manuscript','fkfield': 'manu',                      'keyS': 'manu',         'keyFk': 'manu',        'infield': 'id'},
             {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
@@ -5283,8 +5127,12 @@ class KeywordDetails(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Keyword details", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Keywords', reverse('keyword_list')])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
+
         return context
 
 
@@ -5309,7 +5157,11 @@ class KeywordEdit(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Keyword edit", False)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Keywords', reverse('keyword_list')])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
 
         context['afterdelurl'] = get_previous_page(self.request)
         return context
@@ -5593,10 +5445,6 @@ class ManuscriptDetails(PassimDetails):
                 manu_name = "Manuscript (unidentified)"
 
         # Process this visit and get the new breadcrumbs object
-
-        # OLD: context['breadcrumbs'] = process_visit(self.request, manu_name, False)
-        # OLD: context['prevpage'] = get_previous_page(self.request)
-        # New approach
         prevpage = reverse('search_manuscript')
         context['prevpage'] = prevpage
         context['breadcrumbs'] = get_breadcrumbs(self.request, manu_name, False, 
@@ -6292,8 +6140,19 @@ class SermonGoldDetails(PassimDetails):
         context['relations'] = lst_related
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon details", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('search_gold')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Gold Sermons', prevpage])
+        if instance:
+            qs = instance.goldsignatures.all()
+            if qs.count() == 0:
+                current_name = "Gold-sermon (no id)"
+            else:
+                current_name = "Gold-sermon [{}]".format(qs[0].code)
+        else:
+            current_name = "Gold-sermon (new)"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         return context
 
@@ -6400,8 +6259,10 @@ class SermonGoldEdit(PassimDetails):
         # Check if editions have been added
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Gold-Sermon edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Gold-Sermon edit", False)
+        # context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
 
         context['afterdelurl'] = reverse('search_gold')
 
@@ -6464,8 +6325,15 @@ class AuthorDetails(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Author details", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('author_search')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Authors', prevpage])
+        if instance:
+            current_name = instance.name
+        else:
+            current_name = "Author details"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -6490,7 +6358,7 @@ class AuthorEdit(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Author edit", False)
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Author edit", False)
 
         context['afterdelurl'] = get_previous_page(self.request)
         return context
@@ -6538,8 +6406,9 @@ class AuthorListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Authors", True)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Authors", True)
 
         # Return the calculated context
         return context
@@ -6630,8 +6499,9 @@ class LibraryListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
          # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Libraries", True)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Libraries", True)
 
         # Return the calculated context
         return context
@@ -6813,8 +6683,18 @@ class LibraryDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Library edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('library_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Libraries', prevpage])
+        if instance:
+            if instance.name:
+                current_name = instance.name
+            else:
+                current_name = "Library (unnamed)"
+        else:
+            current_name = "Library details"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -6974,8 +6854,9 @@ class ReportListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Upload reports", True)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Upload reports", True)
 
         # Return the calculated context
         return context
@@ -7013,8 +6894,14 @@ class ReportDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Report edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('report_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Reports', prevpage])
+        current_name = "Report details"
+        if instance:
+            current_name = "Report {} {}".format(instance.get_reptype_display(), get_crpp_date(instance.created))
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -7116,8 +7003,9 @@ class SourceListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Sources", True)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Sources", True)
 
         # Return the calculated context
         return context
@@ -7156,8 +7044,14 @@ class SourceDetailsView(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Source edit", False)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('source_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Sources', prevpage])
+        current_name = "Source details"
+        if instance:
+            current_name = "Source {} {}".format(instance.collector, get_crpp_date(instance.created))
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 
@@ -7240,8 +7134,9 @@ class LitRefListView(ListView):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
 
         # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = process_visit(self.request, "Sources", True)
-        context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Literature references", True)
 
         # Return the calculated context
         return context
