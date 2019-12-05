@@ -7,7 +7,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField
 from django.forms.widgets import *
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget
 from passim.seeker.models import *
 
 def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
@@ -141,6 +141,28 @@ class KeywordWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Keyword.objects.all().order_by('name').distinct()
+
+
+class ProjectWidget(ModelSelect2MultipleWidget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
+
+
+class ProjectOneWidget(ModelSelect2Widget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
 
 
 class SearchManuForm(forms.ModelForm):
@@ -419,6 +441,33 @@ class KeywordForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class ProjectForm(forms.ModelForm):
+    """Keyword list"""
+
+    project_ta = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
+    prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Project
+        fields = ['name']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProjectForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -935,7 +984,7 @@ class ManuscriptForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype']
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
@@ -947,7 +996,8 @@ class ManuscriptForm(forms.ModelForm):
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  # 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+                 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):

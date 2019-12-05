@@ -1,5 +1,9 @@
 ﻿{% load i18n %}
 
+{% block scripts %}
+  {{manuForm.media.css}}
+{% endblock %}
+
 <!-- Manuscript information -->
 <form>
   {% csrf_token %}
@@ -277,6 +281,21 @@
         </td>
       </tr>
 
+      <!-- Project this manuscript belongs to -->
+      <tr class="form-row">
+        <td valign="top"><b>Project</b></td>
+        <td class="manuscript-project" align="left">
+          <div class="view-mode">
+            {% if manuForm.instance.project %}
+              <span class="project">{{manuForm.instance.project.name}}</span>
+            {% else %}-{% endif %}
+          </div>
+          {% if is_passim_editor %}
+            <div class="edit-mode hidden">{{manuForm.project}}</div>
+          {% endif %}
+        </td>
+      </tr>
+
       <!-- VIEW only: keywords -->
       <tr class="form-row">
         <td valign="top"><b>Keywords</b></td>
@@ -315,3 +334,7 @@
     </tbody>
   </table>
 </form>
+
+{% block endcontent %} 
+  {{manuForm.media.js }} 
+{% endblock %}

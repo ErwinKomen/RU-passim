@@ -2131,6 +2131,31 @@ class Litref(models.Model):
         return adapt_markdown(self.short, lowercase=False)
 
 
+class Project(models.Model):
+    """manuscripts may belong to the project 'Passim' or to something else"""
+
+    # [1] Obligatory name for a project
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the normal saving
+        response = super(Project, self).save(force_insert, force_update, using, update_fields)
+        # Check if this is the first project object
+        qs = Project.objects.all()
+        if qs.count() == 1:
+            # Set this as default project for all manuscripts
+            prj = qs.first()
+            with transaction.atomic():
+                for obj in Manuscript.objects.all():
+                    obj.project = prj
+                    obj.save()
+
+        return response
+
+
 class Keyword(models.Model):
     """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
 
@@ -2193,8 +2218,11 @@ class Manuscript(models.Model):
     literature = models.TextField("Literature", null=True, blank=True)
 
     # Where do we get our information from? And when was it added?
-    # Note: deletion of a sourceinfo sets the manuscript.source to NULL
+    #    Note: deletion of a sourceinfo sets the manuscript.source to NULL
     source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
+
+    # [0-1] Each manuscript should belong to a particular project
+    project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
 
     # [m] Many-to-many: one manuscript can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")

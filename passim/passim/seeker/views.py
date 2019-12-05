@@ -62,11 +62,11 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm
+                                ManuscriptKeywordForm, DaterangeForm, ProjectForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
-    Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
 
 # Some constants that can be used
 paginateSize = 20
@@ -5124,15 +5124,19 @@ class KeywordDetails(PassimDetails):
         """Action to be performed after adding a new item"""
 
         self.afternewurl = reverse('keyword_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('keyword_details', kwargs={'pk': instance.id})
         return True, "" 
 
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
+        prevpage = reverse('keyword_list')
         context['prevpage'] = prevpage
         crumbs = []
-        crumbs.append(['Keywords', reverse('keyword_list')])
+        crumbs.append(['Keywords', prevpage])
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
 
         return context
@@ -5186,6 +5190,91 @@ class KeywordListView(BasicListView):
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
+        ]
+
+
+class ProjectDetails(PassimDetails):
+    """The details of one project"""
+
+    model = Project
+    mForm = ProjectForm
+    template_name = 'seeker/project_details.html'
+    template_post = 'seeker/project_details.html'
+    prefix = 'prj'
+    title = "ProjectDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('project_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('project_details', kwargs={'pk': instance.id})
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('project_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Projects', prevpage])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Project details", True, crumbs)
+
+        return context
+
+
+class ProjectEdit(PassimDetails):
+    """The details of one project"""
+
+    model = Project
+    mForm = ProjectForm
+    template_name = 'seeker/project_edit.html'
+    template_post = 'seeker/project_edit.html'
+    prefix = 'prj'
+    title = "ProjectEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('project_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Projects', reverse('project_list')])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Project details", True, crumbs)
+
+        context['afterdelurl'] = get_previous_page(self.request)
+        return context
+
+
+class ProjectListView(BasicListView):
+    """Search and list keywords"""
+
+    model = Project
+    listform = ProjectForm
+    prefix = "prj"
+    paginate_by = 20
+    template_name = 'seeker/project_list.html'
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str'},
+                   {'name': 'Manuscripts', 'order': '', 'type': 'str'}]
+    filters = [ {"name": "Project",         "id": "filter_project",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'project',   'dbfield': 'name',          'keyS': 'project_ta', 'keyList': 'prjlist', 'infield': 'name' }]}
         ]
 
 
@@ -5449,8 +5538,9 @@ class ManuscriptDetails(PassimDetails):
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('search_manuscript')
         context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, manu_name, False, 
-                                                 [['Manuscripts', prevpage]])
+        crumbs = []
+        crumbs.append(['Manuscripts', prevpage])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, manu_name, False, crumbs)
 
         context['afternewurl'] = reverse('search_manuscript')
 
