@@ -3661,10 +3661,10 @@ class Collection(models.Model):
     name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Each collecttion has only 1 owner
-    owner = models.ForeignKey(Profile)
+    owner = models.ForeignKey(Profile, null=True)
         
     # [0-n] Link to one or more SermonDescr instances or gold?
-#    sermons = models.ManyToManyField(SermonDescr, through="CollectionSermonDescr", related_name="collection_sermondescr")
+#   sermons = models.ManyToManyField(SermonDescr, through="CollectionSermonDescr", related_name="collection_sermondescr")
         
     # [0-1] Each collection can be marked a "read only" by certain users TH: yes or no? 
     readonly = models.TextField("ReadOnly", null=True, blank=True)
@@ -3674,6 +3674,7 @@ class Collection(models.Model):
 
     # Link to a description or bibliography (url) TH: wat is hiervan de bedoeling? Literature? Lijkt mij niet nodig dit veld
     url = models.URLField("Web info", null=True, blank=True)
+
 
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
