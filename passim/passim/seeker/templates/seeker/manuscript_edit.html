@@ -284,7 +284,7 @@
           <div class="any-mode">
             {% if manuForm.instance.keywords.count > 0 %}
               {% for kw in manuForm.instance.keywords.all %}
-                <span class="badge">{{kw.name}}</span>
+                <span class="keyword">{{kw.name}}</span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
