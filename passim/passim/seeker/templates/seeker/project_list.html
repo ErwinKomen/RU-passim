@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block scripts %}
-  {{kwForm.media.css}}
+  {{prjForm.media.css}}
 {% endblock %}
 
 {% block content %}
@@ -14,9 +14,9 @@
   <div>
 
     {% if authenticated %}
-      <!-- Upper part of the keyword list interface -->
+      <!-- Upper part of the project list interface -->
 
-      <div id="keywords_top" >
+      <div id="projects_top" >
 
         <!-- Allow access to interface parts that are normally hidden -->
         <div  class="panel panel-none">
@@ -34,7 +34,7 @@
           </div>
         </div>
 
-        <form  id="keywords_filter" method='post' action="{% url 'keyword_list' %}" >
+        <form  id="projects_filter" method='post' action="{% url 'project_list' %}" >
           {% csrf_token %}
           <!-- entrypoint for search_paged_start -->
           <div class="hidden search_paged_start">
@@ -44,11 +44,6 @@
           <!-- entrypoint for search_ordered_start -->
           <div class="hidden search_ordered_start">
             <input name="o" type="text" value="{{sortOrder}}" />
-          </div>
-
-          <!-- basket switched on or not -->
-          <div class="hidden">
-            <input name="usebasket" type="text" value="{{usebasket}}" />
           </div>
 
           <!-- Filter tab -->
@@ -73,24 +68,24 @@
                 </div>
               </div>
               
-              <div class="row" id="keyword_filter_specs">
+              <div class="row" id="project_filter_specs">
                 <!-- The column with the different filter sections -->
                 <div class="col-md-10">
                   <div class="panel panel-default ">
 
                     <!-- Intro -->
-                    <div><h5>Keyword filters: </h5></div>
+                    <div><h5>Project filters: </h5></div>
 
                     <!-- One or more (key)words -->
-                    <div id="filter_keyword" class="{% if not kwForm.keyword_ta.value and not kwForm.kwlist.value %}hidden{% endif %}">
+                    <div id="filter_project" class="{% if not prjForm.project_ta.value and not prjForm.prjlist.value %}hidden{% endif %}">
                       <table style="width: 100%;">
                         <tr class="form-row">
-                          <td style="min-width: 130px;" valign="top">Keyword text</td>
+                          <td style="min-width: 130px;" valign="top">Project text</td>
                           <td style="width: 100%;">
-                            <span class="keyword-key hidden">{{kwForm.name}}</span>
-                            <span>{{kwForm.keyword_ta}}</span>
+                            <span class="project-key hidden">{{prjForm.name}}</span>
+                            <span>{{prjForm.project_ta}}</span>
                             <span> or select: </span>
-                            <span>{{kwForm.kwlist}}</span>
+                            <span>{{prjForm.prjlist}}</span>
                           </td>
                         </tr>
                       </table>
@@ -124,21 +119,21 @@
           <div class="panel panel-default">
 
             <h3>
-              <span>Keywords</span>
+              <span>Projects</span>
               {% if is_passim_editor %}
-                <span id="add_keyword" class="pull-right">
+                <span id="add_project" class="pull-right">
                     {% csrf_token %}
                     <a class="btn btn-xs jumbo-3" role="button" 
-                        onclick="document.getElementById('create_new_keyword').submit();" >
-                      <span class="glyphicon glyphicon-plus"></span>Add a keyword
+                        onclick="document.getElementById('create_new_project').submit();" >
+                      <span class="glyphicon glyphicon-plus"></span>Add a project
                     </a>
                 </span>
               {% endif %}
             </h3>
 
-            <!-- Room to have the form-link to create a new keyword -->
+            <!-- Room to have the form-link to create a new project -->
             <div class="hidden" >
-              <form action="{% url 'keyword_details' %}" method="post" id="create_new_keyword">
+              <form action="{% url 'project_details' %}" method="post" id="create_new_project">
                 {% csrf_token %}
               </form>
             </div>
@@ -156,7 +151,7 @@
                   </div>
               </div>
 
-              <!-- Table that contains a list of keywords -->
+              <!-- Table that contains a list of projects -->
               <div class="row">
                 <div class="col-md-12">
                   <table class="table table-hover">
@@ -176,31 +171,21 @@
                       </tr>
                     </thead>
                     <tbody>
-                    {% for kwitem in object_list %}
+                    {% for prjitem in object_list %}
                       <tr class="dict-entry clickable" >
-                        <td class="hidden"> {{ kwitem.id }}</td>
+                        <td class="hidden"> {{ prjitem.id }}</td>
 
-                        <!-- The keyword itself -->
-                        <td class="kw-name" align="left" style="width: 100%;" 
-                            onclick="ru.passim.seeker.goto_url('{% url 'keyword_details' kwitem.id %}')"
-                            title="{{kwitem.name}}">{{kwitem.name}}</td>
+                        <!-- The project itself -->
+                        <td class="prj-name" align="left" style="width: 100%;" 
+                            onclick="ru.passim.seeker.goto_url('{% url 'project_details' prjitem.id %}')"
+                            title="{{prjitem.name}}">{{prjitem.name}}</td>
 
-                        <!-- Number of times this keyword is referred to in sermons and gold sermons -->
-                        <td class="kw-number tdnowrap">
-                          {% if kwitem.freqsermo %}
-                            <a href="{% url 'sermon_list' %}?sermo-keyword={{kwitem.name}}">
-                              <span class="badge jumbo-1 clickable" 
-                                    title="Frequency in manifestation sermons">{{kwitem.freqsermo}}</span></a>
-                          {% endif %}
-                          {% if kwitem.freqgold %}
-                            <a href="{% url 'search_gold' %}?gold-keyword={{kwitem.name}}">
-                              <span class="badge jumbo-2 clickable" 
-                                    title="Frequency in gold sermons">{{kwitem.freqgold}}</span></a>
-                          {% endif %}
-                          {% if kwitem.freqmanu %}
-                            <a href="{% url 'search_manuscript' %}?manu-kwlist={{kwitem.id}}">
+                        <!-- Number manuscripts belonging to this project -->
+                        <td class="prj-number tdnowrap">
+                          {% if prjitem.freqmanu %}
+                            <a href="{% url 'search_manuscript' %}?manu-prjlist={{prjitem.id}}">
                               <span class="badge jumbo-3 clickable" 
-                                    title="Frequency in manuscripts">{{kwitem.freqmanu}}</span></a>
+                                    title="Number of manuscripts in this project">{{prjitem.freqmanu}}</span></a>
                           {% endif %}
                         </td>
 
@@ -222,7 +207,7 @@
               </div>
 
             {% else %}
-              <p>No keywords have been found.</p>
+              <p>No projects have been found.</p>
             {% endif %}
 
             </div>
@@ -254,5 +239,5 @@
 {% endblock content %}
 
 {% block endcontent %} 
-  {{kwForm.media.js }} 
+  {{prjForm.media.js }} 
 {% endblock %}

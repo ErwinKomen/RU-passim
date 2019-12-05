@@ -29,9 +29,8 @@
                           <li><a href="{% url 'search_collection' %}">Collection</a></li>
                           <li><a href="{% url 'library_search' %}">Library</a></li>
                           <li><a href="{% url 'author_search' %}">Author</a></li>
-                            <li role="separator" class="divider"></li>
+                          <li role="separator" class="divider"></li>
                           <li><a href="{% url 'search_gold' %}">Gold-Sermon</a></li>
-                            <li role="separator" class="divider"></li>
                           
                         </ul>
                       </li>
@@ -51,6 +50,10 @@
                             <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                             <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>
+                          {% endif %}
+                          {% if is_passim_uploader %}
+                            <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'project_list' %}" title="Projects">Projects</a></li> 
                           {% endif %}
                         </ul>
                       </li>

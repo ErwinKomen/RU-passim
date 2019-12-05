@@ -213,6 +213,20 @@
         </td>
       </tr>
 
+      <!-- VIEW only: keywords -->
+      <tr class="form-row">
+        <td valign="top" class="hoverable">Keywords</td>
+        <td class="manuscript-format" align="left">
+          <div class="any-mode">
+            {% if sermoForm.instance.keywords.count > 0 %}
+              {% for kw in sermoForm.instance.keywords.all %}
+                <span class="keyword">{{kw.name}}</span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+        </td>
+      </tr>
+
     </table>
     
 </form>

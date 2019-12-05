@@ -7,7 +7,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField
 from django.forms.widgets import *
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget
 from passim.seeker.models import *
 
 def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
@@ -132,6 +132,39 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
+class KeywordWidget(ModelSelect2MultipleWidget):
+    model = Keyword
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Keyword.objects.all().order_by('name').distinct()
+
+
+class ProjectWidget(ModelSelect2MultipleWidget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
+
+
+class ProjectOneWidget(ModelSelect2Widget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
+
+
 class SearchManuForm(forms.ModelForm):
     """Manuscript search form"""
 
@@ -160,6 +193,10 @@ class SearchManuForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    keyword = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -190,6 +227,7 @@ class SearchManuForm(forms.ModelForm):
         self.fields['yearfinish'].required = False
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -216,17 +254,6 @@ class SearchManuForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
-
-class KeywordWidget(ModelSelect2MultipleWidget):
-    model = Keyword
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Keyword.objects.all().order_by('name').distinct()
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
@@ -414,6 +441,33 @@ class KeywordForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class ProjectForm(forms.ModelForm):
+    """Keyword list"""
+
+    project_ta = forms.CharField(label=_("Keyword"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
+    prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Project
+        fields = ['name']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProjectForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -810,6 +864,30 @@ class ManuscriptExtForm(forms.ModelForm):
             instance = kwargs['instance']
 
 
+class ManuscriptKeywordForm(forms.ModelForm):
+    name = forms.CharField(label=_("Keyword"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptKeyword
+        fields = ['manuscript', 'keyword']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptKeywordForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['keyword'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.keyword != None:
+                kw = instance.keyword.name
+                self.fields['name'].initial = kw
+
+
 class OriginForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
@@ -906,7 +984,7 @@ class ManuscriptForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype']
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
@@ -918,7 +996,8 @@ class ManuscriptForm(forms.ModelForm):
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  # 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+                 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):

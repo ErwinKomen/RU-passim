@@ -1086,6 +1086,39 @@ table.compact-table td:hover {
   min-width: 92px;
 }
 
+.keyword {
+    color: darkblue;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.keyword:hover {
+    color: whitesmoke;
+    background-color: darkblue;
+    cursor: pointer;
+}
+
+.project {
+    color: black;
+    font-family: monospace;
+    background-color: lightgoldenrodyellow;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+.project:hover {
+    color: lightgoldenrodyellow;
+    background-color: darkgoldenrod;
+    cursor: pointer;
+}
+
+
+
 .sermon-author {
   color: darkblue;
 }

@@ -70,6 +70,7 @@ urlpatterns = [
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
     url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),
     url(r'^manuscript/litset(?:/(?P<pk>\d+))?/$', ManuscriptLitset.as_view(), name='manu_litset'),
+    url(r'^manuscript/kwset(?:/(?P<pk>\d+))?/$', ManuscriptKwset.as_view(), name='manu_kwset'),
 
     url(r'^location/list', LocationListView.as_view(), name='location_list'),
     url(r'^location/details(?:/(?P<pk>\d+))?/$', LocationDetailsView.as_view(), name='location_details'),
@@ -109,6 +110,10 @@ urlpatterns = [
     url(r'^keyword/list', KeywordListView.as_view(), name='keyword_list'),
     url(r'^keyword/details(?:/(?P<pk>\d+))?/$', KeywordDetails.as_view(), name='keyword_details'),
     url(r'^keyword/edit(?:/(?P<pk>\d+))?/$', KeywordEdit.as_view(), name='keyword_edit'),
+
+    url(r'^project/list', ProjectListView.as_view(), name='project_list'),
+    url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project_details'),
+    url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project_edit'),
 
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),

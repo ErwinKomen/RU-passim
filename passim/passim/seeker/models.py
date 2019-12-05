@@ -2131,6 +2131,56 @@ class Litref(models.Model):
         return adapt_markdown(self.short, lowercase=False)
 
 
+class Project(models.Model):
+    """manuscripts may belong to the project 'Passim' or to something else"""
+
+    # [1] Obligatory name for a project
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the normal saving
+        response = super(Project, self).save(force_insert, force_update, using, update_fields)
+        # Check if this is the first project object
+        qs = Project.objects.all()
+        if qs.count() == 1:
+            # Set this as default project for all manuscripts
+            prj = qs.first()
+            with transaction.atomic():
+                for obj in Manuscript.objects.all():
+                    obj.project = prj
+                    obj.save()
+
+        return response
+
+
+class Keyword(models.Model):
+    """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
+
+    # [1] Obligatory text of a keyword
+    name = models.CharField("Name", max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
+
+    def freqsermo(self):
+        """Frequency in manifestation sermons"""
+        freq = self.keywords_sermon.all().count()
+        return freq
+
+    def freqgold(self):
+        """Frequency in Gold sermons"""
+        freq = self.keywords_gold.all().count()
+        return freq
+
+    def freqmanu(self):
+        """Frequency in Manuscripts"""
+        freq = self.keywords_manu.all().count()
+        return freq
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -2168,15 +2218,21 @@ class Manuscript(models.Model):
     literature = models.TextField("Literature", null=True, blank=True)
 
     # Where do we get our information from? And when was it added?
-    # Note: deletion of a sourceinfo sets the manuscript.source to NULL
+    #    Note: deletion of a sourceinfo sets the manuscript.source to NULL
     source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
+
+    # [0-1] Each manuscript should belong to a particular project
+    project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
 
     # [m] Many-to-many: one manuscript can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
        
     # [m] Many-to-many: one manuscript can have a series of literature references
     litrefs = models.ManyToManyField("Litref", through="LitrefMan")
-       
+
+     # [0-n] Many-to-many: keywords per SermonDescr
+    keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
+
     def __str__(self):
         return self.name
 
@@ -2948,26 +3004,6 @@ class Nickname(models.Model):
         return hit
 
 
-class Keyword(models.Model):
-    """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
-
-    # [1] Obligatory text of a keyword
-    name = models.CharField("Name", max_length=LONG_STRING)
-
-    def __str__(self):
-        return self.name
-
-    def freqsermo(self):
-        """Frequency in manifestation sermons"""
-        freq = self.keywords_sermon.all().count()
-        return freq
-
-    def freqgold(self):
-        """Frequency in Gold sermons"""
-        freq = self.keywords_gold.all().count()
-        return freq
-
-
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
 
@@ -3617,6 +3653,7 @@ class ManuscriptExt(models.Model):
     def short(self):
         return self.url
 
+
 class Collection(models.Model):
     """A collection can contain one or more sermons (SermonDescr)"""
     
@@ -3814,6 +3851,17 @@ class SermonDescrKeyword(models.Model):
     sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw")
     # [1] ...and a keyword instance
     keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptKeyword(models.Model):
+    """Relation between a Manuscript and a Keyword"""
+
+    # [1] The link is between a Manuscript instance ...
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
