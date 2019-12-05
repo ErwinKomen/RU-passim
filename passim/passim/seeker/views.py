@@ -2219,9 +2219,17 @@ def do_create_pdf_manu(request):
             prov_texts.append(prov_text)
         # Join all provenances together
         provenance = ", ".join(prov_texts)
-        # Store all relevant items in a dictionary and append to the list
-        item = dict(name=obj.name, idno=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish,
-                stype=obj.get_stype_display(), libname=obj.library.name, city=obj.library.city.name, origin=origin, provenance=provenance,
+        
+        # Store all relevant items in a dictionary and append to the list TH: let op, link lib and city
+        name = "" if obj.name == None else obj.name         
+        idno = "" if obj.idno == None else obj.idno
+        yearstart = "" if obj.yearstart == None else obj.yearstart
+        yearfinish = "" if obj.yearfinish == None else obj.yearfinish
+        libname = "" if obj.library == None else obj.library.name
+        city = "" if obj.library == None or obj.library.city == None else obj.library.city.name
+        
+        item = dict(name=name, idno=idno, yearstart=yearstart, yearfinish=yearfinish,
+                stype=obj.get_stype_display(), libname=libname, city=city, origin=origin, provenance=provenance,
                 count=count)
         pdf_list_temp.append(item)
              
