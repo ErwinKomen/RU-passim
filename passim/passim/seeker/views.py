@@ -5289,6 +5289,20 @@ class ManuscriptDetails(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
+        template_sermon = 'seeker/sermon_view.html'
+
+        def sermon_object(obj ):
+            # Calculate the HTML for this sermon
+            context = dict(msitem=obj)
+            html = treat_bom( render_to_string(template_sermon, context))
+            # Determine what the label is going to be
+            label = obj.locus
+            # Determine the parent, if any
+            parent = 1 if obj.parent == None else obj.parent.order + 1
+            id = obj.order + 1
+            # Create a sermon representation
+            oSermon = dict(id=id, parent=parent, pos=label, child=[], f = dict(order=obj.order, html=html))
+            return oSermon
 
         # Get the instance via self.object??
         #   (or why not use the supplied 'instance'??)
@@ -5297,6 +5311,8 @@ class ManuscriptDetails(PassimDetails):
         # Construct the hierarchical list
         sermon_list = []
         maxdepth = 0
+        build_htable = False
+
         if instance != None:
             # Create a well sorted list of sermons
             qs = instance.manusermons.filter(order__gte=0).order_by('order')
@@ -5319,6 +5335,29 @@ class ManuscriptDetails(PassimDetails):
             for oSermon in sermon_list:
                 oSermon['cols'] = maxdepth - oSermon['level'] + 1
                 if oSermon['group']: oSermon['cols'] -= 1
+
+            # Alternative method: create a hierarchical object of sermons
+            if build_htable:
+                lSermon = []
+                for sermon in qs:
+                    # Create sermon object
+                    oSermon = sermon_object(sermon)
+                    # Add it to the list
+                    lSermon.append(oSermon)
+                    # Immediately attach it to the correct parent
+                    parent_id = oSermon['parent']
+                    if parent_id:
+                        oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
+                        if oParent:
+                            oParent['child'].append(oSermon)
+                # Retain the top sermon
+                oSermon = lSermon[0]
+                # Remove the list
+                lSermon = []
+
+                # DEBUGGING: show what we have
+                sSermon = json.dumps(oSermon)
+                context['sermon_htable'] = sSermon
 
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list

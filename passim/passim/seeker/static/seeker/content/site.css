@@ -1234,6 +1234,12 @@ td a.nostyle {
   display: block;
 }
 
+a.sermon:link, a.sermon:visited {
+    text-decoration: inherit;
+    color: inherit;
+    cursor: inherit;
+}
+
 .signature {
   /* font-family: monospace; */
   font-size: smaller;
