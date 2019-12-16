@@ -253,6 +253,83 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sermon_exchange
+       *    Make two sermons exchange place (siblings)
+       * 
+       * @param {el} elSrc
+       * @param {el} elDst
+       * @returns {bool}
+       */
+      sermon_exchange: function (elSrc, elDst) {
+        var nodesrcid = -1,
+            nodedstid = -1,
+            countsrc = -1,
+            countdst = -1,
+            children = [],
+            elTable = null;
+
+        try {
+          // Get the table
+          elTable = $(elSrc).closest("table");
+
+          // Get the current values
+          nodesrcid = parseInt($(elSrc).attr("nodeid"), 10);
+          nodedstid = parseInt($(elDst).attr("nodeid"), 10);
+          countsrc = parseInt($(elSrc).find(".arg-nodeid").first().text(), 10);
+          countdst = parseInt($(elDst).find(".arg-nodeid").first().text(), 10);
+
+          // Exchange source and destination 
+          $(elSrc).attr("nodeid", nodedstid);
+          $(elDst).attr("nodeid", nodesrcid);
+          $(elSrc).find(".arg-nodeid").first().text(countdst);
+          $(elDst).find(".arg-nodeid").first().text(countsrc);
+
+          // Change all the children of the original source
+          $(elTable).find("tr.form-row").each(function (idx, el) {
+            var sNodeSrc = nodesrcid.toString(),
+                sNodeDst = nodedstid.toString();
+
+            // Is this row a child of source?
+            if ($(el).attr("childof") === sNodeSrc) {
+              $(el).attr("childof", sNodeDst);
+              children.push(el);
+            } else if ($(el).attr("childof") === sNodeDst) {
+              $(el).attr("childof", sNodeSrc);
+              children.push(el);
+            }
+          });
+
+          // Determine where to move
+          if (nodesrcid < nodedstid) {
+            // We are moving a node 'down'
+            if (children.length === 0) {
+              // No children: simple moving
+              elSrc.insertAfter(elDst);
+            } else {
+              // Move after the last child
+              elSrc.insertAfter(children[children.length - 1]);
+            }
+          } else {
+            // We are moving a node 'up'
+            if (children.length === 0) {
+              // No children: simple moving
+              elSrc.insertBefore(elDst);
+            } else {
+              // Move before the first
+              elSrc.insertBefore(elDst);
+              // elSrc.insertBefore(children[0]);
+            }
+          }
+
+          // Return positively 
+          return true
+        } catch (ex) {
+          private_methods.showError("sermon_exchange", ex);
+          return false;
+        }
+      },
+
+      /**
        * screenCoordsForRect
        *    Get the correct screen coordinates for the indicated <svg> <rect> element
        * 
@@ -506,7 +583,7 @@ var ru = (function ($, ru) {
           $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
 
           // Make modal draggable
-          $(".modal-header").on("mousedown", function (mousedownEvt) {
+          $(".modal-header, modal-dragpoint").on("mousedown", function (mousedownEvt) {
             var $draggable = $(this),
                 x = mousedownEvt.pageX - $draggable.offset().left,
                 y = mousedownEvt.pageY - $draggable.offset().top;
@@ -596,6 +673,153 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("filter_click", ex);
+        }
+      },
+
+      /**
+       * form_row_select
+       *    By selecting this slement, the whole row gets into the 'selected' state
+       *
+       */
+      form_row_select: function (elStart) {
+        var elTable = null,
+          elRow = null, // The row
+          iSelCount = 0, // Number of selected rows
+          elHier = null,
+          bSelected = false;
+
+        try {
+          // Get to the row
+          elRow = $(elStart).closest("tr.form-row");
+          // Get current state
+          bSelected = $(elRow).hasClass("selected");
+          // FInd nearest table
+          elTable = $(elRow).closest("table");
+          // Check if anything other than me is selected
+          iSelCount = 1;
+          // Remove all selection
+          $(elTable).find(".form-row.selected").removeClass("selected");
+          elHier = $("#sermon_hierarchy");
+          // CHeck what we need to do
+          if (bSelected) {
+            // We are de-selecting: hide the 'Up' and 'Down' buttons if needed
+            // ru.cesar.seeker.show_up_down(this, false);
+            $(elHier).removeClass("in");
+            $(elHier).hide()
+          } else {
+            // Select the new row
+            $(elRow).addClass("selected");
+            // SHow the 'Up' and 'Down' buttons if needed
+            // ru.cesar.seeker.show_up_down(this, true);
+            // document.getElementById('sermon_manipulate').submit();
+            $(elHier).addClass("in");
+            $(elHier).show();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("form_row_select", ex);
+        }
+      },
+
+      /**
+       *  sermon_move
+       *      Move the selected row
+       *
+       */
+      sermon_move: function (type) {
+        var elStart = null,
+            elTable = null,
+            elRow = null,
+            elRowRef = null,
+            data = [],
+            sibling = [],
+            targeturl = "",
+            hList = [],       // List of current hierarchy
+            counter = -1,     // Value of the forloop counter
+            dst = -1,         // Target count
+            nodeid = -1,
+            nodedstid = -1,
+            childof = -1;
+
+        try {
+          // Determine which row is selected
+          elStart = $("#sermon_list").find("tr.selected > td.selectable").first();
+          elRow = $(elStart).parent();
+          elTable = $(elRow).closest("table");
+
+          // Action depends on the type
+          switch (type) {
+            case "close": // Close the modal
+              ru.passim.seeker.form_row_select(elStart);
+              break;
+            case "up":    // position me before my preceding sibling
+              nodeid = parseInt( $(elRow).attr("nodeid"), 10);
+              childof = parseInt($(elRow).attr("childof"), 10);
+              counter = parseInt($(elRow).find(".arg-nodeid").first().text());
+              // Look for preceding sibling
+              // elRowRef = $(elTable).find("tr.form-row[childof='" + childof + "'][nodeid='" + (nodeid - 1) + "']").first();
+              sibling = []
+              $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
+                var thisid = $(el).attr("nodeid");
+
+                if (thisid !== undefined && thisid !== "") {
+                  if (parseInt(thisid, 10) < nodeid) { sibling.push(el); }
+                }
+              });
+              if (sibling.length > 0) {
+                elRowRef = sibling[sibling.length-1];
+                // Move my row there
+               // elRow.insertBefore(elRowRef);
+                // Exchange the numbering
+                private_methods.sermon_exchange(elRow, elRowRef);
+              }
+              break;
+            case "down":  // position me after my following sibling
+              nodeid = parseInt($(elRow).attr("nodeid"), 10);
+              childof = parseInt($(elRow).attr("childof"), 10);
+              counter = parseInt($(elRow).find(".arg-nodeid").first().text());
+
+              // Look for first following sibling
+              sibling = []
+              $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
+                var thisid = $(el).attr("nodeid");
+
+                if (thisid !== undefined && thisid !== "") {
+                  if (parseInt(thisid, 10) > nodeid) { sibling.push(el);}
+                }
+              });
+              if (sibling.length > 0) {
+                elRowRef = sibling[0];
+                // Move my row there
+                //elRow.insertAfter(elRowRef);
+                // Exchange the numbering
+                private_methods.sermon_exchange(elRow, elRowRef);
+              }
+              break;
+            case "left":  // let me become a child of my grandparent, positioned AFTER my parent
+              break;
+            case "down":  // let me become a child of my preceding SIBLING
+              break;
+            case "save":  // Get an adapted list of the hierarchy, post to the server and receive response
+              // Get list of current hierarchy
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var sermonid, nodeid, childof, oNew = {};
+
+                sermonid = $(el).attr("sermonid");
+                nodeid = $(el).attr("nodeid");
+                childof = $(el).attr("childof");
+                oNew = { id: sermonid, nodeid: nodeid, childof: childof };
+                hList.push(oNew);
+              });
+              // Set the value
+              $("#id_manu-hlist").val(JSON.stringify(hList));
+              // Send it onwards
+              $("#save_new_hierarchy").submit();
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_move", ex);
         }
       },
 

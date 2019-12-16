@@ -3608,6 +3608,7 @@ class PassimDetails(DetailView):
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
+    do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
@@ -3713,6 +3714,12 @@ class PassimDetails(DetailView):
             # NOTE: if the object doesn't exist, we will NOT get an error here
             self.object = self.get_object()
 
+        # Possibly perform custom initializations
+        self.custom_init(self.object)
+        
+    def custom_init(self, instance):
+        pass
+
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
         return True, "" 
@@ -3777,7 +3784,7 @@ class PassimDetails(DetailView):
             prefix = self.prefix
 
         # Check if this is a POST or a GET request
-        if self.request.method == "POST":
+        if self.request.method == "POST" and not self.do_not_save:
             # Determine what the action is (if specified)
             action = ""
             if 'action' in initial: action = initial['action']
@@ -5389,6 +5396,48 @@ class ManuscriptDetails(PassimDetails):
         context['afternewurl'] = reverse('search_manuscript')
 
         return context
+
+
+class ManuscriptHierarchy(ManuscriptDetails):
+    newRedirect = True
+
+    def custom_init(self, instance):
+        errHandle = ErrHandle()
+
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("manuscript_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+            # Get the [hlist] value
+            if 'manu-hlist' in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd['manu-hlist'])
+                with transaction.atomic():
+                    for item in hlist:
+                        bNeedSaving = False
+                        # Get the sermon of this item
+                        sermon = SermonDescr.objects.filter(id=item['id']).first()
+                        order = int(item['nodeid']) -1
+                        parent_order = int(item['childof']) - 1
+                        parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
+                        # Check if anytyhing changed
+                        if sermon.order != order:
+                            sermon.order = order
+                            bNeedSaving =True
+                        if sermon.parent is not parent:
+                            sermon.parent = parent
+                            bNeedSaving = True
+                        # Do we need to save this one?
+                        if bNeedSaving:
+                            sermon.save()
+
+            return True
+        except:
+            msg = errHandle.get_error_message()
+            errHandle.DoError("ManuscriptHierarchy")
+            return False
 
 
 class ManuscriptListView(BasicListView):

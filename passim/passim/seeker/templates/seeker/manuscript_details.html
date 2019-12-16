@@ -88,12 +88,55 @@
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
             </div>
 
+            <!-- Keywords -->
             <div class="row">
               <!-- Room for the keywords attached to this manuscript -->
               <div class="col-md-3">
                 <div id="manuscript_kwset" class="post-load hidden" targeturl="{% url 'manu_kwset' pk=manuForm.instance.id %}" >
                   <!-- The wait symbol will be overwritten -->
                   <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hidden modal trigger button -->
+            <div class="hidden">
+              <button id="sermon_manipulate" type="button" class="btn" data-toggle="modal" data-target="#sermon_hierarchy">Hierarchy</button>
+            </div>
+
+            <!-- Modal form that shows the manipulation buttons to move something around -->
+            <div id="sermon_hierarchy" class="modal fade" role="dialog">
+              <div class="modal-dialog modal-sm" style="width: 100px;">
+                <!-- Modal content -->
+                <div class="modal-content">
+                  <div class="modal-header" style="background-color: goldenrod;">
+                    <a class="btn btn-xs jumbo-2" role="button"
+                       title="Save the new hierarchy"
+                       onclick="ru.passim.seeker.sermon_move('save');"
+                       ><span class="glyphicon glyphicon-ok"></span>&nbsp;Save
+                    </a>
+                  </div>
+                  <div class="modal-body modal-dragpoint">
+                    <table>
+                      <tbody>
+                        <tr>
+                          <td>&nbsp;</td>
+                          <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('up');"><span class="glyphicon glyphicon-arrow-up"></span></a></td>
+                          <td>&nbsp;</td>
+                        </tr>
+                        <tr>
+                          <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('left');"><span class="glyphicon glyphicon-arrow-left"></span></a></td>
+                          <td><a class="close btn btn-xs jumbo-1" title="Close" role="button" data-dismiss="modal" style="padding-left: 1px;padding-right: 1px;" onclick="ru.passim.seeker.sermon_move('close', this);"><span class="glyphicon glyphicon-remove"></span></a></td>
+                          <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('right');"><span class="glyphicon glyphicon-arrow-right"></span></a></td>
+                        </tr>
+                        <tr>
+                          <td>&nbsp;</td>
+                          <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('down');"><span class="glyphicon glyphicon-arrow-down"></span></a></td>
+                          <td>&nbsp;</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -123,6 +166,14 @@
                     <form action="{% url 'sermon_details' %}" method="post" id="create_new_sermon">
                       {% csrf_token %}
                       <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
+                    </form>
+                  </div>
+
+                  <!-- Hidden hierarchy submit form -->
+                  <div class="hidden">
+                    <form id="save_new_hierarchy" method="post" action="{% url 'manuscript_hierarchy' pk=manuForm.instance.id %}">
+                      {% csrf_token %}
+                      <input type="text" id="id_manu-hlist" name="manu-hlist" value="" />
                     </form>
                   </div>
 
@@ -156,13 +207,13 @@
                   {% else %}
 
                     <!-- A table to show all the sermons of this manuscript -->
-                    <table id="sermon_list" class="func-view">
+                    <table id="sermon_list" class="func-view" >
                       <thead><tr><th colspan="{{maxdepth|add:1}}">Details of this manuscript's {{sermon_count}} items</th><th>id</th></tr></thead>
                       <tbody>
                         <!-- Use the formset to show the sermons related to this manuscript -->
                         {% for sermon in sermon_list %}
                           <!-- Show the details of this item -->
-                          <tr class="form-row {% if sermon.level > 1 %}hidden{% endif %}" nodeid="{{sermon.nodeid}}" childof="{{sermon.childof}}">
+                          <tr class="form-row {% if sermon.level > 1 %}hidden{% endif %}" nodeid="{{sermon.nodeid}}" childof="{{sermon.childof}}" sermonid="{{sermon.obj.id}}">
                             {% if sermon.group %}
                               {% if sermon.level > 1 %}
                                 <!-- Indicate level depth -->
@@ -180,14 +231,18 @@
                             <td id="sermon-number-{{forloop.counter}}" colspan="{% if sermon.group %}{{sermon.cols|add:1}}{% else %}{{sermon.cols}}{% endif %}" 
                                 class="clickable"
                                 style="width: 100%;" targeturl="{{sermon.obj.target}}" number="{{forloop.counter}}">
-                              <span style="font-size: small; color: darkblue;">{{forloop.counter}}</span>
+                              <span class="arg-nodeid">{{forloop.counter}}</span>
                               <code>{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
                               <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
                                 <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
                               </a>
 
                             </td>
-                            <td class="tdnowrap">{{sermon.obj.id}}</td>
+
+                            <!-- The ID of the sermon: this is used for selecting and de-selecting a row -->
+                            <td class="tdnowrap clickable selectable" title="Select or de-select this row"
+                                onclick="ru.passim.seeker.form_row_select(this);"
+                                >{{sermon.obj.id}}</td>
                           </tr>
                         {% endfor %}
 

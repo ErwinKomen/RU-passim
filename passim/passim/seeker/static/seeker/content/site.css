@@ -918,6 +918,10 @@ td.arg-pre:hover {
   background-color: lightgoldenrodyellow;
   color: darkblue;
 }
+td.arg-nodeid {
+  font-size: smaller; 
+  color: darkblue;
+}
 td.arg-text {
   background-color: lightgray;
   color: darkblue;
@@ -1249,6 +1253,13 @@ a.sermon:link, a.sermon:visited {
 div.view-mode a {
   text-decoration: none;
   color: inherit;
+}
+
+tr.selected > td.selectable {
+  background-color: yellow;
+}
+tr.selected > td.selectable:hover {
+  background-color: greenyellow;
 }
 
 
