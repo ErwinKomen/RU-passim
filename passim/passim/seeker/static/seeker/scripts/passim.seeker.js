@@ -74,7 +74,7 @@ var ru = (function ($, ru) {
           oBound['y'] += document.documentElement.scrollTop || document.body.scrollTop;
           return oBound;
         } catch (ex) {
-          private_methods.showError("fitFeatureBox", ex);
+          private_methods.errMsg("fitFeatureBox", ex);
           return oBound;
         }
       },
@@ -106,7 +106,7 @@ var ru = (function ($, ru) {
           // Failure
           return false;
         } catch (ex) {
-          private_methods.showError("is_in_list", ex);
+          private_methods.errMsg("is_in_list", ex);
           return false;
         }
       },
@@ -131,7 +131,7 @@ var ru = (function ($, ru) {
           // Failure
           return "";
         } catch (ex) {
-          private_methods.showError("get_list_value", ex);
+          private_methods.errMsg("get_list_value", ex);
           return "";
         }
       },
@@ -158,7 +158,7 @@ var ru = (function ($, ru) {
           // Failure
           return false;
         } catch (ex) {
-          private_methods.showError("set_list_value", ex);
+          private_methods.errMsg("set_list_value", ex);
           return false;
         }
       },
@@ -247,8 +247,336 @@ var ru = (function ($, ru) {
 
           return lData.join("\n");
         } catch (ex) {
-          private_methods.showError("prepend_styles", ex);
+          private_methods.errMsg("prepend_styles", ex);
           return "";
+        }
+      },
+
+      /**
+       * sermon_tree
+       *    Convert [elTable] into a correct TREE structure
+       * 
+       * @param {el}     elTable
+       * @param {parent} the [nodeid] of the parent - if defined
+       * @returns {object}
+       */
+      sermon_tree: function (elTable, row) {
+        var oTree = {},
+            previous = null,
+            parent = null,
+            children = [],
+            select = [],
+            rowidx = -1,
+            nodeid = "",
+            sermonid = "",
+            search = "";
+
+        try {
+          // What is the node we have?
+          if (row === undefined) {
+            // We need to get the first node in the table
+            select = $(elTable).find("tr.form-row");
+            if (select.length > 0) {
+              row = select.first();
+              nodeid = $(row).attr("childof");
+              sermonid = "";
+              row = null;
+            }
+          } else {
+            // Get details 
+            sermonid = $(row).attr("sermonid");
+            nodeid = $(row).attr("nodeid");
+            rowidx = $(elTable).find("tr").index(row);
+          }
+
+          // Can we continue?
+          if (nodeid !== "") {
+
+            // Fill in the details of this node
+            oTree['sermonid'] = sermonid;
+            oTree['rowidx'] = rowidx;
+            oTree['row'] = row;
+            oTree['parent'] = null;
+            oTree['next'] = null;
+            oTree['prev'] = null;
+            oTree['firstchild'] = null;
+
+            // Look for children
+            children = $(elTable).find("tr.form-row[childof='" + nodeid + "']");
+
+            // Are there children?
+            if (children.length > 0) {
+              oTree['child'] = []
+              // Walk all the children of this parent
+              previous = null;
+              children.each(function (idx, el) {
+                var oChild;
+
+                // Fill in the details of this child
+                oChild = private_methods.sermon_tree(elTable, el);
+                if (oChild !== null) {
+                  // Is this the first child?
+                  if (idx === 0) { oTree['firstchild'] = oChild; }
+                  // Normal processing
+                  oChild['parent'] = oTree;
+                  oChild['prev'] = previous;
+                  // Add this child to my children
+                  oTree['child'].push(oChild);
+                  if (previous !== null) {
+                    previous['next'] = oChild;
+                  }
+                  // Keep track of the previous
+                  previous = oChild;
+                }
+              });
+            }
+          }
+
+
+          // Return the result
+          return oTree;
+        } catch (ex) {
+          private_methods.errMsg("sermon_tree", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_down
+       *    Move nodeid one place down
+       * 
+       * @param {obj} oTree
+       * @param {tr}  row
+       * @returns {list}
+       */
+      sermon_down: function (oTree, row) {
+        var sermonid = "",
+            i = 0,
+            child = [],
+            parent = null,
+            next = null,
+            prev = null,
+            node = null;
+
+        try {
+          // Get the sermonid in the row
+          sermonid = $(row).attr("sermonid");
+
+          // Find the sermon in the tree
+          node = private_methods.sermon_node(oTree, sermonid);
+          if (node !== null) {
+            // We found the node with this sermon
+            // Find the next sibling of this node
+            next = node['next'];
+            prev = node['prev'];
+            if (prev !== null) {
+              prev['next'] = next;
+            }
+            if (next !== null) {
+              // There is a 'next' sibling, so we can go past it
+              node['next'] = next['next'];
+              next['next'] = node;
+              next['prev'] = node['prev'];
+              node['prev'] = next;
+              // Keep track of firstchild
+              if (node['prev'] === null) {
+                node['parent']['firstchild'] = node;
+              } else if (next['prev'] === null) {
+                next['parent']['firstchild'] = next;
+              }
+            }
+            // Re-arrange the list of children in the parent
+            parent = node['parent'];
+            next = parent['firstchild'];
+            child = [];
+            while (next !== null) {
+              child.push(next);
+              next = next['next'];
+            }
+            parent['child'] = child;
+          }
+
+          // Return the result
+          return oTree;
+        } catch (ex) {
+          private_methods.errMsg("sermon_down", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_reorder
+       *    Order the surface form of the table in accordance with the tree
+       * 
+       * @param {obj} oTree
+       * @returns {bool}
+       */
+      sermon_reorder: function (elTable, oTree) {
+        var lst_this = [],
+            prevtr = null,
+            oNode = null,
+            row = null,
+            i = 0;
+
+        try {
+          // Get a list of nodes
+          private_methods.sermon_list(oTree, lst_this);
+
+          // Walk the list
+          for (i = 0; i < lst_this.length; i++) {
+            oNode = lst_this[i];
+            if (prevtr === null) {
+              // Is this a good one?
+              if (oNode['row'] !== null) {
+                // This must be the first visible child 
+                // See: https://stackoverflow.com/questions/2007357/how-to-set-dom-element-as-the-first-child
+                // if (elTable.firstChild !== )
+              }
+            }
+          }
+
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_reorder", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_list
+       *    Create a list of sub nodes
+       * 
+       * @param {obj}  oNode
+       * @parem {list} lst_this
+       * @returns {bool}
+       */
+      sermon_list: function (oNode, lst_this) {
+        var next = null,
+            i = 0,
+            child = [];
+
+        try {
+          // Add myself to the list
+          lst_this.push(oNode)
+          // Get my children
+          next = oNode['firstchild'];
+          while (next !== null) {
+            private_methods.sermon_list(next, lst_this);
+            //for (i = 0; i < child.length; i++) {
+            //  lst_this.push(child[i]);
+            //}
+            next = next['next'];
+          }
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_list", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_simple
+       *    Simple text representation of this node
+       * 
+       * @param {obj} oNode
+       * @parem {int} level
+       * @returns {text}
+       */
+      sermon_simple: function(oNode, level) {
+        var lHtml = [],
+            next = null,
+            spaces = "";
+
+        try {
+          if (level === undefined) { level = 0; }
+          // Print this node
+          spaces = Array( level * 2 +1).join(" ");
+          lHtml.push(spaces + oNode['sermonid'] + "\t"+ oNode['rowidx']);
+          // Treat children
+          next = oNode['firstchild'];
+          while (next !== null) {
+            lHtml.push(private_methods.sermon_simple(next, level + 1));
+            next = next['next'];
+          }
+          return lHtml.join("\n");
+        } catch (ex) {
+          private_methods.errMsg("sermon_simple", ex);
+        }
+      },
+
+      /**
+       * sermon_node
+       *    Find the node with the identified sermonid
+       * 
+       * @param {obj} node
+       * @param {id}  sermonid
+       * @returns {node}
+       */
+      sermon_node: function (node, sermonid) {
+        var child = null,
+            children = [],
+            i = 0,
+            response = null;
+
+        try {
+          // Validate
+          if (node === null) return null;
+
+          // Is this the one?
+          if (node['sermonid'] === sermonid) {
+            return node;
+          }
+
+          // Check the children
+          if ('child' in node) {
+            children = node['child'];
+            for (i = 0; i < children.length; i++) {
+              child = children[i];
+              response = private_methods.sermon_node(child, sermonid);
+              if (response !== null) {
+                return response;
+              }
+            }
+          }
+          // Getting here means no result
+          return null;
+        } catch (ex) {
+          private_methods.errMsg("sermon_node", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_sibling
+       *    Within [elTable] look for rows that are under [childof] and before [nodeid]
+       * 
+       * @param {el}  elTable
+       * @param {int} nodeid
+       * @param {int} childof
+       * @returns {list}
+       */
+      sermon_sibling: function (elTable, nodeid, childof, order) {
+        var sibling = [];
+
+        try {
+          $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
+            var thisid = $(el).attr("nodeid");
+
+            if (thisid !== undefined && thisid !== "") {
+              switch (order) {
+                case "preceding":
+                  if (parseInt(thisid, 10) < nodeid) { sibling.push(el); }
+                  break;
+                case 'following':
+                  if (parseInt(thisid, 10) > nodeid) { sibling.push(el); }
+                  break;
+              }
+            }
+          });
+          return sibling;
+        } catch (ex) {
+          private_methods.errMsg("sermon_sibling", ex);
+          return [];
         }
       },
 
@@ -263,9 +591,13 @@ var ru = (function ($, ru) {
       sermon_exchange: function (elSrc, elDst) {
         var nodesrcid = -1,
             nodedstid = -1,
-            countsrc = -1,
-            countdst = -1,
+            highid = -1,
+            lowid = -1,
             children = [],
+            counter = 1,
+            mapping = {},
+            oTree = {},
+            method = "new",
             elTable = null;
 
         try {
@@ -275,57 +607,181 @@ var ru = (function ($, ru) {
           // Get the current values
           nodesrcid = parseInt($(elSrc).attr("nodeid"), 10);
           nodedstid = parseInt($(elDst).attr("nodeid"), 10);
-          countsrc = parseInt($(elSrc).find(".arg-nodeid").first().text(), 10);
-          countdst = parseInt($(elDst).find(".arg-nodeid").first().text(), 10);
 
-          // Exchange source and destination 
-          $(elSrc).attr("nodeid", nodedstid);
-          $(elDst).attr("nodeid", nodesrcid);
-          $(elSrc).find(".arg-nodeid").first().text(countdst);
-          $(elDst).find(".arg-nodeid").first().text(countsrc);
+          switch (method) {
+            case "old":
+              // Exchange source and destination 
+              $(elSrc).attr("nodeid", nodedstid);
+              $(elDst).attr("nodeid", nodesrcid);
 
-          // Change all the children of the original source
-          $(elTable).find("tr.form-row").each(function (idx, el) {
-            var sNodeSrc = nodesrcid.toString(),
-                sNodeDst = nodedstid.toString();
+              // Change all the children of the original source
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var sNodeSrc = nodesrcid.toString(),
+                    sNodeDst = nodedstid.toString();
 
-            // Is this row a child of source?
-            if ($(el).attr("childof") === sNodeSrc) {
-              $(el).attr("childof", sNodeDst);
-              children.push(el);
-            } else if ($(el).attr("childof") === sNodeDst) {
-              $(el).attr("childof", sNodeSrc);
-              children.push(el);
-            }
-          });
+                // Is this row a child of source?
+                if ($(el).attr("childof") === sNodeSrc) {
+                  $(el).attr("childof", sNodeDst);
+                  children.push(el);
+                } else if ($(el).attr("childof") === sNodeDst) {
+                  $(el).attr("childof", sNodeSrc);
+                  children.push(el);
+                }
+              });
 
-          // Determine where to move
-          if (nodesrcid < nodedstid) {
-            // We are moving a node 'down'
-            if (children.length === 0) {
-              // No children: simple moving
-              elSrc.insertAfter(elDst);
-            } else {
-              // Move after the last child
-              elSrc.insertAfter(children[children.length - 1]);
-            }
-          } else {
-            // We are moving a node 'up'
-            if (children.length === 0) {
-              // No children: simple moving
-              elSrc.insertBefore(elDst);
-            } else {
-              // Move before the first
-              elSrc.insertBefore(elDst);
-              // elSrc.insertBefore(children[0]);
-            }
+              // Determine where to move
+              if (nodesrcid < nodedstid) {
+                // We are moving a node 'down'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertAfter(elDst);
+                } else {
+                  // Move after the last child
+                  elSrc.insertAfter(children[children.length - 1]);
+                }
+              } else {
+                // We are moving a node 'up'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertBefore(elDst);
+                } else {
+                  // Move before the first
+                  elSrc.insertBefore(elDst);
+                  // elSrc.insertBefore(children[0]);
+                }
+              }
+
+              break;
+            case "attempt":
+              // Determine the correct interval
+              if (nodesrcid < nodedstid) {
+                highid = nodesrcid; lowid = nodedstid;
+              } else {
+                highid = nodedstid; lowid = nodesrcid;
+              }
+
+              // Determine where to move
+              if (nodesrcid < nodedstid) {
+                // We are moving a node 'down'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertAfter(elDst);
+                } else {
+                  // Move after the last child
+                  elSrc.insertAfter(children[children.length - 1]);
+                }
+              } else {
+                // We are moving a node 'up'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertBefore(elDst);
+                } else {
+                  // Move before the first
+                  elSrc.insertBefore(elDst);
+                  // elSrc.insertBefore(children[0]);
+                }
+              }
+
+              // Treat all the rows that need it
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var nodeid = parseInt($(el).attr("nodeid"), 10);
+
+                // Find out where we should be
+                counter += 1;
+                // Make a mapping if needed
+                if (nodeid !== counter) {
+                  mapping[nodeid.toString()] = counter;
+                }
+              });
+
+              // Now apply the mapping
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var nodeid = $(el).attr("nodeid"),
+                    childof = $(el).attr("childof");
+
+                // Check if a mapping is needed
+                if (nodeid in mapping) {
+                  $(el).attr("nodeid", mapping[nodeid]);
+                }
+                if (childof in mapping) {
+                  $(el).attr("childof", mapping[childof])
+                }
+                
+              });
+
+              break;
+            case "new":
+              // ================ TESTING ==================
+
+              // Create a Tree from the sermons
+              oTree = private_methods.sermon_tree(elTable);
+              // move 
+              break;
           }
+          
+          // Re-number the sermon list
+          private_methods.sermon_renumber(elTable);
 
           // Return positively 
           return true
         } catch (ex) {
-          private_methods.showError("sermon_exchange", ex);
+          private_methods.errMsg("sermon_exchange", ex);
           return false;
+        }
+      },
+
+      /**
+       * sermon_renumber
+       *    Re-number the sermons in the list of current table rows
+       * 
+       * @param {el} elTable
+       * @returns {bool}
+       */
+      sermon_renumber: function (elTable) {
+        var counter = 1;
+
+        try {
+          // Get list of current hierarchy
+          $(elTable).find("tr.form-row").each(function (idx, el) {
+            var argnode = null;
+
+            argnode = $(el).find(".arg-nodeid");
+            if (argnode.length > 0) {
+              argnode.first().text(counter++);
+            }
+          });
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_renumber", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_hlist
+       *    Make an object list of the current table rows contents
+       * 
+       * @param {el} elTable
+       * @returns {bool}
+       */
+      sermon_hlist: function (elTable) {
+        var hList = [];
+
+        try {
+          // Get list of current hierarchy
+          $(elTable).find("tr.form-row").each(function (idx, el) {
+            var sermonid, nodeid, childof, oNew = {};
+
+            sermonid = $(el).attr("sermonid");
+            nodeid = $(el).attr("nodeid");
+            childof = $(el).attr("childof");
+            oNew = { id: sermonid, nodeid: nodeid, childof: childof };
+            hList.push(oNew);
+          });
+          return hList;
+        } catch (ex) {
+          private_methods.errMsg("sermon_hlist", ex);
+          return [];
         }
       },
 
@@ -355,11 +811,12 @@ var ru = (function ($, ru) {
           oBound['y'] += document.documentElement.scrollTop || document.body.scrollTop;
           return oBound;
         } catch (ex) {
-          private_methods.showError("screenCoordsForRect", ex);
+          private_methods.errMsg("screenCoordsForRect", ex);
           return oBound;
         }
 
       },
+
       /**
        *  var_move
        *      Move variable row one step down or up
@@ -602,9 +1059,9 @@ var ru = (function ($, ru) {
             });
           });
 
-/*          $(".modal-dialog").draggable({
-            "handle": ".modal-header"
-          })*/
+          /*          $(".modal-dialog").draggable({
+                      "handle": ".modal-header"
+                    })*/
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
@@ -733,9 +1190,10 @@ var ru = (function ($, ru) {
             elRowRef = null,
             data = [],
             sibling = [],
+            oTree = null,
             targeturl = "",
+            sText = "",
             hList = [],       // List of current hierarchy
-            counter = -1,     // Value of the forloop counter
             dst = -1,         // Target count
             nodeid = -1,
             nodedstid = -1,
@@ -755,45 +1213,48 @@ var ru = (function ($, ru) {
             case "up":    // position me before my preceding sibling
               nodeid = parseInt( $(elRow).attr("nodeid"), 10);
               childof = parseInt($(elRow).attr("childof"), 10);
-              counter = parseInt($(elRow).find(".arg-nodeid").first().text());
-              // Look for preceding sibling
-              // elRowRef = $(elTable).find("tr.form-row[childof='" + childof + "'][nodeid='" + (nodeid - 1) + "']").first();
-              sibling = []
-              $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
-                var thisid = $(el).attr("nodeid");
 
-                if (thisid !== undefined && thisid !== "") {
-                  if (parseInt(thisid, 10) < nodeid) { sibling.push(el); }
+              // New method
+              if (true) {
+                // Create a tree
+                oTree = private_methods.sermon_tree(elTable);
+
+              } else {
+
+                // Look for preceding sibling
+                sibling = private_methods.sermon_sibling(elTable, nodeid, childof, 'preceding');
+                if (sibling.length > 0) {
+                  // Figure out where to go to 
+                  elRowRef = sibling[sibling.length - 1];
+                  // Move my row there
+                  private_methods.sermon_exchange(elRow, elRowRef);
                 }
-              });
-              if (sibling.length > 0) {
-                elRowRef = sibling[sibling.length-1];
-                // Move my row there
-               // elRow.insertBefore(elRowRef);
-                // Exchange the numbering
-                private_methods.sermon_exchange(elRow, elRowRef);
               }
               break;
             case "down":  // position me after my following sibling
               nodeid = parseInt($(elRow).attr("nodeid"), 10);
               childof = parseInt($(elRow).attr("childof"), 10);
-              counter = parseInt($(elRow).find(".arg-nodeid").first().text());
 
-              // Look for first following sibling
-              sibling = []
-              $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
-                var thisid = $(el).attr("nodeid");
-
-                if (thisid !== undefined && thisid !== "") {
-                  if (parseInt(thisid, 10) > nodeid) { sibling.push(el);}
+              // New method
+              if (true) {
+                // Create a tree
+                oTree = private_methods.sermon_tree(elTable);
+                sText = private_methods.sermon_simple(oTree);
+                // Move the node 'down'
+                oTree = private_methods.sermon_down(oTree, elRow);
+                sText = private_methods.sermon_simple(oTree);
+                // Re-order the list
+                private_methods.sermon_reorder(elTable, oTree);
+                // Visualize the new constellation
+              } else {
+                // Look for first following sibling
+                sibling = private_methods.sermon_sibling(elTable, nodeid, childof, 'following');
+                if (sibling.length > 0) {
+                  // Figure out where to go to 
+                  elRowRef = sibling[0];
+                  // Move my row there
+                  private_methods.sermon_exchange(elRow, elRowRef);
                 }
-              });
-              if (sibling.length > 0) {
-                elRowRef = sibling[0];
-                // Move my row there
-                //elRow.insertAfter(elRowRef);
-                // Exchange the numbering
-                private_methods.sermon_exchange(elRow, elRowRef);
               }
               break;
             case "left":  // let me become a child of my grandparent, positioned AFTER my parent
@@ -802,16 +1263,8 @@ var ru = (function ($, ru) {
               break;
             case "save":  // Get an adapted list of the hierarchy, post to the server and receive response
               // Get list of current hierarchy
-              $(elTable).find("tr.form-row").each(function (idx, el) {
-                var sermonid, nodeid, childof, oNew = {};
-
-                sermonid = $(el).attr("sermonid");
-                nodeid = $(el).attr("nodeid");
-                childof = $(el).attr("childof");
-                oNew = { id: sermonid, nodeid: nodeid, childof: childof };
-                hList.push(oNew);
-              });
-              // Set the value
+              hList = private_methods.sermon_hlist(elTable);
+              // Set the <input> value to return the contents of [hList]
               $("#id_manu-hlist").val(JSON.stringify(hList));
               // Send it onwards
               $("#save_new_hierarchy").submit();
