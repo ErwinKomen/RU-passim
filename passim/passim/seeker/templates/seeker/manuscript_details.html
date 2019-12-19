@@ -101,7 +101,10 @@
 
             <!-- Hidden modal trigger button -->
             <div class="hidden">
-              <button id="sermon_manipulate" type="button" class="btn" data-toggle="modal" data-target="#sermon_hierarchy">Hierarchy</button>
+              <button id="sermon_manipulate" type="button" 
+                      class="btn" data-toggle="modal" data-target="#sermon_hierarchy"
+                      onclick="ru.passim.seeker.sermon_copytree();"
+                      >Hierarchy</button>
             </div>
 
             <!-- Modal form that shows the manipulation buttons to move something around -->
@@ -249,6 +252,15 @@
                       </tbody>
                     </table>
 
+                    <!-- A place where the Sermons are put in hierarchically organized <div> elements -->
+                    <div id="sermon_tree" class="hidden">
+                      <!-- This is where the sermon hierarchy is put-->
+                      {% for sermon in sermon_list %}
+                        {% if sermon.childof == 1 %}
+                          {% include 'seeker/sermon_one.html' with sermon=sermon sermon_list=sermon_list level=1 %}
+                        {% endif %}
+                      {% endfor %}
+                    </div>
 
                   {% endif %}
                 </div>
@@ -275,6 +287,7 @@
   </div>
 
 <script>
+  ru.passim.seeker.sermon_drawtree();
   ru.passim.init_event_listeners();
   ru.passim.seeker.init_events();
 </script>

@@ -4,6 +4,14 @@
 var jQuery = django.jQuery;
 var $ = jQuery;
 
+String.prototype.format = function () {
+  var formatted = this;
+  for (var arg in arguments) {
+    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+  }
+  return formatted;
+};
+
 var ru = (function ($, ru) {
   "use strict";
 
@@ -78,6 +86,7 @@ var ru = (function ($, ru) {
           return oBound;
         }
       },
+
       /**
        * methodNotVisibleFromOutside - example of a private method
        * @returns {String}
@@ -249,6 +258,187 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("prepend_styles", ex);
           return "";
+        }
+      },
+
+      /**
+       * sermon_treetotable
+       *    Convert the <div> oriented tree structure in [elRoot] into a list
+       *      of appropriate <tr> items under <elTable>
+       * 
+       * @param {el}  elRoot
+       * @param {el}  elTable
+       * @returns {bool}
+       */
+      sermon_treetotable: function (elRoot, elTable) {
+        var elTbody = null,
+            rows = [];
+
+        try {
+          // Find the <tbody> element
+          elTbody = $(elTable).find("tbody").first();
+          if (elTbody.length === 0) return false;
+
+          // Get a list of the <div> elements
+          rows = private_methods.sermon_treelist(elRoot);
+
+          // Replace the rows that are there now with the new ones
+          $(elTbody).html("");
+          $(elTbody).html(rows.join("\n"));
+
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_treetotable", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_treelist
+       *    Convert the <div> oriented tree structure in [elDiv] into a list
+       *      of appropriate <tr> items under <elTable>
+       * 
+       * @param {el}  elDiv
+       * @returns {list}
+       */
+      sermon_treelist: function (elDiv) {
+        var elTbody = null,
+            elTd = null,
+            elSermon = null,
+            elParent = null,
+            sermons = [],
+            sermonid = "",
+            targeturl = "",
+            hidden = "",
+            nodeid = -1,
+            childof = -1,
+            maxdepth = -1,
+            hasChildren = false,
+            colspan = 0,
+            td = "",
+            tr = "",
+            lTr = [],
+            level = -1,
+            idx = -1,
+            lBack = [];
+
+        try {
+          // Get all the sermons
+          sermons = $(elDiv).find("div.tree");
+
+          // Find the maximum depth
+          for (idx = 0; idx < sermons.length; idx++) {
+            elSermon = sermons[idx];
+            level = parseInt($(elSermon).attr("level"), 10);
+            if (level > maxdepth) { maxdepth = level;}
+          }
+
+          // Walk all the sermons
+          for (idx = 0; idx < sermons.length; idx++) {
+            elSermon = sermons[idx];
+            // The nodeid starts at 2, because '1' is reserved for the root element as parent
+            nodeid = idx + 2;
+            $(elSermon).attr("nodeid", nodeid);
+            // Get the parent
+            elParent = $(elSermon).parent(".tree");
+            if (elParent === null || elParent.length === 0) {
+              childof = "1";
+            } else {
+              childof = $(elParent).attr("nodeid");
+            }
+
+            // Get the parameters from the current sermon
+            sermonid = $(elSermon).attr("sermonid");
+            level = $(elSermon).attr("level");
+            elTd = $(elSermon).find("span.td").first();
+            td = $(elTd).html();
+            targeturl = $(elTd).attr("targeturl");
+            hidden = (level === "1") ? "" : " hidden";
+            hasChildren = ($(elSermon).children("div.tree").length > 0);
+
+            // Create the <tr> myself
+            lTr = [];
+            lTr.push("<tr class='form-row{0}' nodeid='{1}' childof='{2}' sermonid='{3}'>".format(hidden, nodeid, childof, sermonid));
+
+            if (hasChildren) {
+              if (level > 1) {
+                // Indicate level depth
+                lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level-1, (level-1) * 20));
+              }
+              // This starts a new level
+              lTr.push("  <td class='arg-plus' style='min-width: 20px;' onclick='crpstudio.htable.plus_click(this, \"func-inline\");'>+</td>");
+            } else {
+              // Indicate level depth
+              lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level, level * 20));
+            }
+
+            // The actual content
+            colspan = maxdepth - level + 1;
+            // if (hasChildren) { colspan += 1;}
+            lTr.push("  <td id='sermon-number-{0}' colspan='{1}' class='clickable' style='width: 100%;' targeturl='{2}' number='{0}'>".format(idx + 1, colspan, targeturl));
+            lTr.push("     <span class='arg-nodeid'>{0}</span>".format(idx + 1));
+            lTr.push(td);
+            lTr.push("  </td>");
+
+            // The ID of the sermon: this is used for selecting and de-selecting a row
+            lTr.push("  <td class='tdnowrap clickable selectable' title='Select or de-select this row'");
+            lTr.push("      onclick='ru.passim.seeker.form_row_select(this);'>{0}</td>".format(sermonid));
+
+            // Finish the <tr>
+            lTr.push("</tr>");
+            tr = lTr.join("\n");
+
+            // Add to the list
+            lBack.push(tr);
+          }
+
+          return lBack;
+        } catch (ex) {
+          private_methods.errMsg("sermon_treelist", ex);
+          return [];
+        }
+      },
+
+      /**
+       * sermon_tabletotree
+       *    Convert [elTable] into a DOM <div> oriented tree structure in [elRoot]
+       * 
+       * @param {el}  elTable
+       * @param {el}  elRoot
+       * @returns {bool}
+       */
+      sermon_tabletotree: function (elTable, elRoot) {
+        var rows = [],
+            lHtml = [],
+            level = 0,
+            elContent = null,   // The <td> with the content
+            sermonid = "",
+            next = null;
+
+        try {
+          // Visit all the rows with a top element
+          rows = $(elTable).find("tr.form-row[childof='1']");
+          rows.each(function (idx, el) {
+            sermonid = $(el).attr("sermonid");
+            // Start adding this row as a <div>
+            lHtml.push("<div sermonid=\"" + sermonid + "\" level=\""+level+"\">");
+            // Add the row information
+            elContent = $(el).find("td[id|='sermon-number']").first();
+            lHtml.push("<span class='td'>");
+            lHtml.push("  " + $(elContent).html());
+            lHtml.push("</span>");
+
+            // Finish this sermon
+            lHtml.push("</div>")
+          });
+
+          // Position the resulting HTML
+          $(elRoot).html(lHtml.join("\n"));
+
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_tabletotree", ex);
+          return false;
         }
       },
 
@@ -1273,6 +1463,26 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("sermon_move", ex);
+        }
+      },
+
+      /**
+       *  sermon_drawtree
+       *      Copy the list of sermons to the div with id=sermon_tree
+       *
+       */
+      sermon_drawtree: function () {
+        var elRoot = null,
+            elTable = null;
+
+        try {
+          elTable = $("#sermon_list");
+          elRoot = $("#sermon_tree");
+          // Create the tree from [elTable] to [elRoot]
+          private_methods.sermon_treetotable(elRoot, elTable);
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_drawtree", ex);
         }
       },
 

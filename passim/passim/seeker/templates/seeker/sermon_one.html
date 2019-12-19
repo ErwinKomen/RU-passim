@@ -1,0 +1,16 @@
+﻿{% load i18n %}
+
+    <!-- Information on one sermon-->
+    <div sermonid="{{sermon.obj.id}}" level="{{level}}" class="tree">
+      <span class="td" targeturl="{{sermon.obj.target}}">
+        <code>{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
+        <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
+          <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
+        </a>
+      </span>
+      {% for child in sermon_list %}
+        {% if child.obj.parent and child.obj.parent.id == sermon.obj.id %}
+          {% include 'seeker/sermon_one.html' with sermon=child sermon_list=sermon_list level=level|add:1 %}
+        {% endif %}
+      {% endfor %}
+    </div>
