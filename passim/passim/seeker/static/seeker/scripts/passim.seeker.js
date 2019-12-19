@@ -268,23 +268,37 @@ var ru = (function ($, ru) {
        * 
        * @param {el}  elRoot
        * @param {el}  elTable
+       * @param {el}  selectedid (optional)
        * @returns {bool}
        */
-      sermon_treetotable: function (elRoot, elTable) {
+      sermon_treetotable: function (elRoot, elTable, selectedid) {
         var elTbody = null,
+            elSel = null,
+            elAnc = null,
+            sermonid = "",
             rows = [];
 
         try {
-          // Find the <tbody> element
-          elTbody = $(elTable).find("tbody").first();
-          if (elTbody.length === 0) return false;
-
           // Get a list of the <div> elements
-          rows = private_methods.sermon_treelist(elRoot);
+          rows = private_methods.sermon_treelist(elRoot, selectedid);
 
           // Replace the rows that are there now with the new ones
-          $(elTbody).html("");
-          $(elTbody).html(rows.join("\n"));
+          $(elTable).html("");
+          $(elTable).html(rows.join("\n"));
+
+          // Possibly find the <div.tree> that is selected
+          if (selectedid !== undefined && selectedid !== "") {
+            elSel = $(elRoot).find("div.tree[sermonid={0}]".format(selectedid));
+            // From here find the ancestor
+            elAnc = $(elSel).parentsUntil("#sermon_tree");
+            // Now find all the <div.tree> that are my descendants
+            $(elAnc).find("div.tree").each(function (idx, el) {
+              // Get this one's sermonid
+              sermonid = $(el).attr("sermonid");
+              // Make sure the corresponding row is visible
+              $(elTable).find("tr[sermonid={0}]".format(sermonid)).first().removeClass("hidden");
+            });
+          }
 
           return true;
         } catch (ex) {
@@ -299,9 +313,10 @@ var ru = (function ($, ru) {
        *      of appropriate <tr> items under <elTable>
        * 
        * @param {el}  elDiv
+       * @param {el}  selectedid (optional)
        * @returns {list}
        */
-      sermon_treelist: function (elDiv) {
+      sermon_treelist: function (elDiv, selectedid) {
         var elTbody = null,
             elTd = null,
             elSermon = null,
@@ -310,6 +325,7 @@ var ru = (function ($, ru) {
             sermonid = "",
             targeturl = "",
             hidden = "",
+            selected = "",
             nodeid = -1,
             childof = -1,
             maxdepth = -1,
@@ -333,6 +349,10 @@ var ru = (function ($, ru) {
             if (level > maxdepth) { maxdepth = level;}
           }
 
+          // Start creating the head
+          lBack.push("<thead><tr><th colspan='{0}'>Details of this manuscript's {1} items</th><th>id</th></tr></thead>".format(maxdepth+1, sermons.length));
+          lBack.push("<tbody>");
+
           // Walk all the sermons
           for (idx = 0; idx < sermons.length; idx++) {
             elSermon = sermons[idx];
@@ -349,16 +369,20 @@ var ru = (function ($, ru) {
 
             // Get the parameters from the current sermon
             sermonid = $(elSermon).attr("sermonid");
-            level = $(elSermon).attr("level");
+            level = parseInt($(elSermon).attr("level"), 10);
             elTd = $(elSermon).find("span.td").first();
             td = $(elTd).html();
             targeturl = $(elTd).attr("targeturl");
-            hidden = (level === "1") ? "" : " hidden";
+            hidden = (level === 1) ? "" : " hidden";
             hasChildren = ($(elSermon).children("div.tree").length > 0);
+            selected = "";
+            if (selectedid !== undefined && selectedid !== "" && sermonid === selectedid) {
+              selected = " selected";
+            }
 
             // Create the <tr> myself
             lTr = [];
-            lTr.push("<tr class='form-row{0}' nodeid='{1}' childof='{2}' sermonid='{3}'>".format(hidden, nodeid, childof, sermonid));
+            lTr.push("<tr class='form-row{0}{1}' nodeid='{2}' childof='{3}' sermonid='{4}'>".format(hidden, selected, nodeid, childof, sermonid));
 
             if (hasChildren) {
               if (level > 1) {
@@ -392,6 +416,8 @@ var ru = (function ($, ru) {
             lBack.push(tr);
           }
 
+          lBack.push("</tbody>");
+
           return lBack;
         } catch (ex) {
           private_methods.errMsg("sermon_treelist", ex);
@@ -399,48 +425,6 @@ var ru = (function ($, ru) {
         }
       },
 
-      /**
-       * sermon_tabletotree
-       *    Convert [elTable] into a DOM <div> oriented tree structure in [elRoot]
-       * 
-       * @param {el}  elTable
-       * @param {el}  elRoot
-       * @returns {bool}
-       */
-      sermon_tabletotree: function (elTable, elRoot) {
-        var rows = [],
-            lHtml = [],
-            level = 0,
-            elContent = null,   // The <td> with the content
-            sermonid = "",
-            next = null;
-
-        try {
-          // Visit all the rows with a top element
-          rows = $(elTable).find("tr.form-row[childof='1']");
-          rows.each(function (idx, el) {
-            sermonid = $(el).attr("sermonid");
-            // Start adding this row as a <div>
-            lHtml.push("<div sermonid=\"" + sermonid + "\" level=\""+level+"\">");
-            // Add the row information
-            elContent = $(el).find("td[id|='sermon-number']").first();
-            lHtml.push("<span class='td'>");
-            lHtml.push("  " + $(elContent).html());
-            lHtml.push("</span>");
-
-            // Finish this sermon
-            lHtml.push("</div>")
-          });
-
-          // Position the resulting HTML
-          $(elRoot).html(lHtml.join("\n"));
-
-          return true;
-        } catch (ex) {
-          private_methods.errMsg("sermon_tabletotree", ex);
-          return false;
-        }
-      },
 
       /**
        * sermon_tree
@@ -1374,7 +1358,10 @@ var ru = (function ($, ru) {
        *
        */
       sermon_move: function (type) {
-        var elStart = null,
+        var elRoot = null,
+            elSrc = null,
+            elDst = null,
+            elStart = null,
             elTable = null,
             elRow = null,
             elRowRef = null,
@@ -1383,17 +1370,24 @@ var ru = (function ($, ru) {
             oTree = null,
             targeturl = "",
             sText = "",
+            method = "dom",   //
             hList = [],       // List of current hierarchy
             dst = -1,         // Target count
+            sermonid = "",    // The sermonid of the selected one
             nodeid = -1,
             nodedstid = -1,
+            level = -1,
             childof = -1;
 
         try {
+          // Make sure we know where the DOM is
+          elRoot = $("#sermon_tree");
+
           // Determine which row is selected
           elStart = $("#sermon_list").find("tr.selected > td.selectable").first();
           elRow = $(elStart).parent();
           elTable = $(elRow).closest("table");
+          sermonid = $(elRow).attr("sermonid");
 
           // Action depends on the type
           switch (type) {
@@ -1401,63 +1395,68 @@ var ru = (function ($, ru) {
               ru.passim.seeker.form_row_select(elStart);
               break;
             case "up":    // position me before my preceding sibling
-              nodeid = parseInt( $(elRow).attr("nodeid"), 10);
-              childof = parseInt($(elRow).attr("childof"), 10);
-
-              // New method
-              if (true) {
-                // Create a tree
-                oTree = private_methods.sermon_tree(elTable);
-
-              } else {
-
-                // Look for preceding sibling
-                sibling = private_methods.sermon_sibling(elTable, nodeid, childof, 'preceding');
-                if (sibling.length > 0) {
-                  // Figure out where to go to 
-                  elRowRef = sibling[sibling.length - 1];
-                  // Move my row there
-                  private_methods.sermon_exchange(elRow, elRowRef);
-                }
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if we have a preceding sibling
+              elDst = $(elSrc).prev("div.tree");
+              if (elDst.length > 0) {
+                $(elSrc).insertBefore(elDst);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
               }
+
               break;
             case "down":  // position me after my following sibling
-              nodeid = parseInt($(elRow).attr("nodeid"), 10);
-              childof = parseInt($(elRow).attr("childof"), 10);
-
-              // New method
-              if (true) {
-                // Create a tree
-                oTree = private_methods.sermon_tree(elTable);
-                sText = private_methods.sermon_simple(oTree);
-                // Move the node 'down'
-                oTree = private_methods.sermon_down(oTree, elRow);
-                sText = private_methods.sermon_simple(oTree);
-                // Re-order the list
-                private_methods.sermon_reorder(elTable, oTree);
-                // Visualize the new constellation
-              } else {
-                // Look for first following sibling
-                sibling = private_methods.sermon_sibling(elTable, nodeid, childof, 'following');
-                if (sibling.length > 0) {
-                  // Figure out where to go to 
-                  elRowRef = sibling[0];
-                  // Move my row there
-                  private_methods.sermon_exchange(elRow, elRowRef);
-                }
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if we have a following sibling
+              elDst = $(elSrc).next("div.tree");
+              if (elDst.length > 0) {
+                $(elSrc).insertAfter(elDst);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
               }
+
               break;
             case "left":  // let me become a child of my grandparent, positioned AFTER my parent
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if there is a parent after which I can be placed
+              elDst = $(elSrc).parent("div.tree");
+              if (elDst.length > 0) {
+                // There is a parent: put me after it
+                $(elSrc).insertAfter(elDst);
+                // Change the level
+                level = parseInt($(elSrc).attr("level"), 10);
+                $(elSrc).attr("level", level - 1);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
               break;
-            case "down":  // let me become a child of my preceding SIBLING
+            case "right":  // let me become a child of my preceding SIBLING
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if there is a preceding sibling
+              elDst = $(elSrc).prev("div.tree");
+              if (elDst.length > 0) {
+                // There is a preceding sibling: make me into its child
+                $(elDst).append(elSrc);
+                // Change the level
+                level = parseInt($(elSrc).attr("level"), 10);
+                $(elSrc).attr("level", level + 1);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
               break;
             case "save":  // Get an adapted list of the hierarchy, post to the server and receive response
               // Get list of current hierarchy
+              /*
               hList = private_methods.sermon_hlist(elTable);
               // Set the <input> value to return the contents of [hList]
               $("#id_manu-hlist").val(JSON.stringify(hList));
               // Send it onwards
               $("#save_new_hierarchy").submit();
+              */
               break;
           }
 
@@ -1471,7 +1470,7 @@ var ru = (function ($, ru) {
        *      Copy the list of sermons to the div with id=sermon_tree
        *
        */
-      sermon_drawtree: function () {
+      sermon_drawtree: function (sermonid) {
         var elRoot = null,
             elTable = null;
 
@@ -1479,7 +1478,7 @@ var ru = (function ($, ru) {
           elTable = $("#sermon_list");
           elRoot = $("#sermon_tree");
           // Create the tree from [elTable] to [elRoot]
-          private_methods.sermon_treetotable(elRoot, elTable);
+          private_methods.sermon_treetotable(elRoot, elTable, sermonid);
 
         } catch (ex) {
           private_methods.errMsg("sermon_drawtree", ex);
