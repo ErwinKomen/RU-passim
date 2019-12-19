@@ -932,6 +932,33 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sermon_hlisttree
+       *    Make an object list of the current sermon hierarchy
+       * 
+       * @param {el} elRoot
+       * @returns {bool}
+       */
+      sermon_hlisttree: function (elRoot) {
+        var hList = [];
+
+        try {
+          $(elRoot).find("div.tree").each(function (idx, el) {
+            var sermonid = "",
+                nodeid = "",
+                childof = "",
+                oNew = {};
+
+            sermonid = $(el).attr("sermonid");
+          });
+
+          return hList;
+        } catch (ex) {
+          private_methods.errMsg("sermon_hlisttree", ex);
+          return [];
+        }
+      },
+
+      /**
        * sermon_hlist
        *    Make an object list of the current table rows contents
        * 
@@ -1450,13 +1477,14 @@ var ru = (function ($, ru) {
               break;
             case "save":  // Get an adapted list of the hierarchy, post to the server and receive response
               // Get list of current hierarchy
-              /*
+              //hList = private_methods.sermon_hlisttree(elRoot);
+              ///*
               hList = private_methods.sermon_hlist(elTable);
               // Set the <input> value to return the contents of [hList]
               $("#id_manu-hlist").val(JSON.stringify(hList));
               // Send it onwards
               $("#save_new_hierarchy").submit();
-              */
+              // */
               break;
           }
 
