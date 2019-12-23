@@ -154,6 +154,17 @@ class ProjectWidget(ModelSelect2MultipleWidget):
         return Project.objects.all().order_by('name').distinct()
 
 
+class ProfileWidget(ModelSelect2MultipleWidget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
+
+
 class CollectionWidget(ModelSelect2MultipleWidget):
     model = Collection
     search_fields = [ 'name__icontains' ]
@@ -493,6 +504,8 @@ class CollectionForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -516,6 +529,7 @@ class CollectionForm(forms.ModelForm):
         self.fields['readonly'].required = False
         self.fields['url'].required = False
         self.fields['collist'].queryset = Collection.objects.all().order_by('name')
+        self.fields['ownlist'].queryset = Profile.objects.all()
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

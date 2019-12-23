@@ -5124,6 +5124,7 @@ class CollectionListView(BasicListView):
     listform = CollectionForm
     prefix = "col"
     paginate_by = 20
+    bUseFilter = True
     template_name = 'seeker/collection_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
@@ -5135,10 +5136,18 @@ class CollectionListView(BasicListView):
         {'section': '', 'filterlist': [
             {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'owner', 'fkfield': 'owner', 'infield': 'id'}]}
+            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'name' }]}
         ]
 
-
+    def adapt_search(self, fields):
+        # Check if the prjlist is identified
+        if fields['ownlist'] == None or len(fields['ownlist']) == 0:
+            # Get the user
+            user = User.objects.filter(username=self.request.user.username).first()
+            # Get to the profile of this user
+            qs = Profile.objects.filter(user=user)
+            fields['ownlist'] = qs
+        return fields
 
 
 class CollectionEdit(PassimDetails):
