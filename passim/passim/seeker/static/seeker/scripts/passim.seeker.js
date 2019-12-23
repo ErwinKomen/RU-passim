@@ -1366,6 +1366,8 @@ var ru = (function ($, ru) {
             $(elHier).removeClass("in");
             $(elHier).hide()
           } else {
+            // Make a copy of the tree as it is
+            $("#sermon_tree_copy").html($("#sermon_tree").html());
             // Select the new row
             $(elRow).addClass("selected");
             // SHow the 'Up' and 'Down' buttons if needed
@@ -1421,6 +1423,10 @@ var ru = (function ($, ru) {
           switch (type) {
             case "close": // Close the modal
               ru.passim.seeker.form_row_select(elStart);
+              // Return the stored copy
+              $("#sermon_tree").html($("#sermon_tree_copy").html());
+              // Make sure the tree is redrawn
+              ru.passim.seeker.sermon_drawtree();
               break;
             case "up":    // position me before my preceding sibling
               // Get the <div> that should be moved
