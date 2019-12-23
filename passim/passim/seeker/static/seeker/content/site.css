@@ -918,6 +918,10 @@ td.arg-pre:hover {
   background-color: lightgoldenrodyellow;
   color: darkblue;
 }
+td.arg-nodeid {
+  font-size: smaller; 
+  color: darkblue;
+}
 td.arg-text {
   background-color: lightgray;
   color: darkblue;
@@ -1234,6 +1238,12 @@ td a.nostyle {
   display: block;
 }
 
+a.sermon:link, a.sermon:visited {
+    text-decoration: inherit;
+    color: inherit;
+    cursor: inherit;
+}
+
 .signature {
   /* font-family: monospace; */
   font-size: smaller;
@@ -1243,6 +1253,13 @@ td a.nostyle {
 div.view-mode a {
   text-decoration: none;
   color: inherit;
+}
+
+tr.selected > td.selectable {
+  background-color: yellow;
+}
+tr.selected > td.selectable:hover {
+  background-color: greenyellow;
 }
 
 

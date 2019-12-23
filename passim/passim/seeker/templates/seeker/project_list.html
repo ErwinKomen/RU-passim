@@ -182,11 +182,9 @@
 
                         <!-- Number manuscripts belonging to this project -->
                         <td class="prj-number tdnowrap">
-                          {% if prjitem.freqmanu %}
-                            <a href="{% url 'search_manuscript' %}?manu-prjlist={{prjitem.id}}">
-                              <span class="badge jumbo-3 clickable" 
-                                    title="Number of manuscripts in this project">{{prjitem.freqmanu}}</span></a>
-                          {% endif %}
+                          <a href="{% url 'search_manuscript' %}?manu-prjlist={{prjitem.id}}">
+                            <span class="badge jumbo-3 clickable" 
+                                  title="Number of manuscripts in this project">{{prjitem.project_manuscripts.all.count}}</span></a>
                         </td>
 
                       </tr>
