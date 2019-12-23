@@ -5137,7 +5137,7 @@ class CollectionListView(BasicListView):
         {'section': '', 'filterlist': [
             {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'name' }]}
+            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' }]}
         ]
 
     def adapt_search(self, fields):
