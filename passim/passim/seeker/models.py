@@ -3854,6 +3854,7 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+
 class CollectionSerm(models.Model):
     """The link between a collection item and a sermon"""
     # [1] The sermon to which the collection item refers

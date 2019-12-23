@@ -5117,6 +5117,7 @@ class ProjectListView(BasicListView):
             {'filter': 'project',   'dbfield': 'name',          'keyS': 'project_ta', 'keyList': 'prjlist', 'infield': 'name' }]}
         ]
 
+
 class CollectionListView(BasicListView):
     """Search and list collections"""
 
@@ -5261,7 +5262,8 @@ class SermonSignset(BasicPart):
                                {'type': 'cl', 'name': 'Clavis'},
                                {'type': 'ot', 'name': 'Other'}]
         return context
-
+    
+    
 class SermonColset(BasicPart):
     """The set of collections that the sermon is a part of"""
     MainModel = SermonDescr
@@ -5320,9 +5322,7 @@ class SermonKwset(BasicPart):
                 has_changed = True
 
         return has_changed
-
-
-
+    
 
 class SermonEdiset(BasicPart):
     """The set of editions from the gold-sermons related to me"""
@@ -5353,9 +5353,6 @@ class SermonEdiset(BasicPart):
         context['sedi_list'] = sedi_list
 
         return context
-
-
-
 
 
 class SermonLitset(BasicPart):
@@ -5676,7 +5673,6 @@ class ManuscriptListView(BasicListView):
         return fields
   
 
-
 class ManuscriptProvset(BasicPart):
     """The set of provenances from one manuscript"""
 
@@ -5734,8 +5730,7 @@ class ManuscriptProvset(BasicPart):
                     has_changed = True
 
         return has_changed
-
-
+    
 
 class SermonGoldEdiset(BasicPart):
     """The set of critical text editions from one gold sermon""" 
@@ -5772,15 +5767,6 @@ class SermonGoldEdiset(BasicPart):
             
         return has_changed  
     
- 
-
-
-    
-
-
-
-
-
 
 class ManuscriptLitset(BasicPart):
     """The set of literature references from one manuscript"""

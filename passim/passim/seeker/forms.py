@@ -19,6 +19,170 @@ def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
         obj.fields[sFieldName].help_text = get_help(sSet)
 
 
+# ================= WIDGETS =====================================
+
+
+class ManuidWidget(ModelSelect2MultipleWidget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        return Manuscript.objects.all().order_by('idno').distinct()
+
+
+class SignatureWidget(ModelSelect2MultipleWidget):
+    model = Signature
+    search_fields = [ 'code__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        return Signature.objects.all().order_by('code').distinct()
+
+
+class KeywordWidget(ModelSelect2MultipleWidget):
+    model = Keyword
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Keyword.objects.all().order_by('name').distinct()
+
+
+class ProjectWidget(ModelSelect2MultipleWidget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
+
+
+class ProfileWidget(ModelSelect2MultipleWidget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
+
+
+class CollectionWidget(ModelSelect2MultipleWidget):
+    model = Collection
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Collection.objects.all().order_by('name').distinct()
+
+
+class ProjectOneWidget(ModelSelect2Widget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Project.objects.all().order_by('name').distinct()
+
+
+class AuthorWidget(ModelSelect2MultipleWidget):
+    model = Author
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Author.objects.all().order_by('name').distinct()
+
+
+class EditionWidget(ModelSelect2TagWidget):
+    """This allows the user to add editions--but that can only happen when the model changes to m2m"""
+
+    model = Edition
+    queryset = Edition.objects.all().order_by('name').distinct()
+    search_fields = [ 'name__icontains']
+
+    def __init__(self, *args, **kwargs):
+        response = super(EditionWidget, self).__init__(*args, **kwargs)
+
+        return response
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Edition.objects.all().order_by('name').distinct()
+
+    def value_from_datadict(self, data, files, name):
+        values = super(EditionWidget, self).value_from_datadict(data, files, name)
+
+        cleaned_values = []
+        # Walk the list and create "cleaned_values"
+        for val in values:
+            obj = None
+            if is_number(val):
+                # Find the item
+                obj = self.queryset.filter(id=val).first()
+
+            #if obj == None:
+            #    obj = self.queryset.create(name=val)
+
+            # Creating a new one is NOT going to work
+            if obj != None:
+                cleaned_values.append(obj)
+
+        ## Get all the PKs
+        #qs = self.queryset.filter(**{'pk__in': list(values)})
+        #pks = set(str(getattr(o, "pk")) for o in qs)
+        #cleaned_values = []
+        #for val in values:
+        #    if str(val) not in pks:
+        #        val = self.queryset.create(name=val).pk
+        #    cleaned_values.append(val)
+        return cleaned_values
+
+
+class EditionExistingWidget(ModelSelect2MultipleWidget):
+    """Only allow user to choose from existing editions"""
+
+    model = Edition
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Edition.objects.all().order_by('name').distinct()
+    
+
+class LocationWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.loctype)
+        # sLabel = obj.name
+        return sLabel
+
+
+# ================= FORMS =======================================
+
+
 class BootstrapAuthenticationForm(AuthenticationForm):
     """Authentication form which uses boostrap CSS."""
     username = forms.CharField(max_length=254,
@@ -108,83 +272,6 @@ class SearchManuscriptForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
     idno = forms.CharField(label=_("Idno"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
-
-
-class ManuidWidget(ModelSelect2MultipleWidget):
-    model = Manuscript
-    search_fields = [ 'idno__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.idno
-
-    def get_queryset(self):
-        return Manuscript.objects.all().order_by('idno').distinct()
-
-
-class SignatureWidget(ModelSelect2MultipleWidget):
-    model = Signature
-    search_fields = [ 'code__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.code
-
-    def get_queryset(self):
-        return Signature.objects.all().order_by('code').distinct()
-
-
-class KeywordWidget(ModelSelect2MultipleWidget):
-    model = Keyword
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Keyword.objects.all().order_by('name').distinct()
-
-
-class ProjectWidget(ModelSelect2MultipleWidget):
-    model = Project
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Project.objects.all().order_by('name').distinct()
-
-
-class ProfileWidget(ModelSelect2MultipleWidget):
-    model = Profile
-    search_fields = [ 'user__username__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.user.username
-
-    def get_queryset(self):
-        return Profile.objects.all().order_by('user__username').distinct()
-
-
-class CollectionWidget(ModelSelect2MultipleWidget):
-    model = Collection
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Collection.objects.all().order_by('name').distinct()
-
-
-class ProjectOneWidget(ModelSelect2Widget):
-    model = Project
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Project.objects.all().order_by('name').distinct()
 
 
 class SearchManuForm(forms.ModelForm):
@@ -279,77 +366,6 @@ class SearchManuForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
-
-class AuthorWidget(ModelSelect2MultipleWidget):
-    model = Author
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Author.objects.all().order_by('name').distinct()
-
-
-class EditionWidget(ModelSelect2TagWidget):
-    """This allows the user to add editions--but that can only happen when the model changes to m2m"""
-
-    model = Edition
-    queryset = Edition.objects.all().order_by('name').distinct()
-    search_fields = [ 'name__icontains']
-
-    def __init__(self, *args, **kwargs):
-        response = super(EditionWidget, self).__init__(*args, **kwargs)
-
-        return response
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
-
-    def value_from_datadict(self, data, files, name):
-        values = super(EditionWidget, self).value_from_datadict(data, files, name)
-
-        cleaned_values = []
-        # Walk the list and create "cleaned_values"
-        for val in values:
-            obj = None
-            if is_number(val):
-                # Find the item
-                obj = self.queryset.filter(id=val).first()
-
-            #if obj == None:
-            #    obj = self.queryset.create(name=val)
-
-            # Creating a new one is NOT going to work
-            if obj != None:
-                cleaned_values.append(obj)
-
-        ## Get all the PKs
-        #qs = self.queryset.filter(**{'pk__in': list(values)})
-        #pks = set(str(getattr(o, "pk")) for o in qs)
-        #cleaned_values = []
-        #for val in values:
-        #    if str(val) not in pks:
-        #        val = self.queryset.create(name=val).pk
-        #    cleaned_values.append(val)
-        return cleaned_values
-
-
-class EditionExistingWidget(ModelSelect2MultipleWidget):
-    """Only allow user to choose from existing editions"""
-
-    model = Edition
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
 
 
 class SermonForm(forms.ModelForm):
@@ -497,6 +513,7 @@ class ProjectForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
 
+
 class CollectionForm(forms.ModelForm):
     """Collection list TH: zie Project"""
 
@@ -533,9 +550,6 @@ class CollectionForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
-
-
-
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -761,8 +775,7 @@ class SermonGoldSignatureForm(forms.ModelForm):
         super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
-
-
+        
 
 class SermonGoldEditionForm(forms.ModelForm):
     litref = forms.CharField(required=False)
@@ -1124,16 +1137,6 @@ class ManuscriptForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
-
-
-class LocationWidget(ModelSelect2MultipleWidget):
-    model = Location
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        sLabel = "{} ({})".format(obj.name, obj.loctype)
-        # sLabel = obj.name
-        return sLabel
 
 
 class LocationForm(forms.ModelForm):
