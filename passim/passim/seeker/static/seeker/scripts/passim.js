@@ -74,6 +74,8 @@ var ru = (function ($, ru) {
         loc_editionL = [],
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
         loc_keywordL = [],
+        loc_collection = [],           // Collections
+        loc_collectionL = [],
         loc_elInput = null,
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_cnrs_manu_url = "http://medium-avance.irht.cnrs.fr/Manuscrits/manuscritforetablissement",
@@ -466,6 +468,26 @@ var ru = (function ($, ru) {
           }
         });
 
+          // Bloodhound: collection
+          loc_collection = new Bloodhound({
+              datumTokenizer: function (myObj) {
+                  return myObj;
+              },
+              queryTokenizer: function (myObj) {
+                  return myObj;
+              },
+              // loc_countries will be an array of collections
+              local: loc_collectionL,
+              prefetch: { url: base_url + 'api/collections/', cache: true },
+              remote: {
+                  url: base_url + 'api/collections/?name=',
+                  replace: function (url, uriEncodedQuery) {
+                      url += encodeURIComponent(uriEncodedQuery);
+                      return url;
+                  }
+              }
+          });
+
         // Initialize typeahead
         ru.passim.init_typeahead();
 
@@ -498,6 +520,7 @@ var ru = (function ($, ru) {
           $(".typeahead.sigclavises").typeahead('destroy');
           $(".typeahead.editions").typeahead('destroy');
           $(".typeahead.keywords").typeahead('destroy');
+          $(".typeahead.collections").typeahead('destroy');
           $(".typeahead.manuidnos").typeahead('destroy');
 
           // Make sure the signature types (gryson/clavis) are set correctly
@@ -839,6 +862,24 @@ var ru = (function ($, ru) {
           }).on('typeahead:open', function (e) {
             $(this).closest("td").find(".keyword-key input").last().val("");
           });
+
+            // Type-ahead: collection -- NOTE: not in a form-row, but in a normal 'row'
+            $(".row .typeahead.collections, tr .typeahead.collections").typeahead(
+                { hint: true, highlight: true, minLength: 1 },
+                {
+                    name: 'collections', source: loc_collection, limit: 25, displayKey: "name",
+                    templates: {
+                        empty: '<p>Use the wildcard * to mark an inexact wording of a collection</p>',
+                        suggestion: function (item) {
+                            return '<div>' + item.name + '</div>';
+                        }
+                    }
+                }
+            ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+                $(this).closest("td").find(".collection-key input").last().val(suggestion.id);
+            }).on('typeahead:open', function (e) {
+                $(this).closest("td").find(".collection-key input").last().val("");
+            });
 
           // Type-ahead: manuidno -- NOTE: not in a form-row, but in a normal 'row'
           $(".form-row:not(.empty-form) .typeahead.manuidnos, .manuscript-details .typeahead.manuidnos").typeahead(

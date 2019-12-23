@@ -3663,11 +3663,11 @@ class Collection(models.Model):
     # [1] Each collecttion has only 1 owner
     owner = models.ForeignKey(Profile, null=True)
         
-    # [0-n] Link to one or more SermonDescr instances or gold?
-#   sermons = models.ManyToManyField(SermonDescr, through="CollectionSermonDescr", related_name="collection_sermondescr")
-        
-    # [0-1] Each collection can be marked a "read only" by certain users TH: yes or no? 
-    readonly = models.TextField("ReadOnly", null=True, blank=True)
+    # [0-n] Link to one or more SermonDescr instances
+    # sermon = models.ManyToManyField("SermonDescr", through="CollectionSerm")
+ 
+    # [0-1] Each collection can be marked a "read only" by certain users TH: yes or no? models.BooleanField(default=False)
+    readonly = models.BooleanField(default=False)
     
     # [0-1] Each collection can have one description
     descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
@@ -3675,7 +3675,14 @@ class Collection(models.Model):
     # Link to a description or bibliography (url) TH: wat is hiervan de bedoeling? Literature? Lijkt mij niet nodig dit veld
     url = models.URLField("Web info", null=True, blank=True)
 
+    def __str__(self):
+        return self.name
 
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
+
+    
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -3743,6 +3750,9 @@ class SermonDescr(models.Model):
 
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
+
+    # [m] Many-to-many: one sermon can be a part of a series of collections
+    collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
         if self.author:
@@ -3844,6 +3854,13 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+class CollectionSerm(models.Model):
+    """The link between a collection item and a sermon"""
+    # [1] The sermon to which the collection item refers
+    sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
+    # [1] The collection to which the context item refers to
+    collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+    
 
 class SermonDescrKeyword(models.Model):
     """Relation between a SermonDescr and a Keyword"""

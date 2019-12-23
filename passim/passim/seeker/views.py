@@ -62,11 +62,11 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm, ProjectForm
+                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
-    Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, LINK_EQUAL, LINK_PRT
+    Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, LINK_EQUAL, LINK_PRT
 
 # Some constants that can be used
 paginateSize = 20
@@ -3215,6 +3215,34 @@ def get_keywords(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_collections(request):
+    """Get a list of collections for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if request.is_ajax():
+            # Get the complete code line, which could use semicolon-separation
+            coll_line = request.GET.get("name", "")
+            coll_list = coll_line.split(";")
+            col = "" if len(coll_list) == 0 else coll_list[-1].strip()
+            lstQ = []
+            lstQ.append(Q(name__icontains=col))
+            items = Collection.objects.filter(*lstQ).order_by("name").distinct()
+            results = []
+            for co in items:
+                co_json = {'name': co.name, 'id': co.id }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_gold(request, pk=None):
     """Get details of one particular gold sermon"""
 
@@ -5285,6 +5313,101 @@ class ProjectListView(BasicListView):
             {'filter': 'project',   'dbfield': 'name',          'keyS': 'project_ta', 'keyList': 'prjlist', 'infield': 'name' }]}
         ]
 
+class CollectionListView(BasicListView):
+    """Search and list collections"""
+
+    model = Collection
+    listform = CollectionForm
+    prefix = "col"
+    paginate_by = 20
+    template_name = 'seeker/collection_list.html'
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str'},
+                   {'name': 'Sermon', 'order': '', 'type': 'str'}]
+    filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'owner', 'fkfield': 'owner', 'infield': 'id'}]}
+        ]
+
+
+
+
+class CollectionEdit(PassimDetails):
+    """The details of one collection"""
+ 
+    model = Collection
+    mForm = CollectionForm
+    template_name = 'seeker/collection_edit.html'
+    template_post = 'seeker/collection_edit.html'
+    prefix = 'col'
+    title = "CollectionEdit"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('collection_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Collections', reverse('collection_list')])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
+
+        context['afterdelurl'] = get_previous_page(self.request)
+        return context
+
+    def before_save(self, instance):
+        if instance != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance.owner = profile
+        return True, ""
+
+
+class CollectionDetails(PassimDetails):
+    """The editing of one collection"""
+
+    model = Collection
+    mForm = CollectionForm
+    template_name = 'seeker/collection_details.html'
+    template_post = 'seeker/collection_details.html'
+    prefix = 'col'
+    title = "CollectionDetails"
+    afternewurl = ""
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('collection_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('collection_details', kwargs={'pk': instance.id})
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('collection_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Collections', prevpage])
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
+
+        return context
+
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
@@ -5326,6 +5449,32 @@ class SermonSignset(BasicPart):
                                {'type': 'ot', 'name': 'Other'}]
         return context
 
+class SermonColset(BasicPart):
+    """The set of collections that the sermon is a part of"""
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_colset.html'
+    title = "SermonDescrCollections"
+    ScolFormSet = inlineformset_factory(SermonDescr, CollectionSerm,  
+                                        form = SermonDescrCollectionForm, min_num=0,
+                                        fk_name = "sermon", extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': ScolFormSet, 'prefix': 'scol', 'readonly': False}]
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        has_changed = False
+        if prefix == "scol":
+            # Get the chosen keyword
+            obj = form.cleaned_data['collection']
+            if obj == None:
+                # Get the value entered for the keyword
+                col = form['name'].data
+                # Check if this is an existing Keyword
+                obj = Collection.objects.filter(name__iexact=col).first()
+                # Now set the instance value correctly
+                instance.collection = obj
+                has_changed = True
+
+        return has_changed
+
 
 class SermonKwset(BasicPart):
     """The set of keywords from one sermon"""
@@ -5360,6 +5509,8 @@ class SermonKwset(BasicPart):
         return has_changed
 
 
+
+
 class SermonEdiset(BasicPart):
     """The set of editions from the gold-sermons related to me"""
 
@@ -5389,6 +5540,9 @@ class SermonEdiset(BasicPart):
         context['sedi_list'] = sedi_list
 
         return context
+
+
+
 
 
 class SermonLitset(BasicPart):
@@ -5612,6 +5766,7 @@ class ManuscriptListView(BasicListView):
         return context
 
 
+
 class ManuscriptProvset(BasicPart):
     """The set of provenances from one manuscript"""
 
@@ -5671,6 +5826,7 @@ class ManuscriptProvset(BasicPart):
         return has_changed
 
 
+
 class SermonGoldEdiset(BasicPart):
     """The set of critical text editions from one gold sermon""" 
 
@@ -5689,10 +5845,10 @@ class SermonGoldEdiset(BasicPart):
             # List the editions for this SermonGold correctly
             qs = EdirefSG.objects.filter(sermon_gold=self.obj).order_by('reference__short')
         return qs
-    
+   
     def before_save(self, prefix, request, instance = None, form = None):
         has_changed = False
-        # Check if a new reference should be processed
+        # Check if a new litref should be processed
         litref_id = form.cleaned_data['litref']
         if litref_id != "":
             if instance.id == None or instance.reference == None or instance.reference.id == None or \
@@ -5705,7 +5861,16 @@ class SermonGoldEdiset(BasicPart):
                     has_changed = True
             
         return has_changed  
-     
+    
+ 
+
+
+    
+
+
+
+
+
 
 class ManuscriptLitset(BasicPart):
     """The set of literature references from one manuscript"""
@@ -7232,7 +7397,7 @@ class LitRefListView(ListView):
     paginate_by = 2000
     template_name = 'seeker/literature_list.html'
     entrycount = 0
-    
+
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(LitRefListView, self).get_context_data(**kwargs)
@@ -7322,5 +7487,3 @@ class LitRefListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
-
-

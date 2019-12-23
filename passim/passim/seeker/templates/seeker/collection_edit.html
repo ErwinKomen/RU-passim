@@ -1,0 +1,101 @@
+﻿{% load i18n %}
+
+{% if is_passim_editor %}
+<!-- Collection information -->
+<form>
+  {% csrf_token %}
+    <table style="width: 100%;">
+      <tr>
+        <td colspan="2"  class="ms editable table">
+          <!-- Provide the necessary buttons: edit, cancel and save -->
+          <div>
+            {% if is_passim_editor %}
+              <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+              </a>
+            {% endif %}
+
+            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+            </a>
+
+            {% if is_passim_editor %}
+              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                 targeturl="{% if colForm.instance.id %}{% url 'collection_edit' colForm.instance.id %}{% else %}{% url 'collection_edit' %}{% endif %}" >
+                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+              </a>
+            {% endif %}
+
+            <!-- Waiting symbol-->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+            <!-- Little error message room -->
+            <span id="gold_err_msg" class="err-msg"></span>
+
+            {% if is_passim_editor %}
+              <!-- Put the delete button completely to the right-->
+              <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+                 onclick="ru.passim.seeker.delete_confirm(this);">
+                <span class="glyphicon glyphicon-remove" title="Delete this collection"></span>
+              </a>
+            {% endif %}
+          </div>
+
+          <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+          {% if is_passim_editor %}
+            <div class="delete-confirm hidden selected">
+              <span>Are you sure you would like to delete this collection?</span>
+              <span>
+                <!-- The button to cancel deletion -->
+                <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                   onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                <!-- The actual delete button-->
+                <a mode="delete" title="Delete this collection" class="btn btn-xs jumbo-3"
+                   afterurl="{% url 'collection_list' %}"
+                   targetid="sermon_edit"
+                   targeturl="{% if colForm.instance.id %}{% url 'collection_edit' colForm.instance.id %}{% endif %}">
+                  Delete
+                </a>
+              </span>
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Room for the standard fields -->
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">Name</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{colForm.name}}</div>
+          <div class="view-mode">{{colForm.name.value}}</div>
+        </td>
+      </tr>
+      
+      <!-- Show the Description of the collection -->
+       <tr>
+        <td class="hoverable" style="min-width: 150px;">Description</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{colForm.descrip}}</div>
+          <div class="view-mode">{{colForm.descrip.value}}</div>
+        </td>
+      </tr>
+      <!-- Show the URL of the collection -->
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">URL</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{colForm.url}}</div>
+          <div class="view-mode">{% if colForm.url.value %}{{colForm.url.value}}{% else %}-{% endif %}</div>
+        </td>
+      </tr>
+      <!-- Show Readonly status of the collection -->
+      <tr>
+        <td class="hoverable" style="min-width: 150px;">Read only</td>
+        <td style="width: 100%">
+          <div class="edit-mode hidden">{{colForm.readonly}}</div>
+          <div class="view-mode">{{colForm.instance.get_readonly_display}}</div>
+        </td>
+      </tr>
+    </table>
+</form>
+
+{% endif %}

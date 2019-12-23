@@ -68,11 +68,20 @@ table tbody tr:hover {
   cursor: pointer;*/
   /*  */
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, span.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, th div a.clickable:hover {
   cursor: pointer;
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbody tr td span.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbody tr td span.clickable:hover, th div a.clickable:hover {
   background-color: lightgoldenrodyellow ;
+}
+
+th div a.clickable.ordered {
+  color: darkgoldenrod;
+}
+
+th div a.clickable.ordered:hover {
+  color: darkgoldenrod;
+  background-color: lightgoldenrodyellow;
 }
 
 table tbody tr td.hoverable:hover {
@@ -1077,6 +1086,39 @@ table.compact-table td:hover {
   min-width: 92px;
 }
 
+.keyword {
+    color: darkblue;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.keyword:hover {
+    color: whitesmoke;
+    background-color: darkblue;
+    cursor: pointer;
+}
+
+.project {
+    color: black;
+    font-family: monospace;
+    background-color: lightgoldenrodyellow;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+.project:hover {
+    color: lightgoldenrodyellow;
+    background-color: darkgoldenrod;
+    cursor: pointer;
+}
+
+
+
 .sermon-author {
   color: darkblue;
 }
@@ -1159,6 +1201,16 @@ span.badge.sim-link {
 }
 span.badge.use-link {
   background-color: mediumorchid;
+}
+
+span.badge.signature {
+  background-color: lightgray;
+  color: darkblue;
+  font-size: smaller;
+  padding: 2px 5px;
+  font-weight: normal;
+  border-radius: 5px;
+  margin: 1px;
 }
 
 /* Badges with background color for location types */

@@ -43,6 +43,8 @@
                           {% if is_passim_editor %}
                             <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
                             <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'collection_list' %}" title="Collections">Collections</a></li> 
+                            <li role="separator" class="divider"></li>
                             <li><a href="{% url 'sync_zotero' %}" title="Force Zotero Sync">Synchronize Zotero (force)</a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'keyword_list' %}" title="Keywords">Keywords</a></li> 

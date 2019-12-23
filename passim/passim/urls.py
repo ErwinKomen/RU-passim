@@ -94,8 +94,12 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
-    # url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonCollection.as_view(), name='sermon_collection'),
-
+    url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
+        
+    url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
+    url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollectionDetails.as_view(), name='collection_details'),
+    url(r'^collection/edit(?:/(?P<pk>\d+))?/$', CollectionEdit.as_view(), name='collection_edit'),
+    
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/show', BasketView.as_view(), name='basket_show'),
 
@@ -148,6 +152,7 @@ urlpatterns = [
     url(r'^api/srmsignatures/$', passim.seeker.views.get_srmsignatures, name='api_srmsignatures'),
     url(r'^api/editions/$', passim.seeker.views.get_editions, name='api_editions'),
     url(r'^api/keywords/$', passim.seeker.views.get_keywords, name='api_keywords'),
+    url(r'^api/collections/$', passim.seeker.views.get_collections, name='api_collections'),
     url(r'^api/manuidnos/$', passim.seeker.views.get_manuidnos, name='api_manuidnos'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
