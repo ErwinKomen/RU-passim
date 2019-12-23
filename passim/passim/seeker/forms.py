@@ -154,6 +154,17 @@ class ProjectWidget(ModelSelect2MultipleWidget):
         return Project.objects.all().order_by('name').distinct()
 
 
+class CollectionWidget(ModelSelect2MultipleWidget):
+    model = Collection
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Collection.objects.all().order_by('name').distinct()
+
+
 class ProjectOneWidget(ModelSelect2Widget):
     model = Project
     search_fields = [ 'name__icontains' ]
@@ -447,7 +458,7 @@ class KeywordForm(forms.ModelForm):
 
 
 class ProjectForm(forms.ModelForm):
-    """Keyword list"""
+    """Project list"""
 
     project_ta = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
@@ -471,6 +482,43 @@ class ProjectForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+
+class CollectionForm(forms.ModelForm):
+    """Collection list TH: zie Project"""
+
+    collection_ta = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Collection
+        fields = ['name', 'owner', 'descrip', 'readonly', 'url']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}), 
+                 'owner':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'descrip':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'readonly':    forms.CheckboxInput(),
+                 'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CollectionForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['owner'].required = False
+        self.fields['descrip'].required = False
+        self.fields['readonly'].required = False
+        self.fields['url'].required = False
+        self.fields['collist'].queryset = Collection.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -537,6 +585,31 @@ class SermonDescrKeywordForm(forms.ModelForm):
             if instance.keyword != None:
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
+
+
+class SermonDescrCollectionForm(forms.ModelForm):
+    name = forms.CharField(label=_("Collection"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CollectionSerm
+        fields = ['sermon', 'collection']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonDescrCollectionForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['collection'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.collection != None:
+                col = instance.collection.name
+                # self.fields['collection'].initial = col
+                self.fields['name'].initial = col
 
 
 class SermonGoldForm(forms.ModelForm):
@@ -673,6 +746,7 @@ class SermonGoldSignatureForm(forms.ModelForm):
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
 
 
+
 class SermonGoldEditionForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
@@ -697,7 +771,7 @@ class SermonGoldEditionForm(forms.ModelForm):
             instance = kwargs['instance']
             # Check if the initial reference should be added
             if instance.reference != None:
-                self.fields['litref_ta'].initial = instance.reference.get_short() # TH hier aanpassen? 
+                self.fields['litref_ta'].initial = instance.reference.get_short() 
 
     def clean(self):
         cleaned_data = super(SermonGoldEditionForm, self).clean()
