@@ -58,20 +58,13 @@
               </div>
 
               <!-- One or more fulltext links (to critical editions) -->
-              <div class="col-md-5">
+              <div class="col-md-8">
                 <div id="sermongold_ftxtset" class="post-load" targeturl="{% url 'gold_ftxtset' pk=goldForm.instance.id %}" >
                   <!-- The wait symbol will be overwritten -->
                   <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
                 </div>
               </div>
 
-              <!-- Room for the keywords attached to this gold sermon -->
-              <div class="col-md-3">
-                <div id="sermongold_kwset" class="post-load" targeturl="{% url 'gold_kwset' pk=goldForm.instance.id %}" >
-                  <!-- The wait symbol will be overwritten -->
-                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-                </div>
-              </div>
             </div>
               
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->

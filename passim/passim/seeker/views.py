@@ -64,7 +64,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
+    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, LINK_EQUAL, LINK_PRT
 
@@ -114,6 +114,70 @@ def treat_bom(sHtml):
     sHtml = sHtml.replace(u'\ufeff', '')
     # Return what we have
     return sHtml
+
+def adapt_m2m(cls, instance, field1, qs, field2):
+    """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
+
+    errHandle = ErrHandle()
+    try:
+        # Get current associations
+        lstQ = [Q(**{field1: instance})]
+        through_qs = cls.objects.filter(*lstQ)
+        related_qs = [getattr(x, field2) for x in through_qs]
+        # make sure all items in [qs] are associated
+        for obj in qs:
+            if obj not in related_qs:
+                # Add the association
+                cls.objects.create(**{field1: instance, field2: obj})
+        # Remove from [cls] all associations that are not in [qs]
+        for item in through_qs:
+            obj = getattr(item, field2)
+            if obj not in qs:
+                # Remove this item
+                item.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+# adapt_m2o(Signature, instance, "gold", siglist)
+def adapt_m2o(cls, instance, field, qs, **kwargs):
+    """Adapt the instances of [cls] pointing to [instance] with [field] to only include [qs] """
+
+    errHandle = ErrHandle()
+    try:
+        # Get all the [cls] items currently linking to [instance]
+        lstQ = [Q(**{field: instance})]
+        linked_qs = cls.objects.filter(*lstQ)
+        # make sure all items in [qs] are linked to [instance]
+        for obj in qs:
+            if obj not in linked_qs:
+                # Create new object
+                oNew = cls()
+                setattr(oNew, field, instance)
+                # Copy the local fields
+                for lfield in obj._meta.local_fields:
+                    fname = lfield.name
+                    if fname != "id" and fname != field:
+                        # Copy the field value
+                        setattr(oNew, fname, getattr(obj, fname))
+                for k, v in kwargs.items():
+                    setattr(oNew, k, v)
+                oNew.save()
+        # Remove links that are not in [qs]
+        for obj in linked_qs:
+            if obj not in qs:
+                # Remove this item
+                obj.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+
+
 
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
@@ -1599,71 +1663,71 @@ def do_goldtogold(request):
         oErr.DoError("goldtogold")
         return reverse('home')
 
-def do_import_editions(request):
-    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
+#def do_import_editions(request):
+#    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
 
-    # Use double for-loop:
-    last_old_edi = ""
-    last_litref = None
-    count = 0
-    oErr = ErrHandle()
-    template_name = 'tools.html'
-    result_list = []
-    context = {'status': 'ok', 'tools_part': 'import_edition'}
-    try:
-        for edi in Edition.objects.all().order_by('name'):
-            edi.update = "NIETGEDAAN"
-            edi.save()
+#    # Use double for-loop:
+#    last_old_edi = ""
+#    last_litref = None
+#    count = 0
+#    oErr = ErrHandle()
+#    template_name = 'tools.html'
+#    result_list = []
+#    context = {'status': 'ok', 'tools_part': 'import_edition'}
+#    try:
+#        for edi in Edition.objects.all().order_by('name'):
+#            edi.update = "NIETGEDAAN"
+#            edi.save()
 
-            # DEBUG
-            if edi.id == 1253:
-                iStop = 1
+#            # DEBUG
+#            if edi.id == 1253:
+#                iStop = 1
 
-            # Split the old editions into old_edi and pages
-            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
-            if old_edi != None and old_edi != "":
-                litref = None
-                if old_edi != last_old_edi:
-                    # Compare the old editions with the new editions ("short"), using short without the year
-                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
-                        if old_edi == get_short_edit(litreftmp.short):
-                            litref = litreftmp
-                            last_litref = litreftmp
-                            break
-                else:
-                    litref = last_litref
-                # Continue...
-                if litref != None:
-                    # We can process him!
-                    gold_obj = edi.gold
-                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
-                    if esg == None:
-                        # Create EdirefSG record
-                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
-                    # Double check pages and add to new EdirefSG record
-                    if pages != None:
-                        esg.pages = pages
-                        esg.save()
-                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
-                    count += 1
-                    if status == "ok":
-                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
-                    else:
-                        edi.update = "PAGES: " + status
-                    edi.save()
-                    # Show it in the result list
-                    result_list.append({'part': count, 'result': edi.name})
-            #else: # Hier moet het nog anders. 
-        # All edition objects have been reviewed
-        context['result_list'] = result_list
-    except:
-        sMsg = oErr.get_error_message()
-        oErr.DoError("do_import_editions")
-        context['status'] = "error"
-        context['message'] = sMsg
+#            # Split the old editions into old_edi and pages
+#            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
+#            if old_edi != None and old_edi != "":
+#                litref = None
+#                if old_edi != last_old_edi:
+#                    # Compare the old editions with the new editions ("short"), using short without the year
+#                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
+#                        if old_edi == get_short_edit(litreftmp.short):
+#                            litref = litreftmp
+#                            last_litref = litreftmp
+#                            break
+#                else:
+#                    litref = last_litref
+#                # Continue...
+#                if litref != None:
+#                    # We can process him!
+#                    gold_obj = edi.gold
+#                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
+#                    if esg == None:
+#                        # Create EdirefSG record
+#                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
+#                    # Double check pages and add to new EdirefSG record
+#                    if pages != None:
+#                        esg.pages = pages
+#                        esg.save()
+#                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
+#                    count += 1
+#                    if status == "ok":
+#                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
+#                    else:
+#                        edi.update = "PAGES: " + status
+#                    edi.save()
+#                    # Show it in the result list
+#                    result_list.append({'part': count, 'result': edi.name})
+#            #else: # Hier moet het nog anders. 
+#        # All edition objects have been reviewed
+#        context['result_list'] = result_list
+#    except:
+#        sMsg = oErr.get_error_message()
+#        oErr.DoError("do_import_editions")
+#        context['status'] = "error"
+#        context['message'] = sMsg
 
-    # Render and return the page
-    return render(request, template_name, context)
+#    # Render and return the page
+#    return render(request, template_name, context)
 
 def get_old_edi(edi):
     """Split pages and year from edition, keep stripped edition and the pages
@@ -3629,6 +3693,7 @@ class PassimDetails(DetailView):
     template_name = ""      # Template for GET
     template_post = ""      # Template for POST
     formset_objects = []    # List of formsets to be processed
+    form_objects = []       # List of form objects
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     previous = None         # Start with empty previous page
@@ -3898,6 +3963,13 @@ class PassimDetails(DetailView):
             else:
                 # Get the form for the sermon
                 frm = mForm(instance=instance, prefix=prefix)
+            # Walk all the form objects
+            for formObj in self.form_objects:
+                formClass = formObj['form']
+                prefix = formObj['prefix']
+                # This is only for *NEW* forms (right now)
+                form = formClass(prefix=prefix)
+                context[prefix + "Form"] = form
             # Walk all the formset objects
             for formsetObj in self.formset_objects:
                 formsetClass = formsetObj['formsetClass']
@@ -6273,6 +6345,13 @@ class SermonGoldDetails(PassimDetails):
     title = "SermonGold" 
     afternewurl = ""
     rtype = "html"
+    form_list = [
+        {'prefix': 'kw', 'name': 'Keyword', 'cls': KeywordForm},
+        {'prefix': 'sig', 'name': 'Signature', 'cls': SermonGoldSignatureForm}
+        ]
+    GkwFormSet = inlineformset_factory(SermonGold, Keyword,
+                                       form=KeywordForm, min_num=1,
+                                       fk_name="gold", extra=0)
     GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
                                          form=SermonGoldSameForm, min_num=0,
                                          fk_name = "src",
@@ -6282,7 +6361,8 @@ class SermonGoldDetails(PassimDetails):
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
-                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False},
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw', 'readonly': False}]
 
     def before_delete(self, instance):
 
@@ -6319,6 +6399,11 @@ class SermonGoldDetails(PassimDetails):
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        # Add the characteristics of different forms
+        for frmthis in self.form_list:
+            frmname = "{}Form".format(frmthis['prefix'])
+            context[frmname] = frmthis
 
         # Start a list of related gold sermons
         lst_related = []
@@ -6442,8 +6527,15 @@ class SermonGoldEdit(PassimDetails):
         oErr = ErrHandle()
         
         try:
-            # Nothing here yet
-            pass
+            # Process many-to-many changes
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
+
+            # Process many-to-one changes
+            # (1) 'goldsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(Signature, instance, "gold", siglist)
         except:
             msg = oErr.get_error_message()
             bResult = False

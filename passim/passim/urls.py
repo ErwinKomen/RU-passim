@@ -160,7 +160,7 @@ urlpatterns = [
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
+    # url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 

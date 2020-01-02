@@ -3157,6 +3157,9 @@ class SermonGold(models.Model):
             lSign.append(item.short())
         return lSign
 
+    def signatures_ordered(self):
+        return self.goldsignatures.all().order_by("editype", "code")
+
     def get_keywords(self):
         """Combine all keywords into one string"""
 
@@ -3446,22 +3449,22 @@ class SermonGold(models.Model):
 
                     # Process Editions (separated by ';')
                     # NOTE: this needs to be emended to use LitrefSG
-                    edition_lst = oGold['edition'].split(";")
-                    for item in edition_lst:
-                        item = item.strip()
+                    #edition_lst = oGold['edition'].split(";")
+                    #for item in edition_lst:
+                    #    item = item.strip()
 
-                        # NOTE: An edition should be unique for a gold sermon; not in general!
-                        edition = Edition.find(item, gold)
-                        if edition == None:
-                            edition = Edition(name=item, gold=gold)
-                            edition.save()
-                        elif bCreated:
-                            # This edition already exists
-                            add_to_manual_list(lst_manual, "edition", 
-                                               "First instance of a gold sermon is attempted to be linked with existing edition [{}]".format(item), oGold)
-                            # Skip the remainder of this line
-                            bBreak = True
-                            break
+                    #    # NOTE: An edition should be unique for a gold sermon; not in general!
+                    #    edition = Edition.find(item, gold)
+                    #    if edition == None:
+                    #        edition = Edition(name=item, gold=gold)
+                    #        edition.save()
+                    #    elif bCreated:
+                    #        # This edition already exists
+                    #        add_to_manual_list(lst_manual, "edition", 
+                    #                           "First instance of a gold sermon is attempted to be linked with existing edition [{}]".format(item), oGold)
+                    #        # Skip the remainder of this line
+                    #        bBreak = True
+                    #        break
 
                     if bBreak:
                         # # Break from the higher gold loop
@@ -3589,38 +3592,38 @@ class SermonGoldKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
-class Edition(models.Model):
-    """Critical text edition of a Gold Sermon"""
+#class Edition(models.Model):
+#    """Critical text edition of a Gold Sermon"""
 
-    # [1] It must have a name - that is the Gryson book or the Clavis book or something
-    name = models.CharField("Name", max_length=LONG_STRING)
-    # [1] Every edition belongs to exactly one gold-sermon
-    #     Note: when a SermonGold is removed, the edition that uses it is also removed
-    #     This is because each Edition instance is uniquely associated with one SermonGold
-    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
-    # [0-1] Temporary field to store update information
-    update = models.CharField("Update info", default="-", max_length=LONG_STRING)
+#    # [1] It must have a name - that is the Gryson book or the Clavis book or something
+#    name = models.CharField("Name", max_length=LONG_STRING)
+#    # [1] Every edition belongs to exactly one gold-sermon
+#    #     Note: when a SermonGold is removed, the edition that uses it is also removed
+#    #     This is because each Edition instance is uniquely associated with one SermonGold
+#    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
+#    # [0-1] Temporary field to store update information
+#    update = models.CharField("Update info", default="-", max_length=LONG_STRING)
 
-    def __str__(self):
-        return self.name
+#    def __str__(self):
+#        return self.name
 
-    def short(self):
-        return self.name
+#    def short(self):
+#        return self.name
 
-    def find(name, gold=None):
-        lstQ = []
-        lstQ.append(Q(name__iexact=name))
-        if gold != None:
-            lstQ.append(Q(gold=gold))
-        obj = Edition.objects.filter(*lstQ).first()
-        return obj
+#    def find(name, gold=None):
+#        lstQ = []
+#        lstQ.append(Q(name__iexact=name))
+#        if gold != None:
+#            lstQ.append(Q(gold=gold))
+#        obj = Edition.objects.filter(*lstQ).first()
+#        return obj
 
-    def find_or_create(name):
-        obj = self.find(name)
-        if obj == None:
-            obj = Edition(name=name)
-            obj.save()
-        return obj
+#    def find_or_create(name):
+#        obj = self.find(name)
+#        if obj == None:
+#            obj = Edition(name=name)
+#            obj.save()
+#        return obj
 
 
 class Ftextlink(models.Model):
@@ -3909,7 +3912,7 @@ class Signature(models.Model):
 
     # [1] It must have a code = gryson code or clavis number
     code = models.CharField("Code", max_length=LONG_STRING)
-    # [1] Every edition must be of a limited number of types
+    # [1] Every signature must be of a limited number of types
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
     # [1] Every signature belongs to exactly one gold-sermon

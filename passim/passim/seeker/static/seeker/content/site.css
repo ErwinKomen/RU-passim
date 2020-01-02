@@ -1207,6 +1207,17 @@ span.badge.use-link {
   background-color: mediumorchid;
 }
 
+span.badge.signature.gr {
+  background-color: lightblue;
+}
+span.badge.signature.cl {
+  background-color: lightgreen;
+}
+span.badge.signature.ot {
+  background-color: lightgoldenrodyellow;
+}
+
+
 span.badge.signature {
   background-color: lightgray;
   color: darkblue;
@@ -1215,6 +1226,12 @@ span.badge.signature {
   font-weight: normal;
   border-radius: 5px;
   margin: 1px;
+}
+
+span.badge.signature:hover {
+    color: whitesmoke;
+    background-color: darkblue;
+    cursor: pointer;
 }
 
 /* Badges with background color for location types */

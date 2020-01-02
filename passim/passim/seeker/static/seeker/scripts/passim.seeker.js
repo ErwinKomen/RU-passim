@@ -1336,6 +1336,22 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * add_new_select2
+       *    Show [table_new] element
+       *
+       */
+      add_new_select2: function (el) {
+        var elTr = null;
+
+        try {
+          elTr = $(el).closest("tr");
+          $(elTr).find(".new-mode").removeClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("add_new_select2", ex);
+        }
+      },
+
+      /**
        * form_row_select
        *    By selecting this slement, the whole row gets into the 'selected' state
        *

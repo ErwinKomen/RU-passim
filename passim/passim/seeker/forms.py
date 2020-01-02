@@ -110,66 +110,6 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
-class EditionWidget(ModelSelect2TagWidget):
-    """This allows the user to add editions--but that can only happen when the model changes to m2m"""
-
-    model = Edition
-    queryset = Edition.objects.all().order_by('name').distinct()
-    search_fields = [ 'name__icontains']
-
-    def __init__(self, *args, **kwargs):
-        response = super(EditionWidget, self).__init__(*args, **kwargs)
-
-        return response
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
-
-    def value_from_datadict(self, data, files, name):
-        values = super(EditionWidget, self).value_from_datadict(data, files, name)
-
-        cleaned_values = []
-        # Walk the list and create "cleaned_values"
-        for val in values:
-            obj = None
-            if is_number(val):
-                # Find the item
-                obj = self.queryset.filter(id=val).first()
-
-            #if obj == None:
-            #    obj = self.queryset.create(name=val)
-
-            # Creating a new one is NOT going to work
-            if obj != None:
-                cleaned_values.append(obj)
-
-        ## Get all the PKs
-        #qs = self.queryset.filter(**{'pk__in': list(values)})
-        #pks = set(str(getattr(o, "pk")) for o in qs)
-        #cleaned_values = []
-        #for val in values:
-        #    if str(val) not in pks:
-        #        val = self.queryset.create(name=val).pk
-        #    cleaned_values.append(val)
-        return cleaned_values
-
-
-class EditionExistingWidget(ModelSelect2MultipleWidget):
-    """Only allow user to choose from existing editions"""
-
-    model = Edition
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
-    
-
 class LocationWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains']
@@ -655,15 +595,11 @@ class SermonGoldForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwnew       = forms.CharField(label=_("New keyword"), required=False, 
+                widget=forms.TextInput(attrs={'placeholder': 'Keyword...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
 
-    # OLD:
-    editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=EditionExistingWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
-    # FUTURE: once model 'Edition' has become attached with ManyToMany to SermonGold
-    #editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-    #                        widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -686,8 +622,6 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
 
-        # OLD:
-        self.fields['editionlist'].queryset = Edition.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -695,6 +629,10 @@ class SermonGoldForm(forms.ModelForm):
             sAuthor = "" if not instance.author else instance.author.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+            # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
+            self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+            self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
+        iStop = 1
 
 
 class SermonGoldSameForm(forms.ModelForm):
