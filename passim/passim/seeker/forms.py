@@ -698,11 +698,17 @@ class EqualGoldLinkForm(forms.ModelForm):
 
 
 class SermonGoldSignatureForm(forms.ModelForm):
+    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
+    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
+    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Signature
-        # fields = ['code', 'editype', 'gold']
         fields = ['code', 'editype']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
@@ -713,6 +719,12 @@ class SermonGoldSignatureForm(forms.ModelForm):
         super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+        # Set the keyword to optional for best processing
+        self.fields['code'].required = False
+        self.fields['editype'].required = False
+        # Make clear which fields must be editable
+        # self.fields['editype'].help_text = "editable"
+        # self.fields['code'].help_text = "editable"
         
 
 class SermonGoldEditionForm(forms.ModelForm):
@@ -753,8 +765,10 @@ class SermonGoldEditionForm(forms.ModelForm):
 
 
 class SermonGoldKeywordForm(forms.ModelForm):
-    name = forms.CharField(label=_("Keyword"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    name   = forms.CharField(label=_("Keyword"), required=False, help_text="", 
+               widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    newkw  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -766,6 +780,7 @@ class SermonGoldKeywordForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonGoldKeywordForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
+        self.fields['newkw'].required = False
         self.fields['keyword'].required = False
         # Get the instance
         if 'instance' in kwargs:

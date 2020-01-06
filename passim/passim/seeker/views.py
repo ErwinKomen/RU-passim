@@ -3738,7 +3738,10 @@ class PassimDetails(DetailView):
                 return redirect(self.redirectpage)
             else:
                 # This takes self.template_name...
-                response = self.render_to_response(context)
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = sHtml.replace("\ufeff", "")
+                response = HttpResponse(sHtml)
+                # response = self.render_to_response(context)
 
         # Return the response
         return response
@@ -3944,6 +3947,7 @@ class PassimDetails(DetailView):
             else:
                 # We need to pass on to the user that there are errors
                 context['errors'] = frm.errors
+
             # Check if this is a new one
             if bNew:
                 # Any code that should be added when creating a new [SermonGold] instance
@@ -3963,6 +3967,8 @@ class PassimDetails(DetailView):
             else:
                 # Get the form for the sermon
                 frm = mForm(instance=instance, prefix=prefix)
+            if frm.is_valid():
+                iOkay = 1
             # Walk all the form objects
             for formObj in self.form_objects:
                 formClass = formObj['form']
@@ -3970,30 +3976,44 @@ class PassimDetails(DetailView):
                 # This is only for *NEW* forms (right now)
                 form = formClass(prefix=prefix)
                 context[prefix + "Form"] = form
-            # Walk all the formset objects
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                form_kwargs = self.get_form_kwargs(prefix)
-                if self.add:
-                    # - CREATE a NEW formset, populating it with any initial data in the request
-                    # Saving a NEW item
-                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
+        # Walk all the formset objects
+        for formsetObj in self.formset_objects:
+            formsetClass = formsetObj['formsetClass']
+            prefix  = formsetObj['prefix']
+            form_kwargs = self.get_form_kwargs(prefix)
+            if 'noinit' in formsetObj and formsetObj['noinit']:
+                if self.request.method == "POST":
+                    # Get a formset including any stuff from POST
+                    formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, instance=instance)
+                    # Process this formset
+                    self.process_formset(prefix, self.request, formset)
+                # Load a clean formset
+                formset = formsetClass(prefix=prefix, form_kwargs=form_kwargs)
+            #elif self.add or ('noinit' in formsetObj and not formsetObj['noinit']):
+            #    # - CREATE a NEW formset, populating it with any initial data in the request
+            #    # Saving a NEW item
+            #    formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, instance=instance)
+            else:
+                # show the data belonging to the current [obj]
+                qs = self.get_formset_queryset(prefix)
+                if qs == None:
+                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                 else:
-                    # show the data belonging to the current [obj]
-                    qs = self.get_formset_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                    else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, self.request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
+                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+            # Process all the forms in the formset
+            ordered_forms = self.process_formset(prefix, self.request, formset)
+            if ordered_forms:
+                context[prefix + "_ordered"] = ordered_forms
+            # Store the instance
+            formsetObj['formsetinstance'] = formset
+            # Add the formset to the context
+            context[prefix + "_formset"] = formset
+
+        # Essential formset information
+        for formsetObj in self.formset_objects:
+            prefix = formsetObj['prefix']
+            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
 
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
@@ -6345,12 +6365,12 @@ class SermonGoldDetails(PassimDetails):
     title = "SermonGold" 
     afternewurl = ""
     rtype = "html"
-    form_list = [
-        {'prefix': 'kw', 'name': 'Keyword', 'cls': KeywordForm},
-        {'prefix': 'sig', 'name': 'Signature', 'cls': SermonGoldSignatureForm}
-        ]
-    GkwFormSet = inlineformset_factory(SermonGold, Keyword,
-                                       form=KeywordForm, min_num=1,
+    #form_list = [
+    #    {'prefix': 'kw', 'name': 'Keyword', 'cls': KeywordForm},
+    #    {'prefix': 'sig', 'name': 'Signature', 'cls': SermonGoldSignatureForm}
+    #    ]
+    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
+                                       form=SermonGoldKeywordForm, min_num=0,
                                        fk_name="gold", extra=0)
     GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
                                          form=SermonGoldSameForm, min_num=0,
@@ -6361,8 +6381,8 @@ class SermonGoldDetails(PassimDetails):
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
-                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False},
-                       {'formsetClass': GkwFormSet,   'prefix': 'gkw', 'readonly': False}]
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
     def before_delete(self, instance):
 
@@ -6391,6 +6411,8 @@ class SermonGoldDetails(PassimDetails):
             geq = EqualGold.objects.create()
             instance.equal = geq
             instance.save()
+
+
         # Make sure we do a page redirect
         self.newRedirect = True
         self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
@@ -6404,7 +6426,7 @@ class SermonGoldDetails(PassimDetails):
         for frmthis in self.form_list:
             frmname = "{}Form".format(frmthis['prefix'])
             context[frmname] = frmthis
-
+        
         # Start a list of related gold sermons
         lst_related = []
         # Do we have an instance?
@@ -6448,6 +6470,20 @@ class SermonGoldEdit(PassimDetails):
     prefix = "gold"
     title = "SermonGold" 
     afternewurl = ""
+    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
+                                       form=SermonGoldKeywordForm, min_num=0,
+                                       fk_name="gold", extra=0)
+    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
+                                         form=SermonGoldSameForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
     def before_delete(self, instance):
 
@@ -6500,26 +6536,73 @@ class SermonGoldEdit(PassimDetails):
         #for edi in edi_list:
         #    edi_copy = Edition.objects.create(name=edi.name, gold=instance)
 
-        # Get the list of keywords
-        keywords = form.cleaned_data['keyword'].strip()
-        if keywords != "":
-            kwlist = keywords.split(";")
-            # Add a signature for each item
-            for kw in kwlist:
-                # Make sure starting and tailing spaces are removed
-                kw = kw.strip().lower()
-                # Check if it is already there
-                obj = Keyword.objects.filter(name=kw).first()
-                if obj == None:
-                    # Add Keyword
-                    obj = Keyword(name=kw)
-                    obj.save()
-                # This is a new instance: add the association with the gold sermon
-                objlink = SermonGoldKeyword(gold=instance, keyword=obj)
-                objlink.save()
+        # EXTINCT: allow adding keywords in a textbox, divided by semicolumn
+        ## Get the list of keywords
+        #keywords = form.cleaned_data['keyword'].strip()
+        #if keywords != "":
+        #    kwlist = keywords.split(";")
+        #    # Add a signature for each item
+        #    for kw in kwlist:
+        #        # Make sure starting and tailing spaces are removed
+        #        kw = kw.strip().lower()
+        #        # Check if it is already there
+        #        obj = Keyword.objects.filter(name=kw).first()
+        #        if obj == None:
+        #            # Add Keyword
+        #            obj = Keyword(name=kw)
+        #            obj.save()
+        #        # This is a new instance: add the association with the gold sermon
+        #        objlink = SermonGoldKeyword(gold=instance, keyword=obj)
+        #        objlink.save()
 
         # Return positively
         return True, "" 
+
+    def process_formset(self, prefix, request, formset):
+
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "gsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Check if this signature already exists
+                        obj = Signature.objects.filter(code=code, editype=editype, gold=instance).first()
+                        if obj == None:
+                            # Add this object
+                            obj = Signature.objects.create(code=code, editype=editype, gold=instance)
+                elif prefix == "gkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Check if the link is already there
+                        olink = SermonGoldKeyword.objects.filter(gold=instance, keyword=obj).first()
+                        if olink == None:
+                            # Add it
+                            olink = SermonGoldKeyword.objects.create(gold=instance, keyword=obj)
+            else:
+                errors = form.errors
+        return True
 
     def after_save(self, form, instance):
         msg = ""

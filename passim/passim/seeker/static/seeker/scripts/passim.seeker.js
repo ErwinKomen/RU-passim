@@ -1341,11 +1341,20 @@ var ru = (function ($, ru) {
        *
        */
       add_new_select2: function (el) {
-        var elTr = null;
+        var elTr = null,
+            elRow = null,
+            elDiv = null;
 
         try {
-          elTr = $(el).closest("tr");
-          $(elTr).find(".new-mode").removeClass("hidden");
+          elTr = $(el).closest("tr");           // Nearest <tr>
+          elDiv = $(elTr).find(".new-mode");    // The div with new-mode in it
+          // Show it
+          $(elDiv).removeClass("hidden");
+          // Find the first row
+          elRow = $(elDiv).find("tbody tr").first();
+          ru.passim.seeker.tabular_addrow($(elRow));
+
+          // Add
         } catch (ex) {
           private_methods.errMsg("add_new_select2", ex);
         }
@@ -3185,17 +3194,23 @@ var ru = (function ($, ru) {
        *   Open the next <tr> to get delete confirmation (or not)
        *
        */
-      delete_confirm: function (el) {
+      delete_confirm: function (el, bNeedConfirm) {
         var elDiv = null;
 
         try {
-          // Find the [.delete-row] to be shown
-          elDiv = $(el).closest("tr").find(".delete-confirm").first();
-          if (elDiv.length === 0) {
-            // Try goint to the next <tr>
-            elDiv = $(el).closest("tr").next("tr.delete-confirm");
+          if (bNeedConfirm === undefined) { bNeedConfirm = true; }
+          // Action depends on the need for confirmation
+          if (bNeedConfirm) {
+            // Find the [.delete-row] to be shown
+            elDiv = $(el).closest("tr").find(".delete-confirm").first();
+            if (elDiv.length === 0) {
+              // Try goint to the next <tr>
+              elDiv = $(el).closest("tr").next("tr.delete-confirm");
+            }
+            $(elDiv).removeClass("hidden");
+          } else {
+
           }
-          $(elDiv).removeClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_confirm", ex);
         }
@@ -3393,6 +3408,7 @@ var ru = (function ($, ru) {
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
+            case "gkw_formset":
             case "mprov_formset":
             case "mdr_formset":
             case "mkw_formset":
@@ -3523,7 +3539,7 @@ var ru = (function ($, ru) {
        *   Add one row into a tabular inline
        *
        */
-      tabular_addrow: function () {
+      tabular_addrow: function (elStart) {
         // NOTE: see the definition of lAddTableRow above
         var arTdef = lAddTableRow,
             oTdef = {},
@@ -3535,14 +3551,16 @@ var ru = (function ($, ru) {
 
         try {
           // Find out just where we are
-          sId = $(this).closest("div[id]").attr("id");
+          if (elStart === undefined || elStart === null)
+            elStart = $(this);
+          sId = $(elStart).closest("div[id]").attr("id");
           // Walk all tables
           for (i = 0; i < arTdef.length; i++) {
             // Get the definition
             oTdef = arTdef[i];
             if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
               // Go to the <tbody> and find the last form-row
-              elTable = $(this).closest("tbody").children("tr.form-row.empty-form")
+              elTable = $(elStart).closest("tbody").children("tr.form-row.empty-form")
 
               // Perform the cloneMore function to this <tr>
               rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
