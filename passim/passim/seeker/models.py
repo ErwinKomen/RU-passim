@@ -3591,6 +3591,10 @@ class SermonGoldKeyword(models.Model):
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
+        return response
+
 
 #class Edition(models.Model):
 #    """Critical text edition of a Gold Sermon"""

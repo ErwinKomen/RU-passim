@@ -621,7 +621,7 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-
+        
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -632,6 +632,9 @@ class SermonGoldForm(forms.ModelForm):
             # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
+            # Make sure to set the DATA property
+            self.fields['kwlist'].data = [str(x.pk) for x in instance.keywords.all().order_by('name')]
+            self.fields['siglist'].data = [str(x.pk) for x in instance.goldsignatures.all().order_by('editype', 'code')]
         iStop = 1
 
 
@@ -789,6 +792,11 @@ class SermonGoldKeywordForm(forms.ModelForm):
             if instance.keyword != None:
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
+
+    def save(self, commit=True, *args, **kwargs):
+        response = super(SermonGoldKeywordForm, self).save(commit, **kwargs)
+        iStop = 1
+        return response
 
 
 class SermonGoldLitrefForm(forms.ModelForm):

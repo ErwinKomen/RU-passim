@@ -3824,7 +3824,7 @@ class PassimDetails(DetailView):
         """Action to be performed after adding a new item"""
         return True, "" 
 
-    def before_save(self, instance):
+    def before_save(self, form, instance):
         """Action to be performed after saving an item preliminarily, and before saving completely"""
         return True, "" 
 
@@ -3868,11 +3868,87 @@ class PassimDetails(DetailView):
 
         # Get the instance
         instance = self.object
+
+        frm = self.prepare_form(instance, initial, context)
+
+        # Walk all the formset objects
+        bFormsetChanged = False
+        for formsetObj in self.formset_objects:
+            formsetClass = formsetObj['formsetClass']
+            prefix  = formsetObj['prefix']
+            form_kwargs = self.get_form_kwargs(prefix)
+            if 'noinit' in formsetObj and formsetObj['noinit']:
+                # Only process actual changes!!
+                if self.request.method == "POST" and self.request.POST:
+                    # Get a formset including any stuff from POST
+                    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                    # Process this formset
+                    self.process_formset(prefix, self.request, formset)
+                    # Make sure this formset is processed 
+                    if formset.is_valid():
+                        formset.save()
+                        # Signal that the *FORM* needs refreshing, because the formset changed
+                        bFormsetChanged = True
+                # Load an explicitly empty formset
+                formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+            else:
+                # show the data belonging to the current [obj]
+                qs = self.get_formset_queryset(prefix)
+                if qs == None:
+                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                else:
+                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+            # Process all the forms in the formset
+            ordered_forms = self.process_formset(prefix, self.request, formset)
+            if ordered_forms:
+                context[prefix + "_ordered"] = ordered_forms
+            # Store the instance
+            formsetObj['formsetinstance'] = formset
+            # Add the formset to the context
+            context[prefix + "_formset"] = formset
+
+        # Essential formset information
+        for formsetObj in self.formset_objects:
+            prefix = formsetObj['prefix']
+            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+
+        # Check if the formset made any changes to the form
+        if bFormsetChanged:
+            # OLD: 
+            frm = self.prepare_form(instance, initial, context)
+
+            ## Re-adjust any lists in the form
+            #if frm.is_valid():
+            #    obj = frm.save(commit=False)
+            #    obj.kwlist = instance.keywords.all().order_by('name')
+            #    obj.siglist = instance.goldsignatures.all().order_by('editype', 'code')
+            #    obj.save()
+
+        # Put the form and the formset in the context
+        context['{}Form'.format(self.prefix)] = frm
+        context['instance'] = instance
+        context['options'] = json.dumps({"isnew": (instance == None)})
+
+        # Possibly add to context by the calling function
+        context = self.add_to_context(context, instance)
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+
+    def prepare_form(self, instance, initial, context):
+        # Initialisations
         bNew = False
         mForm = self.mForm
         oErr = ErrHandle()
 
-        # prefix = self.prefix
+        # Debugging
+        x = instance.keywords.all()
+
+        # Determine the prefix
         if self.prefix_type == "":
             id = "n" if instance == None else instance.id
             prefix = "{}-{}".format(self.prefix, id)
@@ -3924,21 +4000,24 @@ class PassimDetails(DetailView):
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
-                instance = frm.save(commit=False)
+                obj = frm.save(commit=False)
                 # Any checks go here...
-                bResult, msg = self.before_save(instance)
+                bResult, msg = self.before_save(form=frm, instance=obj)
                 if bResult:
                     # Now save it for real
-                    instance.save()
+                    obj.save()
                     # Make it available
                     context['object'] = instance
                     self.object = instance
                     # Log the SAVE action
                     details = {'id': instance.id}
                     details["savetype"] = "new" if bNew else "change"
-                    if frm.changed_data != None:
+                    if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, instance)
                     Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
+
+                    # Make sure the form is actually saved completely
+                    frm.save()
 
                     # Any action(s) after saving
                     bResult, msg = self.after_save(frm, instance)
@@ -3976,58 +4055,10 @@ class PassimDetails(DetailView):
                 # This is only for *NEW* forms (right now)
                 form = formClass(prefix=prefix)
                 context[prefix + "Form"] = form
-        # Walk all the formset objects
-        for formsetObj in self.formset_objects:
-            formsetClass = formsetObj['formsetClass']
-            prefix  = formsetObj['prefix']
-            form_kwargs = self.get_form_kwargs(prefix)
-            if 'noinit' in formsetObj and formsetObj['noinit']:
-                if self.request.method == "POST":
-                    # Get a formset including any stuff from POST
-                    formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, instance=instance)
-                    # Process this formset
-                    self.process_formset(prefix, self.request, formset)
-                # Load a clean formset
-                formset = formsetClass(prefix=prefix, form_kwargs=form_kwargs)
-            #elif self.add or ('noinit' in formsetObj and not formsetObj['noinit']):
-            #    # - CREATE a NEW formset, populating it with any initial data in the request
-            #    # Saving a NEW item
-            #    formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, instance=instance)
-            else:
-                # show the data belonging to the current [obj]
-                qs = self.get_formset_queryset(prefix)
-                if qs == None:
-                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                else:
-                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-            # Process all the forms in the formset
-            ordered_forms = self.process_formset(prefix, self.request, formset)
-            if ordered_forms:
-                context[prefix + "_ordered"] = ordered_forms
-            # Store the instance
-            formsetObj['formsetinstance'] = formset
-            # Add the formset to the context
-            context[prefix + "_formset"] = formset
 
-        # Essential formset information
-        for formsetObj in self.formset_objects:
-            prefix = formsetObj['prefix']
-            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
-            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+        # Return the form we made
+        return frm
 
-        # Put the form and the formset in the context
-        context['{}Form'.format(self.prefix)] = frm
-        context['instance'] = instance
-        context['options'] = json.dumps({"isnew": (instance == None)})
-
-        # Possibly add to context by the calling function
-        context = self.add_to_context(context, instance)
-
-        # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
-
-        # Return the calculated context
-        return context
 
 
 class BasicListView(ListView):
@@ -5273,11 +5304,11 @@ class CollectionEdit(PassimDetails):
         context['afterdelurl'] = get_previous_page(self.request)
         return context
 
-    def before_save(self, instance):
-        if instance != None:
+    def before_save(self, form, instance):
+        if form != None:
             # Search the user profile
             profile = Profile.get_user_profile(self.request.user.username)
-            instance.owner = profile
+            form.owner = profile
         return True, ""
 
 
@@ -6365,10 +6396,6 @@ class SermonGoldDetails(PassimDetails):
     title = "SermonGold" 
     afternewurl = ""
     rtype = "html"
-    #form_list = [
-    #    {'prefix': 'kw', 'name': 'Keyword', 'cls': KeywordForm},
-    #    {'prefix': 'sig', 'name': 'Signature', 'cls': SermonGoldSignatureForm}
-    #    ]
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,
                                        fk_name="gold", extra=0)
@@ -6422,11 +6449,6 @@ class SermonGoldDetails(PassimDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Add the characteristics of different forms
-        for frmthis in self.form_list:
-            frmname = "{}Form".format(frmthis['prefix'])
-            context[frmname] = frmthis
-        
         # Start a list of related gold sermons
         lst_related = []
         # Do we have an instance?
@@ -6582,11 +6604,10 @@ class SermonGoldEdit(PassimDetails):
                         editype = "ot"
                         code = cleaned['newot']
                     if editype != "":
-                        # Check if this signature already exists
-                        obj = Signature.objects.filter(code=code, editype=editype, gold=instance).first()
-                        if obj == None:
-                            # Add this object
-                            obj = Signature.objects.create(code=code, editype=editype, gold=instance)
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
                 elif prefix == "gkw":
                     # Keyword processing
                     if 'newkw' in cleaned and cleaned['newkw'] != "":
@@ -6595,14 +6616,23 @@ class SermonGoldEdit(PassimDetails):
                         obj = Keyword.objects.filter(name=newkw).first()
                         if obj == None:
                             obj = Keyword.objects.create(name=newkw)
-                        # Check if the link is already there
-                        olink = SermonGoldKeyword.objects.filter(gold=instance, keyword=obj).first()
-                        if olink == None:
-                            # Add it
-                            olink = SermonGoldKeyword.objects.create(gold=instance, keyword=obj)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
             else:
                 errors = form.errors
         return True
+
+    def before_save(self, form, instance):
+        ## Re-adjust any lists in the form
+        #if frm.is_valid():
+        #    obj = frm.save(commit=False)
+        #    obj.kwlist = instance.keywords.all().order_by('name')
+        #    obj.siglist = instance.goldsignatures.all().order_by('editype', 'code')
+        #    obj.save()
+        form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
+        form.fields['siglist'].initial = instance.goldsignatures.all().order_by('editype', 'code')
+        return True, ""
 
     def after_save(self, form, instance):
         msg = ""
