@@ -1235,6 +1235,9 @@ var ru = (function ($, ru) {
             // history.pushState(null, null, sUrlShow);
           }
 
+          // Set handling of unique-field
+          $("td.unique-field input").unbind("change").change(ru.passim.seeker.unique_change);
+
           // Make sure typeahead is re-established
           ru.passim.init_typeahead();
 
@@ -1267,6 +1270,28 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      unique_change: function () {
+        var el = $(this),
+            elTr = null;
+
+        try {
+          elTr = $(el).closest("tr");
+          $(elTr).find("td.unique-field").find("input").each(function (idx, elInput) {
+            if ($(el).attr("id") !== $(elInput).attr("id")) {
+              $(elInput).prop("disabled", true);
+            }
+          });
+  
+        } catch (ex) {
+          private_methods.errMsg("unique_change", ex);
         }
       },
 

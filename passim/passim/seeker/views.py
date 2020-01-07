@@ -3869,7 +3869,7 @@ class PassimDetails(DetailView):
         # Get the instance
         instance = self.object
 
-        frm = self.prepare_form(instance, initial, context)
+        frm = self.prepare_form(instance, context, initial)
 
         # Walk all the formset objects
         bFormsetChanged = False
@@ -3916,7 +3916,7 @@ class PassimDetails(DetailView):
         # Check if the formset made any changes to the form
         if bFormsetChanged:
             # OLD: 
-            frm = self.prepare_form(instance, initial, context)
+            frm = self.prepare_form(instance, context)
 
             ## Re-adjust any lists in the form
             #if frm.is_valid():
@@ -3939,14 +3939,11 @@ class PassimDetails(DetailView):
         # Return the calculated context
         return context
 
-    def prepare_form(self, instance, initial, context):
+    def prepare_form(self, instance, context, initial=[]):
         # Initialisations
         bNew = False
         mForm = self.mForm
         oErr = ErrHandle()
-
-        # Debugging
-        x = instance.keywords.all()
 
         # Determine the prefix
         if self.prefix_type == "":
@@ -3987,6 +3984,9 @@ class PassimDetails(DetailView):
                 return context
             
             # All other actions just mean: edit or new and send back
+            # Make instance available
+            context['object'] = instance
+            self.object = instance
 
             # Do we have an existing object or are we creating?
             if instance == None:
@@ -3994,6 +3994,9 @@ class PassimDetails(DetailView):
                 frm = mForm(initial, prefix=prefix)
                 bNew = True
                 self.add = True
+            elif len(initial) == 0:
+                # Create a completely new form, on the basis of the [instance] only
+                frm = mForm(prefix=prefix, instance=instance)
             else:
                 # Editing an existing one
                 frm = mForm(initial, prefix=prefix, instance=instance)
@@ -4006,9 +4009,6 @@ class PassimDetails(DetailView):
                 if bResult:
                     # Now save it for real
                     obj.save()
-                    # Make it available
-                    context['object'] = instance
-                    self.object = instance
                     # Log the SAVE action
                     details = {'id': instance.id}
                     details["savetype"] = "new" if bNew else "change"
@@ -4058,8 +4058,7 @@ class PassimDetails(DetailView):
 
         # Return the form we made
         return frm
-
-
+    
 
 class BasicListView(ListView):
     """Basic listview"""

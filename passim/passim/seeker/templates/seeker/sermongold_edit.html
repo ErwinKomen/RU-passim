@@ -156,7 +156,7 @@
           <div class="edit-mode hidden">{{goldForm.siglist}}</div>
           {% if is_passim_editor %}
             <div class="new-mode hidden" id="gsign_formset">
-              {% include 'seeker/formset_new.html' with this_formset=gsign_formset prefix='gsign' linkfield=gsign_linkfield %}
+              {% include 'seeker/formset_new.html' with this_formset=gsign_formset prefix='gsign' linkfield=gsign_linkfield unique=1 %}
             </div>
           {% endif %}
         </td>

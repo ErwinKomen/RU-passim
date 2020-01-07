@@ -20,7 +20,7 @@
 
         <!-- Iterate over the remaining fields -->
         {% for field in frm %}
-          {% if field.help_text == "editable" %}<td >{{field}}</td>{% endif %}
+          {% if field.help_text == "editable" %}<td {% if unique %}class="unique-field"{% endif %}>{{field}}</td>{% endif %}
         {% endfor %}
 
         <!-- A delete button -->
@@ -43,7 +43,7 @@
 
       <!-- Iterate over the remaining fields -->
       {% for field in this_formset.empty_form %}
-        {% if field.help_text == "editable" %}<td>{{field}}</td>{% endif %}
+        {% if field.help_text == "editable" %}<td {% if unique %}class="unique-field"{% endif %}>{{field}}</td>{% endif %}
       {% endfor %}
 
       <!-- A delete button -->
