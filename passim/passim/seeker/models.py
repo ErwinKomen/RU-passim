@@ -1688,8 +1688,6 @@ class Litref(models.Model):
             bBack = False
         return bBack
 
-
-
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""
 
@@ -2092,8 +2090,7 @@ class Litref(models.Model):
             return result
         except:
             msg = oErr.get_error_message()
-            return ""
-    
+            return ""    
 
     def get_abbr(self):
         """Get the abbreviation, reading from Zotero if not yet done"""
@@ -3050,6 +3047,9 @@ class SermonGold(models.Model):
     # [0-n] Many-to-many: keywords per SermonGold
     keywords = models.ManyToManyField(Keyword, through="SermonGoldKeyword", related_name="keywords_gold")
 
+    # [0-n] Many-to-many: keywords per SermonGold
+    litrefs = models.ManyToManyField(Litref, through="LitrefSG", related_name="litrefs_gold")
+
     def __str__(self):
         name = self.signatures()
         if name == "":
@@ -3187,13 +3187,13 @@ class SermonGold(models.Model):
             lEdition.append(item.reference.short)
         return " | ".join(lEdition)
 
-    def editions_old(self):
-        """Combine all editions into one string"""
-
+    def get_editions(self):
         lEdition = []
-        for item in self.goldeditions.all():
-            lEdition.append(item.short())
-        return " | ".join(lEdition)
+        for item in self.sermon_gold_editions.all():
+            lEdition.append(item.get_short())
+        # Sort the items
+        lEdition.sort()
+        return lEdition
 
     def ftxtlinks(self):
         """Combine all editions into one string"""
@@ -3592,42 +3592,11 @@ class SermonGoldKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
+        response = None
+        # Note: only save if there is both a gold and a keyword
+        if self.gold and self.keyword_id:
+            response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
-
-
-#class Edition(models.Model):
-#    """Critical text edition of a Gold Sermon"""
-
-#    # [1] It must have a name - that is the Gryson book or the Clavis book or something
-#    name = models.CharField("Name", max_length=LONG_STRING)
-#    # [1] Every edition belongs to exactly one gold-sermon
-#    #     Note: when a SermonGold is removed, the edition that uses it is also removed
-#    #     This is because each Edition instance is uniquely associated with one SermonGold
-#    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldeditions")
-#    # [0-1] Temporary field to store update information
-#    update = models.CharField("Update info", default="-", max_length=LONG_STRING)
-
-#    def __str__(self):
-#        return self.name
-
-#    def short(self):
-#        return self.name
-
-#    def find(name, gold=None):
-#        lstQ = []
-#        lstQ.append(Q(name__iexact=name))
-#        if gold != None:
-#            lstQ.append(Q(gold=gold))
-#        obj = Edition.objects.filter(*lstQ).first()
-#        return obj
-
-#    def find_or_create(name):
-#        obj = self.find(name)
-#        if obj == None:
-#            obj = Edition(name=name)
-#            obj.save()
-#        return obj
 
 
 class Ftextlink(models.Model):
@@ -3934,10 +3903,13 @@ class Signature(models.Model):
         return obj
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Do the saving initially
-        response = super(Signature, self).save(force_insert, force_update, using, update_fields)
-        # Adapt list of signatures for the related GOLD
-        self.gold.do_signatures()
+        response = None
+        # Double check
+        if self.code and self.editype and self.gold_id:
+            # Do the saving initially
+            response = super(Signature, self).save(force_insert, force_update, using, update_fields)
+            # Adapt list of signatures for the related GOLD
+            self.gold.do_signatures()
         # Then return the super-response
         return response
 
@@ -4015,6 +3987,14 @@ class LitrefSG(models.Model):
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
+    def get_short(self):
+        short = ""
+        if self.reference:
+            short = self.reference.get_short()
+            if self.pages and self.pages != "":
+                short = "{} {}".format(short, self.pages)
+        return short
+
 
 class EdirefSG(models.Model):
     """The link between an edition item and a SermonGold"""
@@ -4025,6 +4005,15 @@ class EdirefSG(models.Model):
     sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_editions")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Double check the ESSENTIALS (pages may be empty)
+        if self.sermon_gold_id and self.reference_id:
+            # Do the saving initially
+            response = super(EdirefSG, self).save(force_insert, force_update, using, update_fields)
+        # Then return the response: should be "None"
+        return response
 
 
 class NewsItem(models.Model):

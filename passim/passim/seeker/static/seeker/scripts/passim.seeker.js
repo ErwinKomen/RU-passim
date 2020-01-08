@@ -2715,6 +2715,7 @@ var ru = (function ($, ru) {
               // Go to edit mode
               $(elTr).find(".view-mode").addClass("hidden");
               $(elTr).find(".edit-mode").removeClass("hidden");
+              $(elTr).find(".new-mode").removeClass("hidden");
               // Make sure typeahead works here
               ru.passim.init_typeahead();
               break;
@@ -3001,6 +3002,7 @@ var ru = (function ($, ru) {
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
+              $(elTr).find(".new-mode").addClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?

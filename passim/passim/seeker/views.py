@@ -176,7 +176,13 @@ def adapt_m2o(cls, instance, field, qs, **kwargs):
         msg = errHandle.get_error_message()
         return False
 
+def is_empty_form(form):
+    """Check if the indicated form has any cleaned_data"""
 
+    if "cleaned_data" not in form:
+        form.is_valid()
+    cleaned = form.cleaned_data
+    return (len(cleaned) == 0)
 
 
 def csv_to_excel(sCsvData, response):
@@ -3876,6 +3882,7 @@ class PassimDetails(DetailView):
         for formsetObj in self.formset_objects:
             formsetClass = formsetObj['formsetClass']
             prefix  = formsetObj['prefix']
+            formset = None
             form_kwargs = self.get_form_kwargs(prefix)
             if 'noinit' in formsetObj and formsetObj['noinit']:
                 # Only process actual changes!!
@@ -3884,13 +3891,25 @@ class PassimDetails(DetailView):
                     formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
                     # Process this formset
                     self.process_formset(prefix, self.request, formset)
-                    # Make sure this formset is processed 
+
+                    # Process all the correct forms in the formset
+                    for subform in formset:
+                        if subform.is_valid():
+                            subform.save()
+                            # Signal that the *FORM* needs refreshing, because the formset changed
+                            bFormsetChanged = True
+
                     if formset.is_valid():
-                        formset.save()
-                        # Signal that the *FORM* needs refreshing, because the formset changed
-                        bFormsetChanged = True
-                # Load an explicitly empty formset
-                formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                        # Load an explicitly empty formset
+                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                    else:
+                        # Retain the original formset, that now contains the error specifications per form
+                        # But: do *NOT* add an additional form to it
+                        pass
+
+                else:
+                    # All other cases: Load an explicitly empty formset
+                    formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
             else:
                 # show the data belonging to the current [obj]
                 qs = self.get_formset_queryset(prefix)
@@ -3907,6 +3926,7 @@ class PassimDetails(DetailView):
             # Add the formset to the context
             context[prefix + "_formset"] = formset
 
+
         # Essential formset information
         for formsetObj in self.formset_objects:
             prefix = formsetObj['prefix']
@@ -3917,13 +3937,6 @@ class PassimDetails(DetailView):
         if bFormsetChanged:
             # OLD: 
             frm = self.prepare_form(instance, context)
-
-            ## Re-adjust any lists in the form
-            #if frm.is_valid():
-            #    obj = frm.save(commit=False)
-            #    obj.kwlist = instance.keywords.all().order_by('name')
-            #    obj.siglist = instance.goldsignatures.all().order_by('editype', 'code')
-            #    obj.save()
 
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
@@ -6406,9 +6419,14 @@ class SermonGoldDetails(PassimDetails):
                                          form=SermonGoldSignatureForm, min_num=0,
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
+    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
+                                         form = SermonGoldEditionForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
                        {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
-                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
 
     def before_delete(self, instance):
 
@@ -6502,9 +6520,14 @@ class SermonGoldEdit(PassimDetails):
                                          form=SermonGoldSignatureForm, min_num=0,
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
+    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
+                                         form = SermonGoldEditionForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
                        {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
-                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
 
     def before_delete(self, instance):
 
@@ -6549,38 +6572,13 @@ class SermonGoldEdit(PassimDetails):
                 obj = Signature(code=sigcode, editype=editype, gold=instance)
                 obj.save()
 
-        # EXTINCT: use EdirefSG instead!!
-        # -------------------------------
-        ## Get the list of editions
-        #edi_list = form.cleaned_data['editionlist']
-        ## Copy these editions and link those copies to the Gold Sermon instance
-        #for edi in edi_list:
-        #    edi_copy = Edition.objects.create(name=edi.name, gold=instance)
-
-        # EXTINCT: allow adding keywords in a textbox, divided by semicolumn
-        ## Get the list of keywords
-        #keywords = form.cleaned_data['keyword'].strip()
-        #if keywords != "":
-        #    kwlist = keywords.split(";")
-        #    # Add a signature for each item
-        #    for kw in kwlist:
-        #        # Make sure starting and tailing spaces are removed
-        #        kw = kw.strip().lower()
-        #        # Check if it is already there
-        #        obj = Keyword.objects.filter(name=kw).first()
-        #        if obj == None:
-        #            # Add Keyword
-        #            obj = Keyword(name=kw)
-        #            obj.save()
-        #        # This is a new instance: add the association with the gold sermon
-        #        objlink = SermonGoldKeyword(gold=instance, keyword=obj)
-        #        objlink.save()
-
         # Return positively
         return True, "" 
 
     def process_formset(self, prefix, request, formset):
 
+        errors = []
+        bResult = True
         instance = formset.instance
         for form in formset:
             if form.is_valid():
@@ -6618,17 +6616,24 @@ class SermonGoldEdit(PassimDetails):
                         # Make sure we set the keyword
                         form.instance.keyword = obj
                         # Note: it will get saved with formset.save()
+                elif prefix == "gedi":
+                    # Edition processing
+                    if 'newpages' in cleaned and cleaned['newpages'] != "":
+                        newpages = cleaned['newpages']
+                        # Also get the litref
+                        litref = cleaned['litref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.litref = litref
+                            if newpages:
+                                form.instance.pages = newpages
+                        # Note: it will get saved with form.save()
             else:
-                errors = form.errors
-        return True
+                errors.append(form.errors)
+                bResult = False
+        return bResult
 
     def before_save(self, form, instance):
-        ## Re-adjust any lists in the form
-        #if frm.is_valid():
-        #    obj = frm.save(commit=False)
-        #    obj.kwlist = instance.keywords.all().order_by('name')
-        #    obj.siglist = instance.goldsignatures.all().order_by('editype', 'code')
-        #    obj.save()
         form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
         form.fields['siglist'].initial = instance.goldsignatures.all().order_by('editype', 'code')
         return True, ""

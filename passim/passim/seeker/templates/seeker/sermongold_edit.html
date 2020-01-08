@@ -162,6 +162,45 @@
         </td>
       </tr>
 
+      <!-- TESTING -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Litrefs</span>
+          <span><a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);"><span class="glyphicon glyphicon-plus"></span></a></span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            Intentionally empty
+          </div>
+          <div class="edit-mode hidden">
+              {{goldForm.testref}}
+          </div>
+        </td>
+      </tr>
+
+      <!-- EdirefSG / Litref (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Editions</span>
+          <span><a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);"><span class="glyphicon glyphicon-plus"></span></a></span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            {% if goldForm.instance.sermon_gold_editions.count > 0 %}
+              {% for edisg in goldForm.instance.get_editions %}
+                <span class="keyword">{{edisg}}</span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{goldForm.edilist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gedi_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gedi_formset prefix='gedi' linkfield=gedi_linkfield %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
     </table>
 </form>
 

@@ -20,8 +20,17 @@
 
         <!-- Iterate over the remaining fields -->
         {% for field in frm %}
-          {% if field.help_text == "editable" %}<td {% if unique %}class="unique-field"{% endif %}>{{field}}</td>{% endif %}
+          {% if field.help_text == "editable" %}
+            <td {% if unique %}class="unique-field"{% endif %}>{{field}}</td>
+          {% endif %}
         {% endfor %}
+        {% if frm.errors %}
+          <td>
+            {% for error in frm.non_field_errors %}
+              <div class="alert alert-danger"><strong>{{error|escape}}</strong></div>
+            {% endfor %}
+          </td>
+        {% endif %}
 
         <!-- A delete button -->
         <td title="Delete this item" style="vertical-align: middle; width: 20px" class="clickable">
