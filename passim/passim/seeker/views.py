@@ -5903,6 +5903,21 @@ class ManuscriptProvset(BasicPart):
 
                     # Indicate that changes have been made
                     has_changed = True
+            elif instance and instance.id and instance.provenance:
+                # Check for any other changes in existing stuff
+                provenance = instance.provenance
+                name = form.cleaned_data['name']
+                note = form.cleaned_data['note']
+                if provenance.name != name:
+                    # Change in name
+                    instance.provenance.name = name
+                    instance.provenance.save()
+                    has_changed = True
+                if provenance.note != note:
+                    # Change in note
+                    instance.provenance.note = note
+                    instance.provenance.save()
+                    has_changed = True
 
         return has_changed
     
