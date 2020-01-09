@@ -28,7 +28,9 @@ var ru = (function ($, ru) {
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.litref_template }
+          },
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
@@ -1368,6 +1370,7 @@ var ru = (function ($, ru) {
       add_new_select2: function (el) {
         var elTr = null,
             elRow = null,
+            options = {},
             elDiv = null;
 
         try {
@@ -1377,7 +1380,8 @@ var ru = (function ($, ru) {
           $(elDiv).removeClass("hidden");
           // Find the first row
           elRow = $(elDiv).find("tbody tr").first();
-          ru.passim.seeker.tabular_addrow($(elRow));
+          options['select2'] = true;
+          ru.passim.seeker.tabular_addrow($(elRow), options);
 
           // Add
         } catch (ex) {
@@ -3566,14 +3570,16 @@ var ru = (function ($, ru) {
        *   Add one row into a tabular inline
        *
        */
-      tabular_addrow: function (elStart) {
+      tabular_addrow: function (elStart, options) {
         // NOTE: see the definition of lAddTableRow above
         var arTdef = lAddTableRow,
             oTdef = {},
             rowNew = null,
             elTable = null,
+            select2_options = {},
             iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
             sId = "",
+            bSelect2 = false,
             i;
 
         try {
@@ -3581,6 +3587,14 @@ var ru = (function ($, ru) {
           if (elStart === undefined || elStart === null)
             elStart = $(this);
           sId = $(elStart).closest("div[id]").attr("id");
+          // Process options
+          if (options !== undefined) {
+            for (var prop in options) {
+              switch (prop) {
+                case "select2": bSelect2 = options[prop]; break;
+              }
+            }
+          }
           // Walk all tables
           for (i = 0; i < arTdef.length; i++) {
             // Get the definition
@@ -3589,11 +3603,22 @@ var ru = (function ($, ru) {
               // Go to the <tbody> and find the last form-row
               elTable = $(elStart).closest("tbody").children("tr.form-row.empty-form")
 
+              if ("select2_options" in oTdef) {
+                select2_options = oTdef.select2_options;
+              }
+
               // Perform the cloneMore function to this <tr>
               rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
               // Call the event initialisation again
               if (oTdef.events !== null) {
                 oTdef.events();
+              }
+              // Possible Select2 follow-up
+              if (bSelect2) {
+                // Remove previous .select2
+                $(rowNew).find(".select2").remove();
+                // Execute djangoSelect2()
+                $(rowNew).find(".django-select2").djangoSelect2(select2_options);
               }
               // Any follow-up activity
               if ('follow' in oTdef && oTdef['follow'] !== null) {

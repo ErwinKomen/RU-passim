@@ -1221,7 +1221,7 @@ span.badge.signature.ot {
 span.badge.signature {
   background-color: lightgray;
   color: darkblue;
-  font-size: smaller;
+  font-size: 85%;
   padding: 2px 5px;
   font-weight: normal;
   border-radius: 5px;

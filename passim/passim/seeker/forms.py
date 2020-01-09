@@ -64,7 +64,7 @@ class LitrefWidget(ModelSelect2Widget):
         short = obj.get_short()
         full = obj.full
         # Determine here what to return...
-        return short
+        return full
 
     def get_queryset(self):
         return Litref.objects.exclude(full="").order_by('full').distinct()
@@ -80,6 +80,18 @@ class LitrefSgWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
+
+
+class EdirefSgWidget(ModelSelect2MultipleWidget):
+    model = EdirefSG
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
 class ProjectWidget(ModelSelect2MultipleWidget):
@@ -627,21 +639,7 @@ class SermonGoldForm(forms.ModelForm):
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=LitrefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
-
-    testref = forms.ModelChoiceField(queryset=None, required=False, 
-               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #testref = forms.ModelChoiceField(
-    #    queryset = Litref.objects.exclude(full="").order_by('full'),
-    #    label="Reference",
-    #    help_text="editable",
-    #    widget = ModelSelect2Widget(
-    #        model=Litref,
-    #        search_fields = ['full_icontains'],
-    #        attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}
-    #    )
-    #)
-
+                widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -663,10 +661,7 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['edilist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages')
-
-        self.fields['testref'].required = False
-        self.fields['testref'].queryset = Litref.objects.exclude(full="").order_by('full')
+        self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages')
         
         # Get the instance
         if 'instance' in kwargs:
@@ -678,7 +673,7 @@ class SermonGoldForm(forms.ModelForm):
             # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
-            self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
+            self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
 
         # We are okay
         return None
@@ -812,20 +807,9 @@ class SermonGoldSignatureForm(forms.ModelForm):
         
 
 class SermonGoldEditionForm(forms.ModelForm):
-    #oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-    #           widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
-    oneref = forms.ModelChoiceField(
-        queryset = Litref.objects.exclude(full="").order_by('full'),
-        label="Reference",
-        help_text="editable",
-        widget = ModelSelect2Widget(
-            model=Litref,
-            search_fields = ['full_icontains'],
-            attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}
-        )
-    )
-    #oneref = forms.ChoiceField(queryset=None, required=False, help_text="editable",
-    #           widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    # EK: Added for Sermon Gold new approach 
+    oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     # ORIGINAL:
@@ -847,10 +831,10 @@ class SermonGoldEditionForm(forms.ModelForm):
         self.fields['reference'].required = False
         self.fields['litref'].required = False
         self.fields['litref_ta'].required = False
-        # Added:
+        # EK: Added for Sermon Gold new approach 
         self.fields['newpages'].required = False
         self.fields['oneref'].required = False
-        # self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -858,15 +842,23 @@ class SermonGoldEditionForm(forms.ModelForm):
             if instance.reference != None:
                 self.fields['litref_ta'].initial = instance.reference.get_short() 
 
+    def save(self, commit=True, *args, **kwargs):
+        response = super(SermonGoldEditionForm, self).save(commit, **kwargs)
+        iStop = 1
+        return response
+
     def clean(self):
         cleaned_data = super(SermonGoldEditionForm, self).clean()
         litref = cleaned_data.get("litref")
+        oneref = cleaned_data.get("oneref")     # EK: added for new approach (also in the "if-statement")
         reference = cleaned_data.get("reference")
-        if reference == None and (litref == None or litref == ""):
+        if reference == None and (litref == None or litref == "") and (oneref == None or oneref == ""):
             #litref_ta = cleaned_data.get("litref_ta")
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
             raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
+
+    
 
 
 class SermonGoldKeywordForm(forms.ModelForm):

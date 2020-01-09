@@ -3987,13 +3987,26 @@ class LitrefSG(models.Model):
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Double check the ESSENTIALS (pages may be empty)
+        if self.sermon_gold_id and self.reference_id:
+            # Do the saving initially
+            response = super(LitrefSG, self).save(force_insert, force_update, using, update_fields)
+        # Then return the response: should be "None"
+        return response
+
     def get_short(self):
         short = ""
         if self.reference:
             short = self.reference.get_short()
             if self.pages and self.pages != "":
-                short = "{} {}".format(short, self.pages)
+                short = "{}, pp {}".format(short, self.pages)
         return short
+
+    def get_short_markdown(self):
+        short = self.get_short()
+        return adapt_markdown(short, lowercase=False)
 
 
 class EdirefSG(models.Model):
@@ -4014,6 +4027,18 @@ class EdirefSG(models.Model):
             response = super(EdirefSG, self).save(force_insert, force_update, using, update_fields)
         # Then return the response: should be "None"
         return response
+
+    def get_short(self):
+        short = ""
+        if self.reference:
+            short = self.reference.get_short()
+            if self.pages and self.pages != "":
+                short = "{}, pp {}".format(short, self.pages)
+        return short
+
+    def get_short_markdown(self):
+        short = self.get_short()
+        return adapt_markdown(short, lowercase=False)
 
 
 class NewsItem(models.Model):

@@ -115,7 +115,7 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2):
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False):
     """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
 
     errHandle = ErrHandle()
@@ -123,15 +123,30 @@ def adapt_m2m(cls, instance, field1, qs, field2):
         # Get current associations
         lstQ = [Q(**{field1: instance})]
         through_qs = cls.objects.filter(*lstQ)
-        related_qs = [getattr(x, field2) for x in through_qs]
+        if related_is_through:
+            related_qs = through_qs
+        else:
+            related_qs = [getattr(x, field2) for x in through_qs]
         # make sure all items in [qs] are associated
         for obj in qs:
             if obj not in related_qs:
                 # Add the association
-                cls.objects.create(**{field1: instance, field2: obj})
+                args = {field1: instance}
+                if related_is_through:
+                    args[field2] = getattr(obj, field2)
+                else:
+                    args[field2] = obj
+                for item in extra:
+                    # Copy the field with this name from [obj] to 
+                    args[item] = getattr(obj, item)
+                # cls.objects.create(**{field1: instance, field2: obj})
+                cls.objects.create(**args)
         # Remove from [cls] all associations that are not in [qs]
         for item in through_qs:
-            obj = getattr(item, field2)
+            if related_is_through:
+                obj = item
+            else:
+                obj = getattr(item, field2)
             if obj not in qs:
                 # Remove this item
                 item.delete()
@@ -2747,6 +2762,31 @@ def get_locations(request):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("get_locations")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_litref(request):
+    """Get ONE particular short representation of a litref"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            litref = Litref.objects.filter(Q(id=sId)).first()
+            if litref:
+                short = litref.get_short()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_litref")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -6618,16 +6658,17 @@ class SermonGoldEdit(PassimDetails):
                         # Note: it will get saved with formset.save()
                 elif prefix == "gedi":
                     # Edition processing
+                    newpages = ""
                     if 'newpages' in cleaned and cleaned['newpages'] != "":
                         newpages = cleaned['newpages']
-                        # Also get the litref
-                        litref = cleaned['litref']
-                        # Check if all is in order
-                        if litref:
-                            form.instance.litref = litref
-                            if newpages:
-                                form.instance.pages = newpages
-                        # Note: it will get saved with form.save()
+                    # Also get the litref
+                    litref = cleaned['oneref']
+                    # Check if all is in order
+                    if litref:
+                        form.instance.reference = litref
+                        if newpages:
+                            form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -6648,6 +6689,8 @@ class SermonGoldEdit(PassimDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
+            edilist = form.cleaned_data['edilist']
+            adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
 
             # Process many-to-one changes
             # (1) 'goldsignatures'
