@@ -3917,6 +3917,10 @@ class PassimDetails(DetailView):
 
         frm = self.prepare_form(instance, context, initial)
 
+        if instance == None:
+            instance = frm.instance
+            self.object = instance
+
         # Walk all the formset objects
         bFormsetChanged = False
         for formsetObj in self.formset_objects:
@@ -3965,7 +3969,6 @@ class PassimDetails(DetailView):
             formsetObj['formsetinstance'] = formset
             # Add the formset to the context
             context[prefix + "_formset"] = formset
-
 
         # Essential formset information
         for formsetObj in self.formset_objects:
@@ -4063,17 +4066,18 @@ class PassimDetails(DetailView):
                     # Now save it for real
                     obj.save()
                     # Log the SAVE action
-                    details = {'id': instance.id}
+                    details = {'id': obj.id}
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
-                        details['changes'] = action_model_changes(frm, instance)
-                    Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
+                        details['changes'] = action_model_changes(frm, obj)
+                    Action.add(self.request.user.username, obj.__class__.__name__, "save", json.dumps(details))
 
                     # Make sure the form is actually saved completely
                     frm.save()
+                    instance = obj
 
                     # Any action(s) after saving
-                    bResult, msg = self.after_save(frm, instance)
+                    bResult, msg = self.after_save(frm, obj)
                 else:
                     context['errors'] = {'save': msg }
             else:
@@ -4919,21 +4923,21 @@ class SermonDetails(PassimDetails):
             self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
         else:
             # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
-            sedi_list = []
+            # sedi_list = []
             goldauthors = []
             # Visit all linked gold sermons
             for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
                 # Access the gold sermon
                 gold = linked.gold
-                # Get all the editions of this gold sermon
-                for edi in gold.goldeditions.all():
-                    name = edi.name
-                    if name not in sedi_list:
-                        sedi_list.append({'name': name})
+                ## Get all the editions of this gold sermon
+                #for edi in gold.goldeditions.all():
+                #    name = edi.name
+                #    if name not in sedi_list:
+                #        sedi_list.append({'name': name})
                 # Does this one have an author?
                 if gold.author != None:
                     goldauthors.append(gold.author)
-            context['sedi_list'] = sedi_list
+            # context['sedi_list'] = sedi_list
             context['goldauthors'] = goldauthors
 
         return context
@@ -5629,6 +5633,22 @@ class ManuscriptDetails(PassimDetails):
             self.newRedirect = True
             self.redirectpage = reverse('manuscript_details', kwargs={'pk': instance.id})
         return True, "" 
+
+    def before_save(self, form, instance):
+        bNeedSaving = False
+        if instance:
+            if not instance.project:
+                # Set the default project: Passim
+                passim = Project.objects.filter(Q(name__iexact="passim")).first()
+                instance.project = passim
+                bNeedSaving = True
+            if instance.source == None:
+                # Create a source info element
+                source = SourceInfo(collector=self.request.user.username, code="Manually added") # TH: aanpassen, klopt niet, ccfr
+                source.save()
+                instance.source = source
+                bNeedSaving = True
+        return bNeedSaving, ""
 
     def add_to_context(self, context, instance):
         template_sermon = 'seeker/sermon_view.html'
