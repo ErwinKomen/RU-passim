@@ -4771,6 +4771,69 @@ class OriginEdit(BasicPart):
         return context
 
 
+class SermonEdit(BasicPart):
+    """The details of one manuscript"""
+
+    MainModel = SermonDescr
+    template_name = 'seeker/sermon_edit.html'  
+    title = "Sermon" 
+    afternewurl = ""
+    # One form is attached to this 
+    prefix = "sermo"
+    form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}]
+
+    def add_to_context(self, context):
+
+        # Get the instance
+        instance = self.obj
+
+        # Not sure if this is still needed
+        context['msitem'] = instance
+
+        # Make sure to pass on the manuscript_id
+        context['afternewurl'] = ""
+        manuscript_id = None
+        if 'manuscript_id' in self.qd:
+            manuscript_id = self.qd['manuscript_id']
+            # Set the URL to be taken after saving
+            context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+        context['manuscript_id'] = manuscript_id
+
+        # Define where to go to after deletion
+        # context['afterdelurl'] = reverse("sermon_list")
+        context['afterdelurl'] = get_previous_page(self.request)
+
+        return context
+
+    def after_save(self, prefix, instance = None, form = None):
+
+        # Check if this is a new one
+        if self.add:
+            # This is a new one, so it should be coupled to the correct manuscript
+            if 'manuscript_id' in self.qd:
+                # It is there, so we can add it
+                manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
+                if manuscript != None:
+                    # Adapt the SermonDescr instance
+                    instance.manu = manuscript
+                    # Calculate how many sermons there are
+                    sermon_count = manuscript.manusermons.all().count()
+                    # Make sure the new sermon gets changed
+                    instance.order = sermon_count
+                    instance.save()
+        elif instance and instance.order <= 0:
+            # Calculate how many sermons there are
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
+
+                        
+        
+        # There's is no real return value needed here 
+        return True
+
+
 class SermonDetails(PassimDetails):
     """The details of one sermon"""
 
@@ -4941,74 +5004,6 @@ class SermonDetails(PassimDetails):
             context['goldauthors'] = goldauthors
 
         return context
-
-
-class SermonEdit(BasicPart):
-    """The details of one manuscript"""
-
-    MainModel = SermonDescr
-    template_name = 'seeker/sermon_edit.html'  
-    title = "Sermon" 
-    afternewurl = ""
-    # One form is attached to this 
-    prefix = "sermo"
-    form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}]
-
-    def custom_init(self):
-        """Adapt the prefix for [sermo] to fit the kind of prefix provided by PassimDetails"""
-
-        return True
-
-    def add_to_context(self, context):
-
-        # Get the instance
-        instance = self.obj
-
-        # Not sure if this is still needed
-        context['msitem'] = instance
-
-        # Make sure to pass on the manuscript_id
-        context['afternewurl'] = ""
-        manuscript_id = None
-        if 'manuscript_id' in self.qd:
-            manuscript_id = self.qd['manuscript_id']
-            # Set the URL to be taken after saving
-            context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
-        context['manuscript_id'] = manuscript_id
-
-        # Define where to go to after deletion
-        # context['afterdelurl'] = reverse("sermon_list")
-        context['afterdelurl'] = get_previous_page(self.request)
-
-        return context
-
-    def after_save(self, prefix, instance = None, form = None):
-
-        # Check if this is a new one
-        if self.add:
-            # This is a new one, so it should be coupled to the correct manuscript
-            if 'manuscript_id' in self.qd:
-                # It is there, so we can add it
-                manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
-                if manuscript != None:
-                    # Adapt the SermonDescr instance
-                    instance.manu = manuscript
-                    # Calculate how many sermons there are
-                    sermon_count = manuscript.manusermons.all().count()
-                    # Make sure the new sermon gets changed
-                    instance.order = sermon_count
-                    instance.save()
-        elif instance and instance.order <= 0:
-            # Calculate how many sermons there are
-            sermon_count = manuscript.manusermons.all().count()
-            # Make sure the new sermon gets changed
-            instance.order = sermon_count
-            instance.save()
-
-                        
-        
-        # There's is no real return value needed here 
-        return True
 
 
 class SermonListView(BasicListView):
@@ -6756,39 +6751,6 @@ class SermonGoldLitset(BasicPart):
         return has_changed
 
 
-class AuthorDetails(PassimDetails):
-    """The details of one author"""
-
-    model = Author
-    mForm = AuthorEditForm
-    template_name = 'seeker/author_details.html'
-    template_post = 'seeker/author_details.html'
-    prefix = 'author'
-    title = "AuthorDetails"
-    afternewurl = ""
-    rtype = "html"  # GET provides a HTML form straight away
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('author_search')
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('author_search')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Authors', prevpage])
-        if instance:
-            current_name = instance.name
-        else:
-            current_name = "Author details"
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-        return context
-
-
 class AuthorEdit(PassimDetails):
     """The details of one author"""
 
@@ -6797,7 +6759,7 @@ class AuthorEdit(PassimDetails):
     template_name = 'seeker/author_edit.html'
     template_post = 'seeker/author_edit.html'
     prefix = 'author'
-    title = "AuthorEdit"
+    title = "Author"
     afternewurl = ""
     rtype = "json"
 
@@ -6813,6 +6775,30 @@ class AuthorEdit(PassimDetails):
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Author edit", False)
 
         context['afterdelurl'] = get_previous_page(self.request)
+        return context
+
+
+class AuthorDetails(AuthorEdit):
+    """The details of one author"""
+
+    template_name = 'seeker/author_details.html'
+    template_post = 'seeker/author_details.html'
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+
+        context['afterdelurl'] = ""
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('author_search')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Authors', prevpage])
+        if instance:
+            current_name = instance.name
+        else:
+            current_name = "Author details"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
 
 

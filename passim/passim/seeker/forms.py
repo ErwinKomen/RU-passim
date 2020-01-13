@@ -661,7 +661,7 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages')
+        self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
         
         # Get the instance
         if 'instance' in kwargs:

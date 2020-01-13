@@ -3584,7 +3584,7 @@ var ru = (function ($, ru) {
 
         try {
           // Find out just where we are
-          if (elStart === undefined || elStart === null)
+          if (elStart === undefined || elStart === null || $(elStart).closest("div").length === 0)
             elStart = $(this);
           sId = $(elStart).closest("div[id]").attr("id");
           // Process options
