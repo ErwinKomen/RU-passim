@@ -100,6 +100,7 @@ urlpatterns = [
     url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
     url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollectionDetails.as_view(), name='collection_details'),
     url(r'^collection/edit(?:/(?P<pk>\d+))?/$', CollectionEdit.as_view(), name='collection_edit'),
+    url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/show', BasketView.as_view(), name='basket_show'),

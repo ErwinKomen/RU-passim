@@ -5137,7 +5137,7 @@ class CollectionListView(BasicListView):
         {'section': '', 'filterlist': [
             {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'name' }]}
+            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' }]}
         ]
 
     def adapt_search(self, fields):
@@ -5222,6 +5222,29 @@ class CollectionDetails(PassimDetails):
 
         return context
 
+
+class CollectionSermset(BasicPart):
+    """The set of sermons from the collection"""
+
+    MainModel = Collection
+    template_name = 'seeker/collection_sermset.html'
+    title = "CollectionsSermons"
+
+    def add_to_context(self, context):
+        
+        # Pass on all the sermons from each Collection
+        col = self.obj.id #??
+        scol_list = []
+        for item in CollectionSerm.objects.filter(collection_id=col):
+            oAdd = {}
+            oAdd['title'] = item.title.id
+            # oAdd['title'] = item.reference.title
+
+            scol_list.append(oAdd)
+
+        context['scol_list'] = scol_list
+
+        return context
 
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
