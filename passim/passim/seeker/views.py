@@ -589,7 +589,7 @@ def home(request):
     # Create the list of news-items
     lstQ = []
     lstQ.append(Q(status='val'))
-    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-saved', '-created')
+    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
     context['newsitem_list'] = newsitem_list
 
     # Gather the statistics
@@ -6472,108 +6472,6 @@ class SermonGoldFtxtset(BasicPart):
     formset_objects = [{'formsetClass': GftextFormSet, 'prefix': 'gftxt', 'readonly': False}]
 
 
-class SermonGoldDetails(PassimDetails):
-    """The details of one sermon"""
-
-    model = SermonGold
-    mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_details.html'
-    prefix = "gold"
-    title = "SermonGold" 
-    afternewurl = ""
-    rtype = "html"
-    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
-                                       form=SermonGoldKeywordForm, min_num=0,
-                                       fk_name="gold", extra=0)
-    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
-                                         form=SermonGoldSameForm, min_num=0,
-                                         fk_name = "src",
-                                         extra=0, can_delete=True, can_order=False)
-    GsignFormSet = inlineformset_factory(SermonGold, Signature,
-                                         form=SermonGoldSignatureForm, min_num=0,
-                                         fk_name = "gold",
-                                         extra=0, can_delete=True, can_order=False)
-    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
-                                         form = SermonGoldEditionForm, min_num=0,
-                                         fk_name = "sermon_gold",
-                                         extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
-                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
-                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
-                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
-
-    def before_delete(self, instance):
-
-        oErr = ErrHandle()
-        try:
-            # (1) Check if there is an 'equality' link to another SermonGold
-
-            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
-
-            # (3) Remove all gold-to-gold links that include this one
-
-            # (4) Remove all links from SermonDescr to this instance of SermonGold
-
-            # All is well
-            return True, "" 
-        except:
-            msg = oErr.get_error_message()
-            return False, msg
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-        # self.afternewurl = reverse('search_gold')
-
-        if instance.equal == None:
-            # Create a new equality set to which we add this Gold sermon
-            geq = EqualGold.objects.create()
-            instance.equal = geq
-            instance.save()
-
-
-        # Make sure we do a page redirect
-        self.newRedirect = True
-        self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
-
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        """Add to the existing context"""
-
-        # Start a list of related gold sermons
-        lst_related = []
-        # Do we have an instance?
-        if instance != None:
-            # There is an instance: get the list of SermonGold items to which I link
-            relations = instance.get_relations()
-            # Get a form for each of these relations
-            for instance_rel in relations:
-                linkprefix = "glink-{}".format(instance_rel.id)
-                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
-                lst_related.append(oForm)
-
-        # Add the list to the context
-        context['relations'] = lst_related
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('search_gold')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Gold Sermons', prevpage])
-        if instance:
-            qs = instance.goldsignatures.all()
-            if qs.count() == 0:
-                current_name = "Gold-sermon (no id)"
-            else:
-                current_name = "Gold-sermon [{}]".format(qs[0].code)
-        else:
-            current_name = "Gold-sermon (new)"
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-
-        return context
-
-
 class SermonGoldEdit(PassimDetails):
     """The details of one sermon"""
 
@@ -6604,6 +6502,36 @@ class SermonGoldEdit(PassimDetails):
                        {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
 
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set the 'afternew' URL
+        self.afternewurl = reverse('search_gold')
+
+        # Create a new equality set to which we add this Gold sermon
+        if instance.equal == None:
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
+
+        # THIS CODE ON SIGNATURES MAY BE OBSOLETE...
+        #   because we do not user the field "signatures" (plural) for multiple signatures any more
+        ## Get the list of signatures
+        #signatures = form.cleaned_data['signature'].strip()
+        #if signatures != "":
+        #    siglist = signatures.split(";")
+        #    # Add a signature for each item
+        #    for sigcode in siglist:
+        #        # Make sure starting and tailing spaces are removed
+        #        sigcode = sigcode.strip()
+        #        editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
+        #        # Add signature
+        #        obj = Signature(code=sigcode, editype=editype, gold=instance)
+        #        obj.save()
+
+        # Return positively
+        return True, "" 
+
     def before_delete(self, instance):
 
         oErr = ErrHandle()
@@ -6621,34 +6549,6 @@ class SermonGoldEdit(PassimDetails):
         except:
             msg = oErr.get_error_message()
             return False, msg
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        # Set the 'afternew' URL
-        self.afternewurl = reverse('search_gold')
-
-        # Create a new equality set to which we add this Gold sermon
-        if instance.equal == None:
-            geq = EqualGold.objects.create()
-            instance.equal = geq
-            instance.save()
-
-        # Get the list of signatures
-        signatures = form.cleaned_data['signature'].strip()
-        if signatures != "":
-            siglist = signatures.split(";")
-            # Add a signature for each item
-            for sigcode in siglist:
-                # Make sure starting and tailing spaces are removed
-                sigcode = sigcode.strip()
-                editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
-                # Add signature
-                obj = Signature(code=sigcode, editype=editype, gold=instance)
-                obj.save()
-
-        # Return positively
-        return True, "" 
 
     def process_formset(self, prefix, request, formset):
 
@@ -6707,7 +6607,7 @@ class SermonGoldEdit(PassimDetails):
             else:
                 errors.append(form.errors)
                 bResult = False
-        return bResult
+        return None
 
     def before_save(self, form, instance):
         form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
@@ -6750,6 +6650,75 @@ class SermonGoldEdit(PassimDetails):
         context['afterdelurl'] = reverse('search_gold')
 
         return context
+
+
+class SermonGoldDetails(SermonGoldEdit):
+    """The details of one sermon"""
+
+    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_details.html'
+    rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+        # self.afternewurl = reverse('search_gold')
+
+        if instance.equal == None:
+            # Create a new equality set to which we add this Gold sermon
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
+
+
+        # Make sure we do a page redirect
+        self.newRedirect = True
+        self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
+
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start a list of related gold sermons
+        lst_related = []
+        # Do we have an instance?
+        if instance != None:
+            # There is an instance: get the list of SermonGold items to which I link
+            relations = instance.get_relations()
+            # Get a form for each of these relations
+            for instance_rel in relations:
+                linkprefix = "glink-{}".format(instance_rel.id)
+                oForm = SermonGoldSameForm(instance=instance_rel, prefix=linkprefix)
+                lst_related.append(oForm)
+
+        # Add the list to the context
+        context['relations'] = lst_related
+
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('search_gold')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Gold Sermons', prevpage])
+        if instance:
+            qs = instance.goldsignatures.all()
+            if qs.count() == 0:
+                current_name = "Gold-sermon (no id)"
+            else:
+                current_name = "Gold-sermon [{}]".format(qs[0].code)
+        else:
+            current_name = "Gold-sermon (new)"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
 
 
 class SermonGoldLitset(BasicPart):
