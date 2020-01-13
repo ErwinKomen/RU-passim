@@ -181,6 +181,12 @@ class SermonDescrAdmin(admin.ModelAdmin):
     search_fields = ['id', 'siglist']
 
 
+class ManuscriptAdmin(admin.ModelAdmin):
+    """Manuscript"""
+    list_display = ['id', 'name', 'idno', 'project']
+    search_fields = ['name', 'idno']
+    list_filter = ['project'] 
+
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
@@ -200,6 +206,7 @@ admin.site.register(Litref, LitrefAdmin)
 admin.site.register(LitrefMan)
 admin.site.register(SermonDescr, SermonDescrAdmin)
 admin.site.register(SermonGold)
+admin.site.register(Manuscript, ManuscriptAdmin)
 
 admin.site.register(Report, ReportAdmin)
 

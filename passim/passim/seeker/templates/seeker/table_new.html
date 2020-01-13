@@ -1,0 +1,36 @@
+﻿{% load i18n %}
+
+<table class="func-view">
+
+  <thead>
+    <tr>
+      <th>#</th>
+      {% for fname in thisform.fields %}
+        <th>{{fname}}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Standard provide a first row with fields and input -->
+    <tr>
+      <td>1</td>
+      {% for fname in thisform.fields %}
+        <td><input name="{{thisform.prefix}}-1-{{fname}}" value="" /></td>
+      {% endfor %}
+    </tr>
+    <!-- A hidden row with an empty set -->
+    <tr class="hidden" id="kw-empty">
+      <td>__counter__</td>
+      <td><input name="{{thisform.prefix}}-__counter__-name" value="" /></td>
+    </tr>
+    <!-- Add row -->
+    <tr class="add-row">
+      <td colspan="5">
+        <span id="add_{{thisform.name}}">
+          <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a {{thisform.name}}</a>
+        </span>
+      </td>
+    </tr>
+
+  </tbody>
+</table>

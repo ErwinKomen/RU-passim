@@ -143,6 +143,7 @@ urlpatterns = [
     url(r'^api/origins/$', passim.seeker.views.get_origins, name='api_origins'),
     url(r'^api/locations/$', passim.seeker.views.get_locations, name='api_locations'),
     url(r'^api/litrefs/$', passim.seeker.views.get_litrefs, name='api_litrefs'),
+    url(r'^api/litref/$', passim.seeker.views.get_litref, name='api_litref'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
     url(r'^api/nicknames/$', passim.seeker.views.get_nicknames, name='api_nicknames'),
@@ -161,7 +162,7 @@ urlpatterns = [
     url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
     url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
+    # url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 

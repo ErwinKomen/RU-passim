@@ -61,7 +61,7 @@
       <!-- Room for the standard fields -->
       <!-- Author (provided it is found in the gold standard) -->
       <tr>
-        <td class="hoverable" style="min-width: 150px;">Author (gold standard)</td>
+        <td class="hoverable" style="min-width: 150px;">Attributed author</td>
         <td style="width: 100%">
           <div class="author-key hidden">{{goldForm.author}}</div>
           <div class="edit-mode hidden">{{goldForm.authorname}}</div>
@@ -96,15 +96,6 @@
         </td>
       </tr>
 
-      <!-- Keywords - ONLY shown for new items -->
-      <tr class="edit-new hidden">
-        <td class="hoverable" title="List keywords separated by semicolons">Keyword(s)</td>
-        <td>
-          <div class="edit-mode hidden">{{goldForm.keyword}}</div>
-          <div class="view-mode">{{goldForm.instance.get_keywords}}</div>
-        </td>
-      </tr>
-
       <!-- Bibliography -->
       <tr>
         <td class="hoverable" valign="top">Bibliography</td>
@@ -114,27 +105,87 @@
         </td>
       </tr>
 
-      <!-- VIEW only: keywords -->
+      <!-- Keywords (using select2) -->
       <tr class="">
-        <td valign="top">Keywords</td>
+        <td valign="top" class="tdnowrap">
+          <span>Keywords</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
         <td class="manuscript-format" align="left">
-          <div class="any-mode">
+          <div class="view-mode">
             {% if goldForm.instance.keywords.count > 0 %}
-              {% for kw in goldForm.instance.keywords.all %}
-                <span class="keyword">{{kw.name}}</span>
+              {% for kw in goldForm.instance.keywords.all|dictsort:"name" %}
+                <span class="keyword"><a href="{% url 'search_gold' %}?gold-keyword={{kw.name}}">{{kw.name}}</a></span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
+          <div class="edit-mode hidden">{{goldForm.kwlist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gkw_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gkw_formset prefix='gkw' linkfield=gkw_linkfield %}
+            </div>
+          {% endif %}
         </td>
       </tr>
 
-      <!-- Edition(s) -->
-      <!-- NOTE: this has been surpassed by EdirefSG, so the code below should be removed in due course -->
-      <tr class="edit-new hidden">
-        <td class="hoverable" valign="top">Edition(s)</td>
-        <td valign="top">
-          <div class="view-mode">{{goldForm.instance.editionlist}}</div>
-          <div class="edit-mode hidden">{{goldForm.editionlist}}</div>
+      <!-- Signatures (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Gryson/Clavis codes</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            <!-- Gryson -->
+            {% if goldForm.instance.goldsignatures.count > 0 %}
+              {% for sig in goldForm.instance.signatures_ordered %}
+                <span class="badge signature {{sig.editype}}">
+                  <a href="{% url 'search_gold' %}?gold-siglist={{sig.id}}">{{sig.code}}</a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{goldForm.siglist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gsign_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gsign_formset prefix='gsign' linkfield=gsign_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- EdirefSG / Litref (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Editions</span>
+          <span><a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);"><span class="glyphicon glyphicon-plus"></span></a></span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            {% if goldForm.instance.sermon_gold_editions.count > 0 %}
+              {% for edisg in goldForm.instance.sermon_gold_editions.all %}
+                <span class="badge signature ot">
+                  <a href="{% url 'literature_list' %}#edi_{{edisg.reference.pk}}">
+                    {{edisg.get_short_markdown|safe}}
+                  </a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{goldForm.edilist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gedi_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gedi_formset prefix='gedi' linkfield=gedi_linkfield %}
+            </div>
+          {% endif %}
         </td>
       </tr>
 

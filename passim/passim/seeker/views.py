@@ -64,7 +64,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Edition, Ftextlink, ManuscriptExt, \
+    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, LINK_EQUAL, LINK_PRT
 
@@ -114,6 +114,91 @@ def treat_bom(sHtml):
     sHtml = sHtml.replace(u'\ufeff', '')
     # Return what we have
     return sHtml
+
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False):
+    """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
+
+    errHandle = ErrHandle()
+    try:
+        # Get current associations
+        lstQ = [Q(**{field1: instance})]
+        through_qs = cls.objects.filter(*lstQ)
+        if related_is_through:
+            related_qs = through_qs
+        else:
+            related_qs = [getattr(x, field2) for x in through_qs]
+        # make sure all items in [qs] are associated
+        for obj in qs:
+            if obj not in related_qs:
+                # Add the association
+                args = {field1: instance}
+                if related_is_through:
+                    args[field2] = getattr(obj, field2)
+                else:
+                    args[field2] = obj
+                for item in extra:
+                    # Copy the field with this name from [obj] to 
+                    args[item] = getattr(obj, item)
+                # cls.objects.create(**{field1: instance, field2: obj})
+                cls.objects.create(**args)
+        # Remove from [cls] all associations that are not in [qs]
+        for item in through_qs:
+            if related_is_through:
+                obj = item
+            else:
+                obj = getattr(item, field2)
+            if obj not in qs:
+                # Remove this item
+                item.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+# adapt_m2o(Signature, instance, "gold", siglist)
+def adapt_m2o(cls, instance, field, qs, **kwargs):
+    """Adapt the instances of [cls] pointing to [instance] with [field] to only include [qs] """
+
+    errHandle = ErrHandle()
+    try:
+        # Get all the [cls] items currently linking to [instance]
+        lstQ = [Q(**{field: instance})]
+        linked_qs = cls.objects.filter(*lstQ)
+        # make sure all items in [qs] are linked to [instance]
+        for obj in qs:
+            if obj not in linked_qs:
+                # Create new object
+                oNew = cls()
+                setattr(oNew, field, instance)
+                # Copy the local fields
+                for lfield in obj._meta.local_fields:
+                    fname = lfield.name
+                    if fname != "id" and fname != field:
+                        # Copy the field value
+                        setattr(oNew, fname, getattr(obj, fname))
+                for k, v in kwargs.items():
+                    setattr(oNew, k, v)
+                oNew.save()
+        # Remove links that are not in [qs]
+        for obj in linked_qs:
+            if obj not in qs:
+                # Remove this item
+                obj.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+def is_empty_form(form):
+    """Check if the indicated form has any cleaned_data"""
+
+    if "cleaned_data" not in form:
+        form.is_valid()
+    cleaned = form.cleaned_data
+    return (len(cleaned) == 0)
+
 
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
@@ -504,7 +589,7 @@ def home(request):
     # Create the list of news-items
     lstQ = []
     lstQ.append(Q(status='val'))
-    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-saved', '-created')
+    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
     context['newsitem_list'] = newsitem_list
 
     # Gather the statistics
@@ -1599,71 +1684,71 @@ def do_goldtogold(request):
         oErr.DoError("goldtogold")
         return reverse('home')
 
-def do_import_editions(request):
-    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
+#def do_import_editions(request):
+#    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
 
-    # Use double for-loop:
-    last_old_edi = ""
-    last_litref = None
-    count = 0
-    oErr = ErrHandle()
-    template_name = 'tools.html'
-    result_list = []
-    context = {'status': 'ok', 'tools_part': 'import_edition'}
-    try:
-        for edi in Edition.objects.all().order_by('name'):
-            edi.update = "NIETGEDAAN"
-            edi.save()
+#    # Use double for-loop:
+#    last_old_edi = ""
+#    last_litref = None
+#    count = 0
+#    oErr = ErrHandle()
+#    template_name = 'tools.html'
+#    result_list = []
+#    context = {'status': 'ok', 'tools_part': 'import_edition'}
+#    try:
+#        for edi in Edition.objects.all().order_by('name'):
+#            edi.update = "NIETGEDAAN"
+#            edi.save()
 
-            # DEBUG
-            if edi.id == 1253:
-                iStop = 1
+#            # DEBUG
+#            if edi.id == 1253:
+#                iStop = 1
 
-            # Split the old editions into old_edi and pages
-            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
-            if old_edi != None and old_edi != "":
-                litref = None
-                if old_edi != last_old_edi:
-                    # Compare the old editions with the new editions ("short"), using short without the year
-                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
-                        if old_edi == get_short_edit(litreftmp.short):
-                            litref = litreftmp
-                            last_litref = litreftmp
-                            break
-                else:
-                    litref = last_litref
-                # Continue...
-                if litref != None:
-                    # We can process him!
-                    gold_obj = edi.gold
-                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
-                    if esg == None:
-                        # Create EdirefSG record
-                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
-                    # Double check pages and add to new EdirefSG record
-                    if pages != None:
-                        esg.pages = pages
-                        esg.save()
-                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
-                    count += 1
-                    if status == "ok":
-                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
-                    else:
-                        edi.update = "PAGES: " + status
-                    edi.save()
-                    # Show it in the result list
-                    result_list.append({'part': count, 'result': edi.name})
-            #else: # Hier moet het nog anders. 
-        # All edition objects have been reviewed
-        context['result_list'] = result_list
-    except:
-        sMsg = oErr.get_error_message()
-        oErr.DoError("do_import_editions")
-        context['status'] = "error"
-        context['message'] = sMsg
+#            # Split the old editions into old_edi and pages
+#            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
+#            if old_edi != None and old_edi != "":
+#                litref = None
+#                if old_edi != last_old_edi:
+#                    # Compare the old editions with the new editions ("short"), using short without the year
+#                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
+#                        if old_edi == get_short_edit(litreftmp.short):
+#                            litref = litreftmp
+#                            last_litref = litreftmp
+#                            break
+#                else:
+#                    litref = last_litref
+#                # Continue...
+#                if litref != None:
+#                    # We can process him!
+#                    gold_obj = edi.gold
+#                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
+#                    if esg == None:
+#                        # Create EdirefSG record
+#                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
+#                    # Double check pages and add to new EdirefSG record
+#                    if pages != None:
+#                        esg.pages = pages
+#                        esg.save()
+#                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
+#                    count += 1
+#                    if status == "ok":
+#                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
+#                    else:
+#                        edi.update = "PAGES: " + status
+#                    edi.save()
+#                    # Show it in the result list
+#                    result_list.append({'part': count, 'result': edi.name})
+#            #else: # Hier moet het nog anders. 
+#        # All edition objects have been reviewed
+#        context['result_list'] = result_list
+#    except:
+#        sMsg = oErr.get_error_message()
+#        oErr.DoError("do_import_editions")
+#        context['status'] = "error"
+#        context['message'] = sMsg
 
-    # Render and return the page
-    return render(request, template_name, context)
+#    # Render and return the page
+#    return render(request, template_name, context)
 
 def get_old_edi(edi):
     """Split pages and year from edition, keep stripped edition and the pages
@@ -2683,6 +2768,31 @@ def get_locations(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_litref(request):
+    """Get ONE particular short representation of a litref"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            litref = Litref.objects.filter(Q(id=sId)).first()
+            if litref:
+                short = litref.get_short()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_litref")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_litrefs(request):
     """Get a list of literature references for autocomplete"""
     
@@ -3629,6 +3739,7 @@ class PassimDetails(DetailView):
     template_name = ""      # Template for GET
     template_post = ""      # Template for POST
     formset_objects = []    # List of formsets to be processed
+    form_objects = []       # List of form objects
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     previous = None         # Start with empty previous page
@@ -3673,7 +3784,10 @@ class PassimDetails(DetailView):
                 return redirect(self.redirectpage)
             else:
                 # This takes self.template_name...
-                response = self.render_to_response(context)
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = sHtml.replace("\ufeff", "")
+                response = HttpResponse(sHtml)
+                # response = self.render_to_response(context)
 
         # Return the response
         return response
@@ -3756,7 +3870,7 @@ class PassimDetails(DetailView):
         """Action to be performed after adding a new item"""
         return True, "" 
 
-    def before_save(self, instance):
+    def before_save(self, form, instance):
         """Action to be performed after saving an item preliminarily, and before saving completely"""
         return True, "" 
 
@@ -3800,11 +3914,94 @@ class PassimDetails(DetailView):
 
         # Get the instance
         instance = self.object
+
+        frm = self.prepare_form(instance, context, initial)
+
+        if instance == None:
+            instance = frm.instance
+            self.object = instance
+
+        # Walk all the formset objects
+        bFormsetChanged = False
+        for formsetObj in self.formset_objects:
+            formsetClass = formsetObj['formsetClass']
+            prefix  = formsetObj['prefix']
+            formset = None
+            form_kwargs = self.get_form_kwargs(prefix)
+            if 'noinit' in formsetObj and formsetObj['noinit']:
+                # Only process actual changes!!
+                if self.request.method == "POST" and self.request.POST:
+                    # Get a formset including any stuff from POST
+                    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                    # Process this formset
+                    self.process_formset(prefix, self.request, formset)
+
+                    # Process all the correct forms in the formset
+                    for subform in formset:
+                        if subform.is_valid():
+                            subform.save()
+                            # Signal that the *FORM* needs refreshing, because the formset changed
+                            bFormsetChanged = True
+
+                    if formset.is_valid():
+                        # Load an explicitly empty formset
+                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                    else:
+                        # Retain the original formset, that now contains the error specifications per form
+                        # But: do *NOT* add an additional form to it
+                        pass
+
+                else:
+                    # All other cases: Load an explicitly empty formset
+                    formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+            else:
+                # show the data belonging to the current [obj]
+                qs = self.get_formset_queryset(prefix)
+                if qs == None:
+                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                else:
+                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+            # Process all the forms in the formset
+            ordered_forms = self.process_formset(prefix, self.request, formset)
+            if ordered_forms:
+                context[prefix + "_ordered"] = ordered_forms
+            # Store the instance
+            formsetObj['formsetinstance'] = formset
+            # Add the formset to the context
+            context[prefix + "_formset"] = formset
+
+        # Essential formset information
+        for formsetObj in self.formset_objects:
+            prefix = formsetObj['prefix']
+            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+
+        # Check if the formset made any changes to the form
+        if bFormsetChanged:
+            # OLD: 
+            frm = self.prepare_form(instance, context)
+
+        # Put the form and the formset in the context
+        context['{}Form'.format(self.prefix)] = frm
+        context['instance'] = instance
+        context['options'] = json.dumps({"isnew": (instance == None)})
+
+        # Possibly add to context by the calling function
+        context = self.add_to_context(context, instance)
+
+        # Define where to go to after deletion
+        context['afterdelurl'] = get_previous_page(self.request)
+
+        # Return the calculated context
+        return context
+
+    def prepare_form(self, instance, context, initial=[]):
+        # Initialisations
         bNew = False
         mForm = self.mForm
         oErr = ErrHandle()
 
-        # prefix = self.prefix
+        # Determine the prefix
         if self.prefix_type == "":
             id = "n" if instance == None else instance.id
             prefix = "{}-{}".format(self.prefix, id)
@@ -3843,6 +4040,9 @@ class PassimDetails(DetailView):
                 return context
             
             # All other actions just mean: edit or new and send back
+            # Make instance available
+            context['object'] = instance
+            self.object = instance
 
             # Do we have an existing object or are we creating?
             if instance == None:
@@ -3850,35 +4050,40 @@ class PassimDetails(DetailView):
                 frm = mForm(initial, prefix=prefix)
                 bNew = True
                 self.add = True
+            elif len(initial) == 0:
+                # Create a completely new form, on the basis of the [instance] only
+                frm = mForm(prefix=prefix, instance=instance)
             else:
                 # Editing an existing one
                 frm = mForm(initial, prefix=prefix, instance=instance)
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
-                instance = frm.save(commit=False)
+                obj = frm.save(commit=False)
                 # Any checks go here...
-                bResult, msg = self.before_save(instance)
+                bResult, msg = self.before_save(form=frm, instance=obj)
                 if bResult:
                     # Now save it for real
-                    instance.save()
-                    # Make it available
-                    context['object'] = instance
-                    self.object = instance
+                    obj.save()
                     # Log the SAVE action
-                    details = {'id': instance.id}
+                    details = {'id': obj.id}
                     details["savetype"] = "new" if bNew else "change"
-                    if frm.changed_data != None:
-                        details['changes'] = action_model_changes(frm, instance)
-                    Action.add(self.request.user.username, instance.__class__.__name__, "save", json.dumps(details))
+                    if frm.changed_data != None and len(frm.changed_data) > 0:
+                        details['changes'] = action_model_changes(frm, obj)
+                    Action.add(self.request.user.username, obj.__class__.__name__, "save", json.dumps(details))
+
+                    # Make sure the form is actually saved completely
+                    frm.save()
+                    instance = obj
 
                     # Any action(s) after saving
-                    bResult, msg = self.after_save(frm, instance)
+                    bResult, msg = self.after_save(frm, obj)
                 else:
                     context['errors'] = {'save': msg }
             else:
                 # We need to pass on to the user that there are errors
                 context['errors'] = frm.errors
+
             # Check if this is a new one
             if bNew:
                 # Any code that should be added when creating a new [SermonGold] instance
@@ -3898,45 +4103,19 @@ class PassimDetails(DetailView):
             else:
                 # Get the form for the sermon
                 frm = mForm(instance=instance, prefix=prefix)
-            # Walk all the formset objects
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                form_kwargs = self.get_form_kwargs(prefix)
-                if self.add:
-                    # - CREATE a NEW formset, populating it with any initial data in the request
-                    # Saving a NEW item
-                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
-                else:
-                    # show the data belonging to the current [obj]
-                    qs = self.get_formset_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                    else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, self.request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
+            if frm.is_valid():
+                iOkay = 1
+            # Walk all the form objects
+            for formObj in self.form_objects:
+                formClass = formObj['form']
+                prefix = formObj['prefix']
+                # This is only for *NEW* forms (right now)
+                form = formClass(prefix=prefix)
+                context[prefix + "Form"] = form
 
-        # Put the form and the formset in the context
-        context['{}Form'.format(self.prefix)] = frm
-        context['instance'] = instance
-        context['options'] = json.dumps({"isnew": (instance == None)})
-
-        # Possibly add to context by the calling function
-        context = self.add_to_context(context, instance)
-
-        # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
-
-        # Return the calculated context
-        return context
-
+        # Return the form we made
+        return frm
+    
 
 class BasicListView(ListView):
     """Basic listview"""
@@ -4744,21 +4923,21 @@ class SermonDetails(PassimDetails):
             self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
         else:
             # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
-            sedi_list = []
+            # sedi_list = []
             goldauthors = []
             # Visit all linked gold sermons
             for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
                 # Access the gold sermon
                 gold = linked.gold
-                # Get all the editions of this gold sermon
-                for edi in gold.goldeditions.all():
-                    name = edi.name
-                    if name not in sedi_list:
-                        sedi_list.append({'name': name})
+                ## Get all the editions of this gold sermon
+                #for edi in gold.goldeditions.all():
+                #    name = edi.name
+                #    if name not in sedi_list:
+                #        sedi_list.append({'name': name})
                 # Does this one have an author?
                 if gold.author != None:
                     goldauthors.append(gold.author)
-            context['sedi_list'] = sedi_list
+            # context['sedi_list'] = sedi_list
             context['goldauthors'] = goldauthors
 
         return context
@@ -5181,11 +5360,11 @@ class CollectionEdit(PassimDetails):
         context['afterdelurl'] = get_previous_page(self.request)
         return context
 
-    def before_save(self, instance):
-        if instance != None:
+    def before_save(self, form, instance):
+        if form != None:
             # Search the user profile
             profile = Profile.get_user_profile(self.request.user.username)
-            instance.owner = profile
+            form.owner = profile
         return True, ""
 
 
@@ -5478,6 +5657,22 @@ class ManuscriptDetails(PassimDetails):
             self.redirectpage = reverse('manuscript_details', kwargs={'pk': instance.id})
         return True, "" 
 
+    def before_save(self, form, instance):
+        bNeedSaving = False
+        if instance:
+            if not instance.project:
+                # Set the default project: Passim
+                passim = Project.objects.filter(Q(name__iexact="passim")).first()
+                instance.project = passim
+                bNeedSaving = True
+            if instance.source == None:
+                # Create a source info element
+                source = SourceInfo(collector=self.request.user.username, code="Manually added") # TH: aanpassen, klopt niet, ccfr
+                source.save()
+                instance.source = source
+                bNeedSaving = True
+        return bNeedSaving, ""
+
     def add_to_context(self, context, instance):
         template_sermon = 'seeker/sermon_view.html'
 
@@ -5750,6 +5945,21 @@ class ManuscriptProvset(BasicPart):
                     instance.manuscript = self.obj
 
                     # Indicate that changes have been made
+                    has_changed = True
+            elif instance and instance.id and instance.provenance:
+                # Check for any other changes in existing stuff
+                provenance = instance.provenance
+                name = form.cleaned_data['name']
+                note = form.cleaned_data['note']
+                if provenance.name != name:
+                    # Change in name
+                    instance.provenance.name = name
+                    instance.provenance.save()
+                    has_changed = True
+                if provenance.note != note:
+                    # Change in note
+                    instance.provenance.note = note
+                    instance.provenance.save()
                     has_changed = True
 
         return has_changed
@@ -6285,17 +6495,19 @@ class SermonGoldFtxtset(BasicPart):
     formset_objects = [{'formsetClass': GftextFormSet, 'prefix': 'gftxt', 'readonly': False}]
 
 
-class SermonGoldDetails(PassimDetails):
+class SermonGoldEdit(PassimDetails):
     """The details of one sermon"""
 
     model = SermonGold
     mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_details.html'
+    template_name = 'seeker/sermongold_edit.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_edit.html'
     prefix = "gold"
     title = "SermonGold" 
     afternewurl = ""
-    rtype = "html"
+    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
+                                       form=SermonGoldKeywordForm, min_num=0,
+                                       fk_name="gold", extra=0)
     GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
                                          form=SermonGoldSameForm, min_num=0,
                                          fk_name = "src",
@@ -6304,8 +6516,44 @@ class SermonGoldDetails(PassimDetails):
                                          form=SermonGoldSignatureForm, min_num=0,
                                          fk_name = "gold",
                                          extra=0, can_delete=True, can_order=False)
+    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
+                                         form = SermonGoldEditionForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
-                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False}]
+                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set the 'afternew' URL
+        self.afternewurl = reverse('search_gold')
+
+        # Create a new equality set to which we add this Gold sermon
+        if instance.equal == None:
+            geq = EqualGold.objects.create()
+            instance.equal = geq
+            instance.save()
+
+        # THIS CODE ON SIGNATURES MAY BE OBSOLETE...
+        #   because we do not user the field "signatures" (plural) for multiple signatures any more
+        ## Get the list of signatures
+        #signatures = form.cleaned_data['signature'].strip()
+        #if signatures != "":
+        #    siglist = signatures.split(";")
+        #    # Add a signature for each item
+        #    for sigcode in siglist:
+        #        # Make sure starting and tailing spaces are removed
+        #        sigcode = sigcode.strip()
+        #        editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
+        #        # Add signature
+        #        obj = Signature(code=sigcode, editype=editype, gold=instance)
+        #        obj.save()
+
+        # Return positively
+        return True, "" 
 
     def before_delete(self, instance):
 
@@ -6325,6 +6573,115 @@ class SermonGoldDetails(PassimDetails):
             msg = oErr.get_error_message()
             return False, msg
 
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "gsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
+                elif prefix == "gkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "gedi":
+                    # Edition processing
+                    newpages = ""
+                    if 'newpages' in cleaned and cleaned['newpages'] != "":
+                        newpages = cleaned['newpages']
+                    # Also get the litref
+                    litref = cleaned['oneref']
+                    # Check if all is in order
+                    if litref:
+                        form.instance.reference = litref
+                        if newpages:
+                            form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def before_save(self, form, instance):
+        form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
+        form.fields['siglist'].initial = instance.goldsignatures.all().order_by('editype', 'code')
+        return True, ""
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
+            edilist = form.cleaned_data['edilist']
+            adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
+
+            # Process many-to-one changes
+            # (1) 'goldsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(Signature, instance, "gold", siglist)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Check if editions have been added
+
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Gold-Sermon edit", False)
+        # context['prevpage'] = get_previous_page(self.request)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+
+        context['afterdelurl'] = reverse('search_gold')
+
+        return context
+
+
+class SermonGoldDetails(SermonGoldEdit):
+    """The details of one sermon"""
+
+    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermongold_details.html'
+    rtype = "html"
+
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         # self.afternewurl = reverse('search_gold')
@@ -6334,6 +6691,8 @@ class SermonGoldDetails(PassimDetails):
             geq = EqualGold.objects.create()
             instance.equal = geq
             instance.save()
+
+
         # Make sure we do a page redirect
         self.newRedirect = True
         self.redirectpage = reverse('gold_details', kwargs={'pk': instance.id})
@@ -6375,117 +6734,14 @@ class SermonGoldDetails(PassimDetails):
 
         return context
 
+    def before_save(self, form, instance):
+        return True, ""
 
-class SermonGoldEdit(PassimDetails):
-    """The details of one sermon"""
-
-    model = SermonGold
-    mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_edit.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_edit.html'
-    prefix = "gold"
-    title = "SermonGold" 
-    afternewurl = ""
-
-    def before_delete(self, instance):
-
-        oErr = ErrHandle()
-        try:
-            # (1) Check if there is an 'equality' link to another SermonGold
-
-            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
-
-            # (3) Remove all gold-to-gold links that include this one
-
-            # (4) Remove all links from SermonDescr to this instance of SermonGold
-
-            # All is well
-            return True, "" 
-        except:
-            msg = oErr.get_error_message()
-            return False, msg
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        # Set the 'afternew' URL
-        self.afternewurl = reverse('search_gold')
-
-        # Create a new equality set to which we add this Gold sermon
-        if instance.equal == None:
-            geq = EqualGold.objects.create()
-            instance.equal = geq
-            instance.save()
-
-        # Get the list of signatures
-        signatures = form.cleaned_data['signature'].strip()
-        if signatures != "":
-            siglist = signatures.split(";")
-            # Add a signature for each item
-            for sigcode in siglist:
-                # Make sure starting and tailing spaces are removed
-                sigcode = sigcode.strip()
-                editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
-                # Add signature
-                obj = Signature(code=sigcode, editype=editype, gold=instance)
-                obj.save()
-
-        # EXTINCT: use EdirefSG instead!!
-        # -------------------------------
-        ## Get the list of editions
-        #edi_list = form.cleaned_data['editionlist']
-        ## Copy these editions and link those copies to the Gold Sermon instance
-        #for edi in edi_list:
-        #    edi_copy = Edition.objects.create(name=edi.name, gold=instance)
-
-        # Get the list of keywords
-        keywords = form.cleaned_data['keyword'].strip()
-        if keywords != "":
-            kwlist = keywords.split(";")
-            # Add a signature for each item
-            for kw in kwlist:
-                # Make sure starting and tailing spaces are removed
-                kw = kw.strip().lower()
-                # Check if it is already there
-                obj = Keyword.objects.filter(name=kw).first()
-                if obj == None:
-                    # Add Keyword
-                    obj = Keyword(name=kw)
-                    obj.save()
-                # This is a new instance: add the association with the gold sermon
-                objlink = SermonGoldKeyword(gold=instance, keyword=obj)
-                objlink.save()
-
-        # Return positively
-        return True, "" 
+    def process_formset(self, prefix, request, formset):
+        return None
 
     def after_save(self, form, instance):
-        msg = ""
-        bResult = True
-        oErr = ErrHandle()
-        
-        try:
-            # Nothing here yet
-            pass
-        except:
-            msg = oErr.get_error_message()
-            bResult = False
-        return bResult, msg
-
-    def add_to_context(self, context, instance):
-        """Add to the existing context"""
-
-        # Check if editions have been added
-
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Gold-Sermon edit", False)
-        # context['prevpage'] = get_previous_page(self.request)
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-
-        context['afterdelurl'] = reverse('search_gold')
-
-        return context
+        return True, ""
 
 
 class SermonGoldLitset(BasicPart):

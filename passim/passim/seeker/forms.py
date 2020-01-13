@@ -5,7 +5,7 @@ Definition of forms.
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
-from django.forms import ModelMultipleChoiceField
+from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget
 from passim.seeker.models import *
@@ -53,6 +53,45 @@ class KeywordWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Keyword.objects.all().order_by('name').distinct()
+
+
+class LitrefWidget(ModelSelect2Widget):
+    model = Litref
+    search_fields = [ 'full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        short = obj.get_short()
+        full = obj.full
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return Litref.objects.exclude(full="").order_by('full').distinct()
+
+
+class LitrefSgWidget(ModelSelect2MultipleWidget):
+    model = LitrefSG
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
+
+
+class EdirefSgWidget(ModelSelect2MultipleWidget):
+    model = EdirefSG
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
 class ProjectWidget(ModelSelect2MultipleWidget):
@@ -109,66 +148,6 @@ class AuthorWidget(ModelSelect2MultipleWidget):
     def get_queryset(self):
         return Author.objects.all().order_by('name').distinct()
 
-
-class EditionWidget(ModelSelect2TagWidget):
-    """This allows the user to add editions--but that can only happen when the model changes to m2m"""
-
-    model = Edition
-    queryset = Edition.objects.all().order_by('name').distinct()
-    search_fields = [ 'name__icontains']
-
-    def __init__(self, *args, **kwargs):
-        response = super(EditionWidget, self).__init__(*args, **kwargs)
-
-        return response
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
-
-    def value_from_datadict(self, data, files, name):
-        values = super(EditionWidget, self).value_from_datadict(data, files, name)
-
-        cleaned_values = []
-        # Walk the list and create "cleaned_values"
-        for val in values:
-            obj = None
-            if is_number(val):
-                # Find the item
-                obj = self.queryset.filter(id=val).first()
-
-            #if obj == None:
-            #    obj = self.queryset.create(name=val)
-
-            # Creating a new one is NOT going to work
-            if obj != None:
-                cleaned_values.append(obj)
-
-        ## Get all the PKs
-        #qs = self.queryset.filter(**{'pk__in': list(values)})
-        #pks = set(str(getattr(o, "pk")) for o in qs)
-        #cleaned_values = []
-        #for val in values:
-        #    if str(val) not in pks:
-        #        val = self.queryset.create(name=val).pk
-        #    cleaned_values.append(val)
-        return cleaned_values
-
-
-class EditionExistingWidget(ModelSelect2MultipleWidget):
-    """Only allow user to choose from existing editions"""
-
-    model = Edition
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Edition.objects.all().order_by('name').distinct()
-    
 
 class LocationWidget(ModelSelect2MultipleWidget):
     model = Location
@@ -655,15 +634,12 @@ class SermonGoldForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwnew       = forms.CharField(label=_("New keyword"), required=False, 
+                widget=forms.TextInput(attrs={'placeholder': 'Keyword...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
-
-    # OLD:
-    editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=EditionExistingWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
-    # FUTURE: once model 'Edition' has become attached with ManyToMany to SermonGold
-    #editionlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-    #                        widget=EditionWidget(attrs={'data-placeholder': 'Select or add multiple editions...', 'style': 'width: 100%;'}))
+    edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -685,9 +661,8 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-
-        # OLD:
-        self.fields['editionlist'].queryset = Edition.objects.all().order_by('name')
+        self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages')
+        
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -695,6 +670,13 @@ class SermonGoldForm(forms.ModelForm):
             sAuthor = "" if not instance.author else instance.author.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+            # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
+            self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+            self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
+            self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
+
+        # We are okay
+        return None
 
 
 class SermonGoldSameForm(forms.ModelForm):
@@ -760,11 +742,17 @@ class EqualGoldLinkForm(forms.ModelForm):
 
 
 class SermonGoldSignatureForm(forms.ModelForm):
+    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
+    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
+    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Signature
-        # fields = ['code', 'editype', 'gold']
         fields = ['code', 'editype']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
@@ -775,9 +763,56 @@ class SermonGoldSignatureForm(forms.ModelForm):
         super(SermonGoldSignatureForm, self).__init__(*args, **kwargs)
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+        # Set the keyword to optional for best processing
+        self.fields['code'].required = False
+        self.fields['editype'].required = False
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonGoldSignatureForm, self).clean()
+        gold = cleaned_data.get("gold")
+        editype = cleaned_data.get("editype")
+        code = cleaned_data.get("code")
+        if editype == "":
+            newgr = cleaned_data.get("newgr")
+            if newgr != "":
+                code = newgr
+                editype = "gr"
+            else:
+                newcl = cleaned_data.get("newcl")
+                if newcl != "":
+                    code = newcl
+                    editype = "cl"
+                else:
+                    newot = cleaned_data.get("newot")
+                    if newot != "":
+                        code = newot
+                        editype = "ot"
+        # Do we actually have something?
+
+        # Check if any of [name] or [newkw] already exists
+        if code == "" or editype == "":
+            # No keyword chosen
+            raise forms.ValidationError(
+                    "No signature specified to attach to this gold sermon"
+                )
+        else:
+            # Check if [code|editype] already exists
+            signature = Signature.objects.filter(gold=gold, code=code, editype=editype).first()
+            if signature:
+                # This combination already exists
+                raise forms.ValidationError(
+                        "This signature already exists for this gold sermon"
+                    )
         
 
 class SermonGoldEditionForm(forms.ModelForm):
+    # EK: Added for Sermon Gold new approach 
+    oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
+    # ORIGINAL:
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
@@ -796,6 +831,10 @@ class SermonGoldEditionForm(forms.ModelForm):
         self.fields['reference'].required = False
         self.fields['litref'].required = False
         self.fields['litref_ta'].required = False
+        # EK: Added for Sermon Gold new approach 
+        self.fields['newpages'].required = False
+        self.fields['oneref'].required = False
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -803,20 +842,30 @@ class SermonGoldEditionForm(forms.ModelForm):
             if instance.reference != None:
                 self.fields['litref_ta'].initial = instance.reference.get_short() 
 
+    def save(self, commit=True, *args, **kwargs):
+        response = super(SermonGoldEditionForm, self).save(commit, **kwargs)
+        iStop = 1
+        return response
+
     def clean(self):
         cleaned_data = super(SermonGoldEditionForm, self).clean()
         litref = cleaned_data.get("litref")
+        oneref = cleaned_data.get("oneref")     # EK: added for new approach (also in the "if-statement")
         reference = cleaned_data.get("reference")
-        if reference == None and (litref == None or litref == ""):
+        if reference == None and (litref == None or litref == "") and (oneref == None or oneref == ""):
             #litref_ta = cleaned_data.get("litref_ta")
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
             raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
 
+    
+
 
 class SermonGoldKeywordForm(forms.ModelForm):
-    name = forms.CharField(label=_("Keyword"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    name   = forms.CharField(label=_("Keyword"), required=False, help_text="", 
+               widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    newkw  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -828,6 +877,7 @@ class SermonGoldKeywordForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonGoldKeywordForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
+        self.fields['newkw'].required = False
         self.fields['keyword'].required = False
         # Get the instance
         if 'instance' in kwargs:
@@ -836,6 +886,35 @@ class SermonGoldKeywordForm(forms.ModelForm):
             if instance.keyword != None:
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
+
+    def save(self, commit=True, *args, **kwargs):
+        response = super(SermonGoldKeywordForm, self).save(commit, **kwargs)
+        iStop = 1
+        return response
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonGoldKeywordForm, self).clean()
+        name = cleaned_data.get("name")
+        newkw = cleaned_data.get("newkw")
+        gold = cleaned_data.get("gold")
+        # Check if any of [name] or [newkw] already exists
+        keyword = None
+        sName = name if name != "" else newkw
+        if sName == "":
+            # No keyword chosen
+            raise forms.ValidationError(
+                    "No keyword specified to attach to this gold sermon".format(sName)
+                )
+        else:
+            keyword = Keyword.objects.filter(name=sName).first()
+            if keyword:
+                # There is a keyword: check for the combination
+                if SermonGoldKeyword.objects.filter(gold=gold, keyword=keyword).count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "Keyword [{}] is already attached to this gold sermon".format(sName)
+                        )
 
 
 class SermonGoldLitrefForm(forms.ModelForm):

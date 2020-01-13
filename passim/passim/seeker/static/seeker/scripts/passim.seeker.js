@@ -28,7 +28,9 @@ var ru = (function ($, ru) {
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.litref_template }
+          },
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
@@ -1235,6 +1237,9 @@ var ru = (function ($, ru) {
             // history.pushState(null, null, sUrlShow);
           }
 
+          // Set handling of unique-field
+          $("td.unique-field input").unbind("change").change(ru.passim.seeker.unique_change);
+
           // Make sure typeahead is re-established
           ru.passim.init_typeahead();
 
@@ -1267,6 +1272,28 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      unique_change: function () {
+        var el = $(this),
+            elTr = null;
+
+        try {
+          elTr = $(el).closest("tr");
+          $(elTr).find("td.unique-field").find("input").each(function (idx, elInput) {
+            if ($(el).attr("id") !== $(elInput).attr("id")) {
+              $(elInput).prop("disabled", true);
+            }
+          });
+  
+        } catch (ex) {
+          private_methods.errMsg("unique_change", ex);
         }
       },
 
@@ -1336,6 +1363,33 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * add_new_select2
+       *    Show [table_new] element
+       *
+       */
+      add_new_select2: function (el) {
+        var elTr = null,
+            elRow = null,
+            options = {},
+            elDiv = null;
+
+        try {
+          elTr = $(el).closest("tr");           // Nearest <tr>
+          elDiv = $(elTr).find(".new-mode");    // The div with new-mode in it
+          // Show it
+          $(elDiv).removeClass("hidden");
+          // Find the first row
+          elRow = $(elDiv).find("tbody tr").first();
+          options['select2'] = true;
+          ru.passim.seeker.tabular_addrow($(elRow), options);
+
+          // Add
+        } catch (ex) {
+          private_methods.errMsg("add_new_select2", ex);
+        }
+      },
+
+      /**
        * form_row_select
        *    By selecting this slement, the whole row gets into the 'selected' state
        *
@@ -1366,6 +1420,8 @@ var ru = (function ($, ru) {
             $(elHier).removeClass("in");
             $(elHier).hide()
           } else {
+            // Make a copy of the tree as it is
+            $("#sermon_tree_copy").html($("#sermon_tree").html());
             // Select the new row
             $(elRow).addClass("selected");
             // SHow the 'Up' and 'Down' buttons if needed
@@ -1421,6 +1477,10 @@ var ru = (function ($, ru) {
           switch (type) {
             case "close": // Close the modal
               ru.passim.seeker.form_row_select(elStart);
+              // Return the stored copy
+              $("#sermon_tree").html($("#sermon_tree_copy").html());
+              // Make sure the tree is redrawn
+              ru.passim.seeker.sermon_drawtree();
               break;
             case "up":    // position me before my preceding sibling
               // Get the <div> that should be moved
@@ -2659,6 +2719,7 @@ var ru = (function ($, ru) {
               // Go to edit mode
               $(elTr).find(".view-mode").addClass("hidden");
               $(elTr).find(".edit-mode").removeClass("hidden");
+              $(elTr).find(".new-mode").removeClass("hidden");
               // Make sure typeahead works here
               ru.passim.init_typeahead();
               break;
@@ -2945,6 +3006,7 @@ var ru = (function ($, ru) {
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
+              $(elTr).find(".new-mode").addClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?
@@ -3163,17 +3225,23 @@ var ru = (function ($, ru) {
        *   Open the next <tr> to get delete confirmation (or not)
        *
        */
-      delete_confirm: function (el) {
+      delete_confirm: function (el, bNeedConfirm) {
         var elDiv = null;
 
         try {
-          // Find the [.delete-row] to be shown
-          elDiv = $(el).closest("tr").find(".delete-confirm").first();
-          if (elDiv.length === 0) {
-            // Try goint to the next <tr>
-            elDiv = $(el).closest("tr").next("tr.delete-confirm");
+          if (bNeedConfirm === undefined) { bNeedConfirm = true; }
+          // Action depends on the need for confirmation
+          if (bNeedConfirm) {
+            // Find the [.delete-row] to be shown
+            elDiv = $(el).closest("tr").find(".delete-confirm").first();
+            if (elDiv.length === 0) {
+              // Try goint to the next <tr>
+              elDiv = $(el).closest("tr").next("tr.delete-confirm");
+            }
+            $(elDiv).removeClass("hidden");
+          } else {
+
           }
-          $(elDiv).removeClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_confirm", ex);
         }
@@ -3371,6 +3439,7 @@ var ru = (function ($, ru) {
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
+            case "gkw_formset":
             case "mprov_formset":
             case "mdr_formset":
             case "mkw_formset":
@@ -3501,32 +3570,55 @@ var ru = (function ($, ru) {
        *   Add one row into a tabular inline
        *
        */
-      tabular_addrow: function () {
+      tabular_addrow: function (elStart, options) {
         // NOTE: see the definition of lAddTableRow above
         var arTdef = lAddTableRow,
             oTdef = {},
             rowNew = null,
             elTable = null,
+            select2_options = {},
             iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
             sId = "",
+            bSelect2 = false,
             i;
 
         try {
           // Find out just where we are
-          sId = $(this).closest("div[id]").attr("id");
+          if (elStart === undefined || elStart === null)
+            elStart = $(this);
+          sId = $(elStart).closest("div[id]").attr("id");
+          // Process options
+          if (options !== undefined) {
+            for (var prop in options) {
+              switch (prop) {
+                case "select2": bSelect2 = options[prop]; break;
+              }
+            }
+          }
           // Walk all tables
           for (i = 0; i < arTdef.length; i++) {
             // Get the definition
             oTdef = arTdef[i];
             if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
               // Go to the <tbody> and find the last form-row
-              elTable = $(this).closest("tbody").children("tr.form-row.empty-form")
+              elTable = $(elStart).closest("tbody").children("tr.form-row.empty-form")
+
+              if ("select2_options" in oTdef) {
+                select2_options = oTdef.select2_options;
+              }
 
               // Perform the cloneMore function to this <tr>
               rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
               // Call the event initialisation again
               if (oTdef.events !== null) {
                 oTdef.events();
+              }
+              // Possible Select2 follow-up
+              if (bSelect2) {
+                // Remove previous .select2
+                $(rowNew).find(".select2").remove();
+                // Execute djangoSelect2()
+                $(rowNew).find(".django-select2").djangoSelect2(select2_options);
               }
               // Any follow-up activity
               if ('follow' in oTdef && oTdef['follow'] !== null) {

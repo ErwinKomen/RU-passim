@@ -1,0 +1,28 @@
+﻿{% load i18n %}
+
+<!-- Modal form that shows the manipulation buttons to move something around -->
+<div id="create_keyword" class="modal fade" role="dialog">
+
+  <div class="modal-dialog modal-sm">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header" style="background-color: goldenrod;">
+
+        <a class="btn btn-xs jumbo-1" role="button" data-dismiss="modal">
+          <span class="glyphicon glyphicon-arrow-left"></span>&nbsp;Cancel
+        </a>
+
+        <a class="btn btn-xs jumbo-2" role="button" title="Save the new keyword"
+            ><span class="glyphicon glyphicon-ok"></span>&nbsp;Save
+        </a>
+      </div>
+      <div class="modal-body modal-dragpoint">
+        <!-- Keyword Main information -->
+        <div id="keyword_edit">
+          {% include 'seeker/keyword_edit.html' %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
