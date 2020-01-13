@@ -29,6 +29,14 @@
               <div id="collection_edit">
                 {% include 'seeker/collection_edit.html' %}
               </div>
+              
+              <!-- One or more sermons that are part of the collection -->
+              <div class="col-md-3">
+                <div id="collection_sermset" class="post-load" targeturl="{% url 'collection_sermset' pk=colForm.instance.id %}" >
+                  <!-- The wait symbol will be overwritten -->
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                </div>
+              </div>
 
             </div>
           </div>
