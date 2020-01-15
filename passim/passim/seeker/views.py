@@ -3928,9 +3928,20 @@ class PassimDetails(DetailView):
             prefix  = formsetObj['prefix']
             formset = None
             form_kwargs = self.get_form_kwargs(prefix)
-            if 'noinit' in formsetObj and formsetObj['noinit']:
+            if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                 # Only process actual changes!!
                 if self.request.method == "POST" and self.request.POST:
+
+                    #if self.add:
+                    #    # Saving a NEW item
+                    #    if 'initial' in formsetObj:
+                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                    #    else:
+                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                    #else:
+                    #    # Get a formset including any stuff from POST
+                    #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+
                     # Get a formset including any stuff from POST
                     formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
                     # Process this formset
@@ -3990,7 +4001,8 @@ class PassimDetails(DetailView):
         context = self.add_to_context(context, instance)
 
         # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
+        if 'afterdelurl' not in context or context['afterdelurl'] == "":
+            context['afterdelurl'] = get_previous_page(self.request)
 
         # Return the calculated context
         return context
