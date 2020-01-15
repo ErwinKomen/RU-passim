@@ -6638,7 +6638,7 @@ class SermonGoldEdit(PassimDetails):
         oErr = ErrHandle()
         
         try:
-            # Process many-to-many changes
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
