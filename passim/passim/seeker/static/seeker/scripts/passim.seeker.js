@@ -1177,6 +1177,8 @@ var ru = (function ($, ru) {
           $(".post-load").each(function (idx, value) {
             var targetid = $(this),
                 data = [],
+                lst_ta = [],
+                i = 0,
                 targeturl = $(targetid).attr("targeturl");
 
             // Only do this on the first one
@@ -1196,6 +1198,11 @@ var ru = (function ($, ru) {
                       $(targetid).html(response['html']);
                       // Call initialisation again
                       ru.passim.seeker.init_events(sUrlShow);
+                      // Handle type aheads
+                      if ("typeaheads" in response) {
+                        // Perform typeahead for these ones
+                        ru.passim.init_event_listeners(response.typeaheads);
+                      }
                       break;
                     case "error":
                       // Show the error
@@ -1241,6 +1248,7 @@ var ru = (function ($, ru) {
           $("td.unique-field input").unbind("change").change(ru.passim.seeker.unique_change);
 
           // Make sure typeahead is re-established
+          ru.passim.init_event_listeners();
           ru.passim.init_typeahead();
 
           // Switch filters

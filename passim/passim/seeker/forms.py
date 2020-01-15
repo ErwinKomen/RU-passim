@@ -7,7 +7,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
 
 def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
@@ -138,6 +138,10 @@ class ProjectOneWidget(ModelSelect2Widget):
         return Project.objects.all().order_by('name').distinct()
 
 
+#class ManuIdnoWidget(HeavySelect2Widget):
+
+
+
 class AuthorWidget(ModelSelect2MultipleWidget):
     model = Author
     search_fields = [ 'name__icontains']
@@ -206,6 +210,7 @@ class SelectGoldForm(forms.ModelForm):
     signature = forms.CharField(label=_("Signature"), 
         required=False,
         widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    typeaheads = ["authors", "signatures", "gldexplicits", "gldincipits"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -251,6 +256,7 @@ class SearchManuscriptForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
     idno = forms.CharField(label=_("Idno"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
+    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
 class SearchManuForm(forms.ModelForm):
@@ -287,6 +293,7 @@ class SearchManuForm(forms.ModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -387,6 +394,7 @@ class SermonForm(forms.ModelForm):
                                      widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                                      widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    typeaheads = ["authors", "manuidnos", "signatures", "keywords", "countries", "cities", "libraries", "origins", "locations", "srmincipits", "srmexplicits", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -446,6 +454,7 @@ class KeywordForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["keywords"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -473,6 +482,7 @@ class ProjectForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["projects"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -502,6 +512,7 @@ class CollectionForm(forms.ModelForm):
                 widget=CollectionWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["collections"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -541,6 +552,7 @@ class SermonDescrSignatureForm(forms.ModelForm):
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
+    typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -576,6 +588,7 @@ class SermonDescrGoldForm(forms.ModelForm):
 class SermonDescrKeywordForm(forms.ModelForm):
     name = forms.CharField(label=_("Keyword"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    typeaheads = ["keywords"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -600,6 +613,7 @@ class SermonDescrKeywordForm(forms.ModelForm):
 class SermonDescrCollectionForm(forms.ModelForm):
     name = forms.CharField(label=_("Collection"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    typeaheads = ["collections"]
     
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -640,6 +654,7 @@ class SermonGoldForm(forms.ModelForm):
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -748,6 +763,7 @@ class SermonGoldSignatureForm(forms.ModelForm):
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
     newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
+    typeaheads = ["signatures"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -816,6 +832,7 @@ class SermonGoldEditionForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+    typeaheads = ["litrefs"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -857,15 +874,14 @@ class SermonGoldEditionForm(forms.ModelForm):
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
             raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
-
-    
-
+   
 
 class SermonGoldKeywordForm(forms.ModelForm):
     name   = forms.CharField(label=_("Keyword"), required=False, help_text="", 
                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     newkw  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    typeaheads = ["keywords"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -921,6 +937,7 @@ class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+    typeaheads = ["litrefs"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -962,6 +979,7 @@ class ManuscriptProvForm(forms.ModelForm):
     location = forms.CharField(required=False)
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -996,6 +1014,7 @@ class ManuscriptLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+    typeaheads = ["litrefs"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1050,6 +1069,7 @@ class ManuscriptExtForm(forms.ModelForm):
 class ManuscriptKeywordForm(forms.ModelForm):
     name = forms.CharField(label=_("Keyword"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    typeaheads = ["keywords"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1074,6 +1094,7 @@ class ManuscriptKeywordForm(forms.ModelForm):
 class OriginForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1107,6 +1128,7 @@ class OriginForm(forms.ModelForm):
 class LibraryForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1162,6 +1184,7 @@ class ManuscriptForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
+    typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1254,6 +1277,7 @@ class LocationRelForm(forms.ModelForm):
     partof_ta = forms.CharField(label=_("Part of"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Part of...',  'style': 'width: 100%;'}))
     partof = forms.CharField(required=False)
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1318,6 +1342,7 @@ class LibrarySearchForm(forms.Form):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    typeaheads = ["countries", "cities", "libraries"]
 
 
 class ReportEditForm(forms.ModelForm):

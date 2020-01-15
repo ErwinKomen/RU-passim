@@ -3013,9 +3013,13 @@ def get_gldsignatures(request):
             if editype != "":
                 lstQ.append(Q(editype=editype))
             items = Signature.objects.filter(*lstQ).order_by("code").distinct()
+            items = list(items.values("code", "id"))
+
+            # OLD METHOD items = items.values_list('code', "id")
             results = []
             for co in items:
-                co_json = {'name': co.code, 'id': co.id }
+                # OLD METHOD co_json = {'name': co.code, 'id': co.id }
+                co_json = {'name': co["code"], 'id': co["id"] }
                 results.append(co_json)
             data = json.dumps(results)
         else:
@@ -3294,6 +3298,8 @@ class BasicPart(View):
     def post(self, request, pk=None):
         # A POST request means we are trying to SAVE something
         self.initializations(request, pk)
+        # Initialize typeahead list
+        lst_typeahead = []
 
         # Explicitly set the status to OK
         self.data['status'] = "ok"
@@ -3376,6 +3382,11 @@ class BasicPart(View):
                             # x = json.dumps(sorted(self.qd.items(), key=lambda kv: kv[0]), indent=2)
                     # Add instance to the context object
                     context[prefix + "Form"] = formObj['forminstance']
+                    # Get any possible typeahead parameters
+                    lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                    if lst_form_ta != None:
+                        for item in lst_form_ta:
+                            lst_typeahead.append(item)
                 # Walk all the formset objects
                 for formsetObj in self.formset_objects:
                     prefix  = formsetObj['prefix']
@@ -3475,6 +3486,11 @@ class BasicPart(View):
                             # self.arErr.append(formset.errors)
                     else:
                         formset = []
+                    # Get any possible typeahead parameters
+                    lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                    if lst_formset_ta != None:
+                        for item in lst_formset_ta:
+                            lst_typeahead.append(item)
                     # Add the formset to the context
                     context[prefix + "_formset"] = formset
             elif self.action == "download":
@@ -3552,6 +3568,9 @@ class BasicPart(View):
             # Standard: add request user to context
             context['requestuser'] = request.user
 
+            # Set any possible typeaheads
+            self.data['typeaheads'] = lst_typeahead
+
             # Get the HTML response
             if len(self.arErr) > 0:
                 if self.template_err_view != None:
@@ -3583,6 +3602,10 @@ class BasicPart(View):
         self.data['status'] = 'ok'
         # Perform the initializations that need to be made anyway
         self.initializations(request, pk)
+        # Initialize typeahead list
+        lst_typeahead = []
+
+        # Continue if authorized
         if self.checkAuthentication(request):
             context = dict(object_id = pk, savedate=None)
             context['prevpage'] = self.previous
@@ -3604,6 +3627,11 @@ class BasicPart(View):
                     formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
                 # Add instance to the context object
                 context[formObj['prefix'] + "Form"] = formObj['forminstance']
+                # Get any possible typeahead parameters
+                lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                if lst_form_ta != None:
+                    for item in lst_form_ta:
+                        lst_typeahead.append(item)
             # Walk all the formset objects
             for formsetObj in self.formset_objects:
                 formsetClass = formsetObj['formsetClass']
@@ -3627,6 +3655,11 @@ class BasicPart(View):
                         formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                     else:
                         formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
+                # Get any possible typeahead parameters
+                lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                if lst_formset_ta != None:
+                    for item in lst_formset_ta:
+                        lst_typeahead.append(item)
                 # Process all the forms in the formset
                 ordered_forms = self.process_formset(prefix, request, formset)
                 if ordered_forms:
@@ -3643,6 +3676,9 @@ class BasicPart(View):
             context['errors'] = self.arErr
             # Standard: add request user to context
             context['requestuser'] = request.user
+
+            # Set any possible typeaheads
+            self.data['typeaheads'] = json.dumps(lst_typeahead)
             
             # Get the HTML response
             sHtml = render_to_string(self.template_name, context, request)
@@ -3751,6 +3787,7 @@ class PassimDetails(DetailView):
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
+    lst_typeahead = []
 
     def get(self, request, pk=None, *args, **kwargs):
         # Initialisation
@@ -3762,6 +3799,10 @@ class PassimDetails(DetailView):
             if self.rtype == "json":
                 data['html'] = "(No authorization)"
                 data['status'] = "error"
+
+                # Set any possible typeaheads
+                data['typeaheads'] = self.lst_typeahead
+
                 response = JsonResponse(data)
             else:
                 response = reverse('nlogin')
@@ -3779,10 +3820,14 @@ class PassimDetails(DetailView):
                 sHtml = render_to_string(self.template_name, context, request)
                 sHtml = sHtml.replace("\ufeff", "")
                 data['html'] = sHtml
+                # Set any possible typeaheads
+                data['typeaheads'] = self.lst_typeahead
                 response = JsonResponse(data)
             elif self.redirectpage != "":
                 return redirect(self.redirectpage)
             else:
+                # Set any possible typeaheads
+                context['typeaheads'] = json.dumps(self.lst_typeahead)
                 # This takes self.template_name...
                 sHtml = render_to_string(self.template_name, context, request)
                 sHtml = sHtml.replace("\ufeff", "")
@@ -3816,11 +3861,15 @@ class PassimDetails(DetailView):
                 response = render_to_string(self.template_post, context, request)
                 response = response.replace("\ufeff", "")
                 data['html'] = response
+                # Set any possible typeaheads
+                data['typeaheads'] = self.lst_typeahead
                 response = JsonResponse(data)
             elif self.newRedirect and self.redirectpage != "":
                 # Redirect to this page
                 return redirect(self.redirectpage)
             else:
+                # Set any possible typeaheads
+                context['typeaheads'] = json.dumps(self.lst_typeahead)
                 # This takes self.template_name...
                 response = self.render_to_response(context)
         else:
@@ -3834,6 +3883,8 @@ class PassimDetails(DetailView):
     def initializations(self, request, pk):
         # Store the previous page
         # self.previous = get_previous_page(request)
+
+        self.lst_typeahead = []
 
         # Copy any pk
         self.pk = pk
@@ -3980,6 +4031,11 @@ class PassimDetails(DetailView):
             formsetObj['formsetinstance'] = formset
             # Add the formset to the context
             context[prefix + "_formset"] = formset
+            # Get any possible typeahead parameters
+            lst_formset_ta = getattr(formset.form, "typeaheads", None)
+            if lst_formset_ta != None:
+                for item in lst_formset_ta:
+                    self.lst_typeahead.append(item)
 
         # Essential formset information
         for formsetObj in self.formset_objects:
@@ -4124,7 +4180,18 @@ class PassimDetails(DetailView):
                 # This is only for *NEW* forms (right now)
                 form = formClass(prefix=prefix)
                 context[prefix + "Form"] = form
+                # Get any possible typeahead parameters
+                lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                if lst_form_ta != None:
+                    for item in lst_form_ta:
+                        self.lst_typeahead.append(item)
 
+        # Get any possible typeahead parameters
+        if frm != None:
+            lst_form_ta = getattr(frm, "typeaheads", None)
+            if lst_form_ta != None:
+                for item in lst_form_ta:
+                    self.lst_typeahead.append(item)
         # Return the form we made
         return frm
     
@@ -4148,6 +4215,7 @@ class BasicListView(ListView):
     order_heads = []
     filters = []
     searches = []
+    lst_typeaheads = []
     sort_order = ""
     page_function = None
 
@@ -4166,6 +4234,11 @@ class BasicListView(ListView):
             frm = self.listform(initial, prefix=self.prefix)
             if frm.is_valid():
                 context['{}Form'.format(self.prefix)] = frm
+                # Get any possible typeahead parameters
+                lst_form_ta = getattr(frm, "typeaheads", None)
+                if lst_form_ta != None:
+                    for item in lst_form_ta:
+                        self.lst_typeaheads.append(item)
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
@@ -4204,6 +4277,9 @@ class BasicListView(ListView):
         context['order_heads'] = self.order_heads
         context['has_filter'] = self.bFilter
         context['filters'] = self.filters
+
+        # Add any typeaheads that should be initialized
+        context['typeaheads'] = json.dumps( self.lst_typeaheads)
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
@@ -4378,11 +4454,13 @@ class ManuscriptEdit(BasicPart):
             qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for sermon in qs:
+                # Need this first in order to repair any possible errors
+                level = sermon.getdepth()
+
                 oSermon = {}
                 oSermon['obj'] = sermon
                 oSermon['nodeid'] = sermon.order + 1
                 oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                level = sermon.getdepth()
                 oSermon['level'] = level
                 oSermon['pre'] = (level-1) * 20
                 # If this is a new level, indicate it
@@ -5710,11 +5788,14 @@ class ManuscriptDetails(PassimDetails):
             qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for sermon in qs:
+                # Need this first, because it also REPAIRS possible parent errors
+                level = sermon.getdepth()
+
+                # Only then continue!
                 oSermon = {}
                 oSermon['obj'] = sermon
                 oSermon['nodeid'] = sermon.order + 1
                 oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                level = sermon.getdepth()
                 oSermon['level'] = level
                 oSermon['pre'] = (level-1) * 20
                 # If this is a new level, indicate it

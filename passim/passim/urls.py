@@ -12,6 +12,13 @@ import passim.seeker.forms
 import passim.seeker.views
 from passim.seeker.views import *
 
+from passim.testapp.forms import (
+    AddressChainedSelect2WidgetForm, AlbumModelSelect2WidgetForm,
+    HeavySelect2MultipleWidgetForm, HeavySelect2WidgetForm,
+    ModelSelect2TagWidgetForm, Select2WidgetForm
+)
+from passim.testapp.views import TemplateFormView, heavy_data_1, heavy_data_2
+
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
 
@@ -29,6 +36,7 @@ admin.site.site_header = "Patristic Sermons in the Middle Ages"
 admin.site.site_title = "passim Admin"
 
 pfx = APP_PREFIX
+use_testapp = False
 
 urlpatterns = [
     # Examples:
@@ -173,6 +181,16 @@ urlpatterns = [
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),
+
+    # testapp
+    #url(r'^ds2/select2_widget', TemplateFormView.as_view(form_class=Select2WidgetForm), name='select2_widget'),
+    #url(r'^ds2/heavy_select2_widget', TemplateFormView.as_view(form_class=HeavySelect2WidgetForm), name='heavy_select2_widget'),
+    #url(r'^ds2/heavy_select2_multiple_widget', TemplateFormView.as_view(form_class=HeavySelect2MultipleWidgetForm, success_url='/'), name='heavy_select2_multiple_widget'),
+    #url(r'^ds2/model_select2_widget', TemplateFormView.as_view(form_class=AlbumModelSelect2WidgetForm), name='model_select2_widget'),
+    #url(r'^ds2/model_select2_tag_widget', TemplateFormView.as_view(form_class=ModelSelect2TagWidgetForm), name='model_select2_tag_widget'),
+    #url(r'^ds2/model_chained_select2_widget', TemplateFormView.as_view(form_class=AddressChainedSelect2WidgetForm), name='model_chained_select2_widget'),
+    #url(r'^ds2/heavy_data_1', heavy_data_1, name='heavy_data_1'),
+    #url(r'^ds2/heavy_data_2', heavy_data_2, name='heavy_data_2'),
 
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),

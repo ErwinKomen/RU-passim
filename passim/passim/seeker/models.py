@@ -3781,8 +3781,14 @@ class SermonDescr(models.Model):
         depth = 1
         node = self
         while node.parent:
-            depth += 1
-            node = node.parent
+            # Repair strategy...
+            if node.id == node.parent.id:
+                # This is not correct -- need to repair
+                node.parent = None
+                node.save()
+            else:
+                depth += 1
+                node = node.parent
         return depth
 
     def get_manuscript(self):
