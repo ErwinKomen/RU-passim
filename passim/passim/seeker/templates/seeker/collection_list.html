@@ -16,7 +16,7 @@
     {% if authenticated %}
       <!-- Upper part of the collection list interface TH: dit moet anders-->
 
-      <div id="projects_top" >
+      <div id="collections_top" > 
 
         <!-- Allow access to interface parts that are normally hidden -->
         <div  class="panel panel-none">
@@ -68,7 +68,7 @@
                 </div>
               </div>
               
-              <div class="row" id="project_filter_specs">
+              <div class="row" id="collection_filter_specs">
                 <!-- The column with the different filter sections -->
                 <div class="col-md-10">
                   <div class="panel panel-default ">
@@ -82,7 +82,7 @@
                         <tr class="form-row">
                           <td style="min-width: 130px;" valign="top">Collection text</td>
                           <td style="width: 100%;">
-                            <span class="colelction-key hidden">{{colForm.name}}</span>
+                            <span class="collection-key hidden">{{colForm.name}}</span>
                             <span>{{colForm.collection_ta}}</span>
                             <span> or select: </span>
                             <span>{{colForm.collist}}</span>
@@ -194,12 +194,12 @@
                             onclick="ru.passim.seeker.goto_url('{% url 'collection_details' colitem.id %}')"
                             title="{{colitem.name}}">{{colitem.name}}</td>
 
-                        <!-- Number sermons belonging to this collection ??--> 
+                        <!-- Number of sermons belonging to this collection ??--> 
                         <td class="col-number tdnowrap">
                           {% if colitem.freqmanu %}
                             <a href="{% url 'search_manuscript' %}?manu-collist={{colitem.id}}">
                               <span class="badge jumbo-3 clickable" 
-                                    title="Number of manuscripts in this collection">{{colitem.freqmanu}}</span></a>
+                                    title="Number of sermons in this collection">{{colitem.freqmanu}}</span></a>
                           {% endif %}
                         </td>
 

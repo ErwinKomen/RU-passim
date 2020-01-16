@@ -5272,7 +5272,7 @@ class ProjectEdit(PassimDetails):
 
 
 class ProjectListView(BasicListView):
-    """Search and list keywords"""
+    """Search and list projects"""
 
     model = Project
     listform = ProjectForm
@@ -5315,7 +5315,7 @@ class CollectionListView(BasicListView):
         ]
 
     def adapt_search(self, fields):
-        # Check if the prjlist is identified
+        # Check if the collist is identified
         if fields['ownlist'] == None or len(fields['ownlist']) == 0:
             # Get the user
             user = User.objects.filter(username=self.request.user.username).first()
@@ -5323,6 +5323,8 @@ class CollectionListView(BasicListView):
             qs = Profile.objects.filter(user=user)
             fields['ownlist'] = qs
         return fields
+    
+
 
 
 class CollectionEdit(PassimDetails):
@@ -5342,7 +5344,8 @@ class CollectionEdit(PassimDetails):
 
         self.afternewurl = reverse('collection_list')
         return True, "" 
-
+    
+    # Hier nog wat toevoegen mbt terugkeren naar collection_list als er eentje verwijderd is.
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
@@ -5351,17 +5354,17 @@ class CollectionEdit(PassimDetails):
         crumbs = []
         crumbs.append(['Collections', reverse('collection_list')])
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
-
-        context['afterdelurl'] = get_previous_page(self.request)
+        context['afterdelurl'] = reverse('collection_list')
+       
+        # context['afterdelurl'] = reverse('search_gold') van SermonGold Edit
         return context
 
     def before_save(self, form, instance):
         if form != None:
             # Search the user profile
             profile = Profile.get_user_profile(self.request.user.username)
-            form.owner = profile
+            form.instance.owner = profile
         return True, ""
-
 
 class CollectionDetails(PassimDetails):
     """The editing of one collection"""
@@ -5398,7 +5401,7 @@ class CollectionDetails(PassimDetails):
 
 
 class CollectionSermset(BasicPart):
-    """The set of sermons from the collection"""
+    """The set of sermons from the collection TH: wat als voorbeeld te gebruiken?"""
 
     MainModel = Collection
     template_name = 'seeker/collection_sermset.html'

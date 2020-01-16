@@ -1,6 +1,5 @@
 ﻿{% load i18n %}
 
-{% if is_passim_editor %}
 <!-- Collection information -->
 <form>
   {% csrf_token %}
@@ -9,22 +8,16 @@
         <td colspan="2"  class="ms editable table">
           <!-- Provide the necessary buttons: edit, cancel and save -->
           <div>
-            {% if is_passim_editor %}
-              <a mode="edit" class="view-mode btn btn-xs jumbo-1">
-                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
-              </a>
-            {% endif %}
-
+            <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
             <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
               <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
             </a>
-
-            {% if is_passim_editor %}
-              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
-                 targeturl="{% if colForm.instance.id %}{% url 'collection_edit' colForm.instance.id %}{% else %}{% url 'collection_edit' %}{% endif %}" >
-                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
-              </a>
-            {% endif %}
+            <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+              targeturl="{% if colForm.instance.id %}{% url 'collection_edit' colForm.instance.id %}{% else %}{% url 'collection_edit' %}{% endif %}" >
+              <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+            </a>
 
             <!-- Waiting symbol-->
             <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
@@ -32,17 +25,14 @@
             <!-- Little error message room -->
             <span id="gold_err_msg" class="err-msg"></span>
 
-            {% if is_passim_editor %}
-              <!-- Put the delete button completely to the right-->
-              <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
-                 onclick="ru.passim.seeker.delete_confirm(this);">
-                <span class="glyphicon glyphicon-remove" title="Delete this collection"></span>
-              </a>
-            {% endif %}
+            <!-- Put the delete button completely to the right-->
+            <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+              onclick="ru.passim.seeker.delete_confirm(this);">
+              <span class="glyphicon glyphicon-remove" title="Delete this collection"></span>
+            </a>
           </div>
 
           <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-          {% if is_passim_editor %}
             <div class="delete-confirm hidden selected">
               <span>Are you sure you would like to delete this collection?</span>
               <span>
@@ -58,7 +48,7 @@
                 </a>
               </span>
             </div>
-          {% endif %}
+
         </td>
       </tr>
 
@@ -87,7 +77,8 @@
           <div class="view-mode">{% if colForm.url.value %}{{colForm.url.value}}{% else %}-{% endif %}</div>
         </td>
       </tr>
-      <!-- Show Readonly status of the collection -->
+      <!-- Show Readonly status of the collection (for passim editors only)-->
+      {% if is_passim_editor %}
       <tr>
         <td class="hoverable" style="min-width: 150px;">Read only</td>
         <td style="width: 100%">
@@ -95,7 +86,8 @@
           <div class="view-mode">{{colForm.instance.get_readonly_display}}</div>
         </td>
       </tr>
+      {% endif %}
     </table>
 </form>
 
-{% endif %}
+

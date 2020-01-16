@@ -3642,7 +3642,7 @@ class Collection(models.Model):
     # [0-n] Link to one or more SermonDescr instances
     # sermon = models.ManyToManyField("SermonDescr", through="CollectionSerm")
  
-    # [0-1] Each collection can be marked a "read only" by certain users TH: yes or no? models.BooleanField(default=False)
+    # [0-1] Each collection can be marked a "read only" by Passim-team  
     readonly = models.BooleanField(default=False)
     
     # [0-1] Each collection can have one description

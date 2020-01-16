@@ -13,7 +13,7 @@
         <!-- Table of collections for the current sermon -->
         <table class="func-view" style="width: 100%;">
           <thead>
-            <tr><th colspan="2">#</th><th class="tdnowrap">Collection</th><th>&nbsp;</th></tr>
+            <tr><th colspan="2">#</th><th class="tdnowrap">Collections</th><th>&nbsp;</th></tr>
           </thead>
           <tbody>
             {% for colform in scol_formset %}
@@ -43,10 +43,10 @@
                     {% endif %}
                 </td>
 
-                <!-- The collection -->
+                <!-- The collection TH: nog naar de specifieke collection, direct -->
                 <td style="width: 100%;">
                   <div class="view-mode">
-                    <a href="{% url 'sermon_list' %}?sermo-collection={{colform.instance.collection.name}}">
+                    <a href="{% url 'collection_list' %}?sermo-collection={{colform.instance.collection.name}}">
                       {{colform.instance.collection.name}}
                     </a>
                   </div>

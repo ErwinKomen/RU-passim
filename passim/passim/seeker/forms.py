@@ -494,7 +494,7 @@ class ProjectForm(forms.ModelForm):
 
 
 class CollectionForm(forms.ModelForm):
-    """Collection list TH: zie Project"""
+    """Collection list"""
 
     collection_ta = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
