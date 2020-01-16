@@ -79,8 +79,7 @@ INSTALLED_APPS = [
     'reportlab',
     # Add your apps here to enable them
     'django_select2',
-    'passim.seeker',
-    'passim.testapp'
+    'passim.seeker'
 ]
 
 MIDDLEWARE_CLASSES = [
