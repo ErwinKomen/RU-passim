@@ -5895,6 +5895,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             bNeedSaving =True
                         if sermon.parent is not parent:
                             sermon.parent = parent
+                            # Sanity check...
+                            if sermon.parent.id == parent.id:
+                                sermon.parent = None
                             bNeedSaving = True
                         # Do we need to save this one?
                         if bNeedSaving:

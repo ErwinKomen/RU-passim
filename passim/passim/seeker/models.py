@@ -2756,8 +2756,18 @@ class Manuscript(models.Model):
                     # Add relations where appropriate
                     if 'childof' in msItem and msItem['childof']>0: 
                         instance.parent = lst_msitem[msItem['childof']-1]['obj']
-                    if 'firstChild' in msItem: instance.firstchild = msItem['firstChild']['obj']
-                    if 'next' in msItem: instance.next = msItem['next']['obj']
+                        if instance.parent.id == instance.id:
+                            instance.parent = None
+                    if 'firstChild' in msItem: 
+                        instance.firstchild = msItem['firstChild']['obj']
+                        if instance.firstchild.id == instance.id:
+                            instance.firstchild = None
+                    if 'next' in msItem: 
+                        instance.next = msItem['next']['obj']
+                        if instance.next.id == instance.id:
+                            instance.next = None
+
+
                     instance.save()
 
             # Make sure the requester knows how many have been added
