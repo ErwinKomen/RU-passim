@@ -5271,8 +5271,8 @@ class KeywordEdit(PassimDetails):
         crumbs = []
         crumbs.append(['Keywords', reverse('keyword_list')])
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
-
-        context['afterdelurl'] = get_previous_page(self.request)
+        context['afterdelurl'] = reverse('keyword_list')
+        
         return context
 
 
@@ -5356,8 +5356,8 @@ class ProjectEdit(PassimDetails):
         crumbs = []
         crumbs.append(['Projects', reverse('project_list')])
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Project details", True, crumbs)
-
-        context['afterdelurl'] = get_previous_page(self.request)
+        context['afterdelurl'] = reverse('project_list')
+        
         return context
 
 
@@ -5434,8 +5434,7 @@ class CollectionEdit(PassimDetails):
 
         self.afternewurl = reverse('collection_list')
         return True, "" 
-    
-    # Hier nog wat toevoegen mbt terugkeren naar collection_list als er eentje verwijderd is.
+        
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
@@ -5446,7 +5445,6 @@ class CollectionEdit(PassimDetails):
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
         context['afterdelurl'] = reverse('collection_list')
        
-        # context['afterdelurl'] = reverse('search_gold') van SermonGold Edit
         return context
 
     def before_save(self, form, instance):
