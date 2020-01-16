@@ -29,6 +29,7 @@ admin.site.site_header = "Patristic Sermons in the Middle Ages"
 admin.site.site_title = "passim Admin"
 
 pfx = APP_PREFIX
+use_testapp = False
 
 urlpatterns = [
     # Examples:
