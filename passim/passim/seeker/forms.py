@@ -1378,12 +1378,29 @@ class AuthorEditForm(forms.ModelForm):
 
 
 class AuthorSearchForm(forms.ModelForm):
+    author_ta = forms.CharField(label=_("Author"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    authlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["authors"]
+
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Author
         fields = ('name',)
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(AuthorSearchForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['authlist'].queryset = Author.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
 
 
 class UploadFileForm(forms.Form):

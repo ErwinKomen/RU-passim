@@ -1,0 +1,376 @@
+﻿{% extends "layout.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    {% include 'breadcrumb_list.html' %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {% if has_select2 %}{{listForm.media.css}}{% endif %}
+{% endblock %}
+
+{% block content %}
+
+  <div>
+
+    {% if authenticated %}
+      <!-- Upper part of the basic list interface -->
+
+      <div id="basiclist_top" class="container-small" >
+
+        <!-- Allow access to interface parts that are normally hidden -->
+        <div  class="panel panel-none">
+
+          <div class="row">
+            <div class="col-md-2 col-md-offset-9 text-right" style="margin-top: 5px;">
+              {% if downloads %}
+                <a id="downloadmenu" role="button" class="btn jumbo-1 btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" 
+                        onclick="" >
+                  Download<span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="downloadmenu">
+                  {% for ditem in downloads %}
+                    {% if ditem.label %}
+                      <li><a href="#" downloadtype="{{ditem.dtype}}" ajaxurl="{{ditem.url}}" onclick="ru.passim.post_download(this);">{{ditem.label}}</a></li>
+                    {% else %}
+                      <li class="divider" role="separator"></li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+            <div class="col-md-1 text-right">
+              {% if upload and is_passim_uploader %}
+                <span><a title="upload {{title}}" 
+                    class="btn btn-success btn-xs" 
+                    targetid="import_main"
+                    onclick="ru.passim.seeker.toggle_click(this);">
+                  <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
+                </a></span>
+              {% endif %}
+              {% if filters %}
+                <span class="">
+                  <!-- NEW: use filtering instead of 'searching' -->
+                  <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
+                    <span class="glyphicon glyphicon-filter"></span>
+                  </a>
+
+                </span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <form  id="basiclist_filter" method='post' action="{{basic_list}}" >
+          {% csrf_token %}
+          <!-- entrypoint for search_paged_start -->
+          <div class="hidden search_paged_start">
+            <input name="page" type="text" />
+          </div>
+
+          <!-- entrypoint for search_ordered_start -->
+          <div class="hidden search_ordered_start">
+            <input name="o" type="text" value="{{sortOrder}}" />
+          </div>
+
+          {% if downloads %}
+            <!-- Entrypoint for downloading -->
+            <div id="downloadcenter" class="hidden">
+              <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+            </div>
+          {% endif %}
+
+          <!-- basket switched on or not -->
+          <div class="hidden">
+            <input name="usebasket" type="text" value="{{usebasket}}" />
+          </div>
+
+          <!-- Filter tab -->
+          {% if filters %}
+            <div class="inert {% if has_filter %}in{% else %}collapse{% endif %}" id="tab_filter">
+              <div class="panel panel-default">
+                <!-- Filter interface -->
+                <div class="row" id="filter_badges">
+                  <div class="col-md-2">
+                    <h4>Selected filters</h4>
+                  </div>
+                  <div class="col-md-10">
+                    <!-- Main filters -->
+                    <div>
+                      <h4>
+                      {% for filter in filters %}
+                        {% if not filter.head_id %}
+                          <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                        {% endif %}
+                      {% endfor %}
+                      </h4>
+                    </div>
+                  </div>
+                </div>
+              
+                <div class="row" id="basiclist_filter_specs">
+                  <!-- The column with the different filter sections -->
+                  <div class="col-md-10">
+                    <div class="panel panel-default ">
+
+                      <!-- Intro -->
+                      <div><h5>{{titlesg}} filters: </h5></div>
+
+                      <!-- Show the different filters in the list -->
+                      {% for filter in filters %}
+                        {% if not filter.head_id %}
+                          <div id="{{filter.id}}" class="">
+                            <table style="width: 100%;">
+                              <tr class="form-row">
+                                <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
+                                <td style="width: 100%;">
+                                  {% if filter.dbfield %}<span class="keyword-key hidden">{{filter.dbfield}}</span>{% endif %}
+                                  {% if filter.keyS %}
+                                    <span>{{filter.keyS}}</span>
+                                    {% if filter.keyList %}
+                                      <span> or select: </span>
+                                      <span>{{filter.keyList}}</span>
+                                    {% endif %}
+                                  {% elif filter.keyList %}
+                                      <span>{{filter.keyList}}</span>
+                                  {% endif %}
+                                </td>
+                              </tr>
+                            </table>
+                          </div>
+                        {% endif %}
+                      {% endfor %}
+
+
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Row with buttons-->
+                <div class="row">
+                  <div class="col-md-2 col-md-offset-10 text-right">
+                    <!-- Room to reset the search criteria -->
+                    <span>
+                      <a role="button" class="btn btn-sm jumbo-1" title="Clear search criteria" onclick="ru.passim.seeker.search_clear(this);" >Clear</a>
+                    </span>
+                    <!-- Submit the search form -->
+                    <span>
+                      <a role="button" class="btn btn-sm jumbo-3" title="Start searching..." onclick="ru.passim.seeker.search_start(this);">Search</a>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+
+        </form>
+
+        <!-- Allow importing list items from Excel -->
+        {% if is_passim_uploader and upload %}
+          <div id="import_main" class="row hidden container">
+            <form action="{{upload.url}}" method="POST" enctype="multipart/form-data">
+              {% csrf_token %}
+              <!-- Room for the filename to appear -->
+              <div class="col-md-6 form-group" id="main-import_info"
+                   targetid="{{title}}_data_import"
+                   targeturl="{{upload.url}}">
+                <div class="input-group">
+                  <span>{{upload.msg}}</span>
+                  <span class="input-group-btn">
+                    <span class="btn btn-default btn-xs btn-file">
+                      Browse...
+                      <input id="id_file_source" name="file_source" required="" type="file" oninput="ru.passim.seeker.import_data('main');" />
+                    </span>
+                  </span>
+                </div>
+            
+              </div>
+              <!-- Progress of upload indicator -->
+              <div class="col-md-6">
+                <progress class="hidden" style="width:100%;" id="main-import_progress" value="0" min="0" max="100"></progress>
+              </div>
+              <!-- Any error reporting -->
+              <div id="main-import_error"></div>
+            </form>
+
+            <!-- Import information -->
+            <div id="{{title}}_data_import" class="project-part hidden"></div>
+          </div>
+        {% endif %}
+
+        <!-- List tab -->
+        <div class="" id="tab_list">
+          <div class="panel panel-default">
+
+            <h3>
+              <span>{{title|title}}</span>
+              {% if is_passim_editor %}
+                <span id="add_{{basic_name}}" class="pull-right">
+                    {% csrf_token %}
+                    <a class="btn btn-xs jumbo-3" role="button" 
+                        onclick="document.getElementById('create_new_{{basic_name}}').submit();" >
+                      <span class="glyphicon glyphicon-plus"></span>Add a new {{basic_name}}
+                    </a>
+                </span>
+              {% endif %}
+            </h3>
+
+            <!-- Room to have the form-link to create a new list-item -->
+            <div class="hidden" >
+              <form action="{{basic_add}}" method="post" id="create_new_{{basic_name}}">
+                {% csrf_token %}
+              </form>
+            </div>
+
+            {% if object_list %}
+              <!-- Top pagination -->
+              <div class="row">
+                  <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
+                  <div class="col-sm-8">
+                  <span class="step-links pull-right">
+
+                  {% include 'paginationpost.html' %}
+
+                  </span>
+                  </div>
+              </div>
+
+              <!-- Table that contains a list of the basic list items -->
+              <div class="row">
+                <div class="col-md-12">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th class="hidden">id</th>
+                        {% for hd in order_heads %}
+                          <th class="sortable" scope="col" {% if hd.title %}title="{{hd.title}}"{% endif %}>
+                            <div class="text">
+                              {% if hd.order == "" %}{{hd.name}}
+                              {% else %}
+                              <a class="clickable {% if hd.used %}ordered{% endif %}" onclick="ru.passim.seeker.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
+                              {% endif %}
+                            </div>
+                          </th>
+                        {% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                    {% for basic in object_list %}
+                      <tr class="dict-entry clickable" >
+                        <td class="hidden"> {{ basic.id }}</td>
+
+                        <!-- The author abbreviation (if available) -->
+                        <td class="author-abbr tdnowrap" style="min-width: 100px;" >{% if basic.abbr %}{{basic.abbr}}{% endif %}</td>
+
+                        <!-- The author name itself -->
+                        <td style="width: 100%;" class="ms editable">
+                          <span class="author-name clickable"><a href="{% url basic_details basic.id %}" class="nostyle">{{basic.name}}</a></span>
+                          <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+                          {% if delete_line and is_passim_editor %}
+                            <div class="delete-confirm hidden selected">
+                              <form>
+                                {% csrf_token %}
+                                <span>Are you sure you would like to delete this {{basic_name}}?</span>
+                                <span>
+                                  <!-- The button to cancel deletion -->
+                                  <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                                      onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                                  <!-- The actual delete button-->
+                                  <a mode="delete" title="Delete this {{basic_name}}" class="btn btn-xs jumbo-3"
+                                      afterurl="{{basic_list}}"
+                                      targetid="sermon_edit"
+                                      targeturl="{% if basic.id %}{% url basic_edit basic.id %}{% endif %}">
+                                    Delete
+                                  </a>
+                                </span>
+                              </form>
+                            </div>
+                          {% endif %}
+
+                        </td>
+
+                        <!-- Number of links from sermon description and gold sermons -->
+                        <td class="tdnowrap">
+                          {% if basic.author_goldsermons.count %}
+                            <span class="badge jumbo-2" title="linked gold sermons" >
+                              <a href="{% url 'search_gold' %}?gold-author={{basic.id}}">
+                              {{basic.author_goldsermons.count}}
+                              </a>
+                            </span>
+                          {% endif %}
+
+                          {% if basic.author_sermons.count %}
+                            <span class="badge jumbo-1" title="linked sermon descriptions" >
+                              <a href="{% url 'sermon_list' %}?sermo-author={{basic.id}}">
+                              {{basic.author_sermons.count}}
+                                </a>
+                            </span>
+                          {% endif %}
+                        </td>
+
+                        <!-- Delete button for this list item-->
+                        {% if delete_line %}
+                          <td style="min-width: 80px;" >
+                            {% if is_passim_editor %}
+                              <!-- Put the delete button completely to the right-->
+                              <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
+                                 onclick="ru.passim.seeker.delete_confirm(this);">
+                                <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
+                              </a>
+                            {% endif %}
+                          </td>
+                        {% endif %}
+
+                      </tr>
+
+                    {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Bottom pagination -->
+              <div class="pagination">
+                  <span class="step-links">
+
+                  {% include 'paginationpost.html' %}
+
+                  </span>
+              </div>
+
+            {% else %}
+              <p>No {{title}} have been found.</p>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+
+    
+    {% else %}
+      <div class="explanation">
+        <p>Dear user, you are <b>not</b> logged in.</p>
+        <p>Unfortunately this means that you will not be able to perform any searches.</p>
+        <p>Should you want to work with Passim, here are your options:
+          <ul>
+            <li><a class="btn btn-info btn-xs" href="{% url 'login' %}">Login</a> - if you already have an account</li> 
+            <li><a class="btn btn-warning btn-xs" href="{% url 'signup' %}">Sign up</a> - if you don't have an account yet</li>
+          </ul>
+        </p>
+      </div>
+    {% endif %}
+    
+  </div>
+
+<script>
+  ru.passim.seeker.init_events();
+</script>
+
+{% endblock content %}
+
+{% block endcontent %} 
+  {% if has_select2 %}{{listForm.media.js }}{% endif %}
+{% endblock %}
