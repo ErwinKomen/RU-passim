@@ -2985,6 +2985,9 @@ class Author(models.Model):
         # Return the object that has been created
         return oBack
 
+    def list_fields(self):
+        """Provide the HTML of the 
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """

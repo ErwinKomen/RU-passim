@@ -6950,12 +6950,13 @@ class AuthorListView(BasicListView):
     paginate_by = 20
     delete_line = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['', 'name', '', '']
+    order_cols = ['abbr', 'name', '', '']
     order_default = order_cols
-    order_heads = [{'name': '', 'order': '', 'type': 'str'},
-                   {'name': 'Author name', 'order': 'o=2', 'type': 'str'},
+    order_heads = [{'name': '', 'order': '', 'type': 'str', 'field': 'abbr', 'default': ""},
+                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": ""},
                    {'name': 'Links', 'order': '', 'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons' },
                    {'name': '', 'order': '', 'type': 'str'}]
+    list_fields = [{'field': 'abbr'}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
