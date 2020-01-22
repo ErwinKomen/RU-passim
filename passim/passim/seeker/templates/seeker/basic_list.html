@@ -258,13 +258,60 @@
                       </tr>
                     </thead>
                     <tbody>
+
+                    <!-- New method: use result_list -->
+                    {% for result in result_list %}
+                      <tr class="dict-entry clickable">
+                        <!-- put the ID field here-->
+                        <td class="hidden">{{result.id}}</td>
+
+                        <!-- walk the other fields -->
+                        {% for field in result.fields %}
+                          <td class="{{field.classes}}" style="{{field.styles}}">
+                            {{field.value|safe}}
+                            {% if field.delete %}
+                              <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+                              {% if delete_line and is_passim_editor %}
+                                <div class="delete-confirm hidden selected">
+                                  <form>
+                                    {% csrf_token %}
+                                    <span>Are you sure you would like to delete this {{basic_name}}?</span>
+                                    <span>
+                                      <!-- The button to cancel deletion -->
+                                      <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                                          onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
+                                      <!-- The actual delete button-->
+                                      <a mode="delete" title="Delete this {{basic_name}}" class="btn btn-xs jumbo-3"
+                                          afterurl="{{basic_list}}"
+                                          targetid="sermon_edit"
+                                          targeturl="{% if result.id %}{% url basic_edit result.id %}{% endif %}">
+                                        Delete
+                                      </a>
+                                    </span>
+                                  </form>
+                                </div>
+                              {% endif %}
+                            {% endif %}
+                          </td>
+                        {% endfor %}
+                        <!-- Delete button for this list item-->
+                        {% if delete_line %}
+                          <td style="min-width: 80px;" >
+                            {% if is_passim_editor %}
+                              <!-- Put the delete button completely to the right-->
+                              <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
+                                  onclick="ru.passim.seeker.delete_confirm(this);">
+                                <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
+                              </a>
+                            {% endif %}
+                          </td>
+                        {% endif %}
+                      </tr>
+                    {% endfor %}
+
                     {% for basic in object_list %}
                       <tr class="dict-entry clickable" >
                         <td class="hidden"> {{ basic.id }}</td>
-
-                        {% for field in list_fields %}
-
-                        {% endfor %}
 
                         <!-- The author abbreviation (if available) -->
                         <td class="author-abbr tdnowrap" style="min-width: 100px;" >{% if basic.abbr %}{{basic.abbr}}{% endif %}</td>
@@ -321,7 +368,7 @@
                             {% if is_passim_editor %}
                               <!-- Put the delete button completely to the right-->
                               <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
-                                 onclick="ru.passim.seeker.delete_confirm(this);">
+                                  onclick="ru.passim.seeker.delete_confirm(this);">
                                 <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
                               </a>
                             {% endif %}

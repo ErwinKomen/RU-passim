@@ -4223,6 +4223,7 @@ class BasicListView(ListView):
     filters = []
     searches = []
     downloads = []
+    list_fields = []
     upload = None
     delete_line = False
     lst_typeaheads = []
@@ -4280,6 +4281,9 @@ class BasicListView(ListView):
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
 
+        # Make sure to transform the 'object_list'  into a 'result_list'
+        context['result_list'] = self.get_result_list(context['object_list'])
+
         context['sortOrder'] = self.sort_order
 
         # Adapt possible downloads
@@ -4301,7 +4305,7 @@ class BasicListView(ListView):
             self.plural_name = str(self.model._meta.verbose_name_plural)
         context['title'] = self.plural_name
         if self.basic_name == "":
-            self.basic_name = str(self.model._meta.verbose_name)
+            self.basic_name = str(self.model._meta.model_name)
         context['titlesg'] = self.basic_name.capitalize()
         context['basic_name'] = self.basic_name
         context['basic_add'] = reverse("{}_details".format(self.basic_name))
@@ -4339,6 +4343,7 @@ class BasicListView(ListView):
         # Make it available
         context['filters'] = self.filters
         context['fsections'] = fsections
+        context['list_fields'] = self.list_fields
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
@@ -4364,6 +4369,41 @@ class BasicListView(ListView):
 
     def add_to_context(self, context, initial):
         return context
+
+    def get_result_list(self, obj_list):
+        result_list = []
+        # Walk all items in the object list
+        for obj in obj_list:
+            # Transform this object into a list of objects that can be shown
+            result = dict(id=obj.id)
+            fields = []
+            for head in self.order_heads:
+                fobj = dict(value="")
+                if 'field' in head:
+                    # This is a field that can be shown
+                    fname = head['field']
+                    default = "" if 'default' not in head else head['default']
+                    fobj['value'] =getattr(obj, fname, default)
+                elif 'custom' in head:
+                    # The user should provide a way to determine the value for this field
+                    fvalue = self.get_field_value(obj, head['custom'])
+                    fobj['value']= fvalue
+                if 'main' in head and head['main']:
+                    fobj['styles'] = "width: 100%;"
+                elif 'options' in head and len(head['options']) > 0:
+                    options = head['options']
+                    fobj['delete'] = True
+                else:
+                    fobj['styles'] = "width: 100px;"
+                fields.append(fobj)
+            # Make the list of field-values available
+            result['fields'] = fields
+            # Add to the list of results
+            result_list.append(result)
+        return result_list
+
+    def get_field_value(self, instance, custom):
+        return ""
 
     def get_paginate_by(self, queryset):
         """
@@ -6211,6 +6251,7 @@ class SermonGoldListView(BasicListView):
     model = SermonGold
     listform = SermonGoldForm
     prefix = "gold"
+    # basic_name = "gold"
     template_name = 'seeker/sermongold.html'
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
@@ -6953,10 +6994,9 @@ class AuthorListView(BasicListView):
     order_cols = ['abbr', 'name', '', '']
     order_default = order_cols
     order_heads = [{'name': '', 'order': '', 'type': 'str', 'field': 'abbr', 'default': ""},
-                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": ""},
-                   {'name': 'Links', 'order': '', 'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons' },
-                   {'name': '', 'order': '', 'type': 'str'}]
-    list_fields = [{'field': 'abbr'}]
+                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True},
+                   {'name': 'Links', 'order': '', 'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
+                   {'name': '', 'order': '', 'type': 'str', 'options': ['delete']}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
@@ -6967,6 +7007,25 @@ class AuthorListView(BasicListView):
                  {"label": None},
                  {"label": "json", "dtype": "json", "url": 'author_results'}]
     upload = {"url": "import_authors", "msg": "Specify the CSV file (or the JSON file) that contains the PASSIM authors"}
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.author_goldsermons.count()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<span class='badge jumbo-2' title='linked gold sermons'>")
+                html.append(" <a href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
+            number = instance.author_sermons.count()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<span class='badge jumbo-1' title='linked sermon descriptions'>")
+                html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        return sBack
 
 
 class LibraryListView(ListView):
