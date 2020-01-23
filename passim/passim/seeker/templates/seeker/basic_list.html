@@ -101,7 +101,7 @@
                     <div>
                       <h4>
                       {% for filter in filters %}
-                        {% if not filter.head_id %}
+                        {% if not filter.head_id or filter.head_id == "none" %}
                           <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
                         {% endif %}
                       {% endfor %}
@@ -120,8 +120,8 @@
 
                       <!-- Show the different filters in the list -->
                       {% for filter in filters %}
-                        {% if not filter.head_id %}
-                          <div id="{{filter.id}}" class="">
+                        {% if not filter.head_id  %}
+                          <div id="{{filter.id}}" class="{% if not filter.keyS.value and not filter.keyList.value %}hidden{% endif %}">
                             <table style="width: 100%;">
                               <tr class="form-row">
                                 <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
@@ -147,7 +147,76 @@
                     </div>
                   </div>
 
+                  <!-- Basket operation buttons -->
+                  {% if entrycount > 0 and basket_update %}
+                    <div id="basket_buttons" class="col-md-2 text-right">
+                      {% include 'seeker/basket_buttons.html' %}
+                    </div>
+                  {% endif %}
+
                 </div>
+
+                <!-- Process other filter sections - if these are available -->
+                {% for section in fsections  %}
+                  {% if section.name %}
+                    <!-- Row with buttons and stuff for this filtersection -->
+                    <div id="filter_{{section.name}}" class="row {% if not section.has_value %}hidden{% endif %}" targetid="filter_{{section.name}}_specs">
+
+                      <!-- Sub filters for this section -->
+                      <div class="col-md-10 col-sm-offset-2">
+
+                        <!-- Sub filters from this section -->
+                        <div>
+                          {% for filter in filters %}
+                            {% if filter.head_id == "filter_"|add:section.name %}
+                              <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                            {% endif %}
+                          {% endfor %}
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    <!-- Row with the fields for this section -->
+                    <div id="filter_{{section.name}}_specs" class="row">
+                      <div class="col-md-10">
+                        <div class="panel panel-default ">
+
+                          <!-- Intro -->
+                          <div><h5>{{section.name|title}} filters: </h5></div>
+
+                          <!-- Show the different filters in the list -->
+                          {% for filter in filters %}
+                            {% if filter.head_id == "filter_"|add:section.name   %}
+                              <div id="{{filter.id}}" class="{% if not filter.keyS.value and not filter.keyList.value %}hidden{% endif %}">
+                                <table style="width: 100%;">
+                                  <tr class="form-row">
+                                    <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
+                                    <td style="width: 100%;">
+                                      {% if filter.dbfield %}<span class="keyword-key hidden">{{filter.dbfield}}</span>{% endif %}
+                                      {% if filter.keyS %}
+                                        <span>{{filter.keyS}}</span>
+                                        {% if filter.keyList %}
+                                          <span> or select: </span>
+                                          <span>{{filter.keyList}}</span>
+                                        {% endif %}
+                                      {% elif filter.keyList %}
+                                          <span>{{filter.keyList}}</span>
+                                      {% endif %}
+                                    </td>
+                                  </tr>
+                                </table>
+                              </div>
+                            {% endif %}
+                          {% endfor %}
+
+
+                        </div>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endfor %}
 
                 <!-- Row with buttons-->
                 <div class="row">
@@ -267,9 +336,13 @@
 
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
-                          <td class="{{field.classes}}" style="{{field.styles}}">
-                            {{field.value|safe}}
-                            {% if field.delete %}
+                          <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %}>
+                            {% if field.linkdetails %}
+                              <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{basic_name}}">{{field.value|safe}}</a>
+                            {% else %}
+                              {{field.value|safe}}
+                            {% endif %}
+                            {% if field.main %}
                               <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
                               {% if delete_line and is_passim_editor %}
                                 <div class="delete-confirm hidden selected">
@@ -291,92 +364,16 @@
                                   </form>
                                 </div>
                               {% endif %}
+                            {% elif field.delete and is_passim_editor %}
+                                <!-- Put the delete button completely to the right-->
+                                <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
+                                    onclick="ru.passim.seeker.delete_confirm(this);">
+                                  <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
+                                </a>
                             {% endif %}
                           </td>
                         {% endfor %}
-                        <!-- Delete button for this list item-->
-                        {% if delete_line %}
-                          <td style="min-width: 80px;" >
-                            {% if is_passim_editor %}
-                              <!-- Put the delete button completely to the right-->
-                              <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
-                                  onclick="ru.passim.seeker.delete_confirm(this);">
-                                <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
-                              </a>
-                            {% endif %}
-                          </td>
-                        {% endif %}
                       </tr>
-                    {% endfor %}
-
-                    {% for basic in object_list %}
-                      <tr class="dict-entry clickable" >
-                        <td class="hidden"> {{ basic.id }}</td>
-
-                        <!-- The author abbreviation (if available) -->
-                        <td class="author-abbr tdnowrap" style="min-width: 100px;" >{% if basic.abbr %}{{basic.abbr}}{% endif %}</td>
-
-                        <!-- The author name itself -->
-                        <td style="width: 100%;" class="ms editable">
-                          <span class="author-name clickable"><a href="{% url basic_details basic.id %}" class="nostyle">{{basic.name}}</a></span>
-                          <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-                          {% if delete_line and is_passim_editor %}
-                            <div class="delete-confirm hidden selected">
-                              <form>
-                                {% csrf_token %}
-                                <span>Are you sure you would like to delete this {{basic_name}}?</span>
-                                <span>
-                                  <!-- The button to cancel deletion -->
-                                  <a title="Cancel deletion" class="btn btn-xs jumbo-1"
-                                      onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
-                                  <!-- The actual delete button-->
-                                  <a mode="delete" title="Delete this {{basic_name}}" class="btn btn-xs jumbo-3"
-                                      afterurl="{{basic_list}}"
-                                      targetid="sermon_edit"
-                                      targeturl="{% if basic.id %}{% url basic_edit basic.id %}{% endif %}">
-                                    Delete
-                                  </a>
-                                </span>
-                              </form>
-                            </div>
-                          {% endif %}
-
-                        </td>
-
-                        <!-- Number of links from sermon description and gold sermons -->
-                        <td class="tdnowrap">
-                          {% if basic.author_goldsermons.count %}
-                            <span class="badge jumbo-2" title="linked gold sermons" >
-                              <a href="{% url 'search_gold' %}?gold-author={{basic.id}}">
-                              {{basic.author_goldsermons.count}}
-                              </a>
-                            </span>
-                          {% endif %}
-
-                          {% if basic.author_sermons.count %}
-                            <span class="badge jumbo-1" title="linked sermon descriptions" >
-                              <a href="{% url 'sermon_list' %}?sermo-author={{basic.id}}">
-                              {{basic.author_sermons.count}}
-                                </a>
-                            </span>
-                          {% endif %}
-                        </td>
-
-                        <!-- Delete button for this list item-->
-                        {% if delete_line %}
-                          <td style="min-width: 80px;" >
-                            {% if is_passim_editor %}
-                              <!-- Put the delete button completely to the right-->
-                              <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
-                                  onclick="ru.passim.seeker.delete_confirm(this);">
-                                <span class="glyphicon glyphicon-remove" title="Delete this {{basic_name}}"></span>
-                              </a>
-                            {% endif %}
-                          </td>
-                        {% endif %}
-
-                      </tr>
-
                     {% endfor %}
                     </tbody>
                   </table>

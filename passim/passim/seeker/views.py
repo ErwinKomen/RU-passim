@@ -87,14 +87,15 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
         {"name": "Feast",           "id": "filter_feast",       "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
         {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
         {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date range",      "id": "filter_daterange",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
         ]
 GOLD_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
@@ -4234,6 +4235,8 @@ class BasicListView(ListView):
         # Call the base implementation first to get a context
         context = super(BasicListView, self).get_context_data(**kwargs)
 
+        oErr = ErrHandle()
+
         # Get parameters for the search
         if self.initial == None:
             initial = self.request.POST if self.request.POST else self.request.GET
@@ -4323,22 +4326,44 @@ class BasicListView(ListView):
         fsections = []
         # Adapt filters with the information from searches
         for section in self.searches:
+            oFsection = None
+            bHasValue = False
             # Add filter section name
             section_name = section['section']
             if section_name != "" and section_name not in fsections:
-                fsections.append(section_name)
+                oFsection = dict(name=section_name, has_value=False)
+                # fsections.append(dict(name=section_name))
             # Copy the relevant search filter
             for item in section['filterlist']:
                 # Find the corresponding item in the filters
                 id = "filter_{}".format(item['filter'])
                 for fitem in self.filters:
                     if id == fitem['id']:
-                        fitem['search'] = item
-                        # Add possible fields
-                        if 'keyS' in item: fitem['keyS'] = frm[item['keyS']]
-                        if 'keyList' in item: fitem['keyList'] = frm[item['keyList']]
-                        if 'keyS' in item: fitem['dbfield'] = frm[item['dbfield']]
-                        break
+                        try:
+                            fitem['search'] = item
+                            # Add possible fields
+                            if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
+                                fitem['keyS'] = frm[item['keyS']]
+                                if fitem['keyS'].value(): bHasValue = True
+                            if 'keyList' in item and item['keyS'] in frm.cleaned_data: 
+                                fitem['keyList'] = frm[item['keyList']]
+                                if fitem['keyList'].value(): bHasValue = True
+                            if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
+                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
+                                    fitem['dbfield'] = frm[item['dbfield']]
+                                    if fitem['dbfield'].value(): bHasValue = True
+                                elif 'fkfield' in item and item['fkfield'] in frm.cleaned_data:
+                                    fitem['fkfield'] = frm[item['fkfield']]                                    
+                                    if fitem['fkfield'].value(): bHasValue = True
+                                else:
+                                    # There is a keyS without corresponding fkfield or dbfield
+                                    pass
+                            break
+                        except:
+                            sMsg = oErr.get_error_message()
+                            break
+            if bHasValue: oFsection['has_value'] = True
+            if oFsection != None: fsections.append(oFsection)
 
         # Make it available
         context['filters'] = self.filters
@@ -4379,22 +4404,38 @@ class BasicListView(ListView):
             fields = []
             for head in self.order_heads:
                 fobj = dict(value="")
+                fname = None
                 if 'field' in head:
                     # This is a field that can be shown
                     fname = head['field']
                     default = "" if 'default' not in head else head['default']
-                    fobj['value'] =getattr(obj, fname, default)
+                    value = getattr(obj, fname, default)
+                    if not value is None:
+                        fobj['value'] = value
                 elif 'custom' in head:
                     # The user should provide a way to determine the value for this field
-                    fvalue = self.get_field_value(obj, head['custom'])
-                    fobj['value']= fvalue
+                    fvalue, ftitle = self.get_field_value(obj, head['custom'])
+                    if not fvalue is None:
+                        fobj['value']= fvalue
+                    if ftitle != None:
+                        fobj['title'] = ftitle
+                    fname = head['custom']
+                classes = []
+                if fname != None: classes.append("{}-{}".format(self.basic_name, fname))
+                if 'linkdetails' in head and head['linkdetails']: fobj['linkdetails'] = True
                 if 'main' in head and head['main']:
                     fobj['styles'] = "width: 100%;"
+                    fobj['main'] = True
                 elif 'options' in head and len(head['options']) > 0:
                     options = head['options']
-                    fobj['delete'] = True
+                    if 'delete' in options:
+                        fobj['delete'] = True
+                    fobj['styles'] = "width: {}px;".format(50 * len(options))
+                    classes.append("tdnowrap")
                 else:
                     fobj['styles'] = "width: 100px;"
+                    classes.append("tdnowrap")
+                fobj['classes'] = " ".join(classes)
                 fields.append(fobj)
             # Make the list of field-values available
             result['fields'] = fields
@@ -5205,25 +5246,29 @@ class SermonListView(BasicListView):
     listform = SermonForm
     prefix = "sermo"
     paginate_by = 20
-    template_name = 'seeker/sermon_list.html'
+    # template_name = 'seeker/sermon_list.html'
+    # template_name = 'seeker/sermondescr_list.html'
     basketview = False
     plural_name = "Sermons"
+    basic_name = "sermon"
+    has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_default = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
-    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
-                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
-                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str'},
-                   {'name': 'Locus', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'},
-                   {'name': 'Status', 'order': '', 'type': 'str'}]
+    order_default = order_cols
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
+                   {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
+                   {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
+                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
     filters = SERMON_SEARCH_FILTERS
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'feast',     'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
@@ -5233,8 +5278,10 @@ class SermonListView(BasicListView):
             {'filter': 'country',     'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',        'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',     'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'daterange',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange',   'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'origin',      'fkfield': 'manu__origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',  'fkfield': 'manu__provenances',         'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'datefinish',  'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
             ]}
          ]
 
@@ -5242,7 +5289,8 @@ class SermonListView(BasicListView):
         # Find out who the user is
         profile = Profile.get_user_profile(self.request.user.username)
         context['basketsize'] = 0 if profile == None else profile.basketsize
-
+        context['basket_show'] = reverse('basket_show')
+        context['basket_update'] = reverse('basket_update')
         return context
 
     def get_basketqueryset(self):
@@ -5252,6 +5300,47 @@ class SermonListView(BasicListView):
         else:
             qs = SermonDescr.objects.all()
         return qs
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "author":
+            if instance.author:
+                html.append("<span style='color: darkgreen; font-size: small;'>{}</span>".format(instance.author.name[:20]))
+                sTitle = instance.author.name
+            elif instance.nickname:
+                html.append("<span style='color: darkred; font-size: small;'>{}</span>".format(instance.nickname.name[:20]))
+                sTitle = instance.nickname.name
+            else:
+                html.append("<span><i>(unknown)</i></span>")
+        elif custom == "signature":
+            html.append("<span>{}</span>".format(instance.signatures()[:20]))
+            sTitle = instance.signatures()
+        elif custom == "incexpl":
+            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+            dots = "..." if instance.incipit else ""
+            html.append("<span style='color: blue;'>{}</span>".format(dots))
+            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
+        elif custom == "manuscript":
+                          #<a href="{% url 'manuscript_details' sermon.manu.id %}" class="nostyle">
+                          #  <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
+                          #</a>
+            html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
+                reverse('manuscript_details', kwargs={'pk': instance.manu.id}),
+                instance.manu.idno[:20]))
+            sTitle = instance.manu.idno
+        elif custom == "links":
+            for gold in instance.goldsermons.all():
+                for link_def in gold.link_oview():
+                    if link_def['count'] > 0:
+                        html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
+        elif custom == "status":
+            # Provide that status badge
+            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class BasketView(SermonListView):
@@ -5375,13 +5464,37 @@ class KeywordListView(BasicListView):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str'},
-                   {'name': 'Frequency', 'order': '', 'type': 'str'}]
+    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "", 'main': True, 'linkdetails': True},
+                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.freqsermo()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<a href='{}?sermo-keyword={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+            number = instance.freqgold()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?gold-keyword={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+            number = instance.freqmanu()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        return sBack
 
 
 class ProjectEdit(PassimDetails):
