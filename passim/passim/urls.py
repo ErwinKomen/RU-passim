@@ -131,10 +131,7 @@ urlpatterns = [
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
 
-    url(r'^gold/list', SermonGoldListView.as_view(), name='sermongold_list'),
-    url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='sermongold_details'),
-    url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='sermongold_edit'),
-
+    url(r'^gold/list', SermonGoldListView.as_view(), name='gold_list'),
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),

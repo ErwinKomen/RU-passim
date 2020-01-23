@@ -4326,7 +4326,7 @@ class BasicListView(ListView):
         fsections = []
         # Adapt filters with the information from searches
         for section in self.searches:
-            oFsection = None
+            oFsection = {}
             bHasValue = False
             # Add filter section name
             section_name = section['section']
@@ -6364,18 +6364,19 @@ class SermonGoldListView(BasicListView):
     model = SermonGold
     listform = SermonGoldForm
     prefix = "gold"
-    # basic_name = "gold"
-    template_name = 'seeker/sermongold.html'
+    basic_name = "gold"
+    # template_name = 'seeker/sermongold.html'
+    has_select2 = True
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
-    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
-                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
-                   {'name': 'Editions', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'},
-                   {'name': 'Status', 'order': '', 'type': 'str'}]
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+                   {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
+                   {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
+                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
                 {"name": "Author",          "id": "filter_author",      "enabled": False},
                 {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
@@ -6389,6 +6390,45 @@ class SermonGoldListView(BasicListView):
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "author":
+            if instance.author:
+                html.append("<span style='color: darkgreen; font-size: small;'>{}</span>".format(instance.author.name[:20]))
+                sTitle = instance.author.name
+            else:
+                html.append("<span><i>(unknown)</i></span>")
+        elif custom == "signature":
+                          #{% for sig in gold.get_signatures %}
+                          #<span class="badge signature" title="{{sig}}">{{sig}}</span>
+                          #{% endfor %}
+            for sig in instance.goldsignatures.all():
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+            # sTitle = instance.signatures()
+        elif custom == "edition":
+            html.append("<span>{}</span>".format(instance.editions()[:20]))
+            sTitle = instance.editions()
+        elif custom == "incexpl":
+            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+            dots = "..." if instance.incipit else ""
+            html.append("<span style='color: blue;'>{}</span>".format(dots))
+            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
+        elif custom == "links":
+            for link_def in instance.link_oview():
+                if link_def['count'] > 0:
+                    html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
+        elif custom == "status":
+            # Provide that status badge
+            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class SermonGoldSelect(BasicPart):
