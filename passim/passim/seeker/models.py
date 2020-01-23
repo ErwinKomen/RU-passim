@@ -2986,7 +2986,8 @@ class Author(models.Model):
         return oBack
 
     def list_fields(self):
-        """Provide the HTML of the 
+        """Provide the HTML of the """
+        pass
 
 
 class Nickname(models.Model):
