@@ -101,7 +101,7 @@ urlpatterns = [
     url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
     url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollectionDetails.as_view(), name='collection_details'),
     url(r'^collection/edit(?:/(?P<pk>\d+))?/$', CollectionEdit.as_view(), name='collection_edit'),
-    url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
+    # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/show', BasketView.as_view(), name='basket_show'),
@@ -137,6 +137,8 @@ urlpatterns = [
     url(r'^gold/ftxtset(?:/(?P<pk>\d+))?/$', SermonGoldFtxtset.as_view(), name='gold_ftxtset'),
     url(r'^gold/kwset(?:/(?P<pk>\d+))?/$', SermonGoldKwset.as_view(), name='gold_kwset'),
     url(r'^gold/litset(?:/(?P<pk>\d+))?/$', SermonGoldLitset.as_view(), name='gold_litset'),
+
+    # url(r'^gold/colset(?:/(?P<pk>\d+))?/$', SermonGoldColset.as_view(), name='gold_colset'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

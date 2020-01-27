@@ -5488,29 +5488,6 @@ class CollectionDetails(PassimDetails):
         return context
 
 
-class CollectionSermset(BasicPart):
-    """The set of sermons from the collection TH: wat als voorbeeld te gebruiken?"""
-
-    MainModel = Collection
-    template_name = 'seeker/collection_sermset.html'
-    title = "CollectionsSermons"
-
-    def add_to_context(self, context):
-        
-        # Pass on all the sermons from each Collection
-        col = self.obj.id #??
-        scol_list = []
-        for item in CollectionSerm.objects.filter(collection_id=col):
-            oAdd = {}
-            oAdd['title'] = item.title.id
-            # oAdd['title'] = item.reference.title
-
-            scol_list.append(oAdd)
-
-        context['scol_list'] = scol_list
-
-        return context
-
 class SermonLinkset(BasicPart):
     """The set of links from one gold sermon"""
 
@@ -6149,6 +6126,7 @@ class ManuscriptExtset(BasicPart):
         has_changed = False
         # NOTE: no drastic things here yet
         return has_changed
+
 
 
 class ManuscriptKwset(BasicPart):

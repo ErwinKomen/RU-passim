@@ -3727,7 +3727,7 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
-    # [m] Many-to-many: one sermon can be a part of a series of collections
+    # [m] Many-to-many: one sermon can be a part of a series of collections TH: aan te passen, naar SG of SSG
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
@@ -3836,6 +3836,7 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+# naar SG of SSG?
 
 class CollectionSerm(models.Model):
     """The link between a collection item and a sermon"""
