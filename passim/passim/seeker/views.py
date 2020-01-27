@@ -4224,8 +4224,9 @@ class BasicListView(ListView):
     filters = []
     searches = []
     downloads = []
+    custombuttons = []
     list_fields = []
-    upload = None
+    uploads = []
     delete_line = False
     lst_typeaheads = []
     sort_order = ""
@@ -4297,11 +4298,19 @@ class BasicListView(ListView):
             context['downloads'] = self.downloads
 
         # Specify possible upload
-        if self.upload and len(self.upload) > 0:
-            obj = self.upload
-            if 'url' in obj and obj['url'] != "" and "/" not in item['url']:
-                obj['url'] = reverse(obj['url'])
-            context['upload'] = self.upload
+        if len(self.uploads) > 0:
+            for item in self.uploads:
+                if 'url' in item and item['url'] != "" and "/" not in item['url']:
+                    item['url'] = reverse(item['url'])
+            context['uploads'] = self.uploads
+
+        # Custom buttons
+        if len(self.custombuttons) > 0:
+            for item in self.custombuttons:
+                if 'template_name' in item:
+                    # get the code of the template
+                    pass
+            context['custombuttons'] = self.custombuttons
 
         # Set the title of the application
         if self.plural_name =="":
@@ -4435,6 +4444,8 @@ class BasicListView(ListView):
                 else:
                     fobj['styles'] = "width: 100px;"
                     classes.append("tdnowrap")
+                if 'align' in head and head['align'] != "":
+                    fobj['align'] = head['align'] 
                 fobj['classes'] = " ".join(classes)
                 fields.append(fobj)
             # Make the list of field-values available
@@ -4854,7 +4865,7 @@ class LocationRelset(BasicPart):
         return has_changed
 
 
-class OriginListView(ListView):
+class OriginListViewORG(ListView):
     """Listview of origins"""
 
     model = Origin
@@ -4939,6 +4950,57 @@ class OriginListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class OriginListView(BasicListView):
+    """Listview of origins"""
+
+    model = Origin
+    listform = OriginForm
+    prefix = "prj"
+    has_select2 = True
+    paginate_by = 15
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', 'location', 'note', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Name', 'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
+                   {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
+                   {'name': 'Note', 'order': 'o=3', 'type': 'str', 'custom': 'note'},
+                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
+    filters = [ {"name": "Location",         "id": "filter_location",     "enabled": False},
+                {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'location', 'dbfield': 'name', 'keyS': 'location_ta', 'keyList': 'locationlist', 'infield': 'name' }]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "manulink":
+            # Link to manuscripts in this project
+            count = instance.origin_manuscripts.all().count()
+            url = reverse('search_manuscript')
+            if count > 0:
+                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
+                    url, instance.id, count, count))
+        elif custom == "location":
+            sLocation = ""
+            if instance.location:
+                sLocation = instance.location.name
+            html.append(sLocation)
+        elif custom == "note":
+            sNote = "" if not instance.note else instance.note
+            html.append(sNote)
+        elif custom == "origin":
+            sName = instance.name
+            if sName == "": sName = "<i>(unnamed)</i>"
+            html.append(sName)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class OriginDetailsView(PassimDetails):
@@ -5553,12 +5615,14 @@ class ProjectListView(BasicListView):
     model = Project
     listform = ProjectForm
     prefix = "prj"
+    has_select2 = True
     paginate_by = 20
-    template_name = 'seeker/project_list.html'
+    # template_name = 'seeker/project_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str'}]
+    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str', 'custom': 'project', 'main': True, 'linkdetails': True},
+                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
     filters = [ {"name": "Project",         "id": "filter_project",     "enabled": False},
                 {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
@@ -5566,6 +5630,25 @@ class ProjectListView(BasicListView):
         {'section': '', 'filterlist': [
             {'filter': 'project',   'dbfield': 'name',          'keyS': 'project_ta', 'keyList': 'prjlist', 'infield': 'name' }]}
         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "manulink":
+            # Link to manuscripts in this project
+            count = instance.project_manuscripts.all().count()
+            url = reverse('search_manuscript')
+            if count > 0:
+                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
+                    url, instance.id, count, count))
+        elif custom == "project":
+            sName = instance.name
+            if sName == "": sName = "<i>(unnamed)</i>"
+            html.append(sName)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class CollectionListView(BasicListView):
@@ -6086,20 +6169,22 @@ class ManuscriptListView(BasicListView):
     
     model = Manuscript
     listform = SearchManuForm
+    has_select2 = True
     paginate_by = 20
     bUseFilter = True
-    template_name = 'seeker/manuscript_list.html'
+    # template_name = 'seeker/manuscript_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
-    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
-    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
-                   {'name': 'Library',  'order': 'o=2', 'type': 'str'},
-                   {'name': 'Name',     'order': 'o=3', 'type': 'str'},
-                   {'name': 'Items',    'order': '',    'type': 'int'},
-                   {'name': 'From',     'order': 'o=5', 'type': 'int'},
-                   {'name': 'Until',    'order': 'o=6', 'type': 'int'},
-                   {'name': 'Status',   'order': 'o=7', 'type': 'str'}]
+    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str', 'custom': 'city'},
+                   {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
+                   {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+                   {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
+                   {'name': 'From',     'order': 'o=5', 'type': 'int', 'custom': 'from',    'align': 'right'},
+                   {'name': 'Until',    'order': 'o=6', 'type': 'int', 'custom': 'until',   'align': 'right'},
+                   {'name': 'Status',   'order': 'o=7', 'type': 'str', 'custom': 'status'},
+                   {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
         {"name": "Country",         "id": "filter_country",     "enabled": False},
@@ -6108,8 +6193,8 @@ class ManuscriptListView(BasicListView):
         {"name": "Origin",          "id": "filter_origin",      "enabled": False},
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
-        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
         # {"name": "Project",         "id": "filter_project",     "enabled": False, "head_id": "filter_other"},
                 ]
@@ -6132,6 +6217,9 @@ class ManuscriptListView(BasicListView):
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
+    uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
+               {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def add_to_context(self, context, initial):
         # Add a files upload form
@@ -6152,6 +6240,46 @@ class ManuscriptListView(BasicListView):
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
         return fields
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "city":
+            if instance.library and instance.library.lcity:
+                city = instance.library.lcity.name
+                html.append("<span>{}</span>".format(city[:12]))        
+                sTitle = city
+        elif custom == "library":
+            if instance.library:
+                lib = instance.library.name
+                html.append("<span>{}</span>".format(lib[:12]))  
+                sTitle = lib      
+        elif custom == "name":
+            html.append("<span class='manuscript-idno'>{}</span>".format(instance.idno))
+            if instance.name:
+                html.append("<span class='manuscript-title'>| {}</span>".format(instance.name[:100]))
+                sTitle = instance.name
+        elif custom == "count":
+            html.append("{}".format(instance.manusermons.count()))
+        elif custom == "from":
+            for item in instance.manuscript_dateranges.all():
+                html.append("<div>{}</div".format(item.yearstart))
+        elif custom == "until":
+            for item in instance.manuscript_dateranges.all():
+                html.append("<div>{}</div".format(item.yearfinish))
+        elif custom == "status":
+            html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            sTitle = instance.get_stype_display()
+        elif custom == "links":
+            sLinks = ""
+            if instance.url:
+                sLinks = "<a role='button' class='btn btn-xs jumbo-1' href='{}'><span class='glyphicon glyphicon-link'><span></a>".format(instance.url)
+                sTitle = "External link"
+            html.append(sLinks)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
   
 
 class ManuscriptProvset(BasicPart):
@@ -6370,7 +6498,8 @@ class SermonGoldListView(BasicListView):
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
-    order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
+    # order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
+    order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
                    {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
@@ -6390,6 +6519,7 @@ class SermonGoldListView(BasicListView):
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
         ]
+    uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -7146,10 +7276,10 @@ class AuthorListView(BasicListView):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['abbr', 'name', '', '']
     order_default = order_cols
-    order_heads = [{'name': '', 'order': '', 'type': 'str', 'field': 'abbr', 'default': ""},
+    order_heads = [{'name': '',            'order': '',    'type': 'str', 'field': 'abbr', 'default': ""},
                    {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True},
-                   {'name': 'Links', 'order': '', 'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
-                   {'name': '', 'order': '', 'type': 'str', 'options': ['delete']}]
+                   {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
+                   {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
@@ -7687,7 +7817,7 @@ class ReportDownload(BasicPart):
         return sData
 
 
-class SourceListView(ListView):
+class SourceListViewORG(ListView):
     """Listview of sources"""
 
     model = SourceInfo
@@ -7754,6 +7884,44 @@ class SourceListView(ListView):
         return qs
 
 
+class SourceListView(BasicListView):
+    """Listview of sources"""
+
+    model = SourceInfo
+    listform = SourceEditForm
+    has_select2 = True
+    bUseFilter = True
+    page_function = "ru.passim.seeker.search_paged_start"
+    prefix = "src"
+    basic_name = "source"
+    order_cols = ['created', 'collector', 'url']
+    order_default = order_cols
+    order_heads = [{'name': 'Date',           'order': 'o=1', 'type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+                   {'name': 'Collector',      'order': 'o=2', 'type': 'str', 'field': 'collector'},
+                   {'name': 'Collected from', 'order': 'o=3', 'type': 'str', 'custom': 'from', 'main': True}]
+    filters = [ {"name": "Collector",       "id": "filter_collector",      "enabled": False} ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'collector', 'fkfield': 'profile', 'keyS': 'profile_ta', 'keyFk': 'user__username', 'keyList': 'profilelist', 'infield': 'id'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        elif custom == "from":
+            if instance.url != None:
+                sBack = instance.url
+        return sBack, sTitle
+
+    def add_to_context(self, context, initial):
+        SourceInfo.init_profile()
+        return context
+
+
+
 class SourceDetailsView(PassimDetails):
     model = SourceInfo
     mForm = SourceEditForm
@@ -7775,6 +7943,13 @@ class SourceDetailsView(PassimDetails):
             current_name = "Source {} {}".format(instance.collector, get_crpp_date(instance.created))
         context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
+
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.profile = profile
+        return True, ""
 
 
 class SourceEdit(BasicPart):

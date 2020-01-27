@@ -42,13 +42,27 @@
               {% endif %}
             </div>
             <div class="col-md-1 text-right">
-              {% if upload and is_passim_uploader %}
-                <span><a title="upload {{title}}" 
-                    class="btn btn-success btn-xs" 
-                    targetid="import_main"
-                    onclick="ru.passim.seeker.toggle_click(this);">
-                  <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
-                </a></span>
+              {% if custombuttons and is_passim_editor %}
+                {% for citem in custombuttons %}
+                  <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_{{citem.name}}" 
+                     role="button" title="{{citem.title}}">
+                    <span class="glyphicon glyphicon-{{citem.icon}}"></span>
+                  </a>
+                {% endfor %}
+              {% endif %}
+              {% if uploads and is_passim_uploader %}
+                <a id="uploadmenu" role="button" title="Importing..." class="btn jumbo-1 btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" onclick="">
+                  <span class="glyphicon glyphicon-upload"></span>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="uploadmenu">
+                  {% for uitem in uploads %}
+                    {% if uitem.label %}
+                      <li><a href="#" title="upload {{uitem.title}}" targetid="import_{{uitem.title}}" onclick="ru.passim.seeker.toggle_click(this);">{{uitem.label}}</a></li>
+                    {% else %}
+                      <li class="divider" role="separator"></li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
               {% endif %}
               {% if filters %}
                 <span class="">
@@ -126,15 +140,15 @@
                               <tr class="form-row">
                                 <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
                                 <td style="width: 100%;">
-                                  {% if filter.dbfield %}<span class="keyword-key hidden">{{filter.dbfield}}</span>{% endif %}
+                                  {% if filter.dbfield %}<span class="keyword-key hidden filter-dbfield">{{filter.dbfield}}</span>{% endif %}
                                   {% if filter.keyS %}
-                                    <span>{{filter.keyS}}</span>
+                                    <span class="filter-keys">{{filter.keyS}}</span>
                                     {% if filter.keyList %}
                                       <span> or select: </span>
-                                      <span>{{filter.keyList}}</span>
+                                      <span class="filter-keylist">{{filter.keyList}}</span>
                                     {% endif %}
                                   {% elif filter.keyList %}
-                                      <span>{{filter.keyList}}</span>
+                                      <span class="filter-keylist">{{filter.keyList}}</span>
                                   {% endif %}
                                 </td>
                               </tr>
@@ -158,7 +172,7 @@
 
                 <!-- Process other filter sections - if these are available -->
                 {% for section in fsections  %}
-                  {% if section.name %}
+                  {% if section.name and section.name != "other"  %}
                     <!-- Row with buttons and stuff for this filtersection -->
                     <div id="filter_{{section.name}}" class="row {% if not section.has_value %}hidden{% endif %}" targetid="filter_{{section.name}}_specs">
 
@@ -237,37 +251,51 @@
 
         </form>
 
-        <!-- Allow importing list items from Excel -->
-        {% if is_passim_uploader and upload %}
-          <div id="import_main" class="row hidden container">
-            <form action="{{upload.url}}" method="POST" enctype="multipart/form-data">
-              {% csrf_token %}
-              <!-- Room for the filename to appear -->
-              <div class="col-md-6 form-group" id="main-import_info"
-                   targetid="{{title}}_data_import"
-                   targeturl="{{upload.url}}">
-                <div class="input-group">
-                  <span>{{upload.msg}}</span>
-                  <span class="input-group-btn">
-                    <span class="btn btn-default btn-xs btn-file">
-                      Browse...
-                      <input id="id_file_source" name="file_source" required="" type="file" oninput="ru.passim.seeker.import_data('main');" />
-                    </span>
-                  </span>
-                </div>
-            
-              </div>
-              <!-- Progress of upload indicator -->
-              <div class="col-md-6">
-                <progress class="hidden" style="width:100%;" id="main-import_progress" value="0" min="0" max="100"></progress>
-              </div>
-              <!-- Any error reporting -->
-              <div id="main-import_error"></div>
-            </form>
+        <!-- Custom button processing -->
+        {% if custombuttons and is_passim_editor %}
+          {% for citem in custombuttons %}
+            <div id="tab_{{citem.name}}" class="inert collapse">
+              {% if "template_name" in citem %}
+                {% include citem.template_name %}
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% endif %}
 
-            <!-- Import information -->
-            <div id="{{title}}_data_import" class="project-part hidden"></div>
-          </div>
+
+        <!-- Allow importing list items from Excel -->
+        {% if is_passim_uploader and uploads %}
+          {% for uitem in uploads %}
+            <div id="import_{{uitem.title}}" class="row hidden container">
+              <form action="{{uitem.url}}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <!-- Room for the filename to appear -->
+                <div class="col-md-6 form-group" id="{{uitem.title}}-import_info"
+                     targetid="{{uitem.title}}_data_import"
+                     targeturl="{{uitem.url}}">
+                  <div class="input-group">
+                    <span>{{uitem.msg}}</span>
+                    <span class="input-group-btn">
+                      <span class="btn btn-default btn-xs btn-file">
+                        Browse...
+                        <input id="id_{{uitem.title}}-file_source" name="{{uitem.title}}-file_source" required="" type="file" oninput="ru.passim.seeker.import_data('{{uitem.title}}');" />
+                      </span>
+                    </span>
+                  </div>
+            
+                </div>
+                <!-- Progress of upload indicator -->
+                <div class="col-md-6">
+                  <progress class="hidden" style="width:100%;" id="{{uitem.title}}-import_progress" value="0" min="0" max="100"></progress>
+                </div>
+                <!-- Any error reporting -->
+                <div id="{{uitem.title}}-import_error"></div>
+              </form>
+
+              <!-- Import information -->
+              <div id="{{uitem.title}}_data_import" class="project-part hidden"></div>
+            </div>
+          {% endfor %}
         {% endif %}
 
         <!-- List tab -->
@@ -336,7 +364,7 @@
 
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
-                          <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %}>
+                          <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
                               <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{basic_name}}">{{field.value|safe}}</a>
                             {% else %}
