@@ -370,9 +370,13 @@
                             <span><i>(unknown)</i></span>
                           {% endif %}
                         </td>
+
+                        <!-- Signature -->
                         <td class="sermon-signature tdnowrap" style="font-size: small;" align="left" title="{{sermon.signatures}}">
                           <span>{{sermon.signatures|truncatechars:20}}</span>
                         </td>
+
+                        <!-- Incipit/Explicit -->
                         <td style="width: 100%;">
                           <span>{{sermon.get_incipit_markdown|safe}}</span>
                           <span style="color: blue;">{% if sermon.incipit %}...{% endif %}</span>

@@ -87,14 +87,15 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
         {"name": "Feast",           "id": "filter_feast",       "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
         {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
         {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date range",      "id": "filter_daterange",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
         ]
 GOLD_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
@@ -461,10 +462,11 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 # Get the type
                 sType = order_heads[iOrderCol-1]['type']
                 for order_item in order_cols[iOrderCol-1].split(";"):
-                    if sType == 'str':
-                        order.append(Lower(order_item))
-                    else:
-                        order.append(order_item)
+                    if order_item != "":
+                        if sType == 'str':
+                            order.append(Lower(order_item))
+                        else:
+                            order.append(order_item)
                 if bAscending:
                     order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
                 else:
@@ -478,7 +480,8 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
             for order_item in order_cols[0].split(";"):
-                order.append(Lower(order_item))
+                if order_item != "":
+                    order.append(Lower(order_item))
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
             if len(order) > 0:
@@ -4204,17 +4207,27 @@ class BasicListView(ListView):
     qd = None
     bFilter = False
     basketview = False
+    template_name = 'seeker/basic_list.html'
     bHasParameters = False
     bUseFilter = False
     initial = None
     listform = None
+    has_select2 = False
     plural_name = ""
+    basic_name = ""
+    basic_edit = ""
+    basic_details = ""
     prefix = ""
     order_default = []
     order_cols = []
     order_heads = []
     filters = []
     searches = []
+    downloads = []
+    custombuttons = []
+    list_fields = []
+    uploads = []
+    delete_line = False
     lst_typeaheads = []
     sort_order = ""
     page_function = None
@@ -4222,6 +4235,8 @@ class BasicListView(ListView):
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(BasicListView, self).get_context_data(**kwargs)
+
+        oErr = ErrHandle()
 
         # Get parameters for the search
         if self.initial == None:
@@ -4239,6 +4254,10 @@ class BasicListView(ListView):
                 if lst_form_ta != None:
                     for item in lst_form_ta:
                         self.lst_typeaheads.append(item)
+
+            if self.has_select2:
+                context['has_select2'] = True
+            context['listForm'] = frm
 
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
@@ -4266,17 +4285,99 @@ class BasicListView(ListView):
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
 
+        # Make sure to transform the 'object_list'  into a 'result_list'
+        context['result_list'] = self.get_result_list(context['object_list'])
+
         context['sortOrder'] = self.sort_order
+
+        # Adapt possible downloads
+        if len(self.downloads) > 0:
+            for item in self.downloads:
+                if 'url' in item and item['url'] != "" and "/" not in item['url']:
+                    item['url'] = reverse(item['url'])
+            context['downloads'] = self.downloads
+
+        # Specify possible upload
+        if len(self.uploads) > 0:
+            for item in self.uploads:
+                if 'url' in item and item['url'] != "" and "/" not in item['url']:
+                    item['url'] = reverse(item['url'])
+            context['uploads'] = self.uploads
+
+        # Custom buttons
+        if len(self.custombuttons) > 0:
+            for item in self.custombuttons:
+                if 'template_name' in item:
+                    # get the code of the template
+                    pass
+            context['custombuttons'] = self.custombuttons
 
         # Set the title of the application
         if self.plural_name =="":
             self.plural_name = str(self.model._meta.verbose_name_plural)
         context['title'] = self.plural_name
+        if self.basic_name == "":
+            self.basic_name = str(self.model._meta.model_name)
+        context['titlesg'] = self.basic_name.capitalize()
+        context['basic_name'] = self.basic_name
+        context['basic_add'] = reverse("{}_details".format(self.basic_name))
+        context['basic_list'] = reverse("{}_list".format(self.basic_name))
+        context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
+        context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
+
+        # Delete button per line?
+        if self.delete_line:
+            context['delete_line'] = True
 
         # Make sure we pass on the ordered heads
         context['order_heads'] = self.order_heads
         context['has_filter'] = self.bFilter
+        fsections = []
+        # Adapt filters with the information from searches
+        for section in self.searches:
+            oFsection = {}
+            bHasValue = False
+            # Add filter section name
+            section_name = section['section']
+            if section_name != "" and section_name not in fsections:
+                oFsection = dict(name=section_name, has_value=False)
+                # fsections.append(dict(name=section_name))
+            # Copy the relevant search filter
+            for item in section['filterlist']:
+                # Find the corresponding item in the filters
+                id = "filter_{}".format(item['filter'])
+                for fitem in self.filters:
+                    if id == fitem['id']:
+                        try:
+                            fitem['search'] = item
+                            # Add possible fields
+                            if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
+                                fitem['keyS'] = frm[item['keyS']]
+                                if fitem['keyS'].value(): bHasValue = True
+                            if 'keyList' in item and item['keyS'] in frm.cleaned_data: 
+                                fitem['keyList'] = frm[item['keyList']]
+                                if fitem['keyList'].value(): bHasValue = True
+                            if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
+                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
+                                    fitem['dbfield'] = frm[item['dbfield']]
+                                    if fitem['dbfield'].value(): bHasValue = True
+                                elif 'fkfield' in item and item['fkfield'] in frm.cleaned_data:
+                                    fitem['fkfield'] = frm[item['fkfield']]                                    
+                                    if fitem['fkfield'].value(): bHasValue = True
+                                else:
+                                    # There is a keyS without corresponding fkfield or dbfield
+                                    pass
+                            break
+                        except:
+                            sMsg = oErr.get_error_message()
+                            break
+            if bHasValue: oFsection['has_value'] = True
+            if oFsection != None: fsections.append(oFsection)
+
+        # Make it available
         context['filters'] = self.filters
+        context['fsections'] = fsections
+        context['list_fields'] = self.list_fields
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
@@ -4302,6 +4403,59 @@ class BasicListView(ListView):
 
     def add_to_context(self, context, initial):
         return context
+
+    def get_result_list(self, obj_list):
+        result_list = []
+        # Walk all items in the object list
+        for obj in obj_list:
+            # Transform this object into a list of objects that can be shown
+            result = dict(id=obj.id)
+            fields = []
+            for head in self.order_heads:
+                fobj = dict(value="")
+                fname = None
+                if 'field' in head:
+                    # This is a field that can be shown
+                    fname = head['field']
+                    default = "" if 'default' not in head else head['default']
+                    value = getattr(obj, fname, default)
+                    if not value is None:
+                        fobj['value'] = value
+                elif 'custom' in head:
+                    # The user should provide a way to determine the value for this field
+                    fvalue, ftitle = self.get_field_value(obj, head['custom'])
+                    if not fvalue is None:
+                        fobj['value']= fvalue
+                    if ftitle != None:
+                        fobj['title'] = ftitle
+                    fname = head['custom']
+                classes = []
+                if fname != None: classes.append("{}-{}".format(self.basic_name, fname))
+                if 'linkdetails' in head and head['linkdetails']: fobj['linkdetails'] = True
+                if 'main' in head and head['main']:
+                    fobj['styles'] = "width: 100%;"
+                    fobj['main'] = True
+                elif 'options' in head and len(head['options']) > 0:
+                    options = head['options']
+                    if 'delete' in options:
+                        fobj['delete'] = True
+                    fobj['styles'] = "width: {}px;".format(50 * len(options))
+                    classes.append("tdnowrap")
+                else:
+                    fobj['styles'] = "width: 100px;"
+                    classes.append("tdnowrap")
+                if 'align' in head and head['align'] != "":
+                    fobj['align'] = head['align'] 
+                fobj['classes'] = " ".join(classes)
+                fields.append(fobj)
+            # Make the list of field-values available
+            result['fields'] = fields
+            # Add to the list of results
+            result_list.append(result)
+        return result_list
+
+    def get_field_value(self, instance, custom):
+        return ""
 
     def get_paginate_by(self, queryset):
         """
@@ -4711,7 +4865,7 @@ class LocationRelset(BasicPart):
         return has_changed
 
 
-class OriginListView(ListView):
+class OriginListViewORG(ListView):
     """Listview of origins"""
 
     model = Origin
@@ -4796,6 +4950,57 @@ class OriginListView(ListView):
 
         # Return the resulting filtered and sorted queryset
         return qs
+
+
+class OriginListView(BasicListView):
+    """Listview of origins"""
+
+    model = Origin
+    listform = OriginForm
+    prefix = "prj"
+    has_select2 = True
+    paginate_by = 15
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', 'location', 'note', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Name', 'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
+                   {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
+                   {'name': 'Note', 'order': 'o=3', 'type': 'str', 'custom': 'note'},
+                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
+    filters = [ {"name": "Location",         "id": "filter_location",     "enabled": False},
+                {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'location', 'dbfield': 'name', 'keyS': 'location_ta', 'keyList': 'locationlist', 'infield': 'name' }]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "manulink":
+            # Link to manuscripts in this project
+            count = instance.origin_manuscripts.all().count()
+            url = reverse('search_manuscript')
+            if count > 0:
+                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
+                    url, instance.id, count, count))
+        elif custom == "location":
+            sLocation = ""
+            if instance.location:
+                sLocation = instance.location.name
+            html.append(sLocation)
+        elif custom == "note":
+            sNote = "" if not instance.note else instance.note
+            html.append(sNote)
+        elif custom == "origin":
+            sName = instance.name
+            if sName == "": sName = "<i>(unnamed)</i>"
+            html.append(sName)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class OriginDetailsView(PassimDetails):
@@ -5103,25 +5308,29 @@ class SermonListView(BasicListView):
     listform = SermonForm
     prefix = "sermo"
     paginate_by = 20
-    template_name = 'seeker/sermon_list.html'
+    # template_name = 'seeker/sermon_list.html'
+    # template_name = 'seeker/sermondescr_list.html'
     basketview = False
     plural_name = "Sermons"
+    basic_name = "sermon"
+    has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_default = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
-    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
-                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
-                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str'},
-                   {'name': 'Locus', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'},
-                   {'name': 'Status', 'order': '', 'type': 'str'}]
+    order_default = order_cols
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
+                   {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
+                   {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
+                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
     filters = SERMON_SEARCH_FILTERS
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'feast',     'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
@@ -5131,8 +5340,10 @@ class SermonListView(BasicListView):
             {'filter': 'country',     'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',        'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',     'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'daterange',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange',   'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'origin',      'fkfield': 'manu__origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',  'fkfield': 'manu__provenances',         'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'datefinish',  'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
             ]}
          ]
 
@@ -5140,7 +5351,8 @@ class SermonListView(BasicListView):
         # Find out who the user is
         profile = Profile.get_user_profile(self.request.user.username)
         context['basketsize'] = 0 if profile == None else profile.basketsize
-
+        context['basket_show'] = reverse('basket_show')
+        context['basket_update'] = reverse('basket_update')
         return context
 
     def get_basketqueryset(self):
@@ -5150,6 +5362,47 @@ class SermonListView(BasicListView):
         else:
             qs = SermonDescr.objects.all()
         return qs
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "author":
+            if instance.author:
+                html.append("<span style='color: darkgreen; font-size: small;'>{}</span>".format(instance.author.name[:20]))
+                sTitle = instance.author.name
+            elif instance.nickname:
+                html.append("<span style='color: darkred; font-size: small;'>{}</span>".format(instance.nickname.name[:20]))
+                sTitle = instance.nickname.name
+            else:
+                html.append("<span><i>(unknown)</i></span>")
+        elif custom == "signature":
+            html.append("<span>{}</span>".format(instance.signatures()[:20]))
+            sTitle = instance.signatures()
+        elif custom == "incexpl":
+            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+            dots = "..." if instance.incipit else ""
+            html.append("<span style='color: blue;'>{}</span>".format(dots))
+            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
+        elif custom == "manuscript":
+                          #<a href="{% url 'manuscript_details' sermon.manu.id %}" class="nostyle">
+                          #  <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
+                          #</a>
+            html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
+                reverse('manuscript_details', kwargs={'pk': instance.manu.id}),
+                instance.manu.idno[:20]))
+            sTitle = instance.manu.idno
+        elif custom == "links":
+            for gold in instance.goldsermons.all():
+                for link_def in gold.link_oview():
+                    if link_def['count'] > 0:
+                        html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
+        elif custom == "status":
+            # Provide that status badge
+            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class BasketView(SermonListView):
@@ -5211,40 +5464,6 @@ class BasketUpdate(BasicPart):
         return context
     
 
-class KeywordDetails(PassimDetails):
-    """The details of one keyword"""
-
-    model = Keyword
-    mForm = KeywordForm
-    template_name = 'seeker/keyword_details.html'
-    template_post = 'seeker/keyword_details.html'
-    prefix = 'kw'
-    title = "KeywordDetails"
-    afternewurl = ""
-    rtype = "html"  # GET provides a HTML form straight away
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('keyword_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('keyword_details', kwargs={'pk': instance.id})
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('keyword_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Keywords', prevpage])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
-
-        return context
-
-
 class KeywordEdit(PassimDetails):
     """The details of one keyword"""
 
@@ -5266,7 +5485,7 @@ class KeywordEdit(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
+        prevpage = reverse('keyword_list')
         context['prevpage'] = prevpage
         crumbs = []
         crumbs.append(['Keywords', reverse('keyword_list')])
@@ -5276,6 +5495,25 @@ class KeywordEdit(PassimDetails):
         return context
 
 
+class KeywordDetails(KeywordEdit):
+    """The details of one keyword"""
+
+    template_name = 'seeker/keyword_details.html'
+    template_post = 'seeker/keyword_details.html'
+    title = "KeywordDetails"
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('keyword_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('keyword_details', kwargs={'pk': instance.id})
+        return True, "" 
+
+
 class KeywordListView(BasicListView):
     """Search and list keywords"""
 
@@ -5283,51 +5521,42 @@ class KeywordListView(BasicListView):
     listform = KeywordForm
     prefix = "kw"
     paginate_by = 20
-    template_name = 'seeker/keyword_list.html'
+    # template_name = 'seeker/keyword_list.html'
+    has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str'},
-                   {'name': 'Frequency', 'order': '', 'type': 'str'}]
+    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "", 'main': True, 'linkdetails': True},
+                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
         ]
 
-
-class ProjectDetails(PassimDetails):
-    """The details of one project"""
-
-    model = Project
-    mForm = ProjectForm
-    template_name = 'seeker/project_details.html'
-    template_post = 'seeker/project_details.html'
-    prefix = 'prj'
-    title = "ProjectDetails"
-    afternewurl = ""
-    rtype = "html"  # GET provides a HTML form straight away
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('project_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('project_details', kwargs={'pk': instance.id})
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('project_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Projects', prevpage])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Project details", True, crumbs)
-
-        return context
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.freqsermo()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<a href='{}?sermo-keyword={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+            number = instance.freqgold()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?gold-keyword={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+            number = instance.freqmanu()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        return sBack
 
 
 class ProjectEdit(PassimDetails):
@@ -5351,7 +5580,7 @@ class ProjectEdit(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
+        prevpage = reverse('project_list')
         context['prevpage'] = prevpage
         crumbs = []
         crumbs.append(['Projects', reverse('project_list')])
@@ -5361,18 +5590,39 @@ class ProjectEdit(PassimDetails):
         return context
 
 
+class ProjectDetails(ProjectEdit):
+    """The details of one project"""
+
+    template_name = 'seeker/project_details.html'
+    template_post = 'seeker/project_details.html'
+    title = "ProjectDetails"
+    rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('project_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('project_details', kwargs={'pk': instance.id})
+        return True, "" 
+
+
 class ProjectListView(BasicListView):
     """Search and list projects"""
 
     model = Project
     listform = ProjectForm
     prefix = "prj"
+    has_select2 = True
     paginate_by = 20
-    template_name = 'seeker/project_list.html'
+    # template_name = 'seeker/project_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str'}]
+    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str', 'custom': 'project', 'main': True, 'linkdetails': True},
+                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
     filters = [ {"name": "Project",         "id": "filter_project",     "enabled": False},
                 {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
@@ -5380,6 +5630,25 @@ class ProjectListView(BasicListView):
         {'section': '', 'filterlist': [
             {'filter': 'project',   'dbfield': 'name',          'keyS': 'project_ta', 'keyList': 'prjlist', 'infield': 'name' }]}
         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "manulink":
+            # Link to manuscripts in this project
+            count = instance.project_manuscripts.all().count()
+            url = reverse('search_manuscript')
+            if count > 0:
+                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
+                    url, instance.id, count, count))
+        elif custom == "project":
+            sName = instance.name
+            if sName == "": sName = "<i>(unnamed)</i>"
+            html.append(sName)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class CollectionListView(BasicListView):
@@ -5415,8 +5684,6 @@ class CollectionListView(BasicListView):
         return fields
     
 
-
-
 class CollectionEdit(PassimDetails):
     """The details of one collection"""
  
@@ -5438,7 +5705,7 @@ class CollectionEdit(PassimDetails):
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
         # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
+        prevpage = reverse('collection_list')
         context['prevpage'] = prevpage
         crumbs = []
         crumbs.append(['Collections', reverse('collection_list')])
@@ -5454,16 +5721,13 @@ class CollectionEdit(PassimDetails):
             form.instance.owner = profile
         return True, ""
 
-class CollectionDetails(PassimDetails):
+
+class CollectionDetails(CollectionEdit):
     """The editing of one collection"""
 
-    model = Collection
-    mForm = CollectionForm
     template_name = 'seeker/collection_details.html'
     template_post = 'seeker/collection_details.html'
-    prefix = 'col'
     title = "CollectionDetails"
-    afternewurl = ""
     rtype = "html"  # GET provides a HTML form straight away
 
     def after_new(self, form, instance):
@@ -5476,14 +5740,27 @@ class CollectionDetails(PassimDetails):
             self.redirectpage = reverse('collection_details', kwargs={'pk': instance.id})
         return True, "" 
 
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('collection_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Collections', prevpage])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
+
+class CollectionSermset(BasicPart):
+    """The set of sermons from the collection TH: wat als voorbeeld te gebruiken?"""
+
+    MainModel = Collection
+    template_name = 'seeker/collection_sermset.html'
+    title = "CollectionsSermons"
+
+    def add_to_context(self, context):
+        
+        # Pass on all the sermons from each Collection
+        col = self.obj.id #??
+        scol_list = []
+        for item in CollectionSerm.objects.filter(collection_id=col):
+            oAdd = {}
+            oAdd['title'] = item.title.id
+            # oAdd['title'] = item.reference.title
+
+            scol_list.append(oAdd)
+
+        context['scol_list'] = scol_list
 
         return context
 
@@ -5872,6 +6149,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             bNeedSaving =True
                         if sermon.parent is not parent:
                             sermon.parent = parent
+                            # Sanity check...
+                            if sermon.parent.id == parent.id:
+                                sermon.parent = None
                             bNeedSaving = True
                         # Do we need to save this one?
                         if bNeedSaving:
@@ -5889,20 +6169,22 @@ class ManuscriptListView(BasicListView):
     
     model = Manuscript
     listform = SearchManuForm
+    has_select2 = True
     paginate_by = 20
     bUseFilter = True
-    template_name = 'seeker/manuscript_list.html'
+    # template_name = 'seeker/manuscript_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
-    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype']
+    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
-    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str'},
-                   {'name': 'Library',  'order': 'o=2', 'type': 'str'},
-                   {'name': 'Name',     'order': 'o=3', 'type': 'str'},
-                   {'name': 'Items',    'order': '',    'type': 'int'},
-                   {'name': 'From',     'order': 'o=5', 'type': 'int'},
-                   {'name': 'Until',    'order': 'o=6', 'type': 'int'},
-                   {'name': 'Status',   'order': 'o=7', 'type': 'str'}]
+    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str', 'custom': 'city'},
+                   {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
+                   {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+                   {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
+                   {'name': 'From',     'order': 'o=5', 'type': 'int', 'custom': 'from',    'align': 'right'},
+                   {'name': 'Until',    'order': 'o=6', 'type': 'int', 'custom': 'until',   'align': 'right'},
+                   {'name': 'Status',   'order': 'o=7', 'type': 'str', 'custom': 'status'},
+                   {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
         {"name": "Country",         "id": "filter_country",     "enabled": False},
@@ -5911,8 +6193,8 @@ class ManuscriptListView(BasicListView):
         {"name": "Origin",          "id": "filter_origin",      "enabled": False},
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
-        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
         # {"name": "Project",         "id": "filter_project",     "enabled": False, "head_id": "filter_other"},
                 ]
@@ -5935,6 +6217,9 @@ class ManuscriptListView(BasicListView):
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
+    uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
+               {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def add_to_context(self, context, initial):
         # Add a files upload form
@@ -5955,6 +6240,46 @@ class ManuscriptListView(BasicListView):
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
         return fields
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "city":
+            if instance.library and instance.library.lcity:
+                city = instance.library.lcity.name
+                html.append("<span>{}</span>".format(city[:12]))        
+                sTitle = city
+        elif custom == "library":
+            if instance.library:
+                lib = instance.library.name
+                html.append("<span>{}</span>".format(lib[:12]))  
+                sTitle = lib      
+        elif custom == "name":
+            html.append("<span class='manuscript-idno'>{}</span>".format(instance.idno))
+            if instance.name:
+                html.append("<span class='manuscript-title'>| {}</span>".format(instance.name[:100]))
+                sTitle = instance.name
+        elif custom == "count":
+            html.append("{}".format(instance.manusermons.count()))
+        elif custom == "from":
+            for item in instance.manuscript_dateranges.all():
+                html.append("<div>{}</div".format(item.yearstart))
+        elif custom == "until":
+            for item in instance.manuscript_dateranges.all():
+                html.append("<div>{}</div".format(item.yearfinish))
+        elif custom == "status":
+            html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            sTitle = instance.get_stype_display()
+        elif custom == "links":
+            sLinks = ""
+            if instance.url:
+                sLinks = "<a role='button' class='btn btn-xs jumbo-1' href='{}'><span class='glyphicon glyphicon-link'><span></a>".format(instance.url)
+                sTitle = "External link"
+            html.append(sLinks)
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
   
 
 class ManuscriptProvset(BasicPart):
@@ -6168,17 +6493,20 @@ class SermonGoldListView(BasicListView):
     model = SermonGold
     listform = SermonGoldForm
     prefix = "gold"
-    template_name = 'seeker/sermongold.html'
+    basic_name = "gold"
+    # template_name = 'seeker/sermongold.html'
+    has_select2 = True
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
-    order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
-    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str'}, 
-                   {'name': 'Signature', 'order': 'o=2', 'type': 'str'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str'},
-                   {'name': 'Editions', 'order': '', 'type': 'str'},
-                   {'name': 'Links', 'order': '', 'type': 'str'},
-                   {'name': 'Status', 'order': '', 'type': 'str'}]
+    # order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
+    order_cols = order_default
+    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
+                   {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+                   {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
+                   {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
+                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
                 {"name": "Author",          "id": "filter_author",      "enabled": False},
                 {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
@@ -6192,6 +6520,46 @@ class SermonGoldListView(BasicListView):
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
         ]
+    uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "author":
+            if instance.author:
+                html.append("<span style='color: darkgreen; font-size: small;'>{}</span>".format(instance.author.name[:20]))
+                sTitle = instance.author.name
+            else:
+                html.append("<span><i>(unknown)</i></span>")
+        elif custom == "signature":
+                          #{% for sig in gold.get_signatures %}
+                          #<span class="badge signature" title="{{sig}}">{{sig}}</span>
+                          #{% endfor %}
+            for sig in instance.goldsignatures.all():
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+            # sTitle = instance.signatures()
+        elif custom == "edition":
+            html.append("<span>{}</span>".format(instance.editions()[:20]))
+            sTitle = instance.editions()
+        elif custom == "incexpl":
+            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+            dots = "..." if instance.incipit else ""
+            html.append("<span style='color: blue;'>{}</span>".format(dots))
+            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
+        elif custom == "links":
+            for link_def in instance.link_oview():
+                if link_def['count'] > 0:
+                    html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
+        elif custom == "status":
+            # Provide that status badge
+            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class SermonGoldSelect(BasicPart):
@@ -6897,100 +7265,52 @@ class AuthorDetails(AuthorEdit):
         return context
 
 
-class AuthorListView(ListView):
-    """Listview of authors"""
+class AuthorListView(BasicListView):
+    """Search and list authors"""
 
     model = Author
+    listform = AuthorSearchForm
+    has_select2 = True
+    prefix = "auth"
     paginate_by = 20
-    template_name = 'seeker/author_list.html'
-    entrycount = 0
-    bDoTime = True
+    delete_line = True
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['abbr', 'name', '', '']
+    order_default = order_cols
+    order_heads = [{'name': '',            'order': '',    'type': 'str', 'field': 'abbr', 'default': ""},
+                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True},
+                   {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
+                   {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
+    filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }]}
+        ]
+    downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'author_results'},
+                 {"label": "csv (tab-separated)", "dtype": "csv", "url": 'author_results'},
+                 {"label": None},
+                 {"label": "json", "dtype": "json", "url": 'author_results'}]
+    upload = {"url": "import_authors", "msg": "Specify the CSV file (or the JSON file) that contains the PASSIM authors"}
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(AuthorListView, self).get_context_data(**kwargs)
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.author_goldsermons.count()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<span class='badge jumbo-2' title='linked gold sermons'>")
+                html.append(" <a href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
+            number = instance.author_sermons.count()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<span class='badge jumbo-1' title='linked sermon descriptions'>")
+                html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        return sBack
 
-        # Get parameters for the search
-        initial = self.request.GET if self.request.method == "GET" else self.request.POST
-        search_form = AuthorSearchForm(initial)
-
-        context['searchform'] = search_form
-
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Passim Authors"
-
-        # Check this user: is he allowed to UPLOAD data?
-        context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Authors", True)
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.get = get
-
-        # Fix the sort-order
-        get['sortOrder'] = 'name'
-
-        lstQ = []
-
-        # Check for author [name]
-        if 'name' in get and get['name'] != '':
-            val = adapt_search(get['name'])
-            # Search in both the name as well as the abbr field
-            lstQ.append(Q(name__iregex=val) | Q(abbr__iregex=val))
-
-        # Calculate the final qs
-        qs = Author.objects.filter(*lstQ).order_by('name').distinct()
-
-        # Time measurement
-        if self.bDoTime:
-            print("AuthorListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("AuthorListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("AuthorListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
-        return qs
-    
 
 class LibraryListView(ListView):
     """Listview of libraries in countries/cities"""
@@ -7498,7 +7818,7 @@ class ReportDownload(BasicPart):
         return sData
 
 
-class SourceListView(ListView):
+class SourceListViewORG(ListView):
     """Listview of sources"""
 
     model = SourceInfo
@@ -7565,6 +7885,44 @@ class SourceListView(ListView):
         return qs
 
 
+class SourceListView(BasicListView):
+    """Listview of sources"""
+
+    model = SourceInfo
+    listform = SourceEditForm
+    has_select2 = True
+    bUseFilter = True
+    page_function = "ru.passim.seeker.search_paged_start"
+    prefix = "src"
+    basic_name = "source"
+    order_cols = ['created', 'collector', 'url']
+    order_default = order_cols
+    order_heads = [{'name': 'Date',           'order': 'o=1', 'type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+                   {'name': 'Collector',      'order': 'o=2', 'type': 'str', 'field': 'collector'},
+                   {'name': 'Collected from', 'order': 'o=3', 'type': 'str', 'custom': 'from', 'main': True}]
+    filters = [ {"name": "Collector",       "id": "filter_collector",      "enabled": False} ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'collector', 'fkfield': 'profile', 'keyS': 'profile_ta', 'keyFk': 'user__username', 'keyList': 'profilelist', 'infield': 'id'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        elif custom == "from":
+            if instance.url != None:
+                sBack = instance.url
+        return sBack, sTitle
+
+    def add_to_context(self, context, initial):
+        SourceInfo.init_profile()
+        return context
+
+
+
 class SourceDetailsView(PassimDetails):
     model = SourceInfo
     mForm = SourceEditForm
@@ -7586,6 +7944,13 @@ class SourceDetailsView(PassimDetails):
             current_name = "Source {} {}".format(instance.collector, get_crpp_date(instance.created))
         context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
         return context
+
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.profile = profile
+        return True, ""
 
 
 class SourceEdit(BasicPart):
