@@ -304,7 +304,7 @@
 
             <h3>
               <span>{{title|title}}</span>
-              {% if is_passim_editor %}
+              {% if is_passim_editor and new_button %}
                 <span id="add_{{basic_name}}" class="pull-right">
                     {% csrf_token %}
                     <a class="btn btn-xs jumbo-3" role="button" 
@@ -366,7 +366,9 @@
                         {% for field in result.fields %}
                           <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
-                              <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{basic_name}}">{{field.value|safe}}</a>
+                              <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{basic_name}}">
+                                {% if field.value %}{{field.value|safe}}{% else %}<i>(unidentified)</i>{% endif %}
+                              </a>
                             {% else %}
                               {{field.value|safe}}
                             {% endif %}
@@ -384,7 +386,7 @@
                                       <!-- The actual delete button-->
                                       <a mode="delete" title="Delete this {{basic_name}}" class="btn btn-xs jumbo-3"
                                           afterurl="{{basic_list}}"
-                                          targetid="sermon_edit"
+                                          targetid="{{basic_name}}_edit"
                                           targeturl="{% if result.id %}{% url basic_edit result.id %}{% endif %}">
                                         Delete
                                       </a>

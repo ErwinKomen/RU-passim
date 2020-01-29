@@ -4210,6 +4210,7 @@ class BasicListView(ListView):
     template_name = 'seeker/basic_list.html'
     bHasParameters = False
     bUseFilter = False
+    new_button = True
     initial = None
     listform = None
     has_select2 = False
@@ -4285,10 +4286,25 @@ class BasicListView(ListView):
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
 
+        # Set the title of the application
+        if self.plural_name =="":
+            self.plural_name = str(self.model._meta.verbose_name_plural)
+        context['title'] = self.plural_name
+        if self.basic_name == "":
+            self.basic_name = str(self.model._meta.model_name)
+        context['titlesg'] = self.basic_name.capitalize()
+        context['basic_name'] = self.basic_name
+        context['basic_add'] = reverse("{}_details".format(self.basic_name))
+        context['basic_list'] = reverse("{}_list".format(self.basic_name))
+        context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
+        context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
+
         # Make sure to transform the 'object_list'  into a 'result_list'
         context['result_list'] = self.get_result_list(context['object_list'])
 
         context['sortOrder'] = self.sort_order
+
+        context['new_button'] = self.new_button
 
         # Adapt possible downloads
         if len(self.downloads) > 0:
@@ -4311,19 +4327,6 @@ class BasicListView(ListView):
                     # get the code of the template
                     pass
             context['custombuttons'] = self.custombuttons
-
-        # Set the title of the application
-        if self.plural_name =="":
-            self.plural_name = str(self.model._meta.verbose_name_plural)
-        context['title'] = self.plural_name
-        if self.basic_name == "":
-            self.basic_name = str(self.model._meta.model_name)
-        context['titlesg'] = self.basic_name.capitalize()
-        context['basic_name'] = self.basic_name
-        context['basic_add'] = reverse("{}_details".format(self.basic_name))
-        context['basic_list'] = reverse("{}_list".format(self.basic_name))
-        context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
-        context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
 
         # Delete button per line?
         if self.delete_line:
@@ -4435,6 +4438,8 @@ class BasicListView(ListView):
                 if 'main' in head and head['main']:
                     fobj['styles'] = "width: 100%;"
                     fobj['main'] = True
+                    if self.delete_line:
+                        classes.append("ms editable")
                 elif 'options' in head and len(head['options']) > 0:
                     options = head['options']
                     if 'delete' in options:
@@ -4865,93 +4870,6 @@ class LocationRelset(BasicPart):
         return has_changed
 
 
-class OriginListViewORG(ListView):
-    """Listview of origins"""
-
-    model = Origin
-    paginate_by = 15
-    template_name = 'seeker/origin_list.html'
-    entrycount = 0
-
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(OriginListView, self).get_context_data(**kwargs)
-
-        # Get parameters
-        initial = self.request.GET
-
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Get parameters for the search
-        initial = self.request.GET
-        # The searchform is just a list form, but filled with the 'initial' parameters
-        context['searchform'] = OriginForm(initial)
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Passim origin info"
-
-        # Check if user may upload
-        context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
-        current_name = "Origins"
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True)
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in default class property value.
-        """
-        return self.paginate_by
-  
-    def get_queryset(self):
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.get = get
-
-        lstQ = []
-
-        # Check for author [name]
-        if 'name' in get and get['name'] != '':
-            val = adapt_search(get['name'])
-            # Search in both the name field
-            lstQ.append(Q(name__iregex=val))
-
-        # Check for origin type
-        if 'location_ta' in get and get['location_ta'] != '':
-            val = adapt_search(get['location_ta'])
-            # Search in both the name field
-            lstQ.append(Q(location__name__iregex=val))
-
-        # Calculate the final qs
-        qs = Origin.objects.filter(*lstQ).order_by('name').distinct()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Return the resulting filtered and sorted queryset
-        return qs
-
-
 class OriginListView(BasicListView):
     """Listview of origins"""
 
@@ -5016,6 +4934,10 @@ class OriginDetailsView(PassimDetails):
         """Action to be performed after adding a new item"""
 
         self.afternewurl = reverse('origin_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('origin_details', kwargs={'pk': instance.id})
         return True, "" 
 
     def add_to_context(self, context, instance):
@@ -5062,6 +4984,7 @@ class OriginEdit(BasicPart):
         if 'afternewurl' in self.qd:
             afternew = self.qd['afternewurl']
         context['afternewurl'] = afternew
+        context['afterdelurl'] = reverse('origin_list')
 
         return context
 
@@ -5139,6 +5062,7 @@ class SermonDetails(PassimDetails):
     prefix = "sermo"
     prefix_type = "simple"
     title = "Sermon" 
+    basic_name = "sermon"
     afternewurl = ""
     rtype = "html"
     fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
@@ -5310,6 +5234,7 @@ class SermonListView(BasicListView):
     paginate_by = 20
     # template_name = 'seeker/sermon_list.html'
     # template_name = 'seeker/sermondescr_list.html'
+    new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Sermons"
     basic_name = "sermon"
@@ -5526,7 +5451,7 @@ class KeywordListView(BasicListView):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "", 'main': True, 'linkdetails': True},
+    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
                    {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
     searches = [
@@ -5536,6 +5461,7 @@ class KeywordListView(BasicListView):
 
     def get_field_value(self, instance, custom):
         sBack = ""
+        sTitle = ""
         if custom == "links":
             html = []
             # Get the HTML code for the links of this instance
@@ -5556,7 +5482,7 @@ class KeywordListView(BasicListView):
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
-        return sBack
+        return sBack, sTitle
 
 
 class ProjectEdit(PassimDetails):
@@ -6452,8 +6378,7 @@ class ManuscriptExtset(BasicPart):
         # NOTE: no drastic things here yet
         return has_changed
 
-
-
+    
 class ManuscriptKwset(BasicPart):
     """The set of keywords from one manuscript"""
 
@@ -7237,7 +7162,7 @@ class AuthorEdit(PassimDetails):
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Author edit", False)
 
-        context['afterdelurl'] = get_previous_page(self.request)
+        context['afterdelurl'] = reverse('author_search')
         return context
 
 
@@ -7247,6 +7172,16 @@ class AuthorDetails(AuthorEdit):
     template_name = 'seeker/author_details.html'
     template_post = 'seeker/author_details.html'
     rtype = "html"  # GET provides a HTML form straight away
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('author_search')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('author_details', kwargs={'pk': instance.id})
+        return True, "" 
 
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
@@ -7275,10 +7210,10 @@ class AuthorListView(BasicListView):
     paginate_by = 20
     delete_line = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['abbr', 'name', '', '']
+    order_cols = ['name', 'abbr', '', '']
     order_default = order_cols
-    order_heads = [{'name': '',            'order': '',    'type': 'str', 'field': 'abbr', 'default': ""},
-                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True},
+    order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
+                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
@@ -7290,10 +7225,11 @@ class AuthorListView(BasicListView):
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'author_results'},
                  {"label": None},
                  {"label": "json", "dtype": "json", "url": 'author_results'}]
-    upload = {"url": "import_authors", "msg": "Specify the CSV file (or the JSON file) that contains the PASSIM authors"}
+    uploads = [{"url": "import_authors", "label": "Authors (csv/json)", "msg": "Specify the CSV file (or the JSON file) that contains the PASSIM authors"}]
 
     def get_field_value(self, instance, custom):
         sBack = ""
+        sTitle = ""
         if custom == "links":
             html = []
             # Get the HTML code for the links of this instance
@@ -7309,7 +7245,7 @@ class AuthorListView(BasicListView):
                 html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
             # Combine the HTML code
             sBack = "\n".join(html)
-        return sBack
+        return sBack, sTitle
 
 
 class LibraryListView(ListView):
@@ -7818,73 +7754,6 @@ class ReportDownload(BasicPart):
         return sData
 
 
-class SourceListViewORG(ListView):
-    """Listview of sources"""
-
-    model = SourceInfo
-    paginate_by = 15
-    template_name = 'seeker/source_list.html'
-    entrycount = 0
-
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(SourceListView, self).get_context_data(**kwargs)
-
-        # Get parameters
-        initial = self.request.GET
-
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Passim source info"
-
-        # Check if user may upload
-        context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Sources", True)
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in default class property value.
-        """
-        return self.paginate_by
-  
-    def get_queryset(self):
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.get = get
-
-        # Calculate the final qs
-        qs = SourceInfo.objects.all().order_by('-created')
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Return the resulting filtered and sorted queryset
-        return qs
-
-
 class SourceListView(BasicListView):
     """Listview of sources"""
 
@@ -7920,8 +7789,7 @@ class SourceListView(BasicListView):
     def add_to_context(self, context, initial):
         SourceInfo.init_profile()
         return context
-
-
+    
 
 class SourceDetailsView(PassimDetails):
     model = SourceInfo
@@ -7931,6 +7799,16 @@ class SourceDetailsView(PassimDetails):
     prefix_type = "simple"
     title = "SourceDetails"
     rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('source_list')
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('source_details', kwargs={'pk': instance.id})
+        return True, "" 
 
     def add_to_context(self, context, instance):
         context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
@@ -7977,8 +7855,12 @@ class SourceEdit(BasicPart):
         # Not sure if this is still needed
         context['msitem'] = instance
 
+        afternew =  reverse('source_list')
+        if 'afternewurl' in self.qd:
+            afternew = self.qd['afternewurl']
+        context['afternewurl'] = afternew
         # Define where to go to after deletion
-        context['afterdelurl'] = get_previous_page(self.request)
+        context['afterdelurl'] = reverse('source_list')
 
         return context
 
