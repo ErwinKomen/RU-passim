@@ -13,6 +13,7 @@ Creating and using the ``BasicListView`` class can best be described by an examp
       listform = AuthorSearchForm
       has_select2 = True
       prefix = "auth"
+      basic_name = "author"
       paginate_by = 20
       delete_line = True
       page_function = "ru.passim.seeker.search_paged_start"
@@ -47,6 +48,11 @@ Attributes
 
 ``prefix``
    This is the prefix that you would like the function to use for this particular listview. Make sure to use non-identical prefixes between views.
+
+``basic_name``
+   This is the basic name that is used in ``urls.py``, for instance, to derive the obligatory associated details view. 
+   That is to say, there **must** be a DetailsView named ``basic_name`` + ``_details``.
+   The ``basic_name`` does not actually need to be specified here, since the name of the model ``Author`` is the same (modulo the case).
 
 ``paginate_by``
    The default value is 15 lines per page. Specify it here if you would like to have a different page size.

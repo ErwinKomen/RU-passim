@@ -62,7 +62,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm
+                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
+                                SuperSermonGoldForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
@@ -7140,6 +7141,51 @@ class SermonGoldLitset(BasicPart):
                     has_changed = True
             
         return has_changed
+
+
+class EqualGoldEdit(PassimDetails):
+    pass
+
+
+class EqualGoldDetails(EqualGoldEdit):
+    pass
+
+
+class EqualGoldListView(BasicListView):
+    """List super sermon gold instances"""
+
+    model = EqualGold
+    listform = SuperSermonGoldForm
+    has_select2 = True  # Check
+    prefix = "ssg"
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['author', 'number', 'code', '' ]
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Author',       'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
+        {'name': 'Number',       'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+        {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
+        {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True }
+        ]
+    filters = []
+    searches = []
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "author":
+            # Get a good name for the author
+            if instance.author:
+                sBack = instance.author.name
+            else:
+                sBack = "<i>(not specified)</i>"
+        elif custom == "number":
+            sBack = "{}".format(instance.number)
+        elif custom == "code":
+            sBack = "{}".format(instance.code)
+        elif custom == "sig":
+            sBack = "(not implemented)"
+        return sBack, sTitle
 
 
 class AuthorEdit(PassimDetails):
