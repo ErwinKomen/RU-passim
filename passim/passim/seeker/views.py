@@ -4054,9 +4054,26 @@ class PassimDetails(DetailView):
 
         # Put the form and the formset in the context
         context['{}Form'.format(self.prefix)] = frm
+        context['basic_form'] = frm
         context['instance'] = instance
         context['options'] = json.dumps({"isnew": (instance == None)})
 
+        # Possibly define where a listview is
+        classname = self.model._meta.model_name
+        listviewname = "{}_list".format(classname)
+        try:
+            context['listview'] = reverse(listviewname)
+        except:
+            context['listview'] = reverse('home')
+
+        # Possibly define the admin detailsview
+        if instance:
+            admindetails = "admin:seeker_{}_change".format(classname)
+            try:
+                context['admindetails'] = reverse(admindetails, args=[instance.id])
+            except:
+                pass
+        context['modelname'] = self.model._meta.object_name
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
 
@@ -7144,11 +7161,81 @@ class SermonGoldLitset(BasicPart):
 
 
 class EqualGoldEdit(PassimDetails):
-    pass
+    model = EqualGold
+    mForm = SuperSermonGoldForm
+    template_name = 'seeker/generic_edit.html'
+    template_post = template_name
+    prefix = 'ssg'
+    title = "Super Sermon Gold"
+    afternewurl = ""
+    rtype = "json"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        self.afternewurl = reverse('equalgold_list')
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        # Process this visit and get the new breadcrumbs object
+        context['breadcrumbs'] = get_breadcrumbs(self.request, "Super sermon gold edit", False)
+        prevpage = reverse('home')
+        context['prevpage'] = prevpage
+
+        context['afterdelurl'] = reverse('equalgold_list')
+        return context
 
 
 class EqualGoldDetails(EqualGoldEdit):
-    pass
+    template_name = 'seeker/generic_details.html'
+    template_post = template_name
+    rtype = "html"
+    mainitems = []
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Make sure we do a page redirect
+        self.newRedirect = True
+        self.redirectpage = reverse('equalgold_details', kwargs={'pk': instance.id})
+
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Process this visit and get the new breadcrumbs object
+        prevpage = reverse('equalgold_list')
+        context['prevpage'] = prevpage
+        crumbs = []
+        crumbs.append(['Super sermons gold', prevpage])
+        current_name = "Super sermon gold" if instance else "Super sermon gold (new)"
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Author:",      'value': instance.author},
+            {'type': 'plain', 'label': "Number:",      'value': instance.number},
+            {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
+            ]
+
+        context['sections'] = []
+
+        related_objects = []
+
+        context['related_objects'] = related_objects
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
 
 
 class EqualGoldListView(BasicListView):
