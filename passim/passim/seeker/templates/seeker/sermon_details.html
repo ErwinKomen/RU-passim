@@ -15,13 +15,15 @@
       <div class="panel panel-default gold-head subform">
         <div class="row">&nbsp;</div>
         <div class="row">
-          <!-- Possibility to go back-->
-          <div class="col-md-1">
-            <a class="btn jumbo-1" 
-               href="{{prevpage}}"
-               title="Return to the list of sermons">&lt;&lt;</a>
-            <a class="btn jumbo-1" href="{% url 'manuscript_details' sermoForm.instance.manu.id %}" title="Go to the manuscript">M</a>
-          </div>
+          <!-- Possibility to go back -- provided there is a sermon instance -->
+          {% if sermoForm.instance and sermoForm.instance.manu %}
+            <div class="col-md-1">
+              <a class="btn jumbo-1" 
+                 href="{{prevpage}}"
+                 title="Return to the list of sermons">&lt;&lt;</a>
+              <a class="btn jumbo-1" href="{% url 'manuscript_details' sermoForm.instance.manu.id %}" title="Go to manuscript {{sermoForm.instance.manu.idno}}">M</a>
+            </div>
+          {% endif %}
 
           <!-- Actual contents -->
           <div class="col-md-10">
@@ -32,6 +34,9 @@
                 {% for sig in sermoForm.instance.sermonsignatures.all %}
                   <span class="badge jumbo-1">{{sig.code}}</span>
                 {% endfor %}
+              </span>
+              <span class="pull-right">
+                <span class="manuscript-idno">{{sermoForm.instance.manu.idno}}</span>
               </span>
             </h3>
 

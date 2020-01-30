@@ -15,7 +15,8 @@ class ErrHandle:
     # 6/apr/2016    ERK Created
     # ----------------------------------------------------------------------------------
     def Status(self, msg):
-        # Just print the message
+        """Put a status message on the standard error output"""
+
         print(msg, file=sys.stderr)
 
     # ----------------------------------------------------------------------------------
@@ -25,6 +26,8 @@ class ErrHandle:
     # 6/apr/2016    ERK Created
     # ----------------------------------------------------------------------------------
     def DoError(self, msg, bExit = False):
+        """Show an error message on stderr, preceded by the name of the function"""
+
         # Append the error message to the stack we have
         self.loc_errStack.append(msg)
         # get the message
@@ -38,6 +41,8 @@ class ErrHandle:
         return "<br>".join(self.loc_errStack)
 
     def get_error_message(self):
+        """Retrieve just the error message and the line number itself as a string"""
+
         arInfo = sys.exc_info()
         if len(arInfo) == 3:
             sMsg = str(arInfo[1])

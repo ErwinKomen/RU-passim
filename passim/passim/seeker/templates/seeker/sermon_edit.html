@@ -61,14 +61,6 @@
         </td>
       </tr>
 
-      <!-- Make sure we pass on the manuscript_id to which this sermon belongs -->
-      <tr class="hidden">
-        <td colspan="1">
-          <input id="id_manuscript_id" name="manuscript_id" type="text" value="{{manuscript_id}}" />
-        </td>
-        <td>{{sermoForm.manu}}</td>
-      </tr>
-
       <!-- Sermon status -->
       <tr class="form-row edit-notnew">
         <td valign="top">Status</td>
@@ -79,6 +71,26 @@
           {% endif %}
         </td>
       </tr>
+
+      <!-- MANUSCRIPT: Make sure we pass on the manuscript_id to which this sermon belongs -->
+      {% if sermoForm.manu %}
+        <tr class="hidden">
+          <td colspan="1">
+            <input id="id_manuscript_id" name="manuscript_id" type="text" value="{{manuscript_id}}" />
+          </td>
+          <td>{{sermoForm.manu}}</td>
+        </tr>
+      {% else %}
+        <tr class="form-row">
+          <td class="hoverable" style="min-width: 150px;">Manuscript</td>
+          <td  style="width: 100%;">
+            <div class="view-mode">{% if sermoForm.manu.value %}{{sermoForm.manu.value}}{% else %}-{% endif %}</div>
+            {% if is_passim_editor %}
+              <div class="edit-mode hidden">{{sermoForm.manu}}</div>
+            {% endif %}
+          </td>
+        </tr>
+      {% endif %}
 
       <!-- Locus -->
       <tr class="form-row">

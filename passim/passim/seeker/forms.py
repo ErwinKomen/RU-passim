@@ -728,6 +728,40 @@ class EqualGoldForm(forms.ModelForm):
         fields = [ ]
 
 
+class SuperSermonGoldForm(forms.ModelForm):
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["authors", "gldincipits", "gldexplicits"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = EqualGold
+        fields = ['author', 'incipit', 'explicit', 'code', 'number']
+        widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SuperSermonGoldForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            sAuthor = "" if not instance.author else instance.author.name
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+
+        # We are okay
+        return None
+
+
 class EqualGoldLinkForm(forms.ModelForm):
     gold = forms.CharField(label=_("Destination gold sermon"), required=False)
 
@@ -1094,6 +1128,8 @@ class ManuscriptKeywordForm(forms.ModelForm):
 class OriginForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    locationlist = ModelMultipleChoiceField(queryset=None, required=False,
+                            widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:
@@ -1114,6 +1150,7 @@ class OriginForm(forms.ModelForm):
         self.fields['note'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
+        self.fields['locationlist'].queryset = Location.objects.all().order_by('loctype__level', 'name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1358,13 +1395,28 @@ class ReportEditForm(forms.ModelForm):
 
 
 class SourceEditForm(forms.ModelForm):
+    profile_ta = forms.CharField(label=_("Collector"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching users input-sm', 'placeholder': 'Collector(s)...', 'style': 'width: 100%;'}))
+    profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select collector(s)...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = SourceInfo
-        fields = [ 'code', 'url']
-        widgets={'url':          forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'code':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
+        fields = ['profile', 'code', 'url']
+        widgets={'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'code':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
                  }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SourceEditForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['url'].required = False
+        self.fields['code'].required = False
+        self.fields['profile_ta'].required = False
+        self.fields['profile'].required = False
+        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
+        # Set the initial value for the profile
 
 
 class AuthorEditForm(forms.ModelForm):

@@ -66,6 +66,7 @@ urlpatterns = [
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
     url(r'^report/download(?:/(?P<pk>\d+))?/$', ReportDownload.as_view(), name='report_results'),
 
+    url(r'^manuscript/list', ManuscriptListView.as_view(), name='manuscript_list'),
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
     url(r'^manuscript/hierarchy(?:/(?P<pk>\d+))?/$', ManuscriptHierarchy.as_view(), name='manuscript_hierarchy'),
@@ -87,9 +88,9 @@ urlpatterns = [
     url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetailsView.as_view(), name='library_details'),
     url(r'^library/edit(?:/(?P<pk>\d+))?/$', LibraryEdit.as_view(), name='library_edit'),
 
-    #url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermondescr_details'),
-    #url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermondescr_edit'),
-    #url(r'^sermon/list', SermonListView.as_view(), name='sermondescr_list'),
+    url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
+    url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
+    url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
@@ -105,7 +106,7 @@ urlpatterns = [
     url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
     url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollectionDetails.as_view(), name='collection_details'),
     url(r'^collection/edit(?:/(?P<pk>\d+))?/$', CollectionEdit.as_view(), name='collection_edit'),
-    url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
+    # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/show', BasketView.as_view(), name='basket_show'),
@@ -143,6 +144,8 @@ urlpatterns = [
     url(r'^gold/ftxtset(?:/(?P<pk>\d+))?/$', SermonGoldFtxtset.as_view(), name='gold_ftxtset'),
     url(r'^gold/kwset(?:/(?P<pk>\d+))?/$', SermonGoldKwset.as_view(), name='gold_kwset'),
     url(r'^gold/litset(?:/(?P<pk>\d+))?/$', SermonGoldLitset.as_view(), name='gold_litset'),
+
+    # url(r'^gold/colset(?:/(?P<pk>\d+))?/$', SermonGoldColset.as_view(), name='gold_colset'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

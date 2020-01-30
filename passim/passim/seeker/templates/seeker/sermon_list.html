@@ -135,6 +135,13 @@
                         <tr class="form-row"><td style="min-width: 130px;">Feast</td><td style="width: 100%;">{{sermoForm.feast}}</td></tr>
                       </table>
                     </div>
+                    
+                    <!-- One or more collections (TH: van feast) -->
+                    <div id="filter_collection" class="{% if not sermoForm.collection.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row"><td style="min-width: 130px;">Collection</td><td style="width: 100%;">{{sermoForm.collection}}</td></tr>
+                      </table>
+                    </div>
 
                     <!-- One or more keywords -->
                     <div id="filter_keyword" class="{% if not sermoForm.keyword.value %}hidden{% endif %}">

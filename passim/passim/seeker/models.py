@@ -33,6 +33,7 @@ from xml.dom import minidom
 STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
+PASSIM_CODE_LENGTH = 20
 
 VIEW_STATUS = "view.status"
 LIBRARY_TYPE = "seeker.libtype"
@@ -1620,6 +1621,18 @@ class SourceInfo(models.Model):
     url = models.URLField("URL", null=True, blank=True)
     # [1] The person who was in charge of extracting the information
     collector = models.CharField("Collected by", max_length=LONG_STRING)
+    profile = models.ForeignKey(Profile, on_delete=models.SET_NULL, blank=True, null=True)
+
+    def init_profile():
+        coll_set = {}
+        qs = SourceInfo.objects.filter(profile__isnull=True)
+        with transaction.atomic():
+            for obj in qs:
+                if obj.collector not in coll_set:
+                    coll_set[obj.collector] = Profile.get_user_profile(obj.collector)
+                obj.profile = coll_set[obj.collector]
+                obj.save()
+        result = True
 
 
 class Litref(models.Model):
@@ -2135,7 +2148,10 @@ class Project(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
 
     def __str__(self):
-        return self.name
+        sName = self.name
+        if sName == None or sName == "":
+            sName = "(unnamed)"
+        return sName
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # First do the normal saving
@@ -2851,6 +2867,10 @@ class Author(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
     # [0-1] Possibly add the Gryson abbreviation for the author
     abbr = models.CharField("Abbreviation", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Author number: automatically consecutively filled when added to EqualGold
+    number = models.IntegerField("Number", null=True, blank=True)
+    # [1] Can this author's name and abbreviation be edited by users?
+    editable = models.BooleanField("Editable", default=True)
 
     def __str__(self):
         return self.name
@@ -3018,9 +3038,24 @@ class Nickname(models.Model):
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
 
+    # [0-1] We would very much like to know the *REAL* author
+    author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_equalgolds")
+    # [0-1] We would like to know the INCIPIT (first line in Latin)
+    incipit = models.TextField("Incipit", null=True, blank=True)
+    srchincipit = models.TextField("Incipit (searchable)", null=True, blank=True)
+    # [0-1] We would like to know the EXPLICIT (last line in Latin)
+    explicit = models.TextField("Explicit", null=True, blank=True)
+    srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+    # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
+    code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="DETERMINE")
+    # [0-1] The number of this SSG (numbers are 1-based, per author)
+    number = models.IntegerField("Number", blank=True, null=True)
+    # [0-1] The number of the sermon to which this one has moved
+    # moved = models.IntegerField("Moved to", blank=True, null=True)
+    moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
+
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
-
 
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
@@ -3741,7 +3776,7 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
-    # [m] Many-to-many: one sermon can be a part of a series of collections
+    # [m] Many-to-many: one sermon can be a part of a series of collections TH: aan te passen, naar SG of SSG
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
@@ -3850,6 +3885,7 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+# naar SG of SSG?
 
 class CollectionSerm(models.Model):
     """The link between a collection item and a sermon"""
