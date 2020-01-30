@@ -4444,7 +4444,7 @@ class BasicListView(ListView):
         return result_list
 
     def get_field_value(self, instance, custom):
-        return ""
+        return "", ""
 
     def get_paginate_by(self, queryset):
         """
@@ -5474,6 +5474,7 @@ class KeywordListView(BasicListView):
 
     def get_field_value(self, instance, custom):
         sBack = ""
+        sTitle = ""
         if custom == "links":
             html = []
             # Get the HTML code for the links of this instance
@@ -5494,7 +5495,7 @@ class KeywordListView(BasicListView):
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
-        return sBack
+        return sBack, sTitle
 
 
 class ProjectEdit(PassimDetails):
@@ -7163,6 +7164,7 @@ class AuthorListView(BasicListView):
 
     def get_field_value(self, instance, custom):
         sBack = ""
+        sTitle = ""
         if custom == "links":
             html = []
             # Get the HTML code for the links of this instance
@@ -7178,7 +7180,7 @@ class AuthorListView(BasicListView):
                 html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
             # Combine the HTML code
             sBack = "\n".join(html)
-        return sBack
+        return sBack, sTitle
 
 
 class LibraryListView(ListView):
