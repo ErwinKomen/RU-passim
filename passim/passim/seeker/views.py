@@ -4200,7 +4200,10 @@ class PassimDetails(DetailView):
     
 
 class BasicListView(ListView):
-    """Basic listview"""
+    """Basic listview
+    
+    This listview inherits the standard listview and adds a few automatic matters
+    """
 
     paginate_by = 15
     entrycount = 0
