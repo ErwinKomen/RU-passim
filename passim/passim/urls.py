@@ -55,6 +55,7 @@ urlpatterns = [
     url(r'^tools/daterange/$', passim.seeker.views.do_daterange, name='do_daterange'),
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
+    url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),

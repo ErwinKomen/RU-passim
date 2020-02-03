@@ -51,7 +51,7 @@ Attributes
 
 ``basic_name``
    This is the basic name that is used in ``urls.py``, for instance, to derive the obligatory associated details view. 
-   That is to say, there **must** be a DetailsView named ``basic_name`` + ``_details``.
+   That is to say, there **must** be a DetailsView that has an entry in ``urls.py`` called ``basic_name`` + ``_details``.
    The ``basic_name`` does not actually need to be specified here, since the name of the model ``Author`` is the same (modulo the case).
 
 ``paginate_by``
@@ -71,18 +71,26 @@ Attributes
 ``order_cols``
    This is a list of strings representing *all* the columns available in the listview.
    A column that doesn't require ordering is represented by an empty string.
+   Each column in ``order_heads`` should have one representative in ``order_cols``.
    The string of each column that requires ordering should be the field used in ordering.
 
    .. code-block:: python
 
-      order_cols = ['name', 'abbr', '', '']
+      order_cols = ['abbr', 'name', '', '']
        
-   The example above shows that the default ordering is: first look at the field ``name`` and if that is equal, also take into account ``abbr``.
+   The names ``abbr`` and ``name`` should coincide with the first and second columns in ``order_heads``.
    
    **Note:** it is not possible to provide a *function* for the ordering of a column.
    
 ``order_default``
-   This should normally be the same as ``order_default``.
+   This is normally the same as ``order_cols``.
+   But it is possible to have a default search order that takes the columns in different precedence.
+   
+   .. code-block:: python
+
+      order_default = ['name', 'abbr', '', '']
+       
+   The example above shows that the default ordering is: first look at the field ``name`` and if that is equal, also take into account ``abbr``.
 
 ``order_heads``
    A list of objects, one for each of the columns in the listview. 
@@ -132,15 +140,20 @@ Attributes
    A list of sections that consist of ``section``  (name of this section; first one is empty) and ``filterlist``. The latter is a list of filter objects.
    Each filter object can have a number of *obligatory* and *optional* fields.
    
-   ================= ====================================================================
+   ================= ==========================================================================================
    field             meaning
-   ================= ====================================================================
+   ================= ==========================================================================================
    ``*filter``       the exact id-name as also used in ``filters``
-   ``[dbfield]``     todo: explain
-   ``[keyS]``        todo: explain
-   ``[keyList]``     todo: explain
-   ``[infield]``     todo: explain
-   ================= ====================================================================
+   ``[keyS]``        the simple field name
+   ``[dbfield]``     the field name, if it is a 'simple' field (no FK, no many2many)
+                     if the form has a separate typeahead field, then take the name of that field
+                     (note: either dbfield or fkfield *must* be specified)
+   ``[fkfield]``     the field name, if it is a foreign key
+                     (note: either dbfield or fkfield *must* be specified)
+   ``[keyFk]``       (fkfield specified): the name of the content-field of the FK-related table (e.g. 'name')
+   ``[keyList]``     the name of a multi-values form field
+   ``[infield]``     (keyList specified): the name of a unique model field (e.g. "id")
+   ================= ==========================================================================================
    
 ``downloads``
    A list of download option objects. The fields used in the objects are: 

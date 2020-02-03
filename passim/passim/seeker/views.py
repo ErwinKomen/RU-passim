@@ -8,7 +8,7 @@ from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
-from django.db.models import Q, Prefetch, Count
+from django.db.models import Q, Prefetch, Count, F
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
@@ -437,7 +437,7 @@ def make_search_list(filters, oFields, search_list, qd):
     # Return what we have created
     return filters, lstQ, qd
 
-def make_ordering(qs, qd, orders, order_cols, order_heads):
+def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     oErr = ErrHandle()
 
@@ -465,9 +465,9 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 for order_item in order_cols[iOrderCol-1].split(";"):
                     if order_item != "":
                         if sType == 'str':
-                            order.append(Lower(order_item))
+                            order.append(Lower(order_item).asc(nulls_last=True))
                         else:
-                            order.append(order_item)
+                            order.append(F(order_item).asc(nulls_last=True))
                 if bAscending:
                     order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
                 else:
@@ -480,14 +480,13 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                         # Reset this sort order
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
-            for order_item in order_cols[0].split(";"):
+            for order_item in order_default[0].split(";"):
                 if order_item != "":
                     order.append(Lower(order_item))
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
             if len(order) > 0:
                 qs = qs.order_by(*order)
-            # qs = qs.order_by('editions__first__date_late')
         else:
             qs = qs.order_by(*order)
         # Possibly reverse the order
@@ -1687,6 +1686,85 @@ def do_goldtogold(request):
         msg = oErr.get_error_message()
         oErr.DoError("goldtogold")
         return reverse('home')
+
+def do_ssgmigrate(request):
+    """Migration of super sermon gold"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Migrate SSG"
+
+        added = 0
+        lst_total = []
+
+        # Walk all the EqualGold items
+        qs = EqualGold.objects.all()
+        for obj in qs:
+            # Need treatment?
+            if not obj.author or not obj.number:
+                # Check how many SG items there are within this EqualGold (=ssg)
+                qs_sg = obj.equal_goldsermons.all()
+                if qs_sg.count() == 1:
+                    # There is just ONE (1) GS in the set
+                    sg = qs_sg.first()
+                    # (1) Get the author
+                    author = sg.author
+                    if author != None:
+                        # There is an author!!
+                        auth_num = author.get_number()
+                        if auth_num > 0:
+                            # Check the highest sermon number for this author
+                            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+                            if qs_ssg.count() == 0:
+                                iNumber = 1
+                            else:
+                                iNumber = qs_ssg.first().number + 1
+                            # Now we have both an author and a number...
+                            obj.author = author
+                            obj.number = iNumber
+                            obj.code = EqualGold.passim_code(auth_num, iNumber)
+                            obj.incipit = sg.incipit
+                            obj.srchincipit = sg.srchincipit
+                            obj.explicit = sg.explicit
+                            obj.srchexplicit = sg.srchexplicit
+                            obj.save()
+                            added += 1
+                            lst_total.append(obj.code)
+            # Double check to see if something has changed
+            if obj.code == "DETERMINE":
+                obj.code = "ZZZ_DETERMINE"
+                obj.save()
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of added SSGs', 'result': added})
+        # result_list.append({'part': 'All additions', 'result': json.dumps(lst_total)})
+        result_list.append({'part': 'All additions', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("ssgmigrate")
+        return reverse('home')
+
 
 #def do_import_editions(request):
 #    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
@@ -3787,6 +3865,8 @@ class PassimDetails(DetailView):
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
+    basic_name = None
+    titlesg = None          # Alternative title in singular
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
@@ -4060,7 +4140,8 @@ class PassimDetails(DetailView):
 
         # Possibly define where a listview is
         classname = self.model._meta.model_name
-        listviewname = "{}_list".format(classname)
+        basic_name = self.basic_name if self.basic_name else classname
+        listviewname = "{}_list".format(basic_name)
         try:
             context['listview'] = reverse(listviewname)
         except:
@@ -4074,8 +4155,25 @@ class PassimDetails(DetailView):
             except:
                 pass
         context['modelname'] = self.model._meta.object_name
+        context['titlesg'] = self.titlesg if self.titlesg else basic_name.capitalize()
+
+        # Make sure we have a url for editing
+        if instance:
+            # There is an edit url
+            context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
+        # Make sure we have an url for new
+        context['addview'] = reverse("{}_details".format(basic_name))
+
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
+
+        # fill in the form values
+        if frm and 'mainitems' in context:
+            for mobj in context['mainitems']:
+                # Check for possible form field information
+                if 'field_key' in mobj: mobj['field_key'] = frm[mobj['field_key']]
+                if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+                if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
         # Define where to go to after deletion
         if 'afterdelurl' not in context or context['afterdelurl'] == "":
@@ -4236,6 +4334,7 @@ class BasicListView(ListView):
     listform = None
     has_select2 = False
     plural_name = ""
+    sg_name = ""
     basic_name = ""
     basic_edit = ""
     basic_details = ""
@@ -4313,7 +4412,7 @@ class BasicListView(ListView):
         context['title'] = self.plural_name
         if self.basic_name == "":
             self.basic_name = str(self.model._meta.model_name)
-        context['titlesg'] = self.basic_name.capitalize()
+        context['titlesg'] = self.sg_name if self.sg_name != "" else self.basic_name.capitalize()
         context['basic_name'] = self.basic_name
         context['basic_add'] = reverse("{}_details".format(self.basic_name))
         context['basic_list'] = reverse("{}_list".format(self.basic_name))
@@ -7191,6 +7290,7 @@ class EqualGoldDetails(EqualGoldEdit):
     template_name = 'seeker/generic_details.html'
     template_post = template_name
     rtype = "html"
+    titlesg = "Super sermon gold"
     mainitems = []
 
     def after_new(self, form, instance):
@@ -7215,7 +7315,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Author:",      'value': instance.author},
+            {'type': 'plain', 'label': "Author:",      'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
             {'type': 'plain', 'label': "Number:",      'value': instance.number},
             {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
             ]
@@ -7245,8 +7345,10 @@ class EqualGoldListView(BasicListView):
     listform = SuperSermonGoldForm
     has_select2 = True  # Check
     prefix = "ssg"
+    plural_name = "Super sermons gold"
+    sg_name = "Super sermon gold"
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author', 'number', 'code', '' ]
+    order_cols = ['code', 'author', 'number', '' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',       'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -7254,24 +7356,52 @@ class EqualGoldListView(BasicListView):
         {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
         {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True }
         ]
-    filters = []
-    searches = []
+    filters = [{"name": "Author",         "id": "filter_author",     "enabled": False},
+               {"name": "Incipit",        "id": "filter_incipit",    "enabled": False},
+               {"name": "Explicit",       "id": "filter_explicit",   "enabled": False},
+               {"name": "Passim code",    "id": "filter_code",       "enabled": False},
+               {"name": "Number",         "id": "filter_number",     "enabled": False},
+               {"name": "Gryson/Clavis",  "id": "filter_signature",  "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
+            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
+                                    'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 
+                                    'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            ]}
+        ]
 
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
+        html = []
         if custom == "author":
             # Get a good name for the author
             if instance.author:
-                sBack = instance.author.name
+                html.append(instance.author.name)
             else:
-                sBack = "<i>(not specified)</i>"
+                html.append("<i>(not specified)</i>")
         elif custom == "number":
-            sBack = "{}".format(instance.number)
+            sNumber = "-" if instance.number  == None else instance.number
+            html.append("{}".format(sNumber))
         elif custom == "code":
-            sBack = "{}".format(instance.code)
+            sCode = "-" if instance.code  == None else instance.code
+            html.append("{}".format(sCode))
         elif custom == "sig":
-            sBack = "(not implemented)"
+            # Get all the associated signatures
+            qs = Signature.objects.filter(gold__equal=instance).order_by('editype', 'code')
+            for sig in qs:
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
         return sBack, sTitle
 
 
@@ -7346,10 +7476,11 @@ class AuthorListView(BasicListView):
     paginate_by = 20
     delete_line = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', 'abbr', '', '']
-    order_default = order_cols
+    order_cols = ['abbr', 'number', 'name', '', '']
+    order_default = ['name', 'abbr', 'number', '', '']
     order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
-                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
+                   {'name': 'Number',      'order': 'o=2', 'type': 'int', 'title': 'Passim author number', 'field': 'number', 'default': 10000, 'align': 'right'},
+                   {'name': 'Author name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]

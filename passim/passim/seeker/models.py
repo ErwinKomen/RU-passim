@@ -3009,6 +3009,29 @@ class Author(models.Model):
         """Provide the HTML of the """
         pass
 
+    def get_number(self):
+        """Get the author number"""
+
+        iNumber = -1
+        # Validate this author
+        if self.name.lower() == "undecided" or self.name.lower() == "anonymus":
+            return -1
+        # Check if this author already has a number
+        if not self.number:
+            # Create a number for this author
+            qs = Author.objects.filter(number__isnull=False).order_by('-number')
+            if qs.count() == 0:
+                iNumber = 1
+            else:
+                sName = self.name
+                iNumber = qs.first().number + 1
+            self.number = iNumber
+            # Save changes
+            self.save()
+        else:
+            iNumber = self.number
+        return iNumber
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """
@@ -3047,7 +3070,7 @@ class EqualGold(models.Model):
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
-    code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="DETERMINE")
+    code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
     number = models.IntegerField("Number", blank=True, null=True)
     # [0-1] The number of the sermon to which this one has moved
@@ -3060,7 +3083,14 @@ class EqualGold(models.Model):
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
         return name
-    
+
+    def passim_code(auth_num, iNumber):
+        """determine a passim code based on author number and sermon number"""
+
+        sCode = None
+        if auth_num and iNumber and iNumber > 0:
+            sCode = "PASSIM {:03d}.{:04d}".format(auth_num, iNumber)
+        return sCode
 
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
