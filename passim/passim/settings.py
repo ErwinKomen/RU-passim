@@ -34,17 +34,23 @@ elif "/applejack" in BASE_DIR:
 MEDIA_DIR = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
 
 APP_PREFIX = ""
+USE_REDIS = False
 if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or "c:" in WRITABLE_DIR or "C:" in WRITABLE_DIR or bUseTunnel:
     APP_PREFIX = ""
     admin.site.site_url = '/'
+    # Specific differentiation
+    if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR:
+        USE_REDIS = True
 elif "131.174" in hst:
     # Configuration within the Radboud University environment (AppleJack)
     APP_PREFIX = "passim/"
     admin.site.site_url = '/passim'
+    USE_REDIS = True
 elif "/var/www" in WRITABLE_DIR:
     # New configuration of http://corpus-studio-web.cttnww-meertens.surf-hosted.nl/passim
     APP_PREFIX = "passim/"
     admin.site.site_url = '/passim'
+    USE_REDIS = True
 else:
     APP_PREFIX = "dd/"
     admin.site.site_url = '/dd'
@@ -64,8 +70,23 @@ SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.science.ru.nl', 'corpus-studio-web.cttnww-meertens.surf-hosted.nl', 'testserver' ]
+ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.science.ru.nl', 'testserver' ]
 
+# Caching
+if USE_REDIS:
+    CACHES = {"default": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": "redis://127.0.0.1:7779/1",
+                "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
+                },
+                "select2": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": "redis://127.0.0.1:7779/2",
+                "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
+                }
+            }
+    # Set the cache backend to select2
+    SELECT2_CACHE_BACKEND = 'select2'
 
 # Application definition
 
