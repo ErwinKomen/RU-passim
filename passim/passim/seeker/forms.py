@@ -728,6 +728,48 @@ class EqualGoldForm(forms.ModelForm):
         fields = [ ]
 
 
+class SuperSermonGoldForm(forms.ModelForm):
+    authorname = forms.CharField(label=_("Author"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    signature = forms.CharField(label=_("Signature"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
+    signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["authors", "gldincipits", "gldexplicits"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = EqualGold
+        fields = ['author', 'incipit', 'explicit', 'code', 'number']
+        widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Passim code'}),
+                 'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
+                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SuperSermonGoldForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # If there is an instance, then check the author specification
+            sAuthor = "" if not instance.author else instance.author.name
+            self.fields['authorname'].initial = sAuthor
+            self.fields['authorname'].required = False
+
+        # We are okay
+        return None
+
+
 class EqualGoldLinkForm(forms.ModelForm):
     gold = forms.CharField(label=_("Destination gold sermon"), required=False)
 

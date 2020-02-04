@@ -55,6 +55,7 @@ urlpatterns = [
     url(r'^tools/daterange/$', passim.seeker.views.do_daterange, name='do_daterange'),
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
+    url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
 
     url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -88,9 +89,9 @@ urlpatterns = [
     url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetailsView.as_view(), name='library_details'),
     url(r'^library/edit(?:/(?P<pk>\d+))?/$', LibraryEdit.as_view(), name='library_edit'),
 
-    #url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermondescr_details'),
-    #url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermondescr_edit'),
-    #url(r'^sermon/list', SermonListView.as_view(), name='sermondescr_list'),
+    url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
+    url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
+    url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),

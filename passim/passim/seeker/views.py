@@ -8,7 +8,7 @@ from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
-from django.db.models import Q, Prefetch, Count
+from django.db.models import Q, Prefetch, Count, F
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory
@@ -62,7 +62,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, CollectionForm, SermonDescrCollectionForm
+                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
+                                SuperSermonGoldForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
@@ -437,7 +438,7 @@ def make_search_list(filters, oFields, search_list, qd):
     # Return what we have created
     return filters, lstQ, qd
 
-def make_ordering(qs, qd, orders, order_cols, order_heads):
+def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     oErr = ErrHandle()
 
@@ -465,9 +466,9 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                 for order_item in order_cols[iOrderCol-1].split(";"):
                     if order_item != "":
                         if sType == 'str':
-                            order.append(Lower(order_item))
+                            order.append(Lower(order_item).asc(nulls_last=True))
                         else:
-                            order.append(order_item)
+                            order.append(F(order_item).asc(nulls_last=True))
                 if bAscending:
                     order_heads[iOrderCol-1]['order'] = 'o=-{}'.format(iOrderCol)
                 else:
@@ -480,14 +481,13 @@ def make_ordering(qs, qd, orders, order_cols, order_heads):
                         # Reset this sort order
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
-            for order_item in order_cols[0].split(";"):
+            for order_item in order_default[0].split(";"):
                 if order_item != "":
                     order.append(Lower(order_item))
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
             if len(order) > 0:
                 qs = qs.order_by(*order)
-            # qs = qs.order_by('editions__first__date_late')
         else:
             qs = qs.order_by(*order)
         # Possibly reverse the order
@@ -1687,6 +1687,85 @@ def do_goldtogold(request):
         msg = oErr.get_error_message()
         oErr.DoError("goldtogold")
         return reverse('home')
+
+def do_ssgmigrate(request):
+    """Migration of super sermon gold"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools.html'
+        # Define the initial context
+        context =  {'title':'RU-passim-tools',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
+        # Only passim uploaders can do this
+        if not context['is_passim_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Migrate SSG"
+
+        added = 0
+        lst_total = []
+
+        # Walk all the EqualGold items
+        qs = EqualGold.objects.all()
+        for obj in qs:
+            # Need treatment?
+            if not obj.author or not obj.number:
+                # Check how many SG items there are within this EqualGold (=ssg)
+                qs_sg = obj.equal_goldsermons.all()
+                if qs_sg.count() == 1:
+                    # There is just ONE (1) GS in the set
+                    sg = qs_sg.first()
+                    # (1) Get the author
+                    author = sg.author
+                    if author != None:
+                        # There is an author!!
+                        auth_num = author.get_number()
+                        if auth_num > 0:
+                            # Check the highest sermon number for this author
+                            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+                            if qs_ssg.count() == 0:
+                                iNumber = 1
+                            else:
+                                iNumber = qs_ssg.first().number + 1
+                            # Now we have both an author and a number...
+                            obj.author = author
+                            obj.number = iNumber
+                            obj.code = EqualGold.passim_code(auth_num, iNumber)
+                            obj.incipit = sg.incipit
+                            obj.srchincipit = sg.srchincipit
+                            obj.explicit = sg.explicit
+                            obj.srchexplicit = sg.srchexplicit
+                            obj.save()
+                            added += 1
+                            lst_total.append(obj.code)
+            # Double check to see if something has changed
+            if obj.code == "DETERMINE":
+                obj.code = "ZZZ_DETERMINE"
+                obj.save()
+
+        # Create list to be returned
+        result_list = []
+        result_list.append({'part': 'Number of added SSGs', 'result': added})
+        # result_list.append({'part': 'All additions', 'result': json.dumps(lst_total)})
+        result_list.append({'part': 'All additions', 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("ssgmigrate")
+        return reverse('home')
+
 
 #def do_import_editions(request):
 #    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
@@ -3783,14 +3862,17 @@ class PassimDetails(DetailView):
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     previous = None         # Start with empty previous page
-    title = ""              # The title to be passedon with the context
+    title = ""              # The title to be passed on with the context
+    titlesg = None          # Alternative title in singular
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
+    basic_name = None
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
+    is_basic = False        # Is this a basic details/edit view?
     lst_typeahead = []
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -3813,6 +3895,11 @@ class PassimDetails(DetailView):
         else:
             context = self.get_context_data(object=self.object)
 
+            if self.is_basic and self.template_name == "":
+                if self.rtype == "json":
+                    self.template_name = "seeker/generic_edit.html"
+                else:
+                    self.template_name = "seeker/generic_details.html"
             # Possibly indicate form errors
             # NOTE: errors is a dictionary itself...
             if 'errors' in context and len(context['errors']) > 0:
@@ -3861,7 +3948,14 @@ class PassimDetails(DetailView):
                 data['status'] = "error"
                 data['msg'] = context['errors']
 
+            if self.is_basic and self.template_name == "":
+                if self.rtype == "json":
+                    self.template_name = "seeker/generic_edit.html"
+                else:
+                    self.template_name = "seeker/generic_details.html"
+
             if self.rtype == "json":
+                if self.template_post == "": self.template_post = self.template_name
                 response = render_to_string(self.template_post, context, request)
                 response = response.replace("\ufeff", "")
                 data['html'] = response
@@ -3957,6 +4051,19 @@ class PassimDetails(DetailView):
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
+        # Possibly define where a listview is
+        classname = self.model._meta.model_name
+        basic_name = self.basic_name if self.basic_name else classname
+        self.basic_name = basic_name
+        listviewname = "{}_list".format(basic_name)
+        try:
+            context['listview'] = reverse(listviewname)
+        except:
+            context['listview'] = reverse('home')
+
+        if self.is_basic:
+            context['afterdelurl'] = context['listview']
+
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         initial = get.copy()
@@ -3972,93 +4079,140 @@ class PassimDetails(DetailView):
 
         frm = self.prepare_form(instance, context, initial)
 
-        if instance == None:
-            instance = frm.instance
-            self.object = instance
+        if frm:
 
-        # Walk all the formset objects
-        bFormsetChanged = False
-        for formsetObj in self.formset_objects:
-            formsetClass = formsetObj['formsetClass']
-            prefix  = formsetObj['prefix']
-            formset = None
-            form_kwargs = self.get_form_kwargs(prefix)
-            if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
-                # Only process actual changes!!
-                if self.request.method == "POST" and self.request.POST:
+            if instance == None:
+                instance = frm.instance
+                self.object = instance
 
-                    #if self.add:
-                    #    # Saving a NEW item
-                    #    if 'initial' in formsetObj:
-                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
-                    #    else:
-                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                    #else:
-                    #    # Get a formset including any stuff from POST
-                    #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+            # Walk all the formset objects
+            bFormsetChanged = False
+            for formsetObj in self.formset_objects:
+                formsetClass = formsetObj['formsetClass']
+                prefix  = formsetObj['prefix']
+                formset = None
+                form_kwargs = self.get_form_kwargs(prefix)
+                if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
+                    # Only process actual changes!!
+                    if self.request.method == "POST" and self.request.POST:
 
-                    # Get a formset including any stuff from POST
-                    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
-                    # Process this formset
-                    self.process_formset(prefix, self.request, formset)
+                        #if self.add:
+                        #    # Saving a NEW item
+                        #    if 'initial' in formsetObj:
+                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                        #    else:
+                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                        #else:
+                        #    # Get a formset including any stuff from POST
+                        #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
 
-                    # Process all the correct forms in the formset
-                    for subform in formset:
-                        if subform.is_valid():
-                            subform.save()
-                            # Signal that the *FORM* needs refreshing, because the formset changed
-                            bFormsetChanged = True
+                        # Get a formset including any stuff from POST
+                        formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                        # Process this formset
+                        self.process_formset(prefix, self.request, formset)
 
-                    if formset.is_valid():
-                        # Load an explicitly empty formset
-                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                        # Process all the correct forms in the formset
+                        for subform in formset:
+                            if subform.is_valid():
+                                subform.save()
+                                # Signal that the *FORM* needs refreshing, because the formset changed
+                                bFormsetChanged = True
+
+                        if formset.is_valid():
+                            # Load an explicitly empty formset
+                            formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                        else:
+                            # Retain the original formset, that now contains the error specifications per form
+                            # But: do *NOT* add an additional form to it
+                            pass
+
                     else:
-                        # Retain the original formset, that now contains the error specifications per form
-                        # But: do *NOT* add an additional form to it
-                        pass
-
+                        # All other cases: Load an explicitly empty formset
+                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
                 else:
-                    # All other cases: Load an explicitly empty formset
-                    formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                    # show the data belonging to the current [obj]
+                    qs = self.get_formset_queryset(prefix)
+                    if qs == None:
+                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                    else:
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                # Process all the forms in the formset
+                ordered_forms = self.process_formset(prefix, self.request, formset)
+                if ordered_forms:
+                    context[prefix + "_ordered"] = ordered_forms
+                # Store the instance
+                formsetObj['formsetinstance'] = formset
+                # Add the formset to the context
+                context[prefix + "_formset"] = formset
+                # Get any possible typeahead parameters
+                lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                if lst_formset_ta != None:
+                    for item in lst_formset_ta:
+                        self.lst_typeahead.append(item)
+
+            # Essential formset information
+            for formsetObj in self.formset_objects:
+                prefix = formsetObj['prefix']
+                if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+                if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+
+            # Check if the formset made any changes to the form
+            if bFormsetChanged:
+                # OLD: 
+                frm = self.prepare_form(instance, context)
+
+            # Put the form and the formset in the context
+            context['{}Form'.format(self.prefix)] = frm
+            context['basic_form'] = frm
+            context['instance'] = instance
+            context['options'] = json.dumps({"isnew": (instance == None)})
+
+            # Possibly define the admin detailsview
+            if instance:
+                admindetails = "admin:seeker_{}_change".format(classname)
+                try:
+                    context['admindetails'] = reverse(admindetails, args=[instance.id])
+                except:
+                    pass
+            context['modelname'] = self.model._meta.object_name
+            context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
+
+            # Make sure we have a url for editing
+            if instance and instance.id:
+                # There is a details and edit url
+                context['editview'] = reverse("{}_edit".format(basic_name), kwargs={'pk': instance.id})
+                context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
+            # Make sure we have an url for new
+            context['addview'] = reverse("{}_details".format(basic_name))
+
+        # Determine breadcrumbs and previous page
+        if self.is_basic:
+            title = self.title if self.title != "" else basic_name
+            if self.rtype == "json":
+                # This is the EditView
+                context['breadcrumbs'] = get_breadcrumbs(self.request, "{} edit".format(title), False)
+                prevpage = reverse('home')
+                context['prevpage'] = prevpage
             else:
-                # show the data belonging to the current [obj]
-                qs = self.get_formset_queryset(prefix)
-                if qs == None:
-                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                else:
-                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-            # Process all the forms in the formset
-            ordered_forms = self.process_formset(prefix, self.request, formset)
-            if ordered_forms:
-                context[prefix + "_ordered"] = ordered_forms
-            # Store the instance
-            formsetObj['formsetinstance'] = formset
-            # Add the formset to the context
-            context[prefix + "_formset"] = formset
-            # Get any possible typeahead parameters
-            lst_formset_ta = getattr(formset.form, "typeaheads", None)
-            if lst_formset_ta != None:
-                for item in lst_formset_ta:
-                    self.lst_typeahead.append(item)
-
-        # Essential formset information
-        for formsetObj in self.formset_objects:
-            prefix = formsetObj['prefix']
-            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
-            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
-
-        # Check if the formset made any changes to the form
-        if bFormsetChanged:
-            # OLD: 
-            frm = self.prepare_form(instance, context)
-
-        # Put the form and the formset in the context
-        context['{}Form'.format(self.prefix)] = frm
-        context['instance'] = instance
-        context['options'] = json.dumps({"isnew": (instance == None)})
+                # This is DetailsView
+                # Process this visit and get the new breadcrumbs object
+                prevpage = context['listview']
+                context['prevpage'] = prevpage
+                crumbs = []
+                crumbs.append([title, prevpage])
+                current_name = title if instance else "{} (new)".format(title)
+                context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
+
+        # fill in the form values
+        if frm and 'mainitems' in context:
+            for mobj in context['mainitems']:
+                # Check for possible form field information
+                if 'field_key' in mobj: mobj['field_key'] = frm[mobj['field_key']]
+                if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+                if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
         # Define where to go to after deletion
         if 'afterdelurl' not in context or context['afterdelurl'] == "":
@@ -4103,13 +4257,17 @@ class PassimDetails(DetailView):
                     # Create an errors object
                     context['errors'] = {'delete':  msg }
 
-                context['afterdelurl'] = get_previous_page(self.request, True)
+                if 'afterdelurl' not in context or context['afterdelurl'] == "":
+                    context['afterdelurl'] = get_previous_page(self.request, True)
+
+                # Make sure we are returning JSON
+                self.rtype = "json"
 
                 # Possibly add to context by the calling function
                 context = self.add_to_context(context, instance)
 
-                # And return the complied context
-                return context
+                # No need to retern a form anymore - we have been deleting
+                return None
             
             # All other actions just mean: edit or new and send back
             # Make instance available
@@ -4158,6 +4316,12 @@ class PassimDetails(DetailView):
 
             # Check if this is a new one
             if bNew:
+                if self.is_basic:
+                    self.afternewurl = context['listview']
+                    if self.rtype == "html":
+                        # Make sure we do a page redirect
+                        self.newRedirect = True
+                        self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
                 # Any code that should be added when creating a new [SermonGold] instance
                 bResult, msg = self.after_new(frm, instance)
                 if not bResult:
@@ -4200,8 +4364,15 @@ class PassimDetails(DetailView):
         return frm
     
 
+class BasicDetails(PassimDetails):
+    is_basic = True
+
+
 class BasicListView(ListView):
-    """Basic listview"""
+    """Basic listview
+    
+    This listview inherits the standard listview and adds a few automatic matters
+    """
 
     paginate_by = 15
     entrycount = 0
@@ -4216,6 +4387,7 @@ class BasicListView(ListView):
     listform = None
     has_select2 = False
     plural_name = ""
+    sg_name = ""
     basic_name = ""
     basic_edit = ""
     basic_details = ""
@@ -4293,7 +4465,7 @@ class BasicListView(ListView):
         context['title'] = self.plural_name
         if self.basic_name == "":
             self.basic_name = str(self.model._meta.model_name)
-        context['titlesg'] = self.basic_name.capitalize()
+        context['titlesg'] = self.sg_name if self.sg_name != "" else self.basic_name.capitalize()
         context['basic_name'] = self.basic_name
         context['basic_add'] = reverse("{}_details".format(self.basic_name))
         context['basic_list'] = reverse("{}_list".format(self.basic_name))
@@ -4461,7 +4633,7 @@ class BasicListView(ListView):
         return result_list
 
     def get_field_value(self, instance, custom):
-        return ""
+        return "", ""
 
     def get_paginate_by(self, queryset):
         """
@@ -5388,57 +5560,31 @@ class BasketUpdate(BasicPart):
 
         # Return the updated context
         return context
-    
 
-class KeywordEdit(PassimDetails):
+
+class KeywordEdit(BasicDetails):
     """The details of one keyword"""
 
     model = Keyword
     mForm = KeywordForm
-    template_name = 'seeker/keyword_edit.html'
-    template_post = 'seeker/keyword_edit.html'
     prefix = 'kw'
     title = "KeywordEdit"
-    afternewurl = ""
     rtype = "json"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('keyword_list')
-        return True, "" 
-
+    mainitems = []
+    
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('keyword_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Keywords', reverse('keyword_list')])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
-        context['afterdelurl'] = reverse('keyword_list')
-        
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",      'value': instance.name, 'field_key': 'name'}
+            ]
+        # Return the context we have made
         return context
 
-
 class KeywordDetails(KeywordEdit):
-    """The details of one keyword"""
-
-    template_name = 'seeker/keyword_details.html'
-    template_post = 'seeker/keyword_details.html'
-    title = "KeywordDetails"
-    rtype = "html"  # GET provides a HTML form straight away
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('keyword_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('keyword_details', kwargs={'pk': instance.id})
-        return True, "" 
-
+    rtype = "html"
+    
 
 class KeywordListView(BasicListView):
     """Search and list keywords"""
@@ -7147,6 +7293,123 @@ class SermonGoldLitset(BasicPart):
         return has_changed
 
 
+class EqualGoldEdit(BasicDetails):
+    model = EqualGold
+    mForm = SuperSermonGoldForm
+    prefix = 'ssg'
+    title = "Super Sermon Gold"
+    rtype = "json"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Author:",      'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
+            {'type': 'plain', 'label': "Number:",      'value': instance.number},
+            {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
+            ]
+        # Return the context we have made
+        return context
+
+
+class EqualGoldDetails(EqualGoldEdit):
+    # template_name = 'seeker/generic_details.html'
+    rtype = "html"
+    # titlesg = "Super sermon gold"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualGoldDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        related_objects = []
+
+        context['related_objects'] = related_objects
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
+
+
+class EqualGoldListView(BasicListView):
+    """List super sermon gold instances"""
+
+    model = EqualGold
+    listform = SuperSermonGoldForm
+    has_select2 = True  # Check
+    prefix = "ssg"
+    plural_name = "Super sermons gold"
+    sg_name = "Super sermon gold"
+    page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['code', 'author', 'number', '' ]
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Author',       'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
+        {'name': 'Number',       'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+        {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
+        {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True }
+        ]
+    filters = [{"name": "Author",         "id": "filter_author",     "enabled": False},
+               {"name": "Incipit",        "id": "filter_incipit",    "enabled": False},
+               {"name": "Explicit",       "id": "filter_explicit",   "enabled": False},
+               {"name": "Passim code",    "id": "filter_code",       "enabled": False},
+               {"name": "Number",         "id": "filter_number",     "enabled": False},
+               {"name": "Gryson/Clavis",  "id": "filter_signature",  "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
+            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
+                                    'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 
+                                    'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            ]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "author":
+            # Get a good name for the author
+            if instance.author:
+                html.append(instance.author.name)
+            else:
+                html.append("<i>(not specified)</i>")
+        elif custom == "number":
+            sNumber = "-" if instance.number  == None else instance.number
+            html.append("{}".format(sNumber))
+        elif custom == "code":
+            sCode = "-" if instance.code  == None else instance.code
+            html.append("{}".format(sCode))
+        elif custom == "sig":
+            # Get all the associated signatures
+            qs = Signature.objects.filter(gold__equal=instance).order_by('editype', 'code')
+            for sig in qs:
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
+
+
 class AuthorEdit(PassimDetails):
     """The details of one author"""
 
@@ -7218,10 +7481,11 @@ class AuthorListView(BasicListView):
     paginate_by = 20
     delete_line = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', 'abbr', '', '']
-    order_default = order_cols
+    order_cols = ['abbr', 'number', 'name', '', '']
+    order_default = ['name', 'abbr', 'number', '', '']
     order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
-                   {'name': 'Author name', 'order': 'o=2', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
+                   {'name': 'Number',      'order': 'o=2', 'type': 'int', 'title': 'Passim author number', 'field': 'number', 'default': 10000, 'align': 'right'},
+                   {'name': 'Author name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
     filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
