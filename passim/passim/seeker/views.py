@@ -5768,7 +5768,7 @@ class CollectionListView(BasicListView):
     paginate_by = 20
     bUseFilter = True
     basic_name_prefix = "coll"
-    template_name = 'seeker/collection_list.html'
+    # template_name = 'seeker/collection_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
