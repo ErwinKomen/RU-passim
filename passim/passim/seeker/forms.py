@@ -529,13 +529,15 @@ class CollectionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
+        # Get the prefix
+        prefix = kwargs['prefix']
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['owner'].required = False
         self.fields['descrip'].required = False
         self.fields['readonly'].required = False
         self.fields['url'].required = False
-        self.fields['collist'].queryset = Collection.objects.all().order_by('name')
+        self.fields['collist'].queryset = Collection.objects.filter(type=prefix).order_by('name')
         self.fields['ownlist'].queryset = Profile.objects.all()
         # Get the instance
         if 'instance' in kwargs:

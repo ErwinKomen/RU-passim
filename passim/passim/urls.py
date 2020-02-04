@@ -106,14 +106,19 @@ urlpatterns = [
     
     # Waarom staat dit hier op twee verschillende manieren?        
     url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
-    url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollSermDetails.as_view(), name='collection_details'),
+    #url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollSermDetails.as_view(), name='collection_details'),
 
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
     url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
     url(r'^collection/gold/list', CollectionListView.as_view(prefix="gold"), name='collgold_list'),
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
-    url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollSermDetails.as_view(), name='collserm_details'),
-    url(r'^collection/edit(?:/(?P<pk>\d+))?/$', CollectionEdit.as_view(), name='collection_edit'),
+
+    url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
+    #url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
+    #url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
+    #url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
+
+    url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),
     # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),

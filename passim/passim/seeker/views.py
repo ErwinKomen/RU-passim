@@ -4389,6 +4389,7 @@ class BasicListView(ListView):
     plural_name = ""
     sg_name = ""
     basic_name = ""
+    basic_name_prefix = ""
     basic_edit = ""
     basic_details = ""
     prefix = ""
@@ -4464,7 +4465,10 @@ class BasicListView(ListView):
             self.plural_name = str(self.model._meta.verbose_name_plural)
         context['title'] = self.plural_name
         if self.basic_name == "":
-            self.basic_name = str(self.model._meta.model_name)
+            if self.basic_name_prefix == "":
+                self.basic_name = str(self.model._meta.model_name)
+            else:
+                self.basic_name = "{}{}".format(self.basic_name_prefix, self.prefix)
         context['titlesg'] = self.sg_name if self.sg_name != "" else self.basic_name.capitalize()
         context['basic_name'] = self.basic_name
         context['basic_add'] = reverse("{}_details".format(self.basic_name))
@@ -5724,10 +5728,35 @@ class ProjectListView(BasicListView):
         return sBack, sTitle
 
 
-class CollSermDetails(PassimDetails):
+#class CollSermDetails(PassimDetails):
+#    model = Collection
+#    template_name = "seeker/collserm_details.html"
+#    template_post = template_name
+
+
+class CollSermoEdit(BasicDetails):
+    """a """
+
     model = Collection
-    template_name = "seeker/collserm_details.html"
-    template_post = template_name
+    mForm = CollectionForm
+    prefix = "sermo"
+    rtype = "json"
+    title = "Sermon collection"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
+
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:",      'value': instance.name, 'field_key': 'name'}
+             ]
+          # Return the context we have made
+          return context    
+
+
+class CollSermoDetails(CollSermoEdit):
+    rtype = "html"
 
 
 class CollectionListView(BasicListView):
@@ -5738,7 +5767,7 @@ class CollectionListView(BasicListView):
     prefix = "col"
     paginate_by = 20
     bUseFilter = True
-    basic_name = "collserm"
+    basic_name_prefix = "coll"
     template_name = 'seeker/collection_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
