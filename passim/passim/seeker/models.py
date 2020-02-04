@@ -4161,12 +4161,27 @@ class NewsItem(models.Model):
       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
       return response
 
+    def check_until():
+        """Check all news items for the until date and emend status where needed"""
+
+        # Get current time
+        now = timezone.now()
+        for obj in NewsItem.objects.all():
+            if obj.until and obj.until < now:
+                # This should be set invalid
+                obj.status = "ext"
+                obj.save()
+        # Return valid
+        return True
+
+
 class CollectionSerm(models.Model):
     """The link between a collection item and a sermon"""
     # [1] The sermon to which the collection item refers
     sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+
 
 class CollectionMan(models.Model):
     """The link between a collection item and a manuscript"""
@@ -4175,12 +4190,14 @@ class CollectionMan(models.Model):
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "manuscript_col")
 
+
 class CollectionGold(models.Model):
     """The link between a collection item and a gold sermon"""
     # [1] The gold sermon to which the collection item refers
     gold = models.ForeignKey(SermonGold, related_name = "gold_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "gold_col")
+
 
 class CollectionSuper(models.Model):
     """The link between a collection item and a gold sermon"""
@@ -4189,3 +4206,4 @@ class CollectionSuper(models.Model):
     super = models.ForeignKey(EqualGold, related_name = "super_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "super_col")
+
