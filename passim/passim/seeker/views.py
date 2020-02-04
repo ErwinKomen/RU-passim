@@ -5582,56 +5582,6 @@ class KeywordDetails(KeywordEdit):
     rtype = "html"
     
 
-class KeywordEdit_ORG(PassimDetails):
-    """The details of one keyword"""
-
-    model = Keyword
-    mForm = KeywordForm
-    template_name = 'seeker/keyword_edit.html'
-    template_post = 'seeker/keyword_edit.html'
-    prefix = 'kw'
-    title = "KeywordEdit"
-    afternewurl = ""
-    rtype = "json"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('keyword_list')
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('keyword_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Keywords', reverse('keyword_list')])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Keyword details", True, crumbs)
-        context['afterdelurl'] = reverse('keyword_list')
-        
-        return context
-
-
-class KeywordDetails_ORG(KeywordEdit):
-    """The details of one keyword"""
-
-    template_name = 'seeker/keyword_details.html'
-    template_post = 'seeker/keyword_details.html'
-    title = "KeywordDetails"
-    rtype = "html"  # GET provides a HTML form straight away
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('keyword_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('keyword_details', kwargs={'pk': instance.id})
-        return True, "" 
-
-
 class KeywordListView(BasicListView):
     """Search and list keywords"""
 
