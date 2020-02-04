@@ -3861,12 +3861,12 @@ class PassimDetails(DetailView):
     afternewurl = ""        # URL to move to after adding a new item
     prefix = ""             # The prefix for the one (!) form we use
     previous = None         # Start with empty previous page
-    title = ""              # The title to be passedon with the context
+    title = ""              # The title to be passed on with the context
+    titlesg = None          # Alternative title in singular
     rtype = "json"          # JSON response (alternative: html)
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
     basic_name = None
-    titlesg = None          # Alternative title in singular
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
@@ -3895,7 +3895,10 @@ class PassimDetails(DetailView):
             context = self.get_context_data(object=self.object)
 
             if self.is_basic and self.template_name == "":
-                self.template_name = "seeker/generic_edit.html"
+                if self.rtype == "json":
+                    self.template_name = "seeker/generic_edit.html"
+                else:
+                    self.template_name = "seeker/generic_details.html"
             # Possibly indicate form errors
             # NOTE: errors is a dictionary itself...
             if 'errors' in context and len(context['errors']) > 0:
@@ -3945,7 +3948,10 @@ class PassimDetails(DetailView):
                 data['msg'] = context['errors']
 
             if self.is_basic and self.template_name == "":
-                self.template_name = "seeker/generic_edit.html"
+                if self.rtype == "json":
+                    self.template_name = "seeker/generic_edit.html"
+                else:
+                    self.template_name = "seeker/generic_details.html"
 
             if self.rtype == "json":
                 if self.template_post == "": self.template_post = self.template_name
@@ -4168,7 +4174,7 @@ class PassimDetails(DetailView):
                 except:
                     pass
             context['modelname'] = self.model._meta.object_name
-            context['titlesg'] = self.titlesg if self.titlesg else basic_name.capitalize()
+            context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
 
             # Make sure we have a url for editing
             if instance and instance.id:
@@ -5549,9 +5555,34 @@ class BasketUpdate(BasicPart):
 
         # Return the updated context
         return context
-    
+
 
 class KeywordEdit(PassimDetails):
+    """The details of one keyword"""
+
+    model = Keyword
+    mForm = KeywordForm
+    prefix = 'kw'
+    title = "KeywordEdit"
+    rtype = "json"
+    is_basic = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",      'value': instance.name, 'field_key': 'name'}
+            ]
+        # Return the context we have made
+        return context
+
+class KeywordDetails(KeywordEdit):
+    rtype = "html"
+    
+
+class KeywordEdit_ORG(PassimDetails):
     """The details of one keyword"""
 
     model = Keyword
@@ -5582,7 +5613,7 @@ class KeywordEdit(PassimDetails):
         return context
 
 
-class KeywordDetails(KeywordEdit):
+class KeywordDetails_ORG(KeywordEdit):
     """The details of one keyword"""
 
     template_name = 'seeker/keyword_details.html'
@@ -7324,9 +7355,9 @@ class EqualGoldEdit(PassimDetails):
 
 
 class EqualGoldDetails(EqualGoldEdit):
-    template_name = 'seeker/generic_details.html'
+    # template_name = 'seeker/generic_details.html'
     rtype = "html"
-    titlesg = "Super sermon gold"
+    # titlesg = "Super sermon gold"
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""

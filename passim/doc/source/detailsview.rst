@@ -35,7 +35,8 @@ Here is an example of an EditView:
 
          # Define the main items to show and edit
          context['mainitems'] = [
-            {'type': 'plain', 'label': "Author:",      'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
+            {'type': 'plain', 'label': "Author:",      'value': instance.author, 
+             'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
             {'type': 'plain', 'label': "Number:",      'value': instance.number},
             {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
             ]
@@ -64,8 +65,67 @@ In fact, there are but a few things that need to be specified for the EditView:
 *Methods*
 
 The EditView must have an ``add_to_context()`` method, as shown in the example above.
+The ``mainitems`` list in the context contains one object for each field that needs to be displayed.
+Each description has at least values for ``type``, ``label`` and ``value``.
+The descriptions for the user-editable fields should have values for at least ``field_key``.
+
+Here is a short description of the field-description object:
+
+================= ==========================================================================
+key               meaning
+================= ==========================================================================
+``*type``         normally 'plain'. Alternatives: ``bold``, ``line``, ``safe``, ``safeline``
+``*label``        the label shown in the details view for this item
+``*value``        the value to be displayed (use ``instance`` to derive it)
+``*link``         the URL that the user can link to from this value
+``[field_key]``   the name of the form field for this item
+``[field_ta]``    the name of the typeahead form field for this item
+``[key_ta]``      the 'key' used for typeahead (CSS class name, e.g. "author-key")
+``[field_list]``  the name of the select2 form field (multi-valuable)
+================= ==========================================================================
+
 
 Note that the ``add_to_context()`` method may also be used to define deviating values for ``afterdelurl`` and ``afternewurl``.
 
 DetailsView
------------   
+-----------
+
+The name of the DetailsView in ``urls.py`` must be like ``author_details``, if ``author`` is the ``basic_name`` (in BasicListView).
+If the ``basic_name`` is not the same as the name of the model, then it needs to be specified.
+
+Here is an example of a DetailsView:
+
+.. code-block:: python
+   :linenos:
+
+   class EqualGoldDetails(EqualGoldEdit):
+      rtype = "html"
+
+      def add_to_context(self, context, instance):
+         """Add to the existing context"""
+
+         # Start by executing the standard handling
+         super(EqualGoldDetails, self).add_to_context(context, instance)
+
+         context['sections'] = []
+         
+         related_objects = []
+
+         context['related_objects'] = related_objects
+         # Return the context we have made
+         return context
+
+*Attributes*
+         
+The details view class is based on the EditView class. It is from that class that it inherits the ``model``, the ``mForm``, the prefix, the title and so forth.
+What remains to be specified for the DetailsView is that ``rtype`` parameter: that should be set to *html*.
+
+*Methods*
+
+In terms of *methods*, the DetailsView is not obliged to specify anything.
+It already inherits the ``mainitems`` from the EditView.
+However, the DetailsView usually contains more information than just the 'basic' fields of a model.
+The generic details view allows specifying two additional matters:
+
+1. ``sections``: Sets of object details that are hidden by default, but appear when pressing a button
+2. ``related_objects``: listviews of objects that link with it.
