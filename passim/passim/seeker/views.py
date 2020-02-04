@@ -3868,6 +3868,7 @@ class PassimDetails(DetailView):
     prefix_type = ""        # Whether the adapt the prefix or not ('simple')
     mForm = None            # Model form
     basic_name = None
+    basic_name_prefix = ""
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
@@ -4053,8 +4054,12 @@ class PassimDetails(DetailView):
 
         # Possibly define where a listview is
         classname = self.model._meta.model_name
-        basic_name = self.basic_name if self.basic_name else classname
-        self.basic_name = basic_name
+        if self.basic_name == None or self.basic_name == "":
+            if self.basic_name_prefix == "":
+                self.basic_name = classname
+            else:
+                self.basic_name = "{}{}".format(self.basic_name_prefix, self.prefix)
+        basic_name = self.basic_name
         listviewname = "{}_list".format(basic_name)
         try:
             context['listview'] = reverse(listviewname)
@@ -5740,6 +5745,7 @@ class CollSermoEdit(BasicDetails):
     model = Collection
     mForm = CollectionForm
     prefix = "sermo"
+    basic_name_prefix = "coll"
     rtype = "json"
     title = "Sermon collection"
     mainitems = []
@@ -5768,7 +5774,6 @@ class CollectionListView(BasicListView):
     paginate_by = 20
     bUseFilter = True
     basic_name_prefix = "coll"
-    template_name = 'seeker/collection_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
