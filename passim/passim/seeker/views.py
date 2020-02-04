@@ -62,11 +62,12 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm
+                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, CollectionForm, SermonDescrCollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
-    Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, LINK_EQUAL, LINK_PRT
+    Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
+    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT
 
 # Some constants that can be used
 paginateSize = 20
@@ -5577,6 +5578,12 @@ class ProjectListView(BasicListView):
         return sBack, sTitle
 
 
+class CollSermDetails(PassimDetails):
+    model = Collection
+    template_name = "seeker/collserm_details.html"
+    template_post = template_name
+
+
 class CollectionListView(BasicListView):
     """Search and list collections"""
 
@@ -5585,6 +5592,7 @@ class CollectionListView(BasicListView):
     prefix = "col"
     paginate_by = 20
     bUseFilter = True
+    basic_name = "collserm"
     template_name = 'seeker/collection_list.html'
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
@@ -5668,7 +5676,7 @@ class CollectionDetails(CollectionEdit):
 
 
 class CollectionSermset(BasicPart):
-    """The set of sermons from the collection TH: wat als voorbeeld te gebruiken?"""
+    """The set of sermons from the collection"""
 
     MainModel = Collection
     template_name = 'seeker/collection_sermset.html'
@@ -5679,7 +5687,7 @@ class CollectionSermset(BasicPart):
         # Pass on all the sermons from each Collection
         col = self.obj.id #??
         scol_list = []
-        for item in CollectionSerm.objects.filter(collection_id=col):
+        for item in Collection.objects.filter(collection_id=col):
             oAdd = {}
             oAdd['title'] = item.title.id
             # oAdd['title'] = item.reference.title

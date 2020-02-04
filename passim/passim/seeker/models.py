@@ -41,6 +41,7 @@ REPORT_TYPE = "seeker.reptype"
 LINK_TYPE = "seeker.linktype"
 EDI_TYPE = "seeker.editype"
 STATUS_TYPE = "seeker.stype"
+COLLECTION_TYPE = "seeker.coltype" 
 
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
@@ -2246,6 +2247,9 @@ class Manuscript(models.Model):
      # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
 
+    # [m] Many-to-many: one sermon can be a part of a series of collections 
+    collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+
     def __str__(self):
         return self.name
 
@@ -3049,11 +3053,13 @@ class EqualGold(models.Model):
     # [0-1] The number of the sermon to which this one has moved
     # moved = models.IntegerField("Moved to", blank=True, null=True)
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
-
+    # [m] Many-to-many: one sermon can be a part of a series of collections
+    collections = models.ManyToManyField("Collection", through="CollectionSuper", related_name="collections_super")
+    
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
         return name
-    
+
 
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
@@ -3091,6 +3097,9 @@ class SermonGold(models.Model):
 
     # [0-n] Many-to-many: keywords per SermonGold
     litrefs = models.ManyToManyField(Litref, through="LitrefSG", related_name="litrefs_gold")
+
+    # [m] Many-to-many: one sermon can be a part of a series of collections 
+    collections = models.ManyToManyField("Collection", through="CollectionGold", related_name="collections_gold")
 
     def __str__(self):
         name = self.signatures()
@@ -3604,7 +3613,6 @@ class EqualGoldLink(models.Model):
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
-    
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -3670,29 +3678,35 @@ class ManuscriptExt(models.Model):
 
     def short(self):
         return self.url
+       
+# aanpassen en geschikt maken zodat in 1 Collection tabel alle collecties kunnen worden geregistreed, dus voor alle entiteiten
 
 
 class Collection(models.Model):
-    """A collection can contain one or more sermons (SermonDescr)"""
+    """A collection can contain one or more sermons, manuscripts, gold sermons or super super golds"""
     
     # [1] Each collection has only 1 name 
     name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Each collecttion has only 1 owner
     owner = models.ForeignKey(Profile, null=True)
-        
-    # [0-n] Link to one or more SermonDescr instances
-    # sermon = models.ManyToManyField("SermonDescr", through="CollectionSerm")
- 
+    
     # [0-1] Each collection can be marked a "read only" by Passim-team  
     readonly = models.BooleanField(default=False)
-    
+
+    # [1] Each collection has only 1 type    
+    type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
+                            max_length=5)
+
     # [0-1] Each collection can have one description
     descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
 
-    # Link to a description or bibliography (url) TH: wat is hiervan de bedoeling? Literature? Lijkt mij niet nodig dit veld
+    # [0-1] Link to a description or bibliography (url) 
     url = models.URLField("Web info", null=True, blank=True)
 
+    # Path to register all additions and changes to each Collection (as stringified JSON list)
+    path = models.TextField("History of collection", null=True, blank=True)
+    
     def __str__(self):
         return self.name
 
@@ -3700,7 +3714,7 @@ class Collection(models.Model):
         response = "yes" if self.readonly else "no"
         return response
 
-    
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -3769,7 +3783,7 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
-    # [m] Many-to-many: one sermon can be a part of a series of collections TH: aan te passen, naar SG of SSG
+    # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
@@ -3878,15 +3892,6 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
-# naar SG of SSG?
-
-class CollectionSerm(models.Model):
-    """The link between a collection item and a sermon"""
-    # [1] The sermon to which the collection item refers
-    sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
-    # [1] The collection to which the context item refers to
-    collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
-    
 
 class SermonDescrKeyword(models.Model):
     """Relation between a SermonDescr and a Keyword"""
@@ -4118,3 +4123,31 @@ class NewsItem(models.Model):
       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
       return response
 
+class CollectionSerm(models.Model):
+    """The link between a collection item and a sermon"""
+    # [1] The sermon to which the collection item refers
+    sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
+    # [1] The collection to which the context item refers to
+    collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+
+class CollectionMan(models.Model):
+    """The link between a collection item and a manuscript"""
+    # [1] The manuscript to which the collection item refers
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_col")
+    # [1] The collection to which the context item refers to
+    collection = models.ForeignKey(Collection, related_name= "manuscript_col")
+
+class CollectionGold(models.Model):
+    """The link between a collection item and a gold sermon"""
+    # [1] The gold sermon to which the collection item refers
+    gold = models.ForeignKey(SermonGold, related_name = "gold_col")
+    # [1] The collection to which the context item refers to
+    collection = models.ForeignKey(Collection, related_name= "gold_col")
+
+class CollectionSuper(models.Model):
+    """The link between a collection item and a gold sermon"""
+    # [1] The gold sermon to which the coll
+    # ection item refers
+    super = models.ForeignKey(EqualGold, related_name = "super_col")
+    # [1] The collection to which the context item refers to
+    collection = models.ForeignKey(Collection, related_name= "super_col")
