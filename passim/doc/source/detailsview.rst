@@ -21,7 +21,7 @@ Here is an example of an EditView:
 .. code-block:: python
    :linenos:
 
-   class EqualGoldEdit(PassimDetails):
+   class EqualGoldEdit(BasicDetails):
       model = EqualGold
       mForm = SuperSermonGoldForm
       prefix = 'ssg'
@@ -45,7 +45,7 @@ Here is an example of an EditView:
       
 *Attributes*
       
-The EditView derives from the class ``PassimDetails``. A lot is defined generically because of the flag **is_basic** that is set to ``True``.
+The EditView derives from the class ``BasicDetails``. A lot is defined generically because of the flag **is_basic** that is set to ``True``.
 In fact, there are but a few things that need to be specified for the EditView:
 
    ``model`` - the name of the model class that this edit view is based on

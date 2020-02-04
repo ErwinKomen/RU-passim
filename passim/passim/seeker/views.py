@@ -4363,6 +4363,10 @@ class PassimDetails(DetailView):
         return frm
     
 
+class BasicDetails(PassimDetails):
+    is_basic = True
+
+
 class BasicListView(ListView):
     """Basic listview
     
@@ -5557,7 +5561,7 @@ class BasketUpdate(BasicPart):
         return context
 
 
-class KeywordEdit(PassimDetails):
+class KeywordEdit(BasicDetails):
     """The details of one keyword"""
 
     model = Keyword
@@ -5565,7 +5569,6 @@ class KeywordEdit(PassimDetails):
     prefix = 'kw'
     title = "KeywordEdit"
     rtype = "json"
-    is_basic = True
     mainitems = []
     
     def add_to_context(self, context, instance):
@@ -7282,14 +7285,13 @@ class SermonGoldLitset(BasicPart):
         return has_changed
 
 
-class EqualGoldEdit(PassimDetails):
+class EqualGoldEdit(BasicDetails):
     model = EqualGold
     mForm = SuperSermonGoldForm
     prefix = 'ssg'
     title = "Super Sermon Gold"
     rtype = "json"
     mainitems = []
-    is_basic = True
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
