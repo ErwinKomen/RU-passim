@@ -1,5 +1,5 @@
-BasicListView
-=============
+Basic List View
+===============
 
 Creating and using the ``BasicListView`` class can best be described by an example model.
 

@@ -27,7 +27,7 @@
             {% if is_passim_editor %}
               <!-- Save button -->
               <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
-                 targeturl="{% if basic_form.instance.id %}{{detailsview}}{% else %}{{addview}}{% endif %}" >
+                 targeturl="{% if basic_form.instance.id %}{{editview}}{% else %}{{addview}}{% endif %}" >
                 <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
               </a>
             {% endif %}
@@ -59,7 +59,7 @@
                 <a mode="delete" title="Delete this item" class="btn btn-xs jumbo-3"
                    afterurl="{{listview}}"
                    targetid="sermon_edit"
-                   targeturl="{% if basic_form.instance.id %}{{detailsview}}{% endif %}">
+                   targeturl="{% if basic_form.instance.id %}{{editview}}{% endif %}">
                   Delete
                 </a>
               </span>

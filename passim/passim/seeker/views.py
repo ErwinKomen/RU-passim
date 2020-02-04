@@ -3871,6 +3871,7 @@ class PassimDetails(DetailView):
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
+    is_basic = False        # Is this a basic details/edit view?
     lst_typeahead = []
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -3893,6 +3894,8 @@ class PassimDetails(DetailView):
         else:
             context = self.get_context_data(object=self.object)
 
+            if self.is_basic and self.template_name == "":
+                self.template_name = "seeker/generic_edit.html"
             # Possibly indicate form errors
             # NOTE: errors is a dictionary itself...
             if 'errors' in context and len(context['errors']) > 0:
@@ -3941,7 +3944,11 @@ class PassimDetails(DetailView):
                 data['status'] = "error"
                 data['msg'] = context['errors']
 
+            if self.is_basic and self.template_name == "":
+                self.template_name = "seeker/generic_edit.html"
+
             if self.rtype == "json":
+                if self.template_post == "": self.template_post = self.template_name
                 response = render_to_string(self.template_post, context, request)
                 response = response.replace("\ufeff", "")
                 data['html'] = response
@@ -4037,6 +4044,19 @@ class PassimDetails(DetailView):
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
+        # Possibly define where a listview is
+        classname = self.model._meta.model_name
+        basic_name = self.basic_name if self.basic_name else classname
+        self.basic_name = basic_name
+        listviewname = "{}_list".format(basic_name)
+        try:
+            context['listview'] = reverse(listviewname)
+        except:
+            context['listview'] = reverse('home')
+
+        if self.is_basic:
+            context['afterdelurl'] = context['listview']
+
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         initial = get.copy()
@@ -4052,117 +4072,129 @@ class PassimDetails(DetailView):
 
         frm = self.prepare_form(instance, context, initial)
 
-        if instance == None:
-            instance = frm.instance
-            self.object = instance
+        if frm:
 
-        # Walk all the formset objects
-        bFormsetChanged = False
-        for formsetObj in self.formset_objects:
-            formsetClass = formsetObj['formsetClass']
-            prefix  = formsetObj['prefix']
-            formset = None
-            form_kwargs = self.get_form_kwargs(prefix)
-            if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
-                # Only process actual changes!!
-                if self.request.method == "POST" and self.request.POST:
+            if instance == None:
+                instance = frm.instance
+                self.object = instance
 
-                    #if self.add:
-                    #    # Saving a NEW item
-                    #    if 'initial' in formsetObj:
-                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
-                    #    else:
-                    #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                    #else:
-                    #    # Get a formset including any stuff from POST
-                    #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+            # Walk all the formset objects
+            bFormsetChanged = False
+            for formsetObj in self.formset_objects:
+                formsetClass = formsetObj['formsetClass']
+                prefix  = formsetObj['prefix']
+                formset = None
+                form_kwargs = self.get_form_kwargs(prefix)
+                if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
+                    # Only process actual changes!!
+                    if self.request.method == "POST" and self.request.POST:
 
-                    # Get a formset including any stuff from POST
-                    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
-                    # Process this formset
-                    self.process_formset(prefix, self.request, formset)
+                        #if self.add:
+                        #    # Saving a NEW item
+                        #    if 'initial' in formsetObj:
+                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                        #    else:
+                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                        #else:
+                        #    # Get a formset including any stuff from POST
+                        #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
 
-                    # Process all the correct forms in the formset
-                    for subform in formset:
-                        if subform.is_valid():
-                            subform.save()
-                            # Signal that the *FORM* needs refreshing, because the formset changed
-                            bFormsetChanged = True
+                        # Get a formset including any stuff from POST
+                        formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                        # Process this formset
+                        self.process_formset(prefix, self.request, formset)
 
-                    if formset.is_valid():
-                        # Load an explicitly empty formset
-                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                        # Process all the correct forms in the formset
+                        for subform in formset:
+                            if subform.is_valid():
+                                subform.save()
+                                # Signal that the *FORM* needs refreshing, because the formset changed
+                                bFormsetChanged = True
+
+                        if formset.is_valid():
+                            # Load an explicitly empty formset
+                            formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                        else:
+                            # Retain the original formset, that now contains the error specifications per form
+                            # But: do *NOT* add an additional form to it
+                            pass
+
                     else:
-                        # Retain the original formset, that now contains the error specifications per form
-                        # But: do *NOT* add an additional form to it
-                        pass
-
+                        # All other cases: Load an explicitly empty formset
+                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
                 else:
-                    # All other cases: Load an explicitly empty formset
-                    formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                    # show the data belonging to the current [obj]
+                    qs = self.get_formset_queryset(prefix)
+                    if qs == None:
+                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                    else:
+                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                # Process all the forms in the formset
+                ordered_forms = self.process_formset(prefix, self.request, formset)
+                if ordered_forms:
+                    context[prefix + "_ordered"] = ordered_forms
+                # Store the instance
+                formsetObj['formsetinstance'] = formset
+                # Add the formset to the context
+                context[prefix + "_formset"] = formset
+                # Get any possible typeahead parameters
+                lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                if lst_formset_ta != None:
+                    for item in lst_formset_ta:
+                        self.lst_typeahead.append(item)
+
+            # Essential formset information
+            for formsetObj in self.formset_objects:
+                prefix = formsetObj['prefix']
+                if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+                if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+
+            # Check if the formset made any changes to the form
+            if bFormsetChanged:
+                # OLD: 
+                frm = self.prepare_form(instance, context)
+
+            # Put the form and the formset in the context
+            context['{}Form'.format(self.prefix)] = frm
+            context['basic_form'] = frm
+            context['instance'] = instance
+            context['options'] = json.dumps({"isnew": (instance == None)})
+
+            # Possibly define the admin detailsview
+            if instance:
+                admindetails = "admin:seeker_{}_change".format(classname)
+                try:
+                    context['admindetails'] = reverse(admindetails, args=[instance.id])
+                except:
+                    pass
+            context['modelname'] = self.model._meta.object_name
+            context['titlesg'] = self.titlesg if self.titlesg else basic_name.capitalize()
+
+            # Make sure we have a url for editing
+            if instance and instance.id:
+                # There is a details and edit url
+                context['editview'] = reverse("{}_edit".format(basic_name), kwargs={'pk': instance.id})
+                context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
+            # Make sure we have an url for new
+            context['addview'] = reverse("{}_details".format(basic_name))
+
+        # Determine breadcrumbs and previous page
+        if self.is_basic:
+            title = self.title if self.title != "" else basic_name
+            if self.rtype == "json":
+                # This is the EditView
+                context['breadcrumbs'] = get_breadcrumbs(self.request, "{} edit".format(title), False)
+                prevpage = reverse('home')
+                context['prevpage'] = prevpage
             else:
-                # show the data belonging to the current [obj]
-                qs = self.get_formset_queryset(prefix)
-                if qs == None:
-                    formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                else:
-                    formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-            # Process all the forms in the formset
-            ordered_forms = self.process_formset(prefix, self.request, formset)
-            if ordered_forms:
-                context[prefix + "_ordered"] = ordered_forms
-            # Store the instance
-            formsetObj['formsetinstance'] = formset
-            # Add the formset to the context
-            context[prefix + "_formset"] = formset
-            # Get any possible typeahead parameters
-            lst_formset_ta = getattr(formset.form, "typeaheads", None)
-            if lst_formset_ta != None:
-                for item in lst_formset_ta:
-                    self.lst_typeahead.append(item)
-
-        # Essential formset information
-        for formsetObj in self.formset_objects:
-            prefix = formsetObj['prefix']
-            if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
-            if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
-
-        # Check if the formset made any changes to the form
-        if bFormsetChanged:
-            # OLD: 
-            frm = self.prepare_form(instance, context)
-
-        # Put the form and the formset in the context
-        context['{}Form'.format(self.prefix)] = frm
-        context['basic_form'] = frm
-        context['instance'] = instance
-        context['options'] = json.dumps({"isnew": (instance == None)})
-
-        # Possibly define where a listview is
-        classname = self.model._meta.model_name
-        basic_name = self.basic_name if self.basic_name else classname
-        listviewname = "{}_list".format(basic_name)
-        try:
-            context['listview'] = reverse(listviewname)
-        except:
-            context['listview'] = reverse('home')
-
-        # Possibly define the admin detailsview
-        if instance:
-            admindetails = "admin:seeker_{}_change".format(classname)
-            try:
-                context['admindetails'] = reverse(admindetails, args=[instance.id])
-            except:
-                pass
-        context['modelname'] = self.model._meta.object_name
-        context['titlesg'] = self.titlesg if self.titlesg else basic_name.capitalize()
-
-        # Make sure we have a url for editing
-        if instance:
-            # There is an edit url
-            context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
-        # Make sure we have an url for new
-        context['addview'] = reverse("{}_details".format(basic_name))
+                # This is DetailsView
+                # Process this visit and get the new breadcrumbs object
+                prevpage = context['listview']
+                context['prevpage'] = prevpage
+                crumbs = []
+                crumbs.append([title, prevpage])
+                current_name = title if instance else "{} (new)".format(title)
+                context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # Possibly add to context by the calling function
         context = self.add_to_context(context, instance)
@@ -4218,13 +4250,17 @@ class PassimDetails(DetailView):
                     # Create an errors object
                     context['errors'] = {'delete':  msg }
 
-                context['afterdelurl'] = get_previous_page(self.request, True)
+                if 'afterdelurl' not in context or context['afterdelurl'] == "":
+                    context['afterdelurl'] = get_previous_page(self.request, True)
+
+                # Make sure we are returning JSON
+                self.rtype = "json"
 
                 # Possibly add to context by the calling function
                 context = self.add_to_context(context, instance)
 
-                # And return the complied context
-                return context
+                # No need to retern a form anymore - we have been deleting
+                return None
             
             # All other actions just mean: edit or new and send back
             # Make instance available
@@ -4273,6 +4309,12 @@ class PassimDetails(DetailView):
 
             # Check if this is a new one
             if bNew:
+                if self.is_basic:
+                    self.afternewurl = context['listview']
+                    if self.rtype == "html":
+                        # Make sure we do a page redirect
+                        self.newRedirect = True
+                        self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
                 # Any code that should be added when creating a new [SermonGold] instance
                 bResult, msg = self.after_new(frm, instance)
                 if not bResult:
@@ -7262,56 +7304,14 @@ class SermonGoldLitset(BasicPart):
 class EqualGoldEdit(PassimDetails):
     model = EqualGold
     mForm = SuperSermonGoldForm
-    template_name = 'seeker/generic_edit.html'
-    template_post = template_name
     prefix = 'ssg'
     title = "Super Sermon Gold"
-    afternewurl = ""
     rtype = "json"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('equalgold_list')
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
-        # Process this visit and get the new breadcrumbs object
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Super sermon gold edit", False)
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-
-        context['afterdelurl'] = reverse('equalgold_list')
-        return context
-
-
-class EqualGoldDetails(EqualGoldEdit):
-    template_name = 'seeker/generic_details.html'
-    template_post = template_name
-    rtype = "html"
-    titlesg = "Super sermon gold"
     mainitems = []
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        # Make sure we do a page redirect
-        self.newRedirect = True
-        self.redirectpage = reverse('equalgold_details', kwargs={'pk': instance.id})
-
-        return True, "" 
+    is_basic = True
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('equalgold_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Super sermons gold', prevpage])
-        current_name = "Super sermon gold" if instance else "Super sermon gold (new)"
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # Define the main items to show and edit
         context['mainitems'] = [
@@ -7319,6 +7319,20 @@ class EqualGoldDetails(EqualGoldEdit):
             {'type': 'plain', 'label': "Number:",      'value': instance.number},
             {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
             ]
+        # Return the context we have made
+        return context
+
+
+class EqualGoldDetails(EqualGoldEdit):
+    template_name = 'seeker/generic_details.html'
+    rtype = "html"
+    titlesg = "Super sermon gold"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualGoldDetails, self).add_to_context(context, instance)
 
         context['sections'] = []
 

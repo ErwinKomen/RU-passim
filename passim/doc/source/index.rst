@@ -15,6 +15,7 @@ Contents:
 
    assumptions
    basiclistview
+   detailsview
 
 Indices and tables
 ==================
