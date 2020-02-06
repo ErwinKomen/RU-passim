@@ -105,7 +105,7 @@ urlpatterns = [
     url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
     
     # Waarom staat dit hier op twee verschillende manieren?        
-    url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
+    #url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
     #url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollSermDetails.as_view(), name='collection_details'),
 
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
@@ -114,14 +114,15 @@ urlpatterns = [
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
 
     url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
-    #url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
-    #url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
-    #url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
+    url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
+    url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
+    url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
 
     url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),
-    #url(r'^collection/manu/edit(?:/(?P<pk>\d+))?/$', CollManuEdit.as_view(), name='collmanu_edit'),
-    #url(r'^collection/gold/edit(?:/(?P<pk>\d+))?/$', CollGoldEdit.as_view(), name='collgold_edit'),
-    #url(r'^collection/super/edit(?:/(?P<pk>\d+))?/$', CollSuperEdit.as_view(), name='collsuper_edit'),
+    url(r'^collection/manu/edit(?:/(?P<pk>\d+))?/$', CollManuEdit.as_view(), name='collmanu_edit'),
+    url(r'^collection/gold/edit(?:/(?P<pk>\d+))?/$', CollGoldEdit.as_view(), name='collgold_edit'),
+    url(r'^collection/super/edit(?:/(?P<pk>\d+))?/$', CollSuperEdit.as_view(), name='collsuper_edit'),
+    
     # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
     url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
