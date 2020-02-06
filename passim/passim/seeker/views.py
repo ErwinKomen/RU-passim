@@ -590,6 +590,9 @@ def home(request):
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
 
+    # Check the newsitems for validity
+    NewsItem.check_until()
+
     # Create the list of news-items
     lstQ = []
     lstQ.append(Q(status='val'))
