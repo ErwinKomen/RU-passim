@@ -14,6 +14,8 @@ Contents:
    :maxdepth: 2
 
    assumptions
+   tagtext
+   basic
    basiclistview
    detailsview
 
