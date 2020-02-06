@@ -4412,11 +4412,17 @@ class BasicListView(ListView):
     sort_order = ""
     page_function = None
 
+    def initializations(self):
+        return None
+
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(BasicListView, self).get_context_data(**kwargs)
 
         oErr = ErrHandle()
+
+        # Allo user to specify alterations to the class instance
+        self.initializations()
 
         # Get parameters for the search
         if self.initial == None:
@@ -4481,7 +4487,7 @@ class BasicListView(ListView):
         context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
         context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
 
-        # Make sure to transform the 'object_list'  into a 'result_list'
+        # Make sure to transform the 'object_list' into a 'result_list'
         context['result_list'] = self.get_result_list(context['object_list'])
 
         context['sortOrder'] = self.sort_order
@@ -5633,7 +5639,7 @@ class KeywordListView(BasicListView):
                 html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
             number = instance.freqmanu()
             if number > 0:
-                url = reverse('search_gold')
+                url = reverse('search_manuscript')
                 html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
@@ -5732,13 +5738,44 @@ class ProjectListView(BasicListView):
         sBack = "\n".join(html)
         return sBack, sTitle
 
+# Manu
+class CollManuEdit(BasicDetails):
+    """a """
 
-#class CollSermDetails(PassimDetails):
-#    model = Collection
-#    template_name = "seeker/collserm_details.html"
-#    template_post = template_name
+    model = Collection
+    mForm = CollectionForm
+    prefix = "manu"
+    basic_name_prefix = "coll"
+    rtype = "json"
+    title = "Manuscript collection"
+    mainitems = []
 
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
 
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             ]
+          # Return the context we have made
+          return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # Also make sure that the correct type (=prefix) gets established
+            form.instance.type = self.prefix
+        return True, ""
+
+class CollManuDetails(CollManuEdit):
+    rtype = "html"
+
+# Sermo
 class CollSermoEdit(BasicDetails):
     """a """
 
@@ -5755,16 +5792,104 @@ class CollSermoEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:",      'value': instance.name, 'field_key': 'name'}
+             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
              ]
           # Return the context we have made
           return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # Also make sure that the correct type (=prefix) gets established
+            form.instance.type = self.prefix
+        return True, ""
 
 
 class CollSermoDetails(CollSermoEdit):
     rtype = "html"
 
+# Gold
+class CollGoldEdit(BasicDetails):
+    """a """
 
+    model = Collection
+    mForm = CollectionForm
+    prefix = "gold"
+    basic_name_prefix = "coll"
+    rtype = "json"
+    title = "Gold collection"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
+
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             ]
+          # Return the context we have made
+          return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # Also make sure that the correct type (=prefix) gets established
+            form.instance.type = self.prefix
+        return True, ""
+
+
+class CollGoldDetails(CollGoldEdit):
+    rtype = "html"
+
+# Super
+class CollSuperEdit(BasicDetails):
+    """a """
+
+    model = Collection
+    mForm = CollectionForm
+    prefix = "super"
+    basic_name_prefix = "coll"
+    rtype = "json"
+    title = "Super collection"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
+
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             ]
+          # Return the context we have made
+          return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # Also make sure that the correct type (=prefix) gets established
+            form.instance.type = self.prefix
+        return True, ""
+
+
+class CollSuperDetails(CollSuperEdit):
+    rtype = "html"
+
+# Collection
 class CollectionListView(BasicListView):
     """Search and list collections"""
 
@@ -5774,18 +5899,37 @@ class CollectionListView(BasicListView):
     paginate_by = 20
     bUseFilter = True
     basic_name_prefix = "coll"
+    plural_name = ""
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str'},
-                   {'name': 'Sermon', 'order': '', 'type': 'str'}]
+    order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}
+                   #{'name': 'Sermon', 'order': '', 'type': 'str', 'main': True }
+                   ]
     filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' }]}
+            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+            {'filter': 'coltype', 'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' }]}
         ]
+
+    def initializations(self):
+        if self.prefix == "sermo":
+            self.plural_name = "Sermon collections"
+            self.sg_name = "Sermon"
+        elif self.prefix == "manu":
+            self.plural_name = "Manuscript Collections"
+            self.sg_name = "Manuscript"
+        elif self.prefix == "gold":
+            self.plural_name = "Gold sermons Collections"
+            self.sg_name = "Sermon gold"
+        elif self.prefix == "super":
+            self.plural_name = "Super sermons gold Collections"
+            self.sg_name = "Super sermon gold"        
+        return None
 
     def adapt_search(self, fields):
         # Check if the collist is identified
@@ -5795,8 +5939,36 @@ class CollectionListView(BasicListView):
             # Get to the profile of this user
             qs = Profile.objects.filter(user=user)
             fields['ownlist'] = qs
+
+            # Also make sure that we add the collection type, which is specified in "prefix"
+            fields['type'] = self.prefix
         return fields
-    
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.freqsermo()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<a href='{}?sermo-keyword={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+           # number = instance.freqgold()
+           # if number > 0:
+           #     url = reverse('search_gold')
+#                html.append("<a href='{}?gold-keyword={}'>".format(url, instance.name))
+ #               html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+  #          number = instance.freqmanu()
+   #         if number > 0:
+    #            url = reverse('search_gold')
+     #           html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+      #          html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        return sBack, sTitle
+
 
 class CollectionEdit(PassimDetails):
     """The details of one collection"""
@@ -5933,13 +6105,13 @@ class SermonColset(BasicPart):
     def before_save(self, prefix, request, instance = None, form = None):
         has_changed = False
         if prefix == "scol":
-            # Get the chosen keyword
+            # Get the chosen collection
             obj = form.cleaned_data['collection']
             if obj == None:
-                # Get the value entered for the keyword
+                # Get the value entered for the collection
                 col = form['name'].data
-                # Check if this is an existing Keyword
-                obj = Collection.objects.filter(name__iexact=col).first()
+                # Check if this is an existing collection
+                obj = Collection.objects.filter(name__iexact=col).first() # gaat dit goed
                 # Now set the instance value correctly
                 instance.collection = obj
                 has_changed = True
@@ -7052,6 +7224,7 @@ class SermonGoldEdit(PassimDetails):
     template_post = 'seeker/sermongold_edit.html'
     prefix = "gold"
     title = "SermonGold" 
+    basic_name = "gold"
     afternewurl = ""
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,

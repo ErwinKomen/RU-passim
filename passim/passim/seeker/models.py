@@ -3751,6 +3751,26 @@ class Collection(models.Model):
     def get_readonly_display(self):
         response = "yes" if self.readonly else "no"
         return response
+        
+    def freqsermo(self):
+        """Frequency in manifestation sermons"""
+        freq = self.collections_sermon.all().count()
+        return freq
+        
+    def freqmanu(self):
+        """Frequency in Manuscripts"""
+        freq = self.collections_manuscript.all().count()
+        return freq
+        
+    def freqgold(self):
+        """Frequency of Gold sermons"""
+        freq = self.collections_gold.all().count()
+        return freq
+        
+    def freqsuper(self):
+        """Frequency in Manuscripts"""
+        freq = self.collections_super.all().count()
+        return freq
 
 
 class SermonDescr(models.Model):
