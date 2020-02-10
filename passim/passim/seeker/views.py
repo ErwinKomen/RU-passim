@@ -70,6 +70,10 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT
 
+# ======= from RU-Basic ========================
+from passim.basic.views import BasicList, BasicDetails
+
+
 # Some constants that can be used
 paginateSize = 20
 paginateSelect = 15
@@ -4372,8 +4376,8 @@ class PassimDetails(DetailView):
         return frm
     
 
-class BasicDetails(PassimDetails):
-    is_basic = True
+#class BasicDetails(PassimDetails):
+#    is_basic = True
 
 
 class BasicListView(ListView):
@@ -5061,7 +5065,7 @@ class LocationRelset(BasicPart):
         return has_changed
 
 
-class OriginListView(BasicListView):
+class OriginListView(BasicList):
     """Listview of origins"""
 
     model = Origin
@@ -5416,7 +5420,7 @@ class SermonDetails(PassimDetails):
         return context
 
 
-class SermonListView(BasicListView):
+class SermonListView(BasicList):
     """Search and list manuscripts"""
     
     model = SermonDescr
@@ -5604,7 +5608,7 @@ class KeywordDetails(KeywordEdit):
     rtype = "html"
     
 
-class KeywordListView(BasicListView):
+class KeywordListView(BasicList):
     """Search and list keywords"""
 
     model = Keyword
@@ -5700,7 +5704,7 @@ class ProjectDetails(ProjectEdit):
         return True, "" 
 
 
-class ProjectListView(BasicListView):
+class ProjectListView(BasicList):
     """Search and list projects"""
 
     model = Project
@@ -5893,7 +5897,7 @@ class CollSuperDetails(CollSuperEdit):
     rtype = "html"
 
 # Collection
-class CollectionListView(BasicListView):
+class CollectionListView(BasicList):
     """Search and list collections"""
 
     model = Collection
@@ -6453,7 +6457,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
             return False
 
 
-class ManuscriptListView(BasicListView):
+class ManuscriptListView(BasicList):
     """Search and list manuscripts"""
     
     model = Manuscript
@@ -6775,13 +6779,15 @@ class ManuscriptKwset(BasicPart):
         return has_changed
 
 
-class SermonGoldListView(BasicListView):
+class SermonGoldListView(BasicList):
     """Search and list manuscripts"""
     
     model = SermonGold
     listform = SermonGoldForm
     prefix = "gold"
     basic_name = "gold"
+    plural_name = "Gold sermons"
+    sg_name = "Gold sermon"
     # template_name = 'seeker/sermongold.html'
     has_select2 = True
     paginate_by = 20
@@ -7553,7 +7559,7 @@ class EqualGoldDetails(EqualGoldEdit):
         return True, ""
 
 
-class EqualGoldListView(BasicListView):
+class EqualGoldListView(BasicList):
     """List super sermon gold instances"""
 
     model = EqualGold
@@ -7681,7 +7687,7 @@ class AuthorDetails(AuthorEdit):
         return context
 
 
-class AuthorListView(BasicListView):
+class AuthorListView(BasicList):
     """Search and list authors"""
 
     model = Author
@@ -8236,7 +8242,7 @@ class ReportDownload(BasicPart):
         return sData
 
 
-class SourceListView(BasicListView):
+class SourceListView(BasicList):
     """Listview of sources"""
 
     model = SourceInfo
