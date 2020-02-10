@@ -4376,6 +4376,7 @@ class PassimDetails(DetailView):
         return frm
     
 
+# NOTE: this has now been surpassed by the 'basic' app with basic.BasicDetails
 #class BasicDetails(PassimDetails):
 #    is_basic = True
 
