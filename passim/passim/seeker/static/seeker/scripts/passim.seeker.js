@@ -37,6 +37,7 @@ var ru = (function ($, ru) {
           { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "skw_formset", "prefix": "skw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },

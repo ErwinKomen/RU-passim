@@ -7525,11 +7525,34 @@ class EqualGoldEdit(BasicDetails):
     rtype = "json"
     mainitems = []
     
-    ScolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
+    EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
                                        fk_name="super", extra=0)
     
-    formset_objects = [{'formsetClass': ScolFormSet, 'prefix': 'scol', 'readonly': False, 'noinit': True, 'linkfield': 'super'}]
+    formset_objects = [{'formsetClass': EqgcolFormSet, 'prefix': 'eqgcol', 'readonly': False, 'noinit': True, 'linkfield': 'super'}]
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
+            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'title': 'This is the automatically assigned sermon number for this particular author' },
+            {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
+            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'plain', 'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide'},
+            {'type': 'plain', 'label': "Collections:",   'value': instance.collections.all().order_by('name'), 
+                'multiple': True, 'field_list': 'collist', 'qlist': 'ssg-collist', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
+            ]
+        # Notes:
+        # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
 
     def process_formset(self, prefix, request, formset):
         errors = []
@@ -7540,7 +7563,7 @@ class EqualGoldEdit(BasicDetails):
                 cleaned = form.cleaned_data
                 # Action depends on prefix
                 
-                if prefix == "scol":
+                if prefix == "eqgcol":
                     # Keyword processing
                     if 'newcol' in cleaned and cleaned['newcol'] != "":
                         newcol = cleaned['newcol']
@@ -7558,21 +7581,20 @@ class EqualGoldEdit(BasicDetails):
                 bResult = False
         return None
 
-    def add_to_context(self, context, instance):
-        """Add to the existing context"""
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionSuper, instance, "super", collist, "collection")
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
-            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'title': 'This is the automatically assigned sermon number for this particular author' },
-            {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
-            {'type': 'plain', 'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide'},
-            {'type': 'plain', 'label': "Collections:",   'value': instance.get_moved_code, 'empty': 'hide'}
-            ]
-        # Return the context we have made
-        return context
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
 
 
 class EqualGoldDetails(EqualGoldEdit):

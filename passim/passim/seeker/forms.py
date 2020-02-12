@@ -770,7 +770,7 @@ class SuperSermonGoldForm(forms.ModelForm):
         # Some fields are not required
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['collist'].queryset = Collection.objects.filter(type='gold').order_by('name')
+        self.fields['collist'].queryset = Collection.objects.filter(type='super').order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
