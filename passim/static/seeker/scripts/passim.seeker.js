@@ -4,6 +4,14 @@
 var jQuery = django.jQuery;
 var $ = jQuery;
 
+String.prototype.format = function () {
+  var formatted = this;
+  for (var arg in arguments) {
+    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+  }
+  return formatted;
+};
+
 var ru = (function ($, ru) {
   "use strict";
 
@@ -20,19 +28,28 @@ var ru = (function ($, ru) {
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.litref_template }
+          },
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "skw_formset", "prefix": "skw", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mcol_formset", "prefix": "mcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
@@ -72,10 +89,11 @@ var ru = (function ($, ru) {
           oBound['y'] += document.documentElement.scrollTop || document.body.scrollTop;
           return oBound;
         } catch (ex) {
-          private_methods.showError("fitFeatureBox", ex);
+          private_methods.errMsg("fitFeatureBox", ex);
           return oBound;
         }
       },
+
       /**
        * methodNotVisibleFromOutside - example of a private method
        * @returns {String}
@@ -104,7 +122,7 @@ var ru = (function ($, ru) {
           // Failure
           return false;
         } catch (ex) {
-          private_methods.showError("is_in_list", ex);
+          private_methods.errMsg("is_in_list", ex);
           return false;
         }
       },
@@ -129,7 +147,7 @@ var ru = (function ($, ru) {
           // Failure
           return "";
         } catch (ex) {
-          private_methods.showError("get_list_value", ex);
+          private_methods.errMsg("get_list_value", ex);
           return "";
         }
       },
@@ -156,7 +174,7 @@ var ru = (function ($, ru) {
           // Failure
           return false;
         } catch (ex) {
-          private_methods.showError("set_list_value", ex);
+          private_methods.errMsg("set_list_value", ex);
           return false;
         }
       },
@@ -245,8 +263,733 @@ var ru = (function ($, ru) {
 
           return lData.join("\n");
         } catch (ex) {
-          private_methods.showError("prepend_styles", ex);
+          private_methods.errMsg("prepend_styles", ex);
           return "";
+        }
+      },
+
+      /**
+       * sermon_treetotable
+       *    Convert the <div> oriented tree structure in [elRoot] into a list
+       *      of appropriate <tr> items under <elTable>
+       * 
+       * @param {el}  elRoot
+       * @param {el}  elTable
+       * @param {el}  selectedid (optional)
+       * @returns {bool}
+       */
+      sermon_treetotable: function (elRoot, elTable, selectedid) {
+        var elTbody = null,
+            elSel = null,
+            elAnc = null,
+            sermonid = "",
+            rows = [];
+
+        try {
+          // Get a list of the <div> elements
+          rows = private_methods.sermon_treelist(elRoot, selectedid);
+
+          // Replace the rows that are there now with the new ones
+          $(elTable).html("");
+          $(elTable).html(rows.join("\n"));
+
+          // Possibly find the <div.tree> that is selected
+          if (selectedid !== undefined && selectedid !== "") {
+            elSel = $(elRoot).find("div.tree[sermonid={0}]".format(selectedid));
+            // From here find the ancestor
+            elAnc = $(elSel).parentsUntil("#sermon_tree");
+            // Now find all the <div.tree> that are my descendants
+            $(elAnc).find("div.tree").each(function (idx, el) {
+              // Get this one's sermonid
+              sermonid = $(el).attr("sermonid");
+              // Make sure the corresponding row is visible
+              $(elTable).find("tr[sermonid={0}]".format(sermonid)).first().removeClass("hidden");
+            });
+          }
+
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_treetotable", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_treelist
+       *    Convert the <div> oriented tree structure in [elDiv] into a list
+       *      of appropriate <tr> items under <elTable>
+       * 
+       * @param {el}  elDiv
+       * @param {el}  selectedid (optional)
+       * @returns {list}
+       */
+      sermon_treelist: function (elDiv, selectedid) {
+        var elTbody = null,
+            elTd = null,
+            elSermon = null,
+            elParent = null,
+            sermons = [],
+            sermonid = "",
+            targeturl = "",
+            hidden = "",
+            selected = "",
+            nodeid = -1,
+            childof = -1,
+            maxdepth = -1,
+            hasChildren = false,
+            colspan = 0,
+            td = "",
+            tr = "",
+            lTr = [],
+            level = -1,
+            idx = -1,
+            lBack = [];
+
+        try {
+          // Get all the sermons
+          sermons = $(elDiv).find("div.tree");
+
+          // Find the maximum depth
+          for (idx = 0; idx < sermons.length; idx++) {
+            elSermon = sermons[idx];
+            level = parseInt($(elSermon).attr("level"), 10);
+            if (level > maxdepth) { maxdepth = level;}
+          }
+
+          // Start creating the head
+          lBack.push("<thead><tr><th colspan='{0}'>Details of this manuscript's {1} items</th><th>id</th></tr></thead>".format(maxdepth+1, sermons.length));
+          lBack.push("<tbody>");
+
+          // Walk all the sermons
+          for (idx = 0; idx < sermons.length; idx++) {
+            elSermon = sermons[idx];
+            // The nodeid starts at 2, because '1' is reserved for the root element as parent
+            nodeid = idx + 2;
+            $(elSermon).attr("nodeid", nodeid);
+            // Get the parent
+            elParent = $(elSermon).parent(".tree");
+            if (elParent === null || elParent.length === 0) {
+              childof = "1";
+            } else {
+              childof = $(elParent).attr("nodeid");
+            }
+
+            // Get the parameters from the current sermon
+            sermonid = $(elSermon).attr("sermonid");
+            level = parseInt($(elSermon).attr("level"), 10);
+            elTd = $(elSermon).find("span.td").first();
+            td = $(elTd).html();
+            targeturl = $(elTd).attr("targeturl");
+            hidden = (level === 1) ? "" : " hidden";
+            hasChildren = ($(elSermon).children("div.tree").length > 0);
+            selected = "";
+            if (selectedid !== undefined && selectedid !== "" && sermonid === selectedid) {
+              selected = " selected";
+            }
+
+            // Create the <tr> myself
+            lTr = [];
+            lTr.push("<tr class='form-row{0}{1}' nodeid='{2}' childof='{3}' sermonid='{4}'>".format(hidden, selected, nodeid, childof, sermonid));
+
+            if (hasChildren) {
+              if (level > 1) {
+                // Indicate level depth
+                lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level-1, (level-1) * 20));
+              }
+              // This starts a new level
+              lTr.push("  <td class='arg-plus' style='min-width: 20px;' onclick='crpstudio.htable.plus_click(this, \"func-inline\");'>+</td>");
+            } else {
+              // Indicate level depth
+              lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level, level * 20));
+            }
+
+            // The actual content
+            colspan = maxdepth - level + 1;
+            // if (hasChildren) { colspan += 1;}
+            lTr.push("  <td id='sermon-number-{0}' colspan='{1}' class='clickable' style='width: 100%;' targeturl='{2}' number='{0}'>".format(idx + 1, colspan, targeturl));
+            lTr.push("     <span class='arg-nodeid'>{0}</span>".format(idx + 1));
+            lTr.push(td);
+            lTr.push("  </td>");
+
+            // The ID of the sermon: this is used for selecting and de-selecting a row
+            lTr.push("  <td class='tdnowrap clickable selectable' title='Select or de-select this row'");
+            lTr.push("      onclick='ru.passim.seeker.form_row_select(this);'>{0}</td>".format(sermonid));
+
+            // Finish the <tr>
+            lTr.push("</tr>");
+            tr = lTr.join("\n");
+
+            // Add to the list
+            lBack.push(tr);
+          }
+
+          lBack.push("</tbody>");
+
+          return lBack;
+        } catch (ex) {
+          private_methods.errMsg("sermon_treelist", ex);
+          return [];
+        }
+      },
+
+
+      /**
+       * sermon_tree
+       *    Convert [elTable] into a correct TREE structure
+       * 
+       * @param {el}     elTable
+       * @param {parent} the [nodeid] of the parent - if defined
+       * @returns {object}
+       */
+      sermon_tree: function (elTable, row) {
+        var oTree = {},
+            previous = null,
+            parent = null,
+            children = [],
+            select = [],
+            rowidx = -1,
+            nodeid = "",
+            sermonid = "",
+            search = "";
+
+        try {
+          // What is the node we have?
+          if (row === undefined) {
+            // We need to get the first node in the table
+            select = $(elTable).find("tr.form-row");
+            if (select.length > 0) {
+              row = select.first();
+              nodeid = $(row).attr("childof");
+              sermonid = "";
+              row = null;
+            }
+          } else {
+            // Get details 
+            sermonid = $(row).attr("sermonid");
+            nodeid = $(row).attr("nodeid");
+            rowidx = $(elTable).find("tr").index(row);
+          }
+
+          // Can we continue?
+          if (nodeid !== "") {
+
+            // Fill in the details of this node
+            oTree['sermonid'] = sermonid;
+            oTree['rowidx'] = rowidx;
+            oTree['row'] = row;
+            oTree['parent'] = null;
+            oTree['next'] = null;
+            oTree['prev'] = null;
+            oTree['firstchild'] = null;
+
+            // Look for children
+            children = $(elTable).find("tr.form-row[childof='" + nodeid + "']");
+
+            // Are there children?
+            if (children.length > 0) {
+              oTree['child'] = []
+              // Walk all the children of this parent
+              previous = null;
+              children.each(function (idx, el) {
+                var oChild;
+
+                // Fill in the details of this child
+                oChild = private_methods.sermon_tree(elTable, el);
+                if (oChild !== null) {
+                  // Is this the first child?
+                  if (idx === 0) { oTree['firstchild'] = oChild; }
+                  // Normal processing
+                  oChild['parent'] = oTree;
+                  oChild['prev'] = previous;
+                  // Add this child to my children
+                  oTree['child'].push(oChild);
+                  if (previous !== null) {
+                    previous['next'] = oChild;
+                  }
+                  // Keep track of the previous
+                  previous = oChild;
+                }
+              });
+            }
+          }
+
+
+          // Return the result
+          return oTree;
+        } catch (ex) {
+          private_methods.errMsg("sermon_tree", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_down
+       *    Move nodeid one place down
+       * 
+       * @param {obj} oTree
+       * @param {tr}  row
+       * @returns {list}
+       */
+      sermon_down: function (oTree, row) {
+        var sermonid = "",
+            i = 0,
+            child = [],
+            parent = null,
+            next = null,
+            prev = null,
+            node = null;
+
+        try {
+          // Get the sermonid in the row
+          sermonid = $(row).attr("sermonid");
+
+          // Find the sermon in the tree
+          node = private_methods.sermon_node(oTree, sermonid);
+          if (node !== null) {
+            // We found the node with this sermon
+            // Find the next sibling of this node
+            next = node['next'];
+            prev = node['prev'];
+            if (prev !== null) {
+              prev['next'] = next;
+            }
+            if (next !== null) {
+              // There is a 'next' sibling, so we can go past it
+              node['next'] = next['next'];
+              next['next'] = node;
+              next['prev'] = node['prev'];
+              node['prev'] = next;
+              // Keep track of firstchild
+              if (node['prev'] === null) {
+                node['parent']['firstchild'] = node;
+              } else if (next['prev'] === null) {
+                next['parent']['firstchild'] = next;
+              }
+            }
+            // Re-arrange the list of children in the parent
+            parent = node['parent'];
+            next = parent['firstchild'];
+            child = [];
+            while (next !== null) {
+              child.push(next);
+              next = next['next'];
+            }
+            parent['child'] = child;
+          }
+
+          // Return the result
+          return oTree;
+        } catch (ex) {
+          private_methods.errMsg("sermon_down", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_reorder
+       *    Order the surface form of the table in accordance with the tree
+       * 
+       * @param {obj} oTree
+       * @returns {bool}
+       */
+      sermon_reorder: function (elTable, oTree) {
+        var lst_this = [],
+            prevtr = null,
+            oNode = null,
+            row = null,
+            i = 0;
+
+        try {
+          // Get a list of nodes
+          private_methods.sermon_list(oTree, lst_this);
+
+          // Walk the list
+          for (i = 0; i < lst_this.length; i++) {
+            oNode = lst_this[i];
+            if (prevtr === null) {
+              // Is this a good one?
+              if (oNode['row'] !== null) {
+                // This must be the first visible child 
+                // See: https://stackoverflow.com/questions/2007357/how-to-set-dom-element-as-the-first-child
+                // if (elTable.firstChild !== )
+              }
+            }
+          }
+
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_reorder", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_list
+       *    Create a list of sub nodes
+       * 
+       * @param {obj}  oNode
+       * @parem {list} lst_this
+       * @returns {bool}
+       */
+      sermon_list: function (oNode, lst_this) {
+        var next = null,
+            i = 0,
+            child = [];
+
+        try {
+          // Add myself to the list
+          lst_this.push(oNode)
+          // Get my children
+          next = oNode['firstchild'];
+          while (next !== null) {
+            private_methods.sermon_list(next, lst_this);
+            //for (i = 0; i < child.length; i++) {
+            //  lst_this.push(child[i]);
+            //}
+            next = next['next'];
+          }
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_list", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_simple
+       *    Simple text representation of this node
+       * 
+       * @param {obj} oNode
+       * @parem {int} level
+       * @returns {text}
+       */
+      sermon_simple: function(oNode, level) {
+        var lHtml = [],
+            next = null,
+            spaces = "";
+
+        try {
+          if (level === undefined) { level = 0; }
+          // Print this node
+          spaces = Array( level * 2 +1).join(" ");
+          lHtml.push(spaces + oNode['sermonid'] + "\t"+ oNode['rowidx']);
+          // Treat children
+          next = oNode['firstchild'];
+          while (next !== null) {
+            lHtml.push(private_methods.sermon_simple(next, level + 1));
+            next = next['next'];
+          }
+          return lHtml.join("\n");
+        } catch (ex) {
+          private_methods.errMsg("sermon_simple", ex);
+        }
+      },
+
+      /**
+       * sermon_node
+       *    Find the node with the identified sermonid
+       * 
+       * @param {obj} node
+       * @param {id}  sermonid
+       * @returns {node}
+       */
+      sermon_node: function (node, sermonid) {
+        var child = null,
+            children = [],
+            i = 0,
+            response = null;
+
+        try {
+          // Validate
+          if (node === null) return null;
+
+          // Is this the one?
+          if (node['sermonid'] === sermonid) {
+            return node;
+          }
+
+          // Check the children
+          if ('child' in node) {
+            children = node['child'];
+            for (i = 0; i < children.length; i++) {
+              child = children[i];
+              response = private_methods.sermon_node(child, sermonid);
+              if (response !== null) {
+                return response;
+              }
+            }
+          }
+          // Getting here means no result
+          return null;
+        } catch (ex) {
+          private_methods.errMsg("sermon_node", ex);
+          return null;
+        }
+      },
+
+      /**
+       * sermon_sibling
+       *    Within [elTable] look for rows that are under [childof] and before [nodeid]
+       * 
+       * @param {el}  elTable
+       * @param {int} nodeid
+       * @param {int} childof
+       * @returns {list}
+       */
+      sermon_sibling: function (elTable, nodeid, childof, order) {
+        var sibling = [];
+
+        try {
+          $(elTable).find("tr.form-row[childof='" + childof + "']").each(function (idx, el) {
+            var thisid = $(el).attr("nodeid");
+
+            if (thisid !== undefined && thisid !== "") {
+              switch (order) {
+                case "preceding":
+                  if (parseInt(thisid, 10) < nodeid) { sibling.push(el); }
+                  break;
+                case 'following':
+                  if (parseInt(thisid, 10) > nodeid) { sibling.push(el); }
+                  break;
+              }
+            }
+          });
+          return sibling;
+        } catch (ex) {
+          private_methods.errMsg("sermon_sibling", ex);
+          return [];
+        }
+      },
+
+      /**
+       * sermon_exchange
+       *    Make two sermons exchange place (siblings)
+       * 
+       * @param {el} elSrc
+       * @param {el} elDst
+       * @returns {bool}
+       */
+      sermon_exchange: function (elSrc, elDst) {
+        var nodesrcid = -1,
+            nodedstid = -1,
+            highid = -1,
+            lowid = -1,
+            children = [],
+            counter = 1,
+            mapping = {},
+            oTree = {},
+            method = "new",
+            elTable = null;
+
+        try {
+          // Get the table
+          elTable = $(elSrc).closest("table");
+
+          // Get the current values
+          nodesrcid = parseInt($(elSrc).attr("nodeid"), 10);
+          nodedstid = parseInt($(elDst).attr("nodeid"), 10);
+
+          switch (method) {
+            case "old":
+              // Exchange source and destination 
+              $(elSrc).attr("nodeid", nodedstid);
+              $(elDst).attr("nodeid", nodesrcid);
+
+              // Change all the children of the original source
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var sNodeSrc = nodesrcid.toString(),
+                    sNodeDst = nodedstid.toString();
+
+                // Is this row a child of source?
+                if ($(el).attr("childof") === sNodeSrc) {
+                  $(el).attr("childof", sNodeDst);
+                  children.push(el);
+                } else if ($(el).attr("childof") === sNodeDst) {
+                  $(el).attr("childof", sNodeSrc);
+                  children.push(el);
+                }
+              });
+
+              // Determine where to move
+              if (nodesrcid < nodedstid) {
+                // We are moving a node 'down'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertAfter(elDst);
+                } else {
+                  // Move after the last child
+                  elSrc.insertAfter(children[children.length - 1]);
+                }
+              } else {
+                // We are moving a node 'up'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertBefore(elDst);
+                } else {
+                  // Move before the first
+                  elSrc.insertBefore(elDst);
+                  // elSrc.insertBefore(children[0]);
+                }
+              }
+
+              break;
+            case "attempt":
+              // Determine the correct interval
+              if (nodesrcid < nodedstid) {
+                highid = nodesrcid; lowid = nodedstid;
+              } else {
+                highid = nodedstid; lowid = nodesrcid;
+              }
+
+              // Determine where to move
+              if (nodesrcid < nodedstid) {
+                // We are moving a node 'down'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertAfter(elDst);
+                } else {
+                  // Move after the last child
+                  elSrc.insertAfter(children[children.length - 1]);
+                }
+              } else {
+                // We are moving a node 'up'
+                if (children.length === 0) {
+                  // No children: simple moving
+                  elSrc.insertBefore(elDst);
+                } else {
+                  // Move before the first
+                  elSrc.insertBefore(elDst);
+                  // elSrc.insertBefore(children[0]);
+                }
+              }
+
+              // Treat all the rows that need it
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var nodeid = parseInt($(el).attr("nodeid"), 10);
+
+                // Find out where we should be
+                counter += 1;
+                // Make a mapping if needed
+                if (nodeid !== counter) {
+                  mapping[nodeid.toString()] = counter;
+                }
+              });
+
+              // Now apply the mapping
+              $(elTable).find("tr.form-row").each(function (idx, el) {
+                var nodeid = $(el).attr("nodeid"),
+                    childof = $(el).attr("childof");
+
+                // Check if a mapping is needed
+                if (nodeid in mapping) {
+                  $(el).attr("nodeid", mapping[nodeid]);
+                }
+                if (childof in mapping) {
+                  $(el).attr("childof", mapping[childof])
+                }
+                
+              });
+
+              break;
+            case "new":
+              // ================ TESTING ==================
+
+              // Create a Tree from the sermons
+              oTree = private_methods.sermon_tree(elTable);
+              // move 
+              break;
+          }
+          
+          // Re-number the sermon list
+          private_methods.sermon_renumber(elTable);
+
+          // Return positively 
+          return true
+        } catch (ex) {
+          private_methods.errMsg("sermon_exchange", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_renumber
+       *    Re-number the sermons in the list of current table rows
+       * 
+       * @param {el} elTable
+       * @returns {bool}
+       */
+      sermon_renumber: function (elTable) {
+        var counter = 1;
+
+        try {
+          // Get list of current hierarchy
+          $(elTable).find("tr.form-row").each(function (idx, el) {
+            var argnode = null;
+
+            argnode = $(el).find(".arg-nodeid");
+            if (argnode.length > 0) {
+              argnode.first().text(counter++);
+            }
+          });
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_renumber", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_hlisttree
+       *    Make an object list of the current sermon hierarchy
+       * 
+       * @param {el} elRoot
+       * @returns {bool}
+       */
+      sermon_hlisttree: function (elRoot) {
+        var hList = [];
+
+        try {
+          $(elRoot).find("div.tree").each(function (idx, el) {
+            var sermonid = "",
+                nodeid = "",
+                childof = "",
+                oNew = {};
+
+            sermonid = $(el).attr("sermonid");
+          });
+
+          return hList;
+        } catch (ex) {
+          private_methods.errMsg("sermon_hlisttree", ex);
+          return [];
+        }
+      },
+
+      /**
+       * sermon_hlist
+       *    Make an object list of the current table rows contents
+       * 
+       * @param {el} elTable
+       * @returns {bool}
+       */
+      sermon_hlist: function (elTable) {
+        var hList = [];
+
+        try {
+          // Get list of current hierarchy
+          $(elTable).find("tr.form-row").each(function (idx, el) {
+            var sermonid, nodeid, childof, oNew = {};
+
+            sermonid = $(el).attr("sermonid");
+            nodeid = $(el).attr("nodeid");
+            childof = $(el).attr("childof");
+            oNew = { id: sermonid, nodeid: nodeid, childof: childof };
+            hList.push(oNew);
+          });
+          return hList;
+        } catch (ex) {
+          private_methods.errMsg("sermon_hlist", ex);
+          return [];
         }
       },
 
@@ -276,11 +1019,12 @@ var ru = (function ($, ru) {
           oBound['y'] += document.documentElement.scrollTop || document.body.scrollTop;
           return oBound;
         } catch (ex) {
-          private_methods.showError("screenCoordsForRect", ex);
+          private_methods.errMsg("screenCoordsForRect", ex);
           return oBound;
         }
 
       },
+
       /**
        *  var_move
        *      Move variable row one step down or up
@@ -437,6 +1181,8 @@ var ru = (function ($, ru) {
           $(".post-load").each(function (idx, value) {
             var targetid = $(this),
                 data = [],
+                lst_ta = [],
+                i = 0,
                 targeturl = $(targetid).attr("targeturl");
 
             // Only do this on the first one
@@ -456,6 +1202,11 @@ var ru = (function ($, ru) {
                       $(targetid).html(response['html']);
                       // Call initialisation again
                       ru.passim.seeker.init_events(sUrlShow);
+                      // Handle type aheads
+                      if ("typeaheads" in response) {
+                        // Perform typeahead for these ones
+                        ru.passim.init_event_listeners(response.typeaheads);
+                      }
                       break;
                     case "error":
                       // Show the error
@@ -497,14 +1248,18 @@ var ru = (function ($, ru) {
             // history.pushState(null, null, sUrlShow);
           }
 
+          // Set handling of unique-field
+          $("td.unique-field input").unbind("change").change(ru.passim.seeker.unique_change);
+
           // Make sure typeahead is re-established
+          ru.passim.init_event_listeners();
           ru.passim.init_typeahead();
 
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.passim.seeker.filter_click);
 
           // Make modal draggable
-          $(".modal-header").on("mousedown", function (mousedownEvt) {
+          $(".modal-header, modal-dragpoint").on("mousedown", function (mousedownEvt) {
             var $draggable = $(this),
                 x = mousedownEvt.pageX - $draggable.offset().left,
                 y = mousedownEvt.pageY - $draggable.offset().top;
@@ -523,12 +1278,34 @@ var ru = (function ($, ru) {
             });
           });
 
-/*          $(".modal-dialog").draggable({
-            "handle": ".modal-header"
-          })*/
+          /*          $(".modal-dialog").draggable({
+                      "handle": ".modal-header"
+                    })*/
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      unique_change: function () {
+        var el = $(this),
+            elTr = null;
+
+        try {
+          elTr = $(el).closest("tr");
+          $(elTr).find("td.unique-field").find("input").each(function (idx, elInput) {
+            if ($(el).attr("id") !== $(elInput).attr("id")) {
+              $(elInput).prop("disabled", true);
+            }
+          });
+  
+        } catch (ex) {
+          private_methods.errMsg("unique_change", ex);
         }
       },
 
@@ -594,6 +1371,218 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("filter_click", ex);
+        }
+      },
+
+      /**
+       * add_new_select2
+       *    Show [table_new] element
+       *
+       */
+      add_new_select2: function (el) {
+        var elTr = null,
+            elRow = null,
+            options = {},
+            elDiv = null;
+
+        try {
+          elTr = $(el).closest("tr");           // Nearest <tr>
+          elDiv = $(elTr).find(".new-mode");    // The div with new-mode in it
+          // Show it
+          $(elDiv).removeClass("hidden");
+          // Find the first row
+          elRow = $(elDiv).find("tbody tr").first();
+          options['select2'] = true;
+          ru.passim.seeker.tabular_addrow($(elRow), options);
+
+          // Add
+        } catch (ex) {
+          private_methods.errMsg("add_new_select2", ex);
+        }
+      },
+
+      /**
+       * form_row_select
+       *    By selecting this slement, the whole row gets into the 'selected' state
+       *
+       */
+      form_row_select: function (elStart) {
+        var elTable = null,
+          elRow = null, // The row
+          iSelCount = 0, // Number of selected rows
+          elHier = null,
+          bSelected = false;
+
+        try {
+          // Get to the row
+          elRow = $(elStart).closest("tr.form-row");
+          // Get current state
+          bSelected = $(elRow).hasClass("selected");
+          // FInd nearest table
+          elTable = $(elRow).closest("table");
+          // Check if anything other than me is selected
+          iSelCount = 1;
+          // Remove all selection
+          $(elTable).find(".form-row.selected").removeClass("selected");
+          elHier = $("#sermon_hierarchy");
+          // CHeck what we need to do
+          if (bSelected) {
+            // We are de-selecting: hide the 'Up' and 'Down' buttons if needed
+            // ru.cesar.seeker.show_up_down(this, false);
+            $(elHier).removeClass("in");
+            $(elHier).hide()
+          } else {
+            // Make a copy of the tree as it is
+            $("#sermon_tree_copy").html($("#sermon_tree").html());
+            // Select the new row
+            $(elRow).addClass("selected");
+            // SHow the 'Up' and 'Down' buttons if needed
+            // ru.cesar.seeker.show_up_down(this, true);
+            // document.getElementById('sermon_manipulate').submit();
+            $(elHier).addClass("in");
+            $(elHier).show();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("form_row_select", ex);
+        }
+      },
+
+      /**
+       *  sermon_move
+       *      Move the selected row
+       *
+       */
+      sermon_move: function (type) {
+        var elRoot = null,
+            elSrc = null,
+            elDst = null,
+            elStart = null,
+            elTable = null,
+            elRow = null,
+            elRowRef = null,
+            data = [],
+            sibling = [],
+            oTree = null,
+            targeturl = "",
+            sText = "",
+            method = "dom",   //
+            hList = [],       // List of current hierarchy
+            dst = -1,         // Target count
+            sermonid = "",    // The sermonid of the selected one
+            nodeid = -1,
+            nodedstid = -1,
+            level = -1,
+            childof = -1;
+
+        try {
+          // Make sure we know where the DOM is
+          elRoot = $("#sermon_tree");
+
+          // Determine which row is selected
+          elStart = $("#sermon_list").find("tr.selected > td.selectable").first();
+          elRow = $(elStart).parent();
+          elTable = $(elRow).closest("table");
+          sermonid = $(elRow).attr("sermonid");
+
+          // Action depends on the type
+          switch (type) {
+            case "close": // Close the modal
+              ru.passim.seeker.form_row_select(elStart);
+              // Return the stored copy
+              $("#sermon_tree").html($("#sermon_tree_copy").html());
+              // Make sure the tree is redrawn
+              ru.passim.seeker.sermon_drawtree();
+              break;
+            case "up":    // position me before my preceding sibling
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if we have a preceding sibling
+              elDst = $(elSrc).prev("div.tree");
+              if (elDst.length > 0) {
+                $(elSrc).insertBefore(elDst);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
+
+              break;
+            case "down":  // position me after my following sibling
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if we have a following sibling
+              elDst = $(elSrc).next("div.tree");
+              if (elDst.length > 0) {
+                $(elSrc).insertAfter(elDst);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
+
+              break;
+            case "left":  // let me become a child of my grandparent, positioned AFTER my parent
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if there is a parent after which I can be placed
+              elDst = $(elSrc).parent("div.tree");
+              if (elDst.length > 0) {
+                // There is a parent: put me after it
+                $(elSrc).insertAfter(elDst);
+                // Change the level
+                level = parseInt($(elSrc).attr("level"), 10);
+                $(elSrc).attr("level", level - 1);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
+              break;
+            case "right":  // let me become a child of my preceding SIBLING
+              // Get the <div> that should be moved
+              elSrc = $(elRoot).find("div.tree[sermonid={0}]".format(sermonid)).first();
+              // See if there is a preceding sibling
+              elDst = $(elSrc).prev("div.tree");
+              if (elDst.length > 0) {
+                // There is a preceding sibling: make me into its child
+                $(elDst).append(elSrc);
+                // Change the level
+                level = parseInt($(elSrc).attr("level"), 10);
+                $(elSrc).attr("level", level + 1);
+                // Make sure the tree is redrawn
+                ru.passim.seeker.sermon_drawtree(sermonid);
+              }
+              break;
+            case "save":  // Get an adapted list of the hierarchy, post to the server and receive response
+              // Get list of current hierarchy
+              //hList = private_methods.sermon_hlisttree(elRoot);
+              ///*
+              hList = private_methods.sermon_hlist(elTable);
+              // Set the <input> value to return the contents of [hList]
+              $("#id_manu-hlist").val(JSON.stringify(hList));
+              // Send it onwards
+              $("#save_new_hierarchy").submit();
+              // */
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_move", ex);
+        }
+      },
+
+      /**
+       *  sermon_drawtree
+       *      Copy the list of sermons to the div with id=sermon_tree
+       *
+       */
+      sermon_drawtree: function (sermonid) {
+        var elRoot = null,
+            elTable = null;
+
+        try {
+          elTable = $("#sermon_list");
+          elRoot = $("#sermon_tree");
+          // Create the tree from [elTable] to [elRoot]
+          private_methods.sermon_treetotable(elRoot, elTable, sermonid);
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_drawtree", ex);
         }
       },
 
@@ -791,7 +1780,7 @@ var ru = (function ($, ru) {
        *    Gather the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method, iPage) {
+      search_start: function (elStart, method, iPage, sOrder) {
         var frm = null,
             url = "",
             targetid = null,
@@ -823,6 +1812,12 @@ var ru = (function ($, ru) {
                   $(this).val(iPage);
                 });
               }
+              // If there is a sort order, we need to process it
+              if (sOrder !== undefined) {
+                $(elStart).find("input[name=o]").each(function (el) {
+                  $(this).val(sOrder);
+                });
+              }
               // Now submit the form
               frm.submit();
               break;
@@ -840,6 +1835,9 @@ var ru = (function ($, ru) {
               // Get the page we need to go to
               if (iPage === undefined) { iPage = 1; }
               data.push({ 'name': 'page', 'value': iPage });
+              if (sOrder !== undefined) {
+                data.push({ 'name': 'o', 'value': sOrder });
+              }
 
               // Issue a post
               $.post(targeturl, data, function (response) {
@@ -893,6 +1891,23 @@ var ru = (function ($, ru) {
           ru.passim.seeker.search_start(elStart, 'submit', iPage)
         } catch (ex) {
           private_methods.errMsg("search_paged_start", ex);
+        }
+      },
+
+      /**
+       * search_ordered_start
+       *    Perform a simple 'submit' call to search_start
+       *
+       */
+      search_ordered_start: function (order) {
+        var elStart = null;
+
+        try {
+          // And then go to the first element within the form that is of any use
+          elStart = $(".search_ordered_start").first();
+          ru.passim.seeker.search_start(elStart, 'submit', 1, order)
+        } catch (ex) {
+          private_methods.errMsg("search_ordered_start", ex);
         }
       },
 
@@ -1716,6 +2731,7 @@ var ru = (function ($, ru) {
               // Go to edit mode
               $(elTr).find(".view-mode").addClass("hidden");
               $(elTr).find(".edit-mode").removeClass("hidden");
+              $(elTr).find(".new-mode").removeClass("hidden");
               // Make sure typeahead works here
               ru.passim.init_typeahead();
               break;
@@ -2002,6 +3018,7 @@ var ru = (function ($, ru) {
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
+              $(elTr).find(".new-mode").addClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?
@@ -2220,17 +3237,23 @@ var ru = (function ($, ru) {
        *   Open the next <tr> to get delete confirmation (or not)
        *
        */
-      delete_confirm: function (el) {
+      delete_confirm: function (el, bNeedConfirm) {
         var elDiv = null;
 
         try {
-          // Find the [.delete-row] to be shown
-          elDiv = $(el).closest("tr").find(".delete-confirm").first();
-          if (elDiv.length === 0) {
-            // Try goint to the next <tr>
-            elDiv = $(el).closest("tr").next("tr.delete-confirm");
+          if (bNeedConfirm === undefined) { bNeedConfirm = true; }
+          // Action depends on the need for confirmation
+          if (bNeedConfirm) {
+            // Find the [.delete-row] to be shown
+            elDiv = $(el).closest("tr").find(".delete-confirm").first();
+            if (elDiv.length === 0) {
+              // Try goint to the next <tr>
+              elDiv = $(el).closest("tr").next("tr.delete-confirm");
+            }
+            $(elDiv).removeClass("hidden");
+          } else {
+
           }
-          $(elDiv).removeClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_confirm", ex);
         }
@@ -2394,8 +3417,10 @@ var ru = (function ($, ru) {
        */
       tabular_deleterow: function () {
         var sId = "",
+            elDiv = null,
             elRow = null,
             elPrev = null,
+            elDel = null,   // The delete inbox
             sPrefix = "",
             elForms = "",
             counter = $(this).attr("counter"),
@@ -2403,6 +3428,7 @@ var ru = (function ($, ru) {
             data = [],
             frm = null,
             bCounter = false,
+            bHideOnDelete = false,
             iForms = 0,
             prefix = "simplerel",
             use_prev_row = false,   // Delete the previous row instead of the current one
@@ -2414,7 +3440,8 @@ var ru = (function ($, ru) {
           bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
           elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
           // Find out just where we are
-          sId = $(this).closest("div[id]").attr("id");
+          elDiv = $(this).closest("div[id]")
+          sId = $(elDiv).attr("id");
           // Find out how many forms there are right now
           iForms = $(elForms).val();
           frm = $(this).closest("form");
@@ -2424,7 +3451,14 @@ var ru = (function ($, ru) {
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
-            case "mprov_formset": 
+            case "gkw_formset":
+            case "gcol_formset":
+            case "mcol_formset":
+            case "scol_formset":
+            case "sdcol_formset":
+            case "mprov_formset":
+            case "mdr_formset":
+            case "mkw_formset":
             case "manu_search":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
@@ -2449,44 +3483,60 @@ var ru = (function ($, ru) {
             } else {
               // Only delete the current row
               elRow = $(this).closest("tr");
-              $(elRow).remove();
+              // Do we need to hide or delete?
+              if ($(elRow).hasClass("hide-on-delete")) {
+                bHideOnDelete = true;
+                $(elRow).addClass("hidden");
+              } else {
+                $(elRow).remove();
+              }
             }
-            // Decrease the amount of forms
-            iForms -= 1;
-            $(elForms).val(iForms);
 
-            // Re-do the numbering of the forms that are shown
-            $(".form-row").not(".empty-form").each(function (idx, elThisRow) {
-              var iCounter = 0, sRowId = "", arRowId = [];
-
-              iCounter = idx + 1;
-              // Adapt the ID attribute -- if it EXISTS
-              sRowId = $(elThisRow).attr("id");
-              if (sRowId !== undefined) {
-                arRowId = sRowId.split("-");
-                arRowId[1] = idx;
-                sRowId = arRowId.join("-");
-                $(elThisRow).attr("id", sRowId);
+            // Further action depends on whether the row just needs to be hidden
+            if (bHideOnDelete) {
+              // Row has been hidden: now find and set the DELETE checkbox
+              elDel = $(elRow).find("input:checkbox[name$='DELETE']");
+              if (elDel !== null) {
+                $(elDel).prop("checked", true);
               }
+            } else {
+              // Decrease the amount of forms
+              iForms -= 1;
+              $(elForms).val(iForms);
 
-              if (bCounter) {
-                // Adjust the number in the FIRST <td>
-                $(elThisRow).find("td").first().html(iCounter.toString());
-              }
+              // Re-do the numbering of the forms that are shown
+              $(elDiv).find(".form-row").not(".empty-form").each(function (idx, elThisRow) {
+                var iCounter = 0, sRowId = "", arRowId = [];
 
-              // Adjust the numbering of the INPUT and SELECT in this row
-              $(elThisRow).find("input, select").each(function (j, elInput) {
-                // Adapt the name of this input
-                var sName = $(elInput).attr("name");
-                if (sName !== undefined) {
-                  var arName = sName.split("-");
-                  arName[1] = idx;
-                  sName = arName.join("-");
-                  $(elInput).attr("name", sName);
-                  $(elInput).attr("id", "id_" + sName);
+                iCounter = idx + 1;
+                // Adapt the ID attribute -- if it EXISTS
+                sRowId = $(elThisRow).attr("id");
+                if (sRowId !== undefined) {
+                  arRowId = sRowId.split("-");
+                  arRowId[1] = idx;
+                  sRowId = arRowId.join("-");
+                  $(elThisRow).attr("id", sRowId);
                 }
+
+                if (bCounter) {
+                  // Adjust the number in the FIRST <td>
+                  $(elThisRow).find("td").first().html(iCounter.toString());
+                }
+
+                // Adjust the numbering of the INPUT and SELECT in this row
+                $(elThisRow).find("input, select").each(function (j, elInput) {
+                  // Adapt the name of this input
+                  var sName = $(elInput).attr("name");
+                  if (sName !== undefined) {
+                    var arName = sName.split("-");
+                    arName[1] = idx;
+                    sName = arName.join("-");
+                    $(elInput).attr("name", sName);
+                    $(elInput).attr("id", "id_" + sName);
+                  }
+                });
               });
-            });
+            }
 
             // The validation action depends on this id (or on the prefix)
             switch (sId) {
@@ -2536,32 +3586,55 @@ var ru = (function ($, ru) {
        *   Add one row into a tabular inline
        *
        */
-      tabular_addrow: function () {
+      tabular_addrow: function (elStart, options) {
         // NOTE: see the definition of lAddTableRow above
         var arTdef = lAddTableRow,
             oTdef = {},
             rowNew = null,
             elTable = null,
+            select2_options = {},
             iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
             sId = "",
+            bSelect2 = false,
             i;
 
         try {
           // Find out just where we are
-          sId = $(this).closest("div[id]").attr("id");
+          if (elStart === undefined || elStart === null || $(elStart).closest("div").length === 0)
+            elStart = $(this);
+          sId = $(elStart).closest("div[id]").attr("id");
+          // Process options
+          if (options !== undefined) {
+            for (var prop in options) {
+              switch (prop) {
+                case "select2": bSelect2 = options[prop]; break;
+              }
+            }
+          }
           // Walk all tables
           for (i = 0; i < arTdef.length; i++) {
             // Get the definition
             oTdef = arTdef[i];
             if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
               // Go to the <tbody> and find the last form-row
-              elTable = $(this).closest("tbody").children("tr.form-row.empty-form")
+              elTable = $(elStart).closest("tbody").children("tr.form-row.empty-form")
+
+              if ("select2_options" in oTdef) {
+                select2_options = oTdef.select2_options;
+              }
 
               // Perform the cloneMore function to this <tr>
               rowNew = ru.passim.seeker.cloneMore(elTable, oTdef.prefix, oTdef.counter);
               // Call the event initialisation again
               if (oTdef.events !== null) {
                 oTdef.events();
+              }
+              // Possible Select2 follow-up
+              if (bSelect2) {
+                // Remove previous .select2
+                $(rowNew).find(".select2").remove();
+                // Execute djangoSelect2()
+                $(rowNew).find(".django-select2").djangoSelect2(select2_options);
               }
               // Any follow-up activity
               if ('follow' in oTdef && oTdef['follow'] !== null) {
