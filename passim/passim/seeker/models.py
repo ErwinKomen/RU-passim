@@ -3801,6 +3801,11 @@ class Collection(models.Model):
         freq = self.collections_super.all().count()
         return freq
 
+    def get_label(self):
+        """Return an appropriate name or label"""
+
+        return self.name
+
 
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""

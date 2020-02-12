@@ -73,23 +73,42 @@
         <!-- Check if this may be shown or not -->
         {% if mainitem.empty != "hide" or mainitem.value != "" %}
           <tr class="view-row">
-
-            {% if mainitem.multiple %}
-              <!-- Multiple value field, i.e. select2 -->
-              <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
-                <span>{{mainitem.label}}</span>
+            <!-- Cell with the name of the field-->
+            <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
+              <span>{{mainitem.label}}</span>
+              {% if mainitem.multiple %}
+                <!-- Multiple value field, i.e. select2 -->
                 <span>
                   <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
                     <span class="glyphicon glyphicon-plus"></span>
                   </a>
                 </span>
-              </td>
+              {% endif %}
+            </td>
 
-            {% else %}
-              <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>{{mainitem.label}}</td>
-              <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} 
-                  {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
+            <!-- Cell with the value of the field (or editing) -->
+            <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} 
+                {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
 
+              {% if mainitem.multiple %}
+                <!-- Multiple instances choosing using Select2 -->
+                <div class="{% if 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
+                  {% if mainitem.value|length > 0 %}
+                    {% for subitem in mainitem.value %}
+                      <span class="keyword"><a href="{{mainitem.link}}?{{mainitem.qlist}}={{subitem.id}}">{{subitem.get_label}}</a></span>
+                    {% endfor %}
+                  {% else %}-{% endif %}
+                </div>
+                {% if 'field_list' in mainitem %}
+                  <div class="edit-mode hidden">{{mainitem.field_list}}</div>
+                  {% if is_passim_editor %}
+                    <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
+                      {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                    </div>
+                  {% endif %}
+                {% endif %}
+
+              {% else %}
                 <!-- Basic view mode -->
                 <div class="{% if 'field_key' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
                   {% spaceless %}
@@ -109,8 +128,8 @@
                 {% elif 'field_key' in mainitem %}
                   <div class="edit-mode hidden">{{mainitem.field_key}}</div>
                 {% endif %}
-              </td>
-            {% endif %}
+              {% endif %}
+            </td>
           </tr>
         {% endif %}
       {% endfor %}

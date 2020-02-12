@@ -1151,7 +1151,7 @@ class BasicDetails(DetailView):
                     # Make sure the form is actually saved completely
                     frm.save()
                     instance = obj
-
+                    
                     # Any action(s) after saving
                     bResult, msg = self.after_save(frm, obj)
                 else:

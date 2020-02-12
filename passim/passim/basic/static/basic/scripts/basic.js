@@ -408,6 +408,12 @@ var ru = (function ($, ru) {
               $(".edit-new").removeClass("hidden");
             }
           }
+
+          // Make sure select2 is initialized correctly
+          // NOTE: what about select2_options?
+          //    $(".django-select2").djangoSelect2(select2_options);
+          $(".django-select2").djangoSelect2();
+
         } catch (ex) {
           private_methods.errMsg("init_event_listeners", ex);
         }
