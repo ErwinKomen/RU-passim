@@ -302,3 +302,4 @@ ModelManifest.xml
 /passim/doc/make.bat
 /passim/doc/Makefile
 /passim/doc/source/conf.py
+/passim/passim/basic/migrations
