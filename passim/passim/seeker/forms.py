@@ -130,14 +130,18 @@ class CollectionWidget(ModelSelect2MultipleWidget):
         else:
             return Collection.objects.filter().order_by('name').distinct()
 
+
 class CollectionSermoWidget(CollectionWidget):
     type = "sermo"
+
 
 class CollectionManuWidget(CollectionWidget):
     type = "manu"
 
+
 class CollectionGoldWidget(CollectionWidget):
     type = "gold"
+
 
 class CollectionSuperWidget(CollectionWidget):
     type = "super"
@@ -155,7 +159,6 @@ class ProjectOneWidget(ModelSelect2Widget):
 
 
 #class ManuIdnoWidget(HeavySelect2Widget):
-
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
@@ -469,6 +472,7 @@ class SermonForm(forms.ModelForm):
             self.fields['authorname'].required = False
             self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
+
 class KeywordForm(forms.ModelForm):
     """Keyword list"""
 
@@ -633,10 +637,7 @@ class SermonDescrKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
-
-
-
-
+                
 class SermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
@@ -1069,6 +1070,7 @@ class ManuscriptCollectionForm(forms.ModelForm):
                 col = instance.collection.name
                 self.fields['name'].initial = col
 
+
 class SermonDescrCollectionForm(forms.ModelForm):
     name = forms.CharField(label=_("Collection"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
@@ -1097,11 +1099,7 @@ class SermonDescrCollectionForm(forms.ModelForm):
                 # self.fields['collection'].initial = col
                 self.fields['name'].initial = col
 
-
-
-
-
-
+                
 class SermonGoldLitrefForm(forms.ModelForm):
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
@@ -1418,8 +1416,7 @@ class ManuscriptForm(forms.ModelForm):
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
             self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
-
-
+            
 
 class LocationForm(forms.ModelForm):
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,

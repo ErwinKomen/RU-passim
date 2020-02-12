@@ -948,7 +948,7 @@ class BasicDetails(DetailView):
                         formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
                         # Process this formset
                         self.process_formset(prefix, self.request, formset)
-
+                        
                         # Process all the correct forms in the formset
                         for subform in formset:
                             if subform.is_valid():

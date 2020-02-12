@@ -7639,9 +7639,13 @@ class EqualGoldEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Author:",      'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
-            {'type': 'plain', 'label': "Number:",      'value': instance.number},
-            {'type': 'plain', 'label': "Passim Code:", 'value': instance.code}
+            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
+            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'title': 'This is the automatically assigned sermon number for this particular author' },
+            {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
+            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'plain', 'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide'},
+            {'type': 'plain', 'label': "Collections:",   'value': instance.get_moved_code, 'empty': 'hide'}
             ]
         # Return the context we have made
         return context

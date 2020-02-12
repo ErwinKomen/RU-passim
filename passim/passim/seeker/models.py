@@ -3091,6 +3091,14 @@ class EqualGold(models.Model):
         name = "" if self.id == None else "eqg_{}".format(self.id)
         return name
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the incipit and explicit
+        self.srchincipit = get_searchable(self.incipit)
+        self.srchexplicit = get_searchable(self.explicit)
+        # Do the saving initially
+        response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
+        return response
+
     def passim_code(auth_num, iNumber):
         """determine a passim code based on author number and sermon number"""
 
@@ -3098,6 +3106,24 @@ class EqualGold(models.Model):
         if auth_num and iNumber and iNumber > 0:
             sCode = "PASSIM {:03d}.{:04d}".format(auth_num, iNumber)
         return sCode
+
+    def get_moved_code(self):
+        """Get the passim code of the one this is replaced by"""
+
+        sBack = ""
+        if self.moved:
+            sBack = self.moved.code
+        return sBack
+
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+        # Perform
+        return adapt_markdown(self.incipit)
+
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
+
 
 class SermonGold(models.Model):
     """The signature of a standard sermon"""

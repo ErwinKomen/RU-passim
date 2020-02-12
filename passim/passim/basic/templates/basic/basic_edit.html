@@ -70,28 +70,49 @@
 
       <!-- Walk all the fields in mainitems -->
       {% for mainitem in mainitems %}
-        <tr class="view-row">
-          <td class="tdnowrap" valign="top">{{mainitem.label}}</td>
-          <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} style="width: 100%;">
-            <div class="{% if 'field_key' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
-              {% spaceless %}
-              {% if mainitem.type == "bold" %}{% if mainitem.link == "" %}<b>{{mainitem.value}}</b>{% else %}<a href="{{mainitem.link}}"><b>{{mainitem.value}}</b></a>{% endif %}
-              {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
-              {% elif mainitem.type == "safe" %}{{mainitem.value|safe}}
-              {% elif mainitem.type == "safeline" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
-              {% else %}{{mainitem.value}}
-              {% endif %}
-              {% endspaceless %}
-            </div>
-            <!-- This is where the editable input comes -->
-            {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
-              <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
-              <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
-            {% elif 'field_key' in mainitem %}
-              <div class="edit-mode hidden">{{mainitem.field_key}}</div>
+        <!-- Check if this may be shown or not -->
+        {% if mainitem.empty != "hide" or mainitem.value != "" %}
+          <tr class="view-row">
+
+            {% if mainitem.multiple %}
+              <!-- Multiple value field, i.e. select2 -->
+              <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
+                <span>{{mainitem.label}}</span>
+                <span>
+                  <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+                    <span class="glyphicon glyphicon-plus"></span>
+                  </a>
+                </span>
+              </td>
+
+            {% else %}
+              <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>{{mainitem.label}}</td>
+              <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} 
+                  {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
+
+                <!-- Basic view mode -->
+                <div class="{% if 'field_key' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
+                  {% spaceless %}
+                  {% if mainitem.type == "bold" %}{% if mainitem.link == "" %}<b>{{mainitem.value}}</b>{% else %}<a href="{{mainitem.link}}"><b>{{mainitem.value}}</b></a>{% endif %}
+                  {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
+                  {% elif mainitem.type == "safe" %}{{mainitem.value|safe}}
+                  {% elif mainitem.type == "safeline" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
+                  {% else %}{{mainitem.value}}
+                  {% endif %}
+                  {% endspaceless %}
+                </div>
+
+                <!-- This is where the editable input comes -->
+                {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
+                  <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
+                  <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
+                {% elif 'field_key' in mainitem %}
+                  <div class="edit-mode hidden">{{mainitem.field_key}}</div>
+                {% endif %}
+              </td>
             {% endif %}
-          </td>
-        </tr>
+          </tr>
+        {% endif %}
       {% endfor %}
 
       <!-- add the links here -->
