@@ -145,7 +145,7 @@
         <td class="manuscript-format" align="left">
           <div class="view-mode">
             <!-- Gryson -->
-            {% if goldForm.instance.goldsignatures.count > 0 %}
+            {% if goldForm.instance.goldsignatures.count > 0 %} 
               {% for sig in goldForm.instance.signatures_ordered %}
                 <span class="badge signature {{sig.editype}}">
                   <a href="{% url 'search_gold' %}?gold-siglist={{sig.id}}">{{sig.code}}</a>
@@ -157,6 +157,34 @@
           {% if is_passim_editor %}
             <div class="new-mode hidden" id="gsign_formset">
               {% include 'seeker/formset_new.html' with this_formset=gsign_formset prefix='gsign' linkfield=gsign_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+      
+      <!-- Collections (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Collections</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left"> 
+          <div class="view-mode">
+            <!-- Collection -->
+            {% if goldForm.instance.collections.count > 0 %}
+              {% for col in goldForm.instance.collections.all|dictsort:"name" %}
+                <span class="collection"><a href="{% url 'search_gold' %}?gold-collection={{col.name}}">{{col.name}}</a></span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{goldForm.collist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gcol_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gcol_formset prefix='gcol' linkfield=gcol_linkfield unique=1 %}
             </div>
           {% endif %}
         </td>

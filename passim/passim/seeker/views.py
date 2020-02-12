@@ -63,7 +63,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
-                                SuperSermonGoldForm
+                                SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
+                                SuperSermonGoldCollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
@@ -4751,7 +4752,7 @@ class BasicListView(ListView):
 class ManuscriptEdit(BasicPart):
     """The details of one manuscript"""
 
-    MainModel = Manuscript
+    MainModel = Manuscript  
     template_name = 'seeker/manuscript_edit.html'  
     title = "Manuscript" 
     afternewurl = ""
@@ -4762,34 +4763,12 @@ class ManuscriptEdit(BasicPart):
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
+    McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
+                                       form=ManuscriptCollectionForm, min_num=0,
+                                       fk_name="manuscript", extra=0)
 
-    def before_save(self, prefix, request, instance = None, form = None):
-        bNeedSaving = False
-        if prefix == "manu":
-            # Check if a new 'Origin' has been added
-            if 'origname_ta' in form.changed_data:
-
-                # TODO: check if this is not already taken care of...
-
-                # Get its value
-                sOrigin = form.cleaned_data['origname_ta']
-                # Check if it is already in the Nicknames
-                origin = Origin.find_or_create(sOrigin)
-                if instance.origin != origin:
-                    # Add it
-                    instance.origin = origin
-                    # Make sure that it is being saved
-                    bNeedSaving = True
-            # Is this a new manuscript?
-            if self.add or instance.source == None:
-                # Create a source info element
-                source = SourceInfo(collector=request.user.username, code="Manually added") # TH: aanpassen, klopt niet, ccfr
-                source.save()
-                instance.source = source
-                bNeedSaving = True
-
-        return bNeedSaving
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False},
+                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'}]
 
     def add_to_context(self, context):
 
@@ -4823,6 +4802,77 @@ class ManuscriptEdit(BasicPart):
             for oSermon in sermon_list:
                 oSermon['cols'] = maxdepth - oSermon['level'] + 1
                 if oSermon['group']: oSermon['cols'] -= 1
+    
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+    
+                if prefix == "mcol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='gold', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "manu":
+            # Check if a new 'Origin' has been added
+            if 'origname_ta' in form.changed_data:
+
+                # TODO: check if this is not already taken care of...
+
+                # Get its value
+                sOrigin = form.cleaned_data['origname_ta']
+                # Check if it is already in the Nicknames
+                origin = Origin.find_or_create(sOrigin)
+                if instance.origin != origin:
+                    # Add it
+                    instance.origin = origin
+                    # Make sure that it is being saved
+                    bNeedSaving = True
+            # Is this a new manuscript?
+            if self.add or instance.source == None:
+                # Create a source info element
+                source = SourceInfo(collector=request.user.username, code="Manually added") 
+                source.save()
+                instance.source = source
+                bNeedSaving = True
+
+        return bNeedSaving
+    
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionMan, instance, "manu", collist, "collection")
+                    
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        
+        return bResult, msg
 
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list
@@ -4835,6 +4885,20 @@ class ManuscriptEdit(BasicPart):
 
         return context
 
+#def add_to_context(self, context, instance):
+#        """Add to the existing context"""
+
+#        # Check if editions have been added
+
+#        # Process this visit and get the new breadcrumbs object
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, "Gold-Sermon edit", False)
+#        # context['prevpage'] = get_previous_page(self.request)
+#        prevpage = reverse('home')
+#        context['prevpage'] = prevpage
+
+#        context['afterdelurl'] = reverse('search_gold')
+
+#        return context
 
 class LocationListView(ListView):
     """Listview of locations"""
@@ -5956,22 +6020,21 @@ class CollectionListView(BasicListView):
             number = instance.freqsermo()
             if number > 0:
                 url = reverse('sermon_list')
-                html.append("<a href='{}?sermo-keyword={}'>".format(url, instance.name))
+                html.append("<a href='{}?sermo-collection={}'>".format(url, instance.name))
                 html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
-           # number = instance.freqgold()
-           # if number > 0:
-           #     url = reverse('search_gold')
-#                html.append("<a href='{}?gold-keyword={}'>".format(url, instance.name))
- #               html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
-  #          number = instance.freqmanu()
-   #         if number > 0:
-    #            url = reverse('search_gold')
-     #           html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
-      #          html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            number = instance.freqgold()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?gold-collection={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+            number = instance.freqmanu()
+            if number > 0:
+                url = reverse('search_manuscript')
+                html.append("<a href='{}?manu-collection={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
         return sBack, sTitle
-
 
 class CollectionEdit(PassimDetails):
     """The details of one collection"""
@@ -7244,10 +7307,15 @@ class SermonGoldEdit(PassimDetails):
                                          form = SermonGoldEditionForm, min_num=0,
                                          fk_name = "sermon_gold",
                                          extra=0, can_delete=True, can_order=False)
+    GcolFormSet = inlineformset_factory(SermonGold, CollectionGold,
+                                       form=SermonGoldCollectionForm, min_num=0,
+                                       fk_name="gold", extra=0)
+    
     formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
                        {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
-                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}]
+                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}, 
+                       {'formsetClass': GcolFormSet,  'prefix': 'gcol',  'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
@@ -7338,6 +7406,19 @@ class SermonGoldEdit(PassimDetails):
                         # Make sure we set the keyword
                         form.instance.keyword = obj
                         # Note: it will get saved with formset.save()
+                elif prefix == "gcol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='gold', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
                 elif prefix == "gedi":
                     # Edition processing
                     newpages = ""
@@ -7373,6 +7454,8 @@ class SermonGoldEdit(PassimDetails):
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
             edilist = form.cleaned_data['edilist']
             adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionGold, instance, "gold", collist, "collection")
 
             # Process many-to-one changes
             # (1) 'goldsignatures'
@@ -7510,6 +7593,39 @@ class EqualGoldEdit(BasicDetails):
     title = "Super Sermon Gold"
     rtype = "json"
     mainitems = []
+    
+    ScolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
+                                       form=SuperSermonGoldCollectionForm, min_num=0,
+                                       fk_name="super", extra=0)
+    
+    formset_objects = [{'formsetClass': ScolFormSet, 'prefix': 'scol', 'readonly': False, 'noinit': True, 'linkfield': 'super'}]
+
+    def process_formset(self, prefix, request, formset):
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                
+                if prefix == "scol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='super', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""

@@ -46,6 +46,10 @@ var ru = (function ($, ru) {
           { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mcol_formset", "prefix": "mcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead }
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
@@ -3448,6 +3452,10 @@ var ru = (function ($, ru) {
             case "gftxt_formset":
             case "gsign_formset":
             case "gkw_formset":
+            case "gcol_formset":
+            case "mcol_formset":
+            case "scol_formset":
+            case "sdcol_formset":
             case "mprov_formset":
             case "mdr_formset":
             case "mkw_formset":

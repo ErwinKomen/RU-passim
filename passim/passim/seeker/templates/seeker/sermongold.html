@@ -151,6 +151,20 @@
                         </tr>
                       </table>
                     </div>
+                    
+                    <!-- One or more collections -->
+                    <div id="filter_collections" class="{% if not goldForm.collection.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;">Collections</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{goldForm.collection}}</span>
+                            <span> or select: </span>
+                            <span>{{goldForm.collist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
 
                   </div>
                 </div>

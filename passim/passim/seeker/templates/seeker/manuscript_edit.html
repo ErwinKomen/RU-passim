@@ -309,6 +309,34 @@
           </div>
         </td>
       </tr>
+      
+      <!-- Collections (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Collections</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left"> 
+          <div class="view-mode">
+            <!-- Collection -->
+            {% if manuForm.instance.collections.count > 0 %}
+              {% for col in manuForm.instance.collections.all|dictsort:"name" %}
+                <span class="collection"><a href="{% url 'search_manuscript' %}?manu-collection={{col.name}}">{{col.name}}</a></span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{manuForm.collist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="mcol_formset">
+              {% include 'seeker/formset_new.html' with this_formset=mcol_formset prefix='mcol' linkfield=mcol_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
 
       <!-- The remainder is only visible by passim editors, and only in EDIT mode, and only as visualisation... -->
       {% if is_passim_editor %}

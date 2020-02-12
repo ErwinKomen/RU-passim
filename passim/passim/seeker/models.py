@@ -3249,6 +3249,9 @@ class SermonGold(models.Model):
     def signatures_ordered(self):
         return self.goldsignatures.all().order_by("editype", "code")
 
+    def collections_ordered(self):
+        return self.collections_gold.all().order_by("name")
+
     def get_keywords(self):
         """Combine all keywords into one string"""
 

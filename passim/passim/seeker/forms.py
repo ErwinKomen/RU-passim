@@ -119,12 +119,28 @@ class ProfileWidget(ModelSelect2MultipleWidget):
 class CollectionWidget(ModelSelect2MultipleWidget):
     model = Collection
     search_fields = [ 'name__icontains' ]
+    type = None
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
-        return Collection.objects.all().order_by('name').distinct()
+        if self.type:
+            return Collection.objects.filter(type=self.type).order_by('name').distinct()
+        else:
+            return Collection.objects.filter().order_by('name').distinct()
+
+class CollectionSermoWidget(CollectionWidget):
+    type = "sermo"
+
+class CollectionManuWidget(CollectionWidget):
+    type = "manu"
+
+class CollectionGoldWidget(CollectionWidget):
+    type = "gold"
+
+class CollectionSuperWidget(CollectionWidget):
+    type = "super"
 
 
 class ProjectOneWidget(ModelSelect2Widget):
@@ -373,7 +389,11 @@ class SermonForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-
+    collection = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionSermoWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+   
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
     country_ta  = forms.CharField(label=_("Country"), required=False, 
@@ -435,6 +455,8 @@ class SermonForm(forms.ModelForm):
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        self.fields['collist'].queryset = Collection.objects.filter(type='gold').order_by('name')
+        
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -445,7 +467,7 @@ class SermonForm(forms.ModelForm):
             #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
-
+            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
 class KeywordForm(forms.ModelForm):
     """Keyword list"""
@@ -612,30 +634,7 @@ class SermonDescrKeywordForm(forms.ModelForm):
                 self.fields['name'].initial = kw
 
 
-class SermonDescrCollectionForm(forms.ModelForm):
-    name = forms.CharField(label=_("Collection"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
-    typeaheads = ["collections"]
-    
-    class Meta:
-        ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-        model = CollectionSerm
-        fields = ['sermon', 'collection']
-
-    def __init__(self, *args, **kwargs):
-        # Start by executing the standard handling
-        super(SermonDescrCollectionForm, self).__init__(*args, **kwargs)
-        # Set the keyword to optional for best processing
-        self.fields['collection'].required = False
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # Check if the initial name should be added
-            if instance.collection != None:
-                col = instance.collection.name
-                # self.fields['collection'].initial = col
-                self.fields['name'].initial = col
 
 
 class SermonGoldForm(forms.ModelForm):
@@ -656,6 +655,10 @@ class SermonGoldForm(forms.ModelForm):
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits"]
 
     class Meta:
@@ -679,6 +682,7 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+        self.fields['collist'].queryset = Collection.objects.filter(type='gold').order_by('name')
         
         # Get the instance
         if 'instance' in kwargs:
@@ -691,6 +695,7 @@ class SermonGoldForm(forms.ModelForm):
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
             self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
+            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
         # We are okay
         return None
@@ -722,13 +727,13 @@ class SermonGoldSameForm(forms.ModelForm):
 
 class EqualGoldForm(forms.ModelForm):
     gold = forms.CharField(label=_("Destination gold sermon"), required=True)
-
+    
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGold
         fields = [ ]
-
+    
 
 class SuperSermonGoldForm(forms.ModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
@@ -740,6 +745,10 @@ class SuperSermonGoldForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "gldincipits", "gldexplicits"]
 
     class Meta:
@@ -760,6 +769,7 @@ class SuperSermonGoldForm(forms.ModelForm):
         # Some fields are not required
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['collist'].queryset = Collection.objects.filter(type='gold').order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -767,6 +777,7 @@ class SuperSermonGoldForm(forms.ModelForm):
             sAuthor = "" if not instance.author else instance.author.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
         # We are okay
         return None
@@ -972,9 +983,123 @@ class SermonGoldKeywordForm(forms.ModelForm):
                 # There is a keyword: check for the combination
                 if SermonGoldKeyword.objects.filter(gold=gold, keyword=keyword).count() > 0:
                     # This combination already exists
-                    raise forms.ValidationError(
-                            "Keyword [{}] is already attached to this gold sermon".format(sName)
-                        )
+                    raise forms.ValidationError("Keyword [{}] is already attached to this gold sermon".format(sName))
+
+
+class SuperSermonGoldCollectionForm(forms.ModelForm):
+    name   = forms.CharField(label=_("Collection"), required=False, help_text="", 
+               widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    #typeaheads = ["keywords"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CollectionSuper
+        fields = ['super', 'collection']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SuperSermonGoldCollectionForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['newcol'].required = False
+        self.fields['collection'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.collection != None:
+                col = instance.collection.name
+                self.fields['name'].initial = col
+
+
+class SermonGoldCollectionForm(forms.ModelForm):
+    name   = forms.CharField(label=_("Collection"), required=False, help_text="", 
+               widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    #typeaheads = ["keywords"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CollectionGold
+        fields = ['gold', 'collection']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldCollectionForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['newcol'].required = False
+        self.fields['collection'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.collection != None:
+                col = instance.collection.name
+                self.fields['name'].initial = col
+            
+
+class ManuscriptCollectionForm(forms.ModelForm):
+    name   = forms.CharField(label=_("Collection"), required=False, help_text="", 
+               widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    #typeaheads = ["keywords"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CollectionMan
+        fields = ['manuscript', 'collection']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptCollectionForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['newcol'].required = False
+        self.fields['collection'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.collection != None:
+                col = instance.collection.name
+                self.fields['name'].initial = col
+
+class SermonDescrCollectionForm(forms.ModelForm):
+    name = forms.CharField(label=_("Collection"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+   # newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
+   #            widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    typeaheads = ["collections"]
+    
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CollectionSerm
+        fields = ['sermon', 'collection']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonDescrCollectionForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        # self.fields['newcol'].required = False 
+        self.fields['collection'].required = False
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.collection != None:
+                col = instance.collection.name
+                # self.fields['collection'].initial = col
+                self.fields['name'].initial = col
+
+
+
+
 
 
 class SermonGoldLitrefForm(forms.ModelForm):
@@ -1231,6 +1356,10 @@ class ManuscriptForm(forms.ModelForm):
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
+    collection = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
 
     class Meta:
@@ -1261,6 +1390,8 @@ class ManuscriptForm(forms.ModelForm):
         self.fields['yearstart'].required = False
         self.fields['yearfinish'].required = False
         self.fields['name'].required = False
+        self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
+
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1286,6 +1417,8 @@ class ManuscriptForm(forms.ModelForm):
             # Look after origin
             origin = instance.origin
             self.fields['origname_ta'].initial = "" if origin == None else origin.name
+            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+
 
 
 class LocationForm(forms.ModelForm):
