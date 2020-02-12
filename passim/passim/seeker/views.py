@@ -5099,15 +5099,53 @@ class OriginEdit(BasicPart):
 
 
 class SermonEdit(BasicPart):
-    """The details of one manuscript"""
+    """The details of one sermon HIERMEE bezig"""
+    
+    model = SermonDescr
+    mForm = SermonForm
 
-    MainModel = SermonDescr
-    template_name = 'seeker/sermon_edit.html'  
+   # MainModel = SermonDescr TH: let op, welke informatie komt van een andere plek 
+    template_name = 'seeker/sermon_edit.html'    # Use this for GET and for POST requests
+    template_post = 'seeker/sermon_edit.html'
+    prefix = "sermo"
     title = "Sermon" 
+    basic_name = "sermon"
     afternewurl = ""
     # One form is attached to this 
-    prefix = "sermo"
-    form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}]
+   
+    # form_objects = [{'form': SermonForm, 'prefix': prefix, 'readonly': False}] #???
+
+    StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
+                                         form=SermonDescrGoldForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    
+    SDsignFormSet = inlineformset_factory(SermonDescr, SermonSignature,
+                                         form=SermonDescrSignatureForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    
+    SDkwFormSet = inlineformset_factory(SermonDescr, SermonGoldKeyword,
+                                       form=SermonDescrKeywordForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+    
+    # eea komt van M en SG litref/ediref
+    #SDediFormSet = inlineformset_factory(SermonDescr, EdirefSG,
+    #                                     form = SermonGoldEditionForm, min_num=0,
+    #                                     fk_name = "sermon_gold",
+    #                                     extra=0, can_delete=True, can_order=False)
+    
+    SDcolFormSet = inlineformset_factory(SermonDescr, CollectionSerm,
+                                       form=SermonDescrCollectionForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+
+    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False},
+                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsign', 'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+                       {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+                       {'formsetClass': SDediFormSet,  'prefix': 'sdedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'}, 
+                       {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'}]
+
+    
 
     def add_to_context(self, context):
 
@@ -5132,6 +5170,84 @@ class SermonEdit(BasicPart):
 
         return context
 
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "sdsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdcol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='sermo', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                  #elif prefix == "gedi":
+                  #  # Edition processing
+                  #  newpages = ""
+                  #  if 'newpages' in cleaned and cleaned['newpages'] != "":
+                  #      newpages = cleaned['newpages']
+                  #  # Also get the litref
+                  #  litref = cleaned['oneref']
+                  #  # Check if all is in order
+                  #  if litref:
+                  #      form.instance.reference = litref
+                  #      if newpages:
+                  #          form.instance.pages = newpages
+                  #  # Note: it will get saved with form.save()
+                
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+    
+    def before_save(self, form, instance):
+        form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
+        form.fields['siglist'].initial = instance.sermonsignatures.all().order_by('editype', 'code')
+        return True, ""
+    
     def after_save(self, prefix, instance = None, form = None):
 
         # Check if this is a new one
@@ -5159,7 +5275,32 @@ class SermonEdit(BasicPart):
         
         # There's is no real return value needed here 
         return True
+    
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonGoldKeyword, instance, "sermon", kwlist, "keyword")
+            # Edifref/litref?
+            #edilist = form.cleaned_data['edilist']
+            #adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
+            # 2 'collections'
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionSerm, instance, "sermon", collist, "collection")
 
+            # Process many-to-one changes
+            # (1) 'sermonsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(Signature, instance, "sermon", siglist)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
 
 class SermonDetails(PassimDetails):
     """The details of one sermon"""

@@ -458,7 +458,7 @@ class SermonForm(forms.ModelForm):
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        self.fields['collist'].queryset = Collection.objects.filter(type='gold').order_by('name')
+        self.fields['collist'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         
         # Get the instance
         if 'instance' in kwargs:
@@ -1074,9 +1074,9 @@ class ManuscriptCollectionForm(forms.ModelForm):
 class SermonDescrCollectionForm(forms.ModelForm):
     name = forms.CharField(label=_("Collection"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
-   # newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
-   #            widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
-    typeaheads = ["collections"]
+    newcol = forms.CharField(label=_("Collection (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Collection...',  'style': 'width: 100%;'}))
+    # typeaheads = ["collections"]
     
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1088,7 +1088,7 @@ class SermonDescrCollectionForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonDescrCollectionForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
-        # self.fields['newcol'].required = False 
+        self.fields['newcol'].required = False 
         self.fields['collection'].required = False
         # Get the instance
         if 'instance' in kwargs:
@@ -1096,7 +1096,6 @@ class SermonDescrCollectionForm(forms.ModelForm):
             # Check if the initial name should be added
             if instance.collection != None:
                 col = instance.collection.name
-                # self.fields['collection'].initial = col
                 self.fields['name'].initial = col
 
                 
