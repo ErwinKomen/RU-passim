@@ -174,10 +174,10 @@
         </td>
         <td class="manuscript-format" align="left"> 
           <div class="view-mode">
-            <!-- Collection -->
+            <!-- Collection TH; link naar? -->
             {% if goldForm.instance.collections.count > 0 %}
               {% for col in goldForm.instance.collections.all|dictsort:"name" %}
-                <span class="collection"><a href="{% url 'search_gold' %}?gold-collection={{col.name}}">{{col.name}}</a></span>
+                <span class="collection"><a href="{% url 'collgold_list' %}?gold-collection={{col.name}}">{{col.name}}</a></span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>

@@ -4123,7 +4123,7 @@ class PassimDetails(DetailView):
                         formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
                         # Process this formset
                         self.process_formset(prefix, self.request, formset)
-
+                        
                         # Process all the correct forms in the formset
                         for subform in formset:
                             if subform.is_valid():
@@ -4753,157 +4753,6 @@ class BasicListView(ListView):
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
     
-
-class ManuscriptEdit(BasicPart):
-    """The details of one manuscript"""
-
-    MainModel = Manuscript  
-    template_name = 'seeker/manuscript_edit.html'  
-    title = "Manuscript" 
-    afternewurl = ""
-    # One form is attached to this 
-    prefix = "manu"
-    form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': False}]
-    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-                                         form=DaterangeForm, min_num=1,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
-    McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
-                                       form=ManuscriptCollectionForm, min_num=0,
-                                       fk_name="manuscript", extra=0)
-
-    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False},
-                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'}]
-
-    def add_to_context(self, context):
-
-        # Get the instance
-        instance = self.obj
-
-        # Construct the hierarchical list
-        sermon_list = []
-        maxdepth = 0
-        if instance != None:
-            # Create a well sorted list of sermons
-            qs = instance.manusermons.filter(order__gte=0).order_by('order')
-            prev_level = 0
-            for sermon in qs:
-                # Need this first in order to repair any possible errors
-                level = sermon.getdepth()
-
-                oSermon = {}
-                oSermon['obj'] = sermon
-                oSermon['nodeid'] = sermon.order + 1
-                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                oSermon['level'] = level
-                oSermon['pre'] = (level-1) * 20
-                # If this is a new level, indicate it
-                oSermon['group'] = (sermon.firstchild != None)
-                sermon_list.append(oSermon)
-                # Bookkeeping
-                if level > maxdepth: maxdepth = level
-                prev_level = level
-            # Review them all and fill in the colspan
-            for oSermon in sermon_list:
-                oSermon['cols'] = maxdepth - oSermon['level'] + 1
-                if oSermon['group']: oSermon['cols'] -= 1
-    
-    def process_formset(self, prefix, request, formset):
-
-        errors = []
-        bResult = True
-        instance = formset.instance
-        for form in formset:
-            if form.is_valid():
-                cleaned = form.cleaned_data
-    
-                if prefix == "mcol":
-                    # Keyword processing
-                    if 'newcol' in cleaned and cleaned['newcol'] != "":
-                        newcol = cleaned['newcol']
-                        # Is the COL already existing?
-                        obj = Collection.objects.filter(name=newcol).first()
-                        if obj == None:
-                            # TODO: add profile here
-                            profile = Profile.get_user_profile(request.user.username)
-                            obj = Collection.objects.create(name=newcol, type='gold', owner=profile)
-                        # Make sure we set the keyword
-                        form.instance.collection = obj
-                        # Note: it will get saved with formset.save()
-                
-            else:
-                errors.append(form.errors)
-                bResult = False
-        return None
-
-    def before_save(self, prefix, request, instance = None, form = None):
-        bNeedSaving = False
-        if prefix == "manu":
-            # Check if a new 'Origin' has been added
-            if 'origname_ta' in form.changed_data:
-
-                # TODO: check if this is not already taken care of...
-
-                # Get its value
-                sOrigin = form.cleaned_data['origname_ta']
-                # Check if it is already in the Nicknames
-                origin = Origin.find_or_create(sOrigin)
-                if instance.origin != origin:
-                    # Add it
-                    instance.origin = origin
-                    # Make sure that it is being saved
-                    bNeedSaving = True
-            # Is this a new manuscript?
-            if self.add or instance.source == None:
-                # Create a source info element
-                source = SourceInfo(collector=request.user.username, code="Manually added") 
-                source.save()
-                instance.source = source
-                bNeedSaving = True
-
-        return bNeedSaving
-    
-    def after_save(self, form, instance):
-        msg = ""
-        bResult = True
-        oErr = ErrHandle()
-        
-        try:
-            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
-            collist = form.cleaned_data['collist']
-            adapt_m2m(CollectionMan, instance, "manu", collist, "collection")
-                    
-        except:
-            msg = oErr.get_error_message()
-            bResult = False
-        
-        return bResult, msg
-
-        # Add instances to the list, noting their childof and order
-        context['sermon_list'] = sermon_list
-        context['sermon_count'] = len(sermon_list)
-        context['maxdepth'] = maxdepth
-        # context['isnew'] = bNew
-
-        context['afternewurl'] = reverse('search_manuscript')
-        context['afterdelurl'] = get_previous_page(self.request)
-
-        return context
-
-#def add_to_context(self, context, instance):
-#        """Add to the existing context"""
-
-#        # Check if editions have been added
-
-#        # Process this visit and get the new breadcrumbs object
-#        context['breadcrumbs'] = get_breadcrumbs(self.request, "Gold-Sermon edit", False)
-#        # context['prevpage'] = get_previous_page(self.request)
-#        prevpage = reverse('home')
-#        context['prevpage'] = prevpage
-
-#        context['afterdelurl'] = reverse('search_gold')
-
-#        return context
 
 class LocationListView(ListView):
     """Listview of locations"""
@@ -6326,23 +6175,138 @@ class SermonLitset(BasicPart):
         return context
 
 
-class ManuscriptDetails(PassimDetails):
-    """Editable manuscript details"""
+class ManuscriptEdit(PassimDetails):
+    """The details of one manuscript"""
 
-    model = Manuscript
-    mForm = ManuscriptForm
-    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
-    template_post = 'seeker/manuscript_details.html'    # Use this for POST requests
+    model = Manuscript  
+    template_name = 'seeker/manuscript_edit.html'  
     title = "Manuscript" 
     afternewurl = ""
+    # One form is attached to this 
     prefix = "manu"
-    prefix_type = "simple"
-    rtype = "html"      # Load this as straight forward html
+    # form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': False}]
+    mForm = ManuscriptForm
     MdrFormSet = inlineformset_factory(Manuscript, Daterange,
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False}]
+    McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
+                                       form=ManuscriptCollectionForm, min_num=0,
+                                       fk_name="manuscript", extra=0)
+
+    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False},
+                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'}]
+
+    def add_to_context(self, context, instance):
+
+        ## Get the instance
+        #instance = self.obj
+
+        # Construct the hierarchical list
+        sermon_list = []
+        maxdepth = 0
+        if instance != None:
+            # Create a well sorted list of sermons
+            qs = instance.manusermons.filter(order__gte=0).order_by('order')
+            prev_level = 0
+            for sermon in qs:
+                # Need this first in order to repair any possible errors
+                level = sermon.getdepth()
+
+                oSermon = {}
+                oSermon['obj'] = sermon
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = (sermon.firstchild != None)
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
+    
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "mcol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def before_save(self, form, instance = None):
+        bOkay = True
+        # Check if a new 'Origin' has been added
+        if 'origname_ta' in form.changed_data:
+
+            # TODO: check if this is not already taken care of...
+
+            # Get its value
+            sOrigin = form.cleaned_data['origname_ta']
+            # Check if it is already in the Nicknames
+            origin = Origin.find_or_create(sOrigin)
+            if instance.origin != origin:
+                # Add it
+                instance.origin = origin
+
+        return bOkay, ""
+    
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionMan, instance, "manu", collist, "collection")
+                    
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        
+        return bResult, msg
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""        
+        
+        context['afternewurl'] = reverse('search_manuscript')
+        context['afterdelurl'] = reverse('search_manuscript')
+
+        return context
+
+
+class ManuscriptDetails(ManuscriptEdit):
+    """Editable manuscript details"""
+
+    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
+    afternewurl = ""
+    prefix_type = "simple"
+    rtype = "html"      # Load this as straight forward html
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
