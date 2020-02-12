@@ -6179,13 +6179,11 @@ class ManuscriptEdit(PassimDetails):
     """The details of one manuscript"""
 
     model = Manuscript  
+    mForm = ManuscriptForm
     template_name = 'seeker/manuscript_edit.html'  
     title = "Manuscript" 
     afternewurl = ""
-    # One form is attached to this 
     prefix = "manu"
-    # form_objects = [{'form': ManuscriptForm, 'prefix': prefix, 'readonly': False}]
-    mForm = ManuscriptForm
     MdrFormSet = inlineformset_factory(Manuscript, Daterange,
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
@@ -6199,36 +6197,11 @@ class ManuscriptEdit(PassimDetails):
 
     def add_to_context(self, context, instance):
 
-        ## Get the instance
-        #instance = self.obj
+        # context['afternewurl'] = reverse('search_manuscript')
+        context['afterdelurl'] = reverse('search_manuscript')
 
-        # Construct the hierarchical list
-        sermon_list = []
-        maxdepth = 0
-        if instance != None:
-            # Create a well sorted list of sermons
-            qs = instance.manusermons.filter(order__gte=0).order_by('order')
-            prev_level = 0
-            for sermon in qs:
-                # Need this first in order to repair any possible errors
-                level = sermon.getdepth()
-
-                oSermon = {}
-                oSermon['obj'] = sermon
-                oSermon['nodeid'] = sermon.order + 1
-                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                oSermon['level'] = level
-                oSermon['pre'] = (level-1) * 20
-                # If this is a new level, indicate it
-                oSermon['group'] = (sermon.firstchild != None)
-                sermon_list.append(oSermon)
-                # Bookkeeping
-                if level > maxdepth: maxdepth = level
-                prev_level = level
-            # Review them all and fill in the colspan
-            for oSermon in sermon_list:
-                oSermon['cols'] = maxdepth - oSermon['level'] + 1
-                if oSermon['group']: oSermon['cols'] -= 1
+        # All us wellL return the adapted context
+        return context
     
     def process_formset(self, prefix, request, formset):
 
@@ -6283,7 +6256,7 @@ class ManuscriptEdit(PassimDetails):
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             collist = form.cleaned_data['collist']
-            adapt_m2m(CollectionMan, instance, "manu", collist, "collection")
+            adapt_m2m(CollectionMan, instance, "manuscript", collist, "collection")
                     
         except:
             msg = oErr.get_error_message()
@@ -6291,21 +6264,12 @@ class ManuscriptEdit(PassimDetails):
         
         return bResult, msg
 
-    def add_to_context(self, context, instance):
-        """Add to the existing context"""        
-        
-        context['afternewurl'] = reverse('search_manuscript')
-        context['afterdelurl'] = reverse('search_manuscript')
-
-        return context
-
 
 class ManuscriptDetails(ManuscriptEdit):
     """Editable manuscript details"""
 
     template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
     afternewurl = ""
-    prefix_type = "simple"
     rtype = "html"      # Load this as straight forward html
 
     def after_new(self, form, instance):
@@ -6349,10 +6313,6 @@ class ManuscriptDetails(ManuscriptEdit):
             # Create a sermon representation
             oSermon = dict(id=id, parent=parent, pos=label, child=[], f = dict(order=obj.order, html=html))
             return oSermon
-
-        # Get the instance via self.object??
-        #   (or why not use the supplied 'instance'??)
-        instance = self.object
 
         # Construct the hierarchical list
         sermon_list = []
