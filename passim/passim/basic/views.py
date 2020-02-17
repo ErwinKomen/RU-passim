@@ -653,6 +653,7 @@ class BasicList(ListView):
                 oFields = self.adapt_search(oFields)
                 
                 self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
+                
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # Just show everything
