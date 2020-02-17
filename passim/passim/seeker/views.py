@@ -5302,6 +5302,7 @@ class SermonEdit(BasicPart):
             bResult = False
         return bResult, msg
 
+
 class SermonDetails(PassimDetails):
     """The details of one sermon"""
 
@@ -5483,6 +5484,7 @@ class SermonDetails(PassimDetails):
 
     def after_save(self, form, instance):
         return True, ""
+
 
 class SermonListView(BasicList):
     """Search and list manuscripts"""
@@ -5668,6 +5670,7 @@ class KeywordEdit(BasicDetails):
         # Return the context we have made
         return context
 
+
 class KeywordDetails(KeywordEdit):
     rtype = "html"
     
@@ -5842,6 +5845,7 @@ class CollManuEdit(BasicDetails):
             # Also make sure that the correct type (=prefix) gets established
             form.instance.type = self.prefix
         return True, ""
+
 
 class CollManuDetails(CollManuEdit):
     rtype = "html"
@@ -6044,6 +6048,7 @@ class CollectionListView(BasicList):
             # Combine the HTML code
             sBack = "\n".join(html)
         return sBack, sTitle
+
 
 class CollectionEdit(PassimDetails):
     """The details of one collection"""
