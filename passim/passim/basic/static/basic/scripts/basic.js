@@ -29,6 +29,7 @@ var ru = (function ($, ru) {
   ru.basic = (function ($, config) {
     // Define variables for ru.basic here
     var loc_divErr = "basic_err",
+        loc_urlStore = "",      // Keep track of URL to be shown
         loc_bManuSaved = false,
         dummy = 1;
 
