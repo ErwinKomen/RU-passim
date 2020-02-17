@@ -485,9 +485,12 @@ class BasicList(ListView):
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 fitem['keyS'] = frm[item['keyS']]
                                 if fitem['keyS'].value(): bHasValue = True
-                            if 'keyList' in item and item['keyS'] in frm.cleaned_data: 
+                            if 'keyList' in item and item['keyList'] in frm.cleaned_data: 
+                                # fitem['keyList'] = frm[item['keyList']]
+                                # if fitem['keyList'].value(): bHasValue = True
+                                if frm.fields[item['keyList']].initial: 
+                                    bHasValue = True
                                 fitem['keyList'] = frm[item['keyList']]
-                                if fitem['keyList'].value(): bHasValue = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
                                     fitem['dbfield'] = frm[item['dbfield']]
@@ -646,7 +649,7 @@ class BasicList(ListView):
 
                 # Allow user to adapt the list of search fields
                 oFields = self.adapt_search(oFields)
-
+                
                 self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
                 # Calculate the final qs
                 if len(lstQ) == 0:
