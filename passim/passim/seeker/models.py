@@ -3171,6 +3171,29 @@ class SermonGold(models.Model):
             name = "RU_sg_{}".format(self.id)
         return name
 
+    def get_view(self):
+        """Get a HTML valid view of myself similar to [sermongold_view.html]"""
+
+        lHtml = []
+        # Treat signatures
+        if self.goldsignatures.all().count() > 0:
+            lHtml.append("<span class='signature'>{}</span>".format(self.signatures()))
+        else:
+            lHtml.append("[-]")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
+        else:
+            lHtml.append("(by <i>Unknwon Author</i>) ")
+        # Treat incipit
+        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+        # Return the results
+        return "".join(lHtml)
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1

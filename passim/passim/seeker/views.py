@@ -7776,7 +7776,23 @@ class EqualGoldDetails(EqualGoldEdit):
 
         context['sections'] = []
 
+        # Lists of related objects
         related_objects = []
+
+        # First list: gold-sermons within the equality set
+        goldsermons = dict(title="Gold sermons that are part of this Super Sermon Gold")
+        # Get the list of SG that are part of the equality set
+        qs = instance.equal_goldsermons.all().order_by('author__name')
+        if qs.count() > 0:
+            rel_list = []
+            for item in qs:
+                rel_item = []
+                rel_item.append({'value': item.get_view(), 'title': 'View this gold sermon', 'link': reverse('gold_details', kwargs={'pk': item.id})})
+                rel_list.append(rel_item)
+            goldsermons['rel_list'] = rel_list
+            goldsermons['columns'] = ['Summary']
+            goldsermons['use_counter'] = True
+            related_objects.append(goldsermons)
 
         context['related_objects'] = related_objects
         # Return the context we have made
