@@ -146,11 +146,11 @@
                                   {% if filter.dbfield %}<span class="keyword-key hidden filter-dbfield">{{filter.dbfield}}</span>{% endif %}
                                   {% if filter.keyS %}
                                     <span class="filter-keys">{{filter.keyS}}</span>
-                                    {% if filter.keyList %}
+                                    {% if filter.has_keylist %}
                                       <span> or select: </span>
                                       <span class="filter-keylist">{{filter.keyList}}</span>
                                     {% endif %}
-                                  {% elif filter.keyList %}
+                                  {% elif filter.has_keylist %}
                                       <span class="filter-keylist">{{filter.keyList}}</span>
                                   {% endif %}
                                 </td>

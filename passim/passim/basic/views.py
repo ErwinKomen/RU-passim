@@ -481,6 +481,7 @@ class BasicList(ListView):
                     if id == fitem['id']:
                         try:
                             fitem['search'] = item
+                            fitem['has_keylist'] = False
                             # Add possible fields
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 fitem['keyS'] = frm[item['keyS']]
@@ -491,6 +492,7 @@ class BasicList(ListView):
                                 if frm.fields[item['keyList']].initial: 
                                     bHasValue = True
                                 fitem['keyList'] = frm[item['keyList']]
+                                fitem['has_keylist'] = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
                                     fitem['dbfield'] = frm[item['dbfield']]
