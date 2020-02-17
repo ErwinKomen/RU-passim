@@ -104,6 +104,9 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Collection",      "id": "filter_collection",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Collection super","id": "filter_collection_super",  "enabled": False, "head_id": "filter_manuscript"},
         ]
 GOLD_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
@@ -6619,32 +6622,38 @@ class ManuscriptListView(BasicList):
                    {'name': 'Status',   'order': 'o=7', 'type': 'str', 'custom': 'status'},
                    {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
-        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False},
-        {"name": "Country",         "id": "filter_country",     "enabled": False},
-        {"name": "City",            "id": "filter_city",        "enabled": False},
-        {"name": "Library",         "id": "filter_library",     "enabled": False},
-        {"name": "Origin",          "id": "filter_origin",      "enabled": False},
-        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
-        {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
-        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Collection",      "id": "filter_collection",  "enabled": False},
-        {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False, "head_id": "none"},
-        {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
-        {"name": "Project",         "id": "filter_project",     "enabled": False, "head_id": "filter_other"},
+        {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
+        {"name": "Country",         "id": "filter_country",          "enabled": False},
+        {"name": "City",            "id": "filter_city",             "enabled": False},
+        {"name": "Library",         "id": "filter_library",          "enabled": False},
+        {"name": "Origin",          "id": "filter_origin",           "enabled": False},
+        {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
+        {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
+        {"name": "Collection",      "id": "filter_collection",       "enabled": False},
+        {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
+        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
+        {"name": "Collection super","id": "filter_collection_super", "enabled": False},
+        {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
+        {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Project",         "id": "filter_project",          "enabled": False, "head_id": "filter_other"},
       ]
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'manuid',    'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',   'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',      'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',   'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance','fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',   'fkfield': 'keywords',            'keyS': 'keyword',      'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'collection','fkfield': 'collections',         'keyS': 'collection',   'keyFk': 'name', 'keyList': 'collist', 'infield': 'name' },
-            {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'manuid',        'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',       'fkfield': 'keywords',            'keyS': 'keyword',      'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'collection',    'fkfield': 'collections',         'keyS': 'collection',   'keyFk': 'name', 'keyList': 'collist', 'infield': 'name' },
+            {'filter': 'collection_sermo',  'fkfield': 'manusermons__collections', 'keyS': 'collection_s', 'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
+            {'filter': 'collection_gold', 'fkfield': 'collections',         'keyS': 'collection_sg','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            {'filter': 'collection_super','fkfield': 'collections',         'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
+            {'filter': 'daterange',     'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -6948,14 +6957,16 @@ class SermonGoldListView(BasicList):
                 {"name": "Author",          "id": "filter_author",      "enabled": False},
                 {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
                 {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-                {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+                {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}, 
+                {"name": "Collection",      "id": "filter_collection",  "enabled": False},]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }]}
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            {'filter': 'collection', 'fkfield': 'collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist', 'infield': 'name' }]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 

@@ -312,10 +312,22 @@ class SearchManuForm(forms.ModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
-    collection = forms.CharField(label=_("Collection"), required=False,
+    collection = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist =  ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection_s = forms.CharField(label=_("Collection s"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist_s =  ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionSermoWidget(attrs={'data-placeholder': 'Select multiple sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection_sg = forms.CharField(label=_("Collection sg"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist_sg =  ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -350,6 +362,9 @@ class SearchManuForm(forms.ModelForm):
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
         self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
+        self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+        self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+        self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -701,7 +716,8 @@ class SermonGoldForm(forms.ModelForm):
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
             self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
-            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+            # self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')
+            
 
         # We are okay
         return None
