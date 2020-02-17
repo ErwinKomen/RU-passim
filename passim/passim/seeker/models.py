@@ -3758,7 +3758,7 @@ class Collection(models.Model):
     # [1] Each collecttion has only 1 owner
     owner = models.ForeignKey(Profile, null=True)
     
-    # [0-1] Each collection can be marked a "read only" by Passim-team  
+    # [0-1] Each collection can be marked a "read only" by Passim-team  ERUIT
     readonly = models.BooleanField(default=False)
 
     # [1] Each collection has only 1 type    
@@ -3773,6 +3773,17 @@ class Collection(models.Model):
 
     # Path to register all additions and changes to each Collection (as stringified JSON list)
     path = models.TextField("History of collection", null=True, blank=True)
+
+    # [1] Each collection has only 1 date/timestamp that shows when the collection was created
+   # date = models.DateTimeField(default=get_current_datetime)
+   
+    # [0-1] Each collection can be marked as "private" by each user 
+    
+    #private = models.BooleanField(default=True)
+    
+    # [0-1] Each collection can be marked as "team" by editors (only when private == False) 
+    #team = models.BooleanField(default=True)
+    
     
     def __str__(self):
         return self.name

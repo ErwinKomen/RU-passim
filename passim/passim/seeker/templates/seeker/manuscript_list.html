@@ -324,6 +324,20 @@
                       </table>
                     </div>
 
+                    <!-- One or more collections -->
+                    <div id="filter_collection" class="{% if not manuForm.collection.value %}hidden{% endif %}">
+                      <table style="width: 100%;">
+                        <tr class="form-row">
+                          <td style="min-width: 130px;">Collection</td>
+                          <td style="width: 100%;">
+                            <span style="min-width: 100px;">{{manuForm.collection}}</span>
+                            <span> or select: </span>
+                            <span>{{manuForm.collist}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
                     <!-- HIDDEN project selection -->
                     <div id="filter_project" class="hidden">
                       <table style="width: 100%;">

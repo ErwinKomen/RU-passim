@@ -243,6 +243,63 @@
         </td>
       </tr>
       
+      <!-- Keywords (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Keywords</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            {% if sermoForm.instance.keywords.count > 0 %}
+              {% for kw in sermoForm.instance.keywords.all|dictsort:"name" %}
+                <span class="keyword"><a href="{% url 'search_sermon' %}?sermon-keyword={{kw.name}}">{{kw.name}}</a></span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{sermoForm.kwlist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="sdkw_formset">
+              {% include 'seeker/formset_new.html' with this_formset=sdkw_formset prefix='sdkw' linkfield=sdkw_linkfield %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+      
+      <!-- Signatures (using select2) TH: let op, komen die van GS?-->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Gryson/Clavis codes</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            <!-- Gryson -->
+            {% if sermoForm.instance.sermonsignatures.count > 0 %} 
+              {% for sig in sermoForm.instance.signatures_ordered %}
+                <span class="badge signature {{sig.editype}}">
+                  <a href="{% url 'search_sermon' %}?gold-siglist={{sig.id}}">{{sig.code}}</a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{sermoForm.siglist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="sdsign_formset">
+              {% include 'seeker/formset_new.html' with this_formset=sdsign_formset prefix='sdsign' linkfield=sdsign_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
       <!-- Collections (using select2) TH nog niet helemaal duidelijk-->
       <tr class="">
         <td valign="top" class="tdnowrap">
@@ -266,6 +323,33 @@
           {% if is_passim_editor %}
             <div class="new-mode hidden" id="sdcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=sdcol_formset prefix='sdcol' linkfield=sdcol_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+      
+      <!-- EdirefSG / Litref (using select2) -->
+      <tr class="">
+        <td valign="top" class="tdnowrap">
+          <span>Editions</span>
+          <span><a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);"><span class="glyphicon glyphicon-plus"></span></a></span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            {% if goldForm.instance.sermon_gold_editions.count > 0 %}
+              {% for edisg in goldForm.instance.sermon_gold_editions.all %}
+                <span class="badge signature ot">
+                  <a href="{% url 'literature_list' %}#edi_{{edisg.reference.pk}}">
+                    {{edisg.get_short_markdown|safe}}
+                  </a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{goldForm.edilist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="gedi_formset">
+              {% include 'seeker/formset_new.html' with this_formset=gedi_formset prefix='gedi' linkfield=gedi_linkfield %}
             </div>
           {% endif %}
         </td>

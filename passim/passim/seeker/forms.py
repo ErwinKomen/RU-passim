@@ -312,7 +312,11 @@ class SearchManuForm(forms.ModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
-    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "manuidnos", "gldsiggrysons", "gldsigclavises"]
+    collection = forms.CharField(label=_("Collection"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+    collist =  ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -345,6 +349,7 @@ class SearchManuForm(forms.ModelForm):
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+        self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:

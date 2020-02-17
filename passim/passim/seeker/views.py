@@ -103,6 +103,7 @@ SERMON_SEARCH_FILTERS = [
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
         {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Collection",      "id": "filter_collection",  "enabled": False, "head_id": "filter_manuscript"},
         ]
 GOLD_SEARCH_FILTERS = [
         {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
@@ -5103,8 +5104,7 @@ class SermonEdit(BasicPart):
     
     model = SermonDescr
     mForm = SermonForm
-
-   # MainModel = SermonDescr TH: let op, welke informatie komt van een andere plek 
+    # MainModel = SermonDescr TH: let op, welke informatie komt van een andere plek 
     template_name = 'seeker/sermon_edit.html'    # Use this for GET and for POST requests
     template_post = 'seeker/sermon_edit.html'
     prefix = "sermo"
@@ -5125,15 +5125,12 @@ class SermonEdit(BasicPart):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
     
-    SDkwFormSet = inlineformset_factory(SermonDescr, SermonGoldKeyword,
+    SDkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
                                        form=SermonDescrKeywordForm, min_num=0,
                                        fk_name="sermon", extra=0)
     
     # eea komt van M en SG litref/ediref
-    #SDediFormSet = inlineformset_factory(SermonDescr, EdirefSG,
-    #                                     form = SermonGoldEditionForm, min_num=0,
-    #                                     fk_name = "sermon_gold",
-    #                                     extra=0, can_delete=True, can_order=False)
+    
     
     SDcolFormSet = inlineformset_factory(SermonDescr, CollectionSerm,
                                        form=SermonDescrCollectionForm, min_num=0,
@@ -5142,7 +5139,7 @@ class SermonEdit(BasicPart):
     formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsign', 'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
-                       {'formsetClass': SDediFormSet,  'prefix': 'sdedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'}, 
+                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'}]
 
     
@@ -5305,22 +5302,23 @@ class SermonEdit(BasicPart):
 class SermonDetails(PassimDetails):
     """The details of one sermon"""
 
-    model = SermonDescr
-    mForm = SermonForm
+    # model = SermonDescr
+    # mForm = SermonForm
     template_name = 'seeker/sermon_details.html'    # Use this for GET and for POST requests
     template_post = 'seeker/sermon_details.html'
-    prefix = "sermo"
-    prefix_type = "simple"
-    title = "Sermon" 
-    basic_name = "sermon"
-    afternewurl = ""
     rtype = "html"
-    fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
-    StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
-                                         form=SermonDescrGoldForm, min_num=0,
-                                         fk_name = "sermon",
-                                         extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
+    #prefix = "sermo"
+    #prefix_type = "simple"
+    #title = "Sermon" 
+    #basic_name = "sermon"
+    #afternewurl = ""
+    
+    #fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
+    #StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
+    #                                     form=SermonDescrGoldForm, min_num=0,
+    #                                     fk_name = "sermon",
+    #                                     extra=0, can_delete=True, can_order=False)
+    #formset_objects = [{'formsetClass': StogFormSet, 'prefix': 'stog', 'readonly': False}]
 
     def before_delete(self, instance):
 
@@ -5473,7 +5471,15 @@ class SermonDetails(PassimDetails):
             context['goldauthors'] = goldauthors
 
         return context
+    
+    def before_save(self, form, instance):
+        return True, ""
 
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
 
 class SermonListView(BasicList):
     """Search and list manuscripts"""
@@ -5951,7 +5957,7 @@ class CollSuperEdit(BasicDetails):
 class CollSuperDetails(CollSuperEdit):
     rtype = "html"
 
-# Collection
+
 class CollectionListView(BasicList):
     """Search and list collections"""
 
@@ -6026,6 +6032,11 @@ class CollectionListView(BasicList):
             if number > 0:
                 url = reverse('search_manuscript')
                 html.append("<a href='{}?manu-collection={}'>".format(url, instance.name))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            number = instance.freqsuper()
+            if number > 0:
+                url = reverse('equalgold_list')
+                html.append("<a href='{}?super-collection={}'>".format(url, instance.name))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
@@ -6616,10 +6627,12 @@ class ManuscriptListView(BasicList):
         {"name": "Provenance",      "id": "filter_provenance",  "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",   "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Collection",      "id": "filter_collection",  "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",      "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False, "head_id": "filter_sermon"},
-        # {"name": "Project",         "id": "filter_project",     "enabled": False, "head_id": "filter_other"},
-                ]
+        {"name": "Project",         "id": "filter_project",     "enabled": False, "head_id": "filter_other"},
+      ]
+
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'manuid',    'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
@@ -6629,6 +6642,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'provenance','fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',    'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',   'fkfield': 'keywords',            'keyS': 'keyword',      'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'collection','fkfield': 'collections',         'keyS': 'collection',   'keyFk': 'name', 'keyList': 'collist', 'infield': 'name' },
             {'filter': 'daterange', 'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
             {'filter': 'daterange', 'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
             ]},
