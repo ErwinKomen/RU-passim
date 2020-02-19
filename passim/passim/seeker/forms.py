@@ -34,6 +34,7 @@ class ManuidWidget(ModelSelect2MultipleWidget):
 
 
 class SignatureWidget(ModelSelect2MultipleWidget):
+    # NOTE: only use the [Signature] table - don't use [SermonSignature]
     model = Signature
     search_fields = [ 'code__icontains' ]
 
@@ -396,47 +397,47 @@ class SearchManuForm(forms.ModelForm):
 class SermonForm(forms.ModelForm):
     # Helper fields for SermonDescr fields
     authorname  = forms.CharField(label=_("Author"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
-                            widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
-                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
-    keyword = forms.CharField(label=_("Keyword"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
-    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    collection = forms.CharField(label=_("Collection"), required=False,
-                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+                    widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    keyword     = forms.CharField(label=_("Keyword"), required=False,
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collection  = forms.CharField(label=_("Collection"), required=False,
+                    widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionSermoWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=CollectionSermoWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
     country_ta  = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city        = forms.CharField(required=False)
     city_ta     = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     library     = forms.CharField(required=False)
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origin      = forms.CharField(required=False)
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
     prov        = forms.CharField(required=False)
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
     date_from   = forms.IntegerField(label=_("Date start"), required = False,
-                                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+                    widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
-                                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+                    widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     typeaheads = ["authors", "manuidnos", "signatures", "keywords", "countries", "cities", "libraries", "origins", "locations", "srmincipits", "srmexplicits", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -458,9 +459,6 @@ class SermonForm(forms.ModelForm):
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
-                 # On the verge of leaving...
-                 #'keyword':     forms.TextInput(attrs={'style': 'width: 100%;'}),
-
                  # larger areas
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
@@ -474,11 +472,15 @@ class SermonForm(forms.ModelForm):
         # Some fields are not required
         self.fields['stype'].required = False
         self.fields['manu'].required = False
-        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['collist'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+
+        # Note: what is shown in the siglist is the set of Signatures linked to Gold sermons!!!
+        # self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        # Better: only show those that are actually linked to me
+        self.fields['siglist'].queryset = Signature.objects.none()
         
         # Get the instance
         if 'instance' in kwargs:
@@ -490,7 +492,13 @@ class SermonForm(forms.ModelForm):
             #sNickName = "" if not instance.nickname else instance.nickname.name
             self.fields['authorname'].initial = sAuthor
             self.fields['authorname'].required = False
+            # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
+            self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+            # Note: what we *show* are the signatures that have actually been copied
+            self.fields['siglist'].initial = [x.pk for x in instance.sermonsignatures.all().order_by('editype', 'code')]
+            # Only allow choosing from those that are part of me (this means: only allow deleting)
+            self.fields['siglist'].queryset = instance.sermonsignatures.all().order_by('editype', 'code')
 
 
 class KeywordForm(forms.ModelForm):
@@ -595,8 +603,8 @@ class SermonDescrSignatureForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonSignature
-        # fields = ['code', 'editype', 'sermon']
-        fields = ['code', 'editype']
+        fields = ['code', 'editype', 'sermon']
+        # fields = ['code', 'editype']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
@@ -634,6 +642,8 @@ class SermonDescrGoldForm(forms.ModelForm):
 
 
 class SermonDescrKeywordForm(forms.ModelForm):
+    newkw  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     name = forms.CharField(label=_("Keyword"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     typeaheads = ["keywords"]
@@ -648,6 +658,7 @@ class SermonDescrKeywordForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonDescrKeywordForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
+        self.fields['newkw'].required = False
         self.fields['keyword'].required = False
         # Get the instance
         if 'instance' in kwargs:

@@ -229,22 +229,54 @@
         </td>
       </tr>
 
-      <!-- VIEW only: keywords -->
+      <!-- Signatures through related gold sermons (view only) -->
       <tr class="form-row">
-        <td valign="top" class="hoverable">Keywords</td>
+        <td class="tdnowrap" title="Gryson or Clavis codes available from the linked gold sermons">Gryson/Clavis codes (g)</td>
         <td class="manuscript-format" align="left">
           <div class="any-mode">
-            {% if sermoForm.instance.keywords.count > 0 %}
-              {% for kw in sermoForm.instance.keywords.all %}
-                <span class="keyword">{{kw.name}}</span>
+            {% if sermoForm.instance.goldsignatures_ordered|length > 0 %} 
+              {% for sig in sermoForm.instance.goldsignatures_ordered %}
+                <span class="badge signature {{sig.editype}}">
+                  <a href="{% url 'search_sermon' %}?sermo-siglist={{sig.id}}">{{sig.code}}</a>
+                </span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
         </td>
       </tr>
-      
+
+      <!-- Signatures (using select2) TH: let op, die komen *niet* van GS - dit zijn de signatures die er met de hand bij worden gedaan?-->
+      <tr class="form-row">
+        <td valign="top" class="tdnowrap" title="Gryson or Clavis codes that have been added manually">
+          <span>Gryson/Clavis codes (m)</span>
+          <span>
+            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+              <span class="glyphicon glyphicon-plus"></span>
+            </a>
+          </span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="view-mode">
+            <!-- Gryson -->
+            {% if sermoForm.instance.sermonsignatures.count > 0 %} 
+              {% for sig in sermoForm.instance.signatures_ordered %}
+                <span class="badge signature {{sig.editype}}">
+                  <a href="{% url 'search_sermon' %}?sermo-siglist={{sig.id}}">{{sig.code}}</a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{sermoForm.siglist}}</div>
+          {% if is_passim_editor %}
+            <div class="new-mode hidden" id="sdsign_formset">
+              {% include 'seeker/formset_new.html' with this_formset=sdsign_formset prefix='sdsign' linkfield=sdsign_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
       <!-- Keywords (using select2) -->
-      <tr class="">
+      <tr class="form-row">
         <td valign="top" class="tdnowrap">
           <span>Keywords</span>
           <span>
@@ -270,38 +302,8 @@
         </td>
       </tr>
       
-      <!-- Signatures (using select2) TH: let op, komen die van GS?-->
-      <tr class="">
-        <td valign="top" class="tdnowrap">
-          <span>Gryson/Clavis codes</span>
-          <span>
-            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
-              <span class="glyphicon glyphicon-plus"></span>
-            </a>
-          </span>
-        </td>
-        <td class="manuscript-format" align="left">
-          <div class="view-mode">
-            <!-- Gryson -->
-            {% if sermoForm.instance.sermonsignatures.count > 0 %} 
-              {% for sig in sermoForm.instance.signatures_ordered %}
-                <span class="badge signature {{sig.editype}}">
-                  <a href="{% url 'search_sermon' %}?gold-siglist={{sig.id}}">{{sig.code}}</a>
-                </span>
-              {% endfor %}
-            {% else %}-{% endif %}
-          </div>
-          <div class="edit-mode hidden">{{sermoForm.siglist}}</div>
-          {% if is_passim_editor %}
-            <div class="new-mode hidden" id="sdsign_formset">
-              {% include 'seeker/formset_new.html' with this_formset=sdsign_formset prefix='sdsign' linkfield=sdsign_linkfield unique=1 %}
-            </div>
-          {% endif %}
-        </td>
-      </tr>
-
       <!-- Collections (using select2) TH nog niet helemaal duidelijk-->
-      <tr class="">
+      <tr class="form-row">
         <td valign="top" class="tdnowrap">
           <span>Collections</span>
           <span>
@@ -315,7 +317,7 @@
             <!-- Collection -->
             {% if sermoForm.instance.collections.count > 0 %}
               {% for col in sermoForm.instance.collections.all|dictsort:"name" %}
-                <span class="collection"><a href="{% url 'search_sermon' %}?sermo-collection={{col.name}}">{{col.name}}</a></span>
+                <span class="collection"><a href="{% url 'sermon_list' %}?sermo-collection={{col.name}}">{{col.name}}</a></span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
@@ -328,16 +330,15 @@
         </td>
       </tr>
       
-      <!-- EdirefSG / Litref (using select2) -->
-      <tr class="">
-        <td valign="top" class="tdnowrap">
-          <span>Editions</span>
-          <span><a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);"><span class="glyphicon glyphicon-plus"></span></a></span>
+      <!-- The set of EdirefSG (Litref ??) that are connected to me through equal gold sermons -->
+      <tr class="form-row">
+        <td valign="top" class="tdnowrap" title="Critical editions related to me via linked gold sermons">
+          <span>Editions (g)</span>
         </td>
         <td class="manuscript-format" align="left">
-          <div class="view-mode">
-            {% if goldForm.instance.sermon_gold_editions.count > 0 %}
-              {% for edisg in goldForm.instance.sermon_gold_editions.all %}
+          <div class="any-mode">
+            {% if sermoForm.instance.goldeditions_ordered|length > 0 %}
+              {% for edisg in sermoForm.instance.goldeditions_ordered %}
                 <span class="badge signature ot">
                   <a href="{% url 'literature_list' %}#edi_{{edisg.reference.pk}}">
                     {{edisg.get_short_markdown|safe}}
@@ -346,12 +347,6 @@
               {% endfor %}
             {% else %}-{% endif %}
           </div>
-          <div class="edit-mode hidden">{{goldForm.edilist}}</div>
-          {% if is_passim_editor %}
-            <div class="new-mode hidden" id="gedi_formset">
-              {% include 'seeker/formset_new.html' with this_formset=gedi_formset prefix='gedi' linkfield=gedi_linkfield %}
-            </div>
-          {% endif %}
         </td>
       </tr>
     </table>

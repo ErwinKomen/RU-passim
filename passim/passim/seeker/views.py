@@ -4017,7 +4017,7 @@ class PassimDetails(DetailView):
             # Get the instance of the Main Model object
             # NOTE: if the object doesn't exist, we will NOT get an error here
             self.object = self.get_object()
-
+        
         # Possibly perform custom initializations
         self.custom_init(self.object)
         
@@ -5102,7 +5102,343 @@ class OriginEdit(BasicPart):
         return context
 
 
-class SermonEdit(BasicPart):
+class SermonEdit(PassimDetails):
+    """The details of one sermon HIERMEE bezig"""
+    
+    model = SermonDescr
+    mForm = SermonForm
+    template_name = 'seeker/sermon_edit.html'   
+    prefix = "sermo"
+    title = "Sermon" 
+    basic_name = "sermon"
+    afternewurl = ""
+    StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
+                                         form=SermonDescrGoldForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    SDsignFormSet = inlineformset_factory(SermonDescr, SermonSignature,
+                                         form=SermonDescrSignatureForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    SDkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
+                                       form=SermonDescrKeywordForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+    SDcolFormSet = inlineformset_factory(SermonDescr, CollectionSerm,
+                                       form=SermonDescrCollectionForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+
+    formset_objects = [{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False},
+                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsign', 'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+                       {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
+                       {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'}]    
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set the 'afternew' URL...
+        self.afternewurl = reverse('sermon_details', kwargs={'pk': instance.id})
+
+        # Return positively
+        return True, "" 
+
+    def before_delete(self, instance):
+        # All is well
+        return True, "" 
+
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "sdsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdcol":
+                    # Keyword processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='sermo', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "stog":
+                    # Which sermon-gold instances are linked to this sermon-descr
+                    iStop = 1
+                    pass                
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+    
+    def before_save(self, form, instance):
+        form.fields['kwlist'].initial = instance.keywords.all().order_by('name')
+        form.fields['siglist'].initial = instance.sermonsignatures.all().order_by('editype', 'code')
+        return True, ""
+    
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Sermon-specific matters - if this is a new one
+            if self.add:
+                # This is a new one, so it should be coupled to the correct manuscript
+                if 'manuscript_id' in self.qd:
+                    # It is there, so we can add it
+                    manuscript = Manuscript.objects.filter(id=self.qd['manuscript_id']).first()
+                    if manuscript != None:
+                        # Adapt the SermonDescr instance
+                        instance.manu = manuscript
+                        # Calculate how many sermons there are
+                        sermon_count = manuscript.manusermons.all().count()
+                        # Make sure the new sermon gets changed
+                        instance.order = sermon_count
+                        instance.save()
+            elif instance and instance.order <= 0:
+                # Calculate how many sermons there are
+                sermon_count = manuscript.manusermons.all().count()
+                # Make sure the new sermon gets changed
+                instance.order = sermon_count
+                instance.save()
+                
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
+            # (2) 'collections'
+            collist = form.cleaned_data['collist']
+            adapt_m2m(CollectionSerm, instance, "sermon", collist, "collection")
+            # (3) linked 'gold'
+            # collist = form.cleaned_data['collist']
+            # adapt_m2m(CollectionSerm, instance, "sermon", collist, "collection")
+
+            # Process many-to-one changes
+            # (1) 'sermonsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(SermonSignature, instance, "sermon", siglist)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+    def add_to_context(self, context, instance):
+
+        # Not sure if this is still needed
+        context['msitem'] = instance
+
+        # Make sure to pass on the manuscript_id
+        # context['afternewurl'] = ""
+        manuscript_id = None
+        if 'manuscript_id' in self.qd:
+            manuscript_id = self.qd['manuscript_id']
+            # Set the URL to be taken after saving
+            # context['afternewurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+        context['manuscript_id'] = manuscript_id
+
+        # Define where to go to after deletion
+        # context['afterdelurl'] = reverse("sermon_list")
+        if manuscript_id:
+            context['afterdelurl'] = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+        else:
+            context['afterdelurl'] = get_previous_page(self.request)
+
+        return context
+
+
+class SermonDetails(SermonEdit):
+    """The details of one sermon"""
+
+    template_name = 'seeker/sermon_details.html'    # Use this for GET and for POST requests
+    rtype = "html"
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Calculate how many sermons there are
+        manuscript = instance.manu
+        if manuscript != None:
+            sermon_count = manuscript.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            instance.order = sermon_count
+            instance.save()
+        if instance != None:
+            # Make sure we do a page redirect
+            self.newRedirect = True
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': instance.id})
+        return True, "" 
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Process this visit and get the new breadcrumbs object
+        #   Static breadcrumbs should be:
+        #       Manuscripts >> Manuscript [idno] >> Manuscript sermons >> Sermon [author/title]
+        prevpage = reverse('sermon_list')
+        context['prevpage'] = prevpage
+        # Start creating a list of breadcrumbs
+        crumbs = []
+        crumbs.append(['Manuscripts', reverse('search_manuscript')])
+        manu_sermons = prevpage
+        if instance:
+            # Which manuscript do we belong to?
+            manu = instance.manu
+            if manu:
+                manu_id = manu.idno
+                if manu_id == None: manu_id = "(unknown ms)"
+                manu_url = reverse('manuscript_details', kwargs={'pk': manu.id})
+                crumbs.append(['{}'.format(manu_id), manu_url])
+               #  manu_sermons = "{}?sermo-manu={}".format(reverse('sermon_list'), manu.id )
+                manu_sermons = "{}?sermo-manuidlist={}".format(reverse('sermon_list'), manu.id )
+        crumbs.append(['Manuscript sermons', manu_sermons])
+        # Figure out what the sermon details are
+        current_name = "Sermon details"
+        if instance:
+            lDetails = []
+            if instance.author: lDetails.append(instance.author.name)
+            if instance.title: lDetails.append(instance.title)
+            if len(lDetails) > 0:
+                current_name = "Sermon [{}]".format(", ".join(lDetails))
+        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+
+        # New:
+        if instance == None:
+            # We are creating a new sermon
+            man_id = None
+            # What is the manuscript id?
+            if 'manuscript_id' in self.qd:
+                man_id = self.qd['manuscript_id']
+            context['manuscript_id'] = man_id
+        elif 'sermo-manu_id' in self.qd:
+            context['manuscript_id'] = self.qd['sermo-manu_id']
+            manuscript_id = context['manuscript_id']
+            self.afternewurl = reverse('manuscript_details', kwargs={'pk': manuscript_id})
+            context['afternewurl'] = self.afternewurl
+        elif instance.manu == None:
+            context['manuscript_id'] = None
+        else:
+            context['manuscript_id'] = instance.manu.id
+
+        # Are we copying information??
+        if 'goldcopy' in self.qd:
+            # Get the ID of the gold sermon from which we are copying
+            goldid = self.qd['goldcopy']
+            gold = SermonGold.objects.filter(id=goldid).first()
+
+            include_keyword_copy = False
+
+            if gold != None:
+                # Copy all relevant information to obj
+                obj = self.object
+                # (1) copy author
+                if gold.author != None: obj.author = gold.author
+                # (2) copy incipit
+                if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
+                # (3) copy explicit
+                if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
+                # (4) copy author
+                if gold.author != None: obj.author = gold.author
+
+                if include_keyword_copy:
+                    # (5) copy keywords
+                    kwlist = [x['id'] for x in obj.keywords.all().values('id')]
+                    for kw in gold.keywords.all():
+                        # Check if it is already there
+                        if kw.id not in kwlist:
+                            # Add it in the proper way
+                            srm_kw = SermonDescrKeyword(sermon=obj, keyword=kw)
+                            srm_kw.save()
+
+                # (6) copy signatures from *all* gold sermons in the equality set
+                # [6.a] get my gold equality set
+                geq = gold.equal
+                # [6.b] get all gold sermons in this equality set
+                qs_geq = SermonGold.objects.filter(equal=geq)
+                # [6.c] Walk all gold sermons in the equality set
+                for obj_geq in qs_geq:
+                    for gold_sig in obj_geq.goldsignatures.all():
+                        # Check if it is already there
+                        srm_sig = SermonSignature.objects.filter(code=gold_sig.code, editype=gold_sig.editype, sermon=obj).first()
+                        if srm_sig == None:
+                            srm_sig = SermonSignature(code=gold_sig.code, editype=gold_sig.editype, sermon=obj)
+                            srm_sig.save()
+                # Now save the adapted sermon
+                obj.save()
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+        else:
+            # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
+            # sedi_list = []
+            goldauthors = []
+            # Visit all linked gold sermons
+            for linked in SermonDescrGold.objects.filter(sermon=self.object, linktype=LINK_EQUAL):
+                # Access the gold sermon
+                gold = linked.gold
+                ## Get all the editions of this gold sermon
+                #for edi in gold.goldeditions.all():
+                #    name = edi.name
+                #    if name not in sedi_list:
+                #        sedi_list.append({'name': name})
+                # Does this one have an author?
+                if gold.author != None:
+                    goldauthors.append(gold.author)
+            # context['sedi_list'] = sedi_list
+            context['goldauthors'] = goldauthors
+
+        return context
+    
+    def before_save(self, form, instance):
+        # Make sure the SermonEdit behaviour is not copied here
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        # Make sure the SermonEdit behaviour is not copied here
+        return None
+
+    def after_save(self, form, instance):
+        # Make sure the SermonEdit behaviour is not copied here
+        return True, ""
+
+
+class SermonEdit_ORG(BasicPart):
     """The details of one sermon HIERMEE bezig"""
     
     model = SermonDescr
@@ -5303,7 +5639,7 @@ class SermonEdit(BasicPart):
         return bResult, msg
 
 
-class SermonDetails(PassimDetails):
+class SermonDetails_ORG(PassimDetails):
     """The details of one sermon"""
 
     # model = SermonDescr
@@ -7388,8 +7724,7 @@ class SermonGoldEdit(PassimDetails):
 
     model = SermonGold
     mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_edit.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_edit.html'
+    template_name = 'seeker/sermongold_edit.html'   
     prefix = "gold"
     title = "SermonGold" 
     basic_name = "gold"
@@ -7431,41 +7766,12 @@ class SermonGoldEdit(PassimDetails):
             instance.equal = geq
             instance.save()
 
-        # THIS CODE ON SIGNATURES MAY BE OBSOLETE...
-        #   because we do not user the field "signatures" (plural) for multiple signatures any more
-        ## Get the list of signatures
-        #signatures = form.cleaned_data['signature'].strip()
-        #if signatures != "":
-        #    siglist = signatures.split(";")
-        #    # Add a signature for each item
-        #    for sigcode in siglist:
-        #        # Make sure starting and tailing spaces are removed
-        #        sigcode = sigcode.strip()
-        #        editype = "cl" if ("CPPM" in sigcode or "CPL" in sigcode) else "gr"
-        #        # Add signature
-        #        obj = Signature(code=sigcode, editype=editype, gold=instance)
-        #        obj.save()
-
         # Return positively
         return True, "" 
 
     def before_delete(self, instance):
-
-        oErr = ErrHandle()
-        try:
-            # (1) Check if there is an 'equality' link to another SermonGold
-
-            # (2) If there is an alternative SermonGold: change all SermonDescr-to-this-Gold link to the alternative
-
-            # (3) Remove all gold-to-gold links that include this one
-
-            # (4) Remove all links from SermonDescr to this instance of SermonGold
-
-            # All is well
-            return True, "" 
-        except:
-            msg = oErr.get_error_message()
-            return False, msg
+        # All is well
+        return True, "" 
 
     def process_formset(self, prefix, request, formset):
 

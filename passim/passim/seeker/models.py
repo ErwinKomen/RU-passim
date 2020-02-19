@@ -3996,6 +3996,27 @@ class SermonDescr(models.Model):
         # And save myself
         self.save()
 
+    def signatures_ordered(self):
+        # Provide an ordered list of signatures
+        return self.sermonsignatures.all().order_by("editype", "code")
+
+    def goldsignatures_ordered(self):
+        """Provide an ordered list of signatures connected to me through related gold sermons"""
+
+        # Get the list of signatures related to the golds
+        lstQ = []
+        lstQ.append(Q(gold__in=self.goldsermons.all()))
+        sig_ordered = Signature.objects.filter(*lstQ).order_by("editype", "code")
+        return sig_ordered
+
+    def goldeditions_ordered(self):
+        """Provide an ordered list of EdirefSG connected to me through related gold sermons"""
+
+        lstQ = []
+        lstQ.append(Q(sermon_gold__in=self.goldsermons.all()))
+        edirefsg_ordered = EdirefSG.objects.filter(*lstQ).order_by("reference__short")
+        return edirefsg_ordered
+
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
         return self.srchincipit
