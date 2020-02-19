@@ -54,7 +54,7 @@ var ru = (function ($, ru) {
                     
           // sermon
           { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sdsignformset", "prefix": "sdsign", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sdsign_formset", "prefix": "sdsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sdkw_formset", "prefix": "sdkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },

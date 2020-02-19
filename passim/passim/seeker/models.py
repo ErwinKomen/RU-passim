@@ -4001,13 +4001,46 @@ class SermonDescr(models.Model):
         return self.sermonsignatures.all().order_by("editype", "code")
 
     def goldsignatures_ordered(self):
-        """Provide an ordered list of signatures connected to me through related gold sermons"""
+        """Provide an ordered list of (gold) signatures that line up with the sermonsignatures linked to me"""
 
-        # Get the list of signatures related to the golds
-        lstQ = []
-        lstQ.append(Q(gold__in=self.goldsermons.all()))
-        sig_ordered = Signature.objects.filter(*lstQ).order_by("editype", "code")
+        sig_ordered = []
+        # Get the list of sermon signatures connected to me
+        for sermosig in self.sermonsignatures.all().order_by("editype", "code"):
+            # See if this sermosig has an equivalent goldsig
+            gsig = sermosig.get_goldsig()
+            if gsig:
+                # Add the id to the list
+                sig_ordered.append(gsig.id)
+        
+        # Return the ordered list
         return sig_ordered
+
+    def get_sermonsig(self, gsig):
+        """Get the sermon signature equivalent of the gold signature gsig"""
+
+        if gsig == None: return None
+        # Initialise
+        sermonsig = None
+        # Check if the gold signature figures in related gold sermons
+        qs = self.sermonsignatures.all()
+        for obj in qs:
+            if obj.gsig.id == gsig.id:
+                # Found it
+                sermonsig = obj
+                break
+            elif obj.editype == gsig.editype and obj.code == gsig.code:
+                # Found it
+                sermonsig = obj
+                # But also set the gsig feature
+                obj.gsig = gsig
+                obj.save()
+                break
+        if sermonsig == None:
+            # Create a new SermonSignature based on this Gold Signature
+            sermonsig = SermonSignature(sermon=self, gsig=gsig, editype=gsig.editype, code=gsig.code)
+            sermonsig.save()
+        # Return the sermon signature
+        return sermonsig
 
     def goldeditions_ordered(self):
         """Provide an ordered list of EdirefSG connected to me through related gold sermons"""
@@ -4123,6 +4156,8 @@ class SermonSignature(models.Model):
     # [1] Every edition must be of a limited number of types
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
+    # [0-1] Optional link to the (gold) Signature from which this derives
+    gsig = models.ForeignKey(Signature, blank=True, null=True, related_name="sermongoldsignatures")
     # [1] Every signature belongs to exactly one gold-sermon
     #     Note: when a SermonDescr gets removed, then its associated SermonSignature gets removed too
     sermon = models.ForeignKey(SermonDescr, null=False, blank=False, related_name="sermonsignatures")
@@ -4144,6 +4179,32 @@ class SermonSignature(models.Model):
         self.sermon.do_signatures()
         # Then return the super-response
         return response
+
+    def get_goldsig(self):
+        """Get the equivalent gold-signature for me"""
+
+        # See if this sermosig has an equivalent goldsig
+        if self.gsig == None:
+            # No gsig given, so depend on the self.editype and self.code
+            qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
+            for obj in qs:
+                if obj.editype == self.editype and obj.code == self.code:
+                    # Found it
+                    self.gsig = obj
+                    break
+            if self.gsig == None:
+                # Get the first gold signature that exists
+                obj = Signature.objects.filter(editype=self.editype, code=self.code).first()
+                if obj:
+                    self.gsig = obj
+                else:
+                    # There is a signature that is not a gold signature -- this cannot be...
+                    pass
+            # Save the sermonsignature with the new information
+            if self.gsig:
+                self.save()
+        # Return what I am in the end
+        return self.gsig
 
     
 class Basket(models.Model):

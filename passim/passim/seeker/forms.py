@@ -478,9 +478,7 @@ class SermonForm(forms.ModelForm):
         self.fields['collist'].queryset = Collection.objects.filter(type='sermo').order_by('name')
 
         # Note: what is shown in the siglist is the set of Signatures linked to Gold sermons!!!
-        # self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        # Better: only show those that are actually linked to me
-        self.fields['siglist'].queryset = Signature.objects.none()
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code').distinct()
         
         # Get the instance
         if 'instance' in kwargs:
@@ -496,9 +494,7 @@ class SermonForm(forms.ModelForm):
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
             # Note: what we *show* are the signatures that have actually been copied
-            self.fields['siglist'].initial = [x.pk for x in instance.sermonsignatures.all().order_by('editype', 'code')]
-            # Only allow choosing from those that are part of me (this means: only allow deleting)
-            self.fields['siglist'].queryset = instance.sermonsignatures.all().order_by('editype', 'code')
+            self.fields['siglist'].initial = instance.goldsignatures_ordered()
 
 
 class KeywordForm(forms.ModelForm):
@@ -599,6 +595,10 @@ class CollectionForm(forms.ModelForm):
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
+    newsdsign  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -608,11 +608,12 @@ class SermonDescrSignatureForm(forms.ModelForm):
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
-    typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonDescrSignatureForm, self).__init__(*args, **kwargs)
+        # Set some parameters to optional for best processing
+        self.fields['newsdsign'].required = False
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
 

@@ -168,7 +168,6 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
         msg = errHandle.get_error_message()
         return False
 
-# adapt_m2o(Signature, instance, "gold", siglist)
 def adapt_m2o(cls, instance, field, qs, **kwargs):
     """Adapt the instances of [cls] pointing to [instance] with [field] to only include [qs] """
 
@@ -203,6 +202,42 @@ def adapt_m2o(cls, instance, field, qs, **kwargs):
         msg = errHandle.get_error_message()
         return False
 
+def adapt_m2o_sig(instance, qs):
+    """Adapt the instances of [SermonSignature] pointing to [instance] to only include [qs] 
+    
+    Note: convert SermonSignature into (Gold) Signature
+    """
+
+    errHandle = ErrHandle()
+    try:
+        # Get all the [SermonSignature] items currently linking to [instance]
+        linked_qs = SermonSignature.objects.filter(sermon=instance)
+        # make sure all items in [qs] are linked to [instance]
+        bRedo = False
+        for obj in qs:
+            # Get the SermonSignature equivalent for Gold signature [obj]
+            sermsig = instance.get_sermonsig(obj)
+            if sermsig not in linked_qs:
+                # Indicate that we need to re-query
+                bRedo = True
+        # Do we need to re-query?
+        if bRedo: 
+            # Yes we do...
+            linked_qs = SermonSignature.objects.filter(sermon=instance)
+        # Remove links that are not in [qs]
+        for obj in linked_qs:
+            # Get the gold-signature equivalent of this sermon signature
+            gsig = obj.get_goldsig()
+            # Check if the gold-sermon equivalent is in [qs]
+            if gsig not in qs:
+                # Remove this item
+                obj.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
 def is_empty_form(form):
     """Check if the indicated form has any cleaned_data"""
 
@@ -210,7 +245,6 @@ def is_empty_form(form):
         form.is_valid()
     cleaned = form.cleaned_data
     return (len(cleaned) == 0)
-
 
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
@@ -5254,7 +5288,9 @@ class SermonEdit(PassimDetails):
             # Process many-to-one changes
             # (1) 'sermonsignatures'
             siglist = form.cleaned_data['siglist']
-            adapt_m2o(SermonSignature, instance, "sermon", siglist)
+            # What we get is a list of 'gold' Signature ids -- this must be changed into a list of [SermonSignature] ids
+            # adapt_m2o(SermonSignature, instance, "sermon", siglist)
+            adapt_m2o_sig(instance, siglist)
         except:
             msg = oErr.get_error_message()
             bResult = False

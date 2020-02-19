@@ -229,35 +229,15 @@
         </td>
       </tr>
 
-      <!-- Signatures through related gold sermons (view only) -->
+      <!-- Signatures (using select2) - these are 'Sermon' signatures. They can be (a) copied from GS, or (b) added manually -->
       <tr class="form-row">
-        <td class="tdnowrap" title="Gryson or Clavis codes available from the linked gold sermons">Gryson/Clavis codes (g)</td>
-        <td class="manuscript-format" align="left">
-          <div class="any-mode">
-            {% if sermoForm.instance.goldsignatures_ordered|length > 0 %} 
-              {% for sig in sermoForm.instance.goldsignatures_ordered %}
-                <span class="badge signature {{sig.editype}}">
-                  <a href="{% url 'search_sermon' %}?sermo-siglist={{sig.id}}">{{sig.code}}</a>
-                </span>
-              {% endfor %}
-            {% else %}-{% endif %}
-          </div>
-        </td>
-      </tr>
-
-      <!-- Signatures (using select2) TH: let op, die komen *niet* van GS - dit zijn de signatures die er met de hand bij worden gedaan?-->
-      <tr class="form-row">
-        <td valign="top" class="tdnowrap" title="Gryson or Clavis codes that have been added manually">
-          <span>Gryson/Clavis codes (m)</span>
-          <span>
-            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
-              <span class="glyphicon glyphicon-plus"></span>
-            </a>
-          </span>
+        <td valign="top" class="tdnowrap" title="Gryson or Clavis codes (these have been added manually; possibly by copying from the related gold sermon)">
+          <span>Gryson/Clavis codes</span>
+          <!-- NOTE: do *not* allow a PLUS sign nor allow adding new ones here - the user can only choose from existing Gold Signatures -->
         </td>
         <td class="manuscript-format" align="left">
           <div class="view-mode">
-            <!-- Gryson -->
+            <!-- Gryson/Clavis/Other -->
             {% if sermoForm.instance.sermonsignatures.count > 0 %} 
               {% for sig in sermoForm.instance.signatures_ordered %}
                 <span class="badge signature {{sig.editype}}">
@@ -266,12 +246,9 @@
               {% endfor %}
             {% else %}-{% endif %}
           </div>
+          <!-- The [siglist] allows choosing from Gold Signatures -->
           <div class="edit-mode hidden">{{sermoForm.siglist}}</div>
-          {% if is_passim_editor %}
-            <div class="new-mode hidden" id="sdsign_formset">
-              {% include 'seeker/formset_new.html' with this_formset=sdsign_formset prefix='sdsign' linkfield=sdsign_linkfield unique=1 %}
-            </div>
-          {% endif %}
+          <!-- Note: do *not* add a [new-mode] here -->
         </td>
       </tr>
 
