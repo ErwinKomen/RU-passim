@@ -197,7 +197,7 @@
                         <!-- Number of sermons belonging to this collection ??--> 
                         <td class="col-number tdnowrap">
                           {% if colitem.freqmanu %}
-                            <a href="{% url 'search_manuscript' %}?manu-collist={{colitem.id}}">
+                            <a href="{% url 'search_manuscript' %}?manu-collist={{colitem.name}}">
                               <span class="badge jumbo-3 clickable" 
                                     title="Number of sermons in this collection">{{colitem.freqmanu}}</span></a>
                           {% endif %}

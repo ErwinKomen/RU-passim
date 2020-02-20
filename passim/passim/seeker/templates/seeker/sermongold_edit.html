@@ -181,7 +181,7 @@
               {% endfor %}
             {% else %}-{% endif %}
           </div>
-          <div class="edit-mode hidden">{{goldForm.collist}}</div>
+          <div class="edit-mode hidden">{{goldForm.collist_sg}}</div>
           {% if is_passim_editor %}
             <div class="new-mode hidden" id="gcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=gcol_formset prefix='gcol' linkfield=gcol_linkfield unique=1 %}

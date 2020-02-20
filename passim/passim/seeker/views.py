@@ -5508,7 +5508,19 @@ class SermonListView(BasicList):
                    {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
-    filters = SERMON_SEARCH_FILTERS
+
+    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
+                {"name": "Author",          "id": "filter_author",          "enabled": False},
+                {"name": "Incipit",         "id": "filter_incipit",         "enabled": False},
+                {"name": "Explicit",        "id": "filter_explicit",        "enabled": False},
+                {"name": "Keyword",         "id": "filter_keyword",         "enabled": False}, 
+                {"name": "Collection manu", "id": "filter_collection_manu", "enabled": False},
+                {"name": "Collection sermo","id": "filter_collection_sermo","enabled": False},
+                {"name": "Collection gold", "id": "filter_collection_gold", "enabled": False},
+                {"name": "Collection super","id": "filter_collection_super","enabled": False},]
+
+   
+
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
@@ -5517,7 +5529,11 @@ class SermonListView(BasicList):
             {'filter': 'feast',     'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            {'filter': 'collection_manu',  'fkfield': 'manu__collections',              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m',  'infield': 'name' }, 
+            {'filter': 'collection_sermo', 'fkfield': 'collections',                    'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s',  'infield': 'name' }, 
+            {'filter': 'collection_gold',  'fkfield': 'goldsermons__collections',       'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collection_super', 'fkfield': 'equal_goldsermons__collections', 'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg','infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',      'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
@@ -6024,26 +6040,26 @@ class CollectionListView(BasicList):
             number = instance.freqsermo()
             if number > 0:
                 url = reverse('sermon_list')
-                html.append("<a href='{}?sermo-collection={}'>".format(url, instance.name))
+                html.append("<a href='{}?sermo-collist_s={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
             number = instance.freqgold()
             if number > 0:
                 url = reverse('search_gold')
-                html.append("<a href='{}?gold-collection={}'>".format(url, instance.name))
+                html.append("<a href='{}?gold-collist_sg={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
             number = instance.freqmanu()
             if number > 0:
                 url = reverse('search_manuscript')
-                html.append("<a href='{}?manu-collection={}'>".format(url, instance.name))
+                html.append("<a href='{}?manu-collist_m={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?super-collection={}'>".format(url, instance.name))
+                html.append("<a href='{}?super-collist_ssg={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
-        return sBack, sTitle
+            return sBack, sTitle
 
 class CollectionEdit(PassimDetails):
     """The details of one collection"""
@@ -6630,7 +6646,7 @@ class ManuscriptListView(BasicList):
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
-        {"name": "Collection",      "id": "filter_collection",       "enabled": False},
+        {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
         {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
         {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
         {"name": "Collection super","id": "filter_collection_super", "enabled": False},
@@ -6641,19 +6657,19 @@ class ManuscriptListView(BasicList):
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'manuid',        'dbfield': 'idno',                'keyS': 'idno',         'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',       'fkfield': 'library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',       'fkfield': 'library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',    'fkfield': 'provenances__location','keyS': 'prov_ta',     'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',        'fkfield': 'origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',       'fkfield': 'keywords',            'keyS': 'keyword',      'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'collection',    'fkfield': 'collections',         'keyS': 'collection',   'keyFk': 'name', 'keyList': 'collist', 'infield': 'name' },
-            {'filter': 'collection_sermo',  'fkfield': 'manusermons__collections', 'keyS': 'collection_s', 'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold', 'fkfield': 'collections',         'keyS': 'collection_sg','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super','fkfield': 'collections',         'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
-            {'filter': 'daterange',     'dbfield': 'yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange',     'dbfield': 'yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'manuid',           'dbfield': 'idno',                                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',          'fkfield': 'library__lcountry',                      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',             'fkfield': 'library__lcity',                         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',          'fkfield': 'library',                                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',          'fkfield': 'keywords',                               'keyS': 'keyword',       'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
+            {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
+            {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
+            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
+            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -6953,12 +6969,18 @@ class SermonGoldListView(BasicList):
                    {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
-    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
-                {"name": "Author",          "id": "filter_author",      "enabled": False},
-                {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
-                {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-                {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}, 
-                {"name": "Collection",      "id": "filter_collection",  "enabled": False},]
+    filters = SERMON_SEARCH_FILTERS
+    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",       "enabled": False},
+                {"name": "Author",          "id": "filter_author",           "enabled": False},
+                {"name": "Incipit",         "id": "filter_incipit",          "enabled": False},
+                {"name": "Explicit",        "id": "filter_explicit",         "enabled": False},
+                {"name": "Keyword",         "id": "filter_keyword",          "enabled": False}, 
+                {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
+                {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
+                {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
+                {"name": "Collection super","id": "filter_collection_super", "enabled": False},]
+       
+    
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
@@ -6966,7 +6988,10 @@ class SermonGoldListView(BasicList):
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection', 'fkfield': 'collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist', 'infield': 'name' }]}
+            {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
@@ -7551,8 +7576,8 @@ class SermonGoldEdit(PassimDetails):
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
             edilist = form.cleaned_data['edilist']
             adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
-            collist = form.cleaned_data['collist']
-            adapt_m2m(CollectionGold, instance, "gold", collist, "collection")
+            collist_sg = form.cleaned_data['collist_sg']
+            adapt_m2m(CollectionGold, instance, "gold", collist_sg, "collection")
 
             # Process many-to-one changes
             # (1) 'goldsignatures'
@@ -7709,7 +7734,7 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'plain', 'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide'},
             {'type': 'plain', 'label': "Collections:",   'value': instance.collections.all().order_by('name'), 
-                'multiple': True, 'field_list': 'collist', 'qlist': 'ssg-collist', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
+                'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
@@ -7754,8 +7779,8 @@ class EqualGoldEdit(BasicDetails):
         
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
-            collist = form.cleaned_data['collist']
-            adapt_m2m(CollectionSuper, instance, "super", collist, "collection")
+            collist_ssg = form.cleaned_data['collist_ssg']
+            adapt_m2m(CollectionSuper, instance, "super", collist_ssg, "collection")
 
         except:
             msg = oErr.get_error_message()
@@ -7810,12 +7835,16 @@ class EqualGoldListView(BasicList):
         {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
         {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True }
         ]
-    filters = [{"name": "Author",         "id": "filter_author",     "enabled": False},
-               {"name": "Incipit",        "id": "filter_incipit",    "enabled": False},
-               {"name": "Explicit",       "id": "filter_explicit",   "enabled": False},
-               {"name": "Passim code",    "id": "filter_code",       "enabled": False},
-               {"name": "Number",         "id": "filter_number",     "enabled": False},
-               {"name": "Gryson/Clavis",  "id": "filter_signature",  "enabled": False},
+    filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
+               {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
+               {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
+               {"name": "Passim code",     "id": "filter_code",              "enabled": False},
+               {"name": "Number",          "id": "filter_number",            "enabled": False},
+               {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
+               {"name": "Collection manu", "id": "filter_collection_manu",   "enabled": False},
+               {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False},
+               {"name": "Collection gold", "id": "filter_collection_gold",   "enabled": False},
+               {"name": "Collection super","id": "filter_collection_super",  "enabled": False},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -7823,11 +7852,12 @@ class EqualGoldListView(BasicList):
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
-                                    'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 
-                                    'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            ]}
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'collection_manu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collection_sermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collection_gold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collection_super', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
         ]
 
     def get_field_value(self, instance, custom):
