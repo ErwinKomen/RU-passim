@@ -279,9 +279,9 @@
         </td>
       </tr>
       
-      <!-- Collections (using select2) TH nog niet helemaal duidelijk-->
+      <!-- *MANU* Collections (using select2) TH nog niet helemaal duidelijk-->
       <tr class="form-row">
-        <td valign="top" class="tdnowrap">
+        <td valign="top" class="tdnowrap" title="Manuscript collections">
           <span>Collections</span>
           <span>
             <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
@@ -298,7 +298,7 @@
               {% endfor %}
             {% else %}-{% endif %}
           </div>
-          <div class="edit-mode hidden">{{sermoForm.collist}}</div>
+          <div class="edit-mode hidden">{{sermoForm.collist_s}}</div>
           {% if is_passim_editor %}
             <div class="new-mode hidden" id="sdcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=sdcol_formset prefix='sdcol' linkfield=sdcol_linkfield unique=1 %}

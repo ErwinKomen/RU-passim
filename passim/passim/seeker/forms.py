@@ -429,9 +429,6 @@ class SermonForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-
-    
-
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -494,6 +491,7 @@ class SermonForm(forms.ModelForm):
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -507,7 +505,10 @@ class SermonForm(forms.ModelForm):
             self.fields['authorname'].required = False
             # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
-            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+            self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
+            self.fields['collist_s'].initial = [x.pk for x in instance.collections.filter(type='sermo').order_by('name')]
+            self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
+            self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
             # Note: what we *show* are the signatures that have actually been copied
             self.fields['siglist'].initial = instance.goldsignatures_ordered()
 

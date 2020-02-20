@@ -5259,18 +5259,14 @@ class SermonEdit(PassimDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
-            # (2) 'collections'
-            collist = form.cleaned_data['collist']
+            # (2) 'collections' - but *only* the *sermon* collection
+            collist = form.cleaned_data['collist_s']
             adapt_m2m(CollectionSerm, instance, "sermon", collist, "collection")
-            # (3) linked 'gold'
-            # collist = form.cleaned_data['collist']
-            # adapt_m2m(CollectionSerm, instance, "sermon", collist, "collection")
 
             # Process many-to-one changes
             # (1) 'sermonsignatures'
             siglist = form.cleaned_data['siglist']
             # What we get is a list of 'gold' Signature ids -- this must be changed into a list of [SermonSignature] ids
-            # adapt_m2o(SermonSignature, instance, "sermon", siglist)
             adapt_m2o_sig(instance, siglist)
         except:
             msg = oErr.get_error_message()
