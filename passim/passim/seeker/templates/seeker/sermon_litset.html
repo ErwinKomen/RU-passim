@@ -6,10 +6,14 @@
       <thead><tr><th class="hidden">id</th><tr><th class="tdnowrap">Literature references</th><th>Pages</th></tr></thead>
       <tbody>
         {% for litref in lref_list %} 
-            <tr class="dict-entry">
-                <td><span class="short reference"><a href="{% url 'literature_list' %}#lit_{{litref.reference.pk}}">{{litref.reference.get_short_markdown|safe}}</a></span></td>
-                <td><span class="pages">{{litref.pages|default_if_none:""}}</span></td>
-            </tr>
+          <tr class="dict-entry">
+            <td class="clickable">
+              <span class="short reference">
+                <a class="nostyle" href="{% url 'literature_list' %}#lit_{{litref.reference.pk}}">{{litref.reference.get_short_markdown|safe}}</a>
+              </span>
+            </td>
+            <td><span class="pages">{{litref.pages|default_if_none:""}}</span></td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>

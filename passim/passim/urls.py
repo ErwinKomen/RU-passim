@@ -57,7 +57,7 @@ urlpatterns = [
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
 
-    url(r'^search/sermon', passim.seeker.views.search_sermon, name='search_sermon'),
+    url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
     url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
@@ -103,10 +103,6 @@ urlpatterns = [
     
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
     url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
-    
-    # Waarom staat dit hier op twee verschillende manieren?        
-    #url(r'^collection/list', CollectionListView.as_view(), name='collection_list'),
-    #url(r'^collection/details(?:/(?P<pk>\d+))?/$', CollSermDetails.as_view(), name='collection_details'),
 
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
     url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),

@@ -96,16 +96,26 @@
                   <!-- List of related items -->
                   <table class="func-view compact-simple" style="width: 100%;">
                     <thead>
-                      <tr>{% for col in related.columns %}<th>{{col}}</th>{% endfor %}</tr>
+                      <tr>
+                        {% if related.use_counter %}<th>#</th>{% endif %}
+                        {% for col in related.columns %}<th>{{col}}</th>{% endfor %}
+                      </tr>
                     </thead>
                     <tbody>
                       {% for relrow in related.rel_list %}
                       <tr class="form-row">
+                        {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
                         {% for relcol in relrow %}
                           <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                              {% if relcol.link %}class="clickable" onclick="ru.basic.goto_url('{{relcol.link}}')"{% endif %}
+                              {% if relcol.link %}class="clickable "{% endif %}
                               >
-                            {% if relcol.value %}{{relcol.value|safe}}{% endif %}
+                            {% if relcol.value %}
+                              {% if relcol.link %}
+                                <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                              {% else %}
+                                {{relcol.value|safe}}
+                              {% endif %}
+                            {% endif %}
                           </td>
                         {% endfor %}
                       </tr>
