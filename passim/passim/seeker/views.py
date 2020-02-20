@@ -5351,7 +5351,10 @@ class SermonDetails(SermonEdit):
         if instance:
             lDetails = []
             if instance.author: lDetails.append(instance.author.name)
-            if instance.title: lDetails.append(instance.title)
+            if instance.title: 
+                title = instance.title[:10]
+                dots = "" if len(instance.title) < 10 else "..."
+                lDetails.append("{}{}".format(title,dots))
             if len(lDetails) > 0:
                 current_name = "Sermon [{}]".format(", ".join(lDetails))
         context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
