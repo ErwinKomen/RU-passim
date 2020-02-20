@@ -77,7 +77,8 @@
       </tr>
 
       <!-- MANUSCRIPT: Make sure we pass on the manuscript_id to which this sermon belongs -->
-      {% if sermoForm.manu %}
+      {% if sermoForm.manu or manuscript_id %}
+        <tr><td>manu value</td><td>{{sermoForm.manu.value}}</td></tr>
         <tr class="hidden">
           <td colspan="1">
             <input id="id_manuscript_id" name="manuscript_id" type="text" value="{{manuscript_id}}" />
@@ -85,6 +86,7 @@
           <td>{{sermoForm.manu}}</td>
         </tr>
       {% else %}
+        <tr><td>manu value</td><td>{{sermoForm.manu.value}}</td></tr>
         <tr class="form-row">
           <td class="hoverable" style="min-width: 150px;">Manuscript</td>
           <td  style="width: 100%;">
