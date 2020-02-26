@@ -704,11 +704,6 @@ class SermonGoldForm(forms.ModelForm):
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #collection = forms.CharField(label=_("Collection"), required=False,
-    #            widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    #collist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-    
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False, 
@@ -766,6 +761,7 @@ class SermonGoldForm(forms.ModelForm):
             self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
             self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
         return None
+
 
 class SermonGoldSameForm(forms.ModelForm):
     class Meta:
@@ -860,10 +856,23 @@ class SuperSermonGoldForm(forms.ModelForm):
             self.fields['authorname'].required = False
             self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
-
-
         # We are okay
         return None
+
+    def clean_author(self):
+        """Possibly determin the author if not known"""
+        
+        author = self.cleaned_data.get("author", None)
+        if not author:
+            authorname = self.cleaned_data.get("authorname", None)
+            if authorname:
+                # Figure out what the author is
+                author = Author.objects.filter(name=authorname).first()
+        if self.instance:
+            if self.instance.author.id != author.id:
+                # Create a copy of the object I used to be
+                moved = EqualGold.create_moved(self.instance)
+        return author
 
 
 class EqualGoldLinkForm(forms.ModelForm):

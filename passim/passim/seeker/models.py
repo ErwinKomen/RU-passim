@@ -3095,9 +3095,50 @@ class EqualGold(models.Model):
         # Adapt the incipit and explicit
         self.srchincipit = get_searchable(self.incipit)
         self.srchexplicit = get_searchable(self.explicit)
+        # Double check the number and the code
+        if self.author:
+            # There is an author--is this different than the author we used to have?
+
+            if not self.number:
+                # Check the highest sermon number for this author
+                self.number = EqualGold.sermon_number(self.author)
+            # Get the author number
+            auth_num = self.author.get_number()
+            # Now we have both an author and a number...
+            passim_code = EqualGold.passim_code(auth_num, self.number)
+            if not self.code or self.code != passim_code:
+                # Now save myself with the new code
+                self.code = passim_code
+
         # Do the saving initially
         response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
         return response
+
+    def create_moved(self):
+        """Create a copy of [self], and indicate in that copy that it moved to [self]"""
+
+        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code']
+        org = EqualGold()
+        for field in fields:
+            value = getattr(self, field)
+            if value != None:
+                setattr(org, field, value)
+        # Now indicate where the original moved to
+        org.moved = self
+        # Save the result
+        org.save()
+        return org
+
+    def sermon_number(author):
+        """Determine what the sermon number *would be* for the indicated author"""
+
+        # Check the highest sermon number for this author
+        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+        if qs_ssg.count() == 0:
+            iNumber = 1
+        else:
+            iNumber = qs_ssg.first().number + 1
+        return iNumber
 
     def passim_code(auth_num, iNumber):
         """determine a passim code based on author number and sermon number"""

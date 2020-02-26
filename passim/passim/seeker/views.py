@@ -1776,11 +1776,7 @@ def do_ssgmigrate(request):
                         auth_num = author.get_number()
                         if auth_num > 0:
                             # Check the highest sermon number for this author
-                            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
-                            if qs_ssg.count() == 0:
-                                iNumber = 1
-                            else:
-                                iNumber = qs_ssg.first().number + 1
+                            iNumber = EqualGold.sermon_number(author)
                             # Now we have both an author and a number...
                             obj.author = author
                             obj.number = iNumber
@@ -5472,40 +5468,52 @@ class SermonListView(BasicList):
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
-                {"name": "Author",          "id": "filter_author",          "enabled": False},
-                {"name": "Incipit",         "id": "filter_incipit",         "enabled": False},
-                {"name": "Explicit",        "id": "filter_explicit",        "enabled": False},
-                {"name": "Keyword",         "id": "filter_keyword",         "enabled": False}, 
-                {"name": "Collection manu", "id": "filter_collection_manu", "enabled": False},
-                {"name": "Collection sermo","id": "filter_collection_sermo","enabled": False},
-                {"name": "Collection gold", "id": "filter_collection_gold", "enabled": False},
-                {"name": "Collection super","id": "filter_collection_super","enabled": False},]
-
-   
+                {"name": "Author",           "id": "filter_author",         "enabled": False},
+                {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
+                {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
+                {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
+                {"name": "Feast",            "id": "filter_feast",          "enabled": False},
+                {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
+                {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
+                {"name": "Collection sermo", "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Collection gold",  "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Collection super", "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Collection manu",  "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Library",          "id": "filter_library",        "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Origin",           "id": "filter_origin",         "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Provenance",       "id": "filter_provenance",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Date from",        "id": "filter_datestart",      "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
+                ]
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
-            {'filter': 'feast',     'dbfield': 'feast',             'keyS': 'feast'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection_manu',  'fkfield': 'manu__collections',              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m',  'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'collections',                    'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s',  'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'goldsermons__collections',       'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'equal_goldsermons__collections', 'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg','infield': 'name' }
+            {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
+            {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'signature',     'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            ]},
+        {'section': 'collection', 'filterlist': [
+            {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'name' }, 
+            {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'name' }, 
+            {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collsuper',     'fkfield': 'equal_goldsermons__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'name' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',      'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'country',     'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',        'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',     'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'origin',      'fkfield': 'manu__origin',              'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'provenance',  'fkfield': 'manu__provenances',         'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',   'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'datefinish',  'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
+            {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',     'dbfield': 'manu__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
             ]}
          ]
 
@@ -6595,8 +6603,6 @@ class ManuscriptListView(BasicList):
     has_select2 = True
     paginate_by = 20
     bUseFilter = True
-    # template_name = 'seeker/manuscript_list.html'
-    page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
     order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
@@ -7712,6 +7718,29 @@ class EqualGoldEdit(BasicDetails):
                 errors.append(form.errors)
                 bResult = False
         return None
+
+    #def before_save(self, form, instance):
+    #    """Action to be performed after saving an item preliminarily, and before saving completely
+        
+    #    Process any [authorname] into an [author] if possible
+    #    """
+
+    #    oErr = ErrHandle()
+    #    msg = ""
+    #    bResult = True
+        
+    #    try:
+    #        cleaned_data = form.cleaned_data
+    #        #if 'authorname' in cleaned_data: 
+    #        #    authorname = cleaned_data['authorname']
+    #        #    if authorname:
+    #        #        author = Author.objects.filter(name=authorname).first()
+    #        #        if author:
+    #        #            instance.author = author
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        bResult = False
+    #    return bResult, msg
 
     def after_save(self, form, instance):
         msg = ""

@@ -304,8 +304,13 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                         # Reset this sort order
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
-            orderings = order_default
-            if ";" in order_default[0]: orderings = order_default[0].split(";")
+            orderings = []
+            for order_item in order_default:
+                if ";" in order_item:
+                    for sub_item in order_item.split(";"):
+                        orderings.append(sub_item)
+                else:
+                    orderings.append(order_item)
             for order_item in orderings:
                 if order_item != "":
                     order.append(Lower(order_item))
@@ -505,18 +510,18 @@ class BasicList(ListView):
                             # Add possible fields
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 fitem['keyS'] = frm[item['keyS']]
-                                if fitem['keyS'].value(): bHasValue = True
+                                if fitem['keyS'].value(): 
+                                    bHasValue = True
                             if 'keyList' in item and item['keyList'] in frm.cleaned_data: 
-                                # fitem['keyList'] = frm[item['keyList']]
-                                # if fitem['keyList'].value(): bHasValue = True
-                                if frm.fields[item['keyList']].initial: 
+                                if frm.fields[item['keyList']].initial or frm.cleaned_data[item['keyList']].count() > 0: 
                                     bHasValue = True
                                 fitem['keyList'] = frm[item['keyList']]
                                 fitem['has_keylist'] = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
                                     fitem['dbfield'] = frm[item['dbfield']]
-                                    if fitem['dbfield'].value(): bHasValue = True
+                                    if fitem['dbfield'].value(): 
+                                        bHasValue = True
                                 elif 'fkfield' in item and item['fkfield'] in frm.cleaned_data:
                                     fitem['fkfield'] = frm[item['fkfield']]                                    
                                     if fitem['fkfield'].value(): bHasValue = True
@@ -527,7 +532,8 @@ class BasicList(ListView):
                         except:
                             sMsg = oErr.get_error_message()
                             break
-            if bHasValue: oFsection['has_value'] = True
+            if bHasValue: 
+                oFsection['has_value'] = True
             if oFsection != None: fsections.append(oFsection)
 
         # Make it available
@@ -638,6 +644,7 @@ class BasicList(ListView):
         get = get.copy()
         self.qd = get
 
+        self.bFilter = False
         self.bHasParameters = (len(get) > 0)
         bHasListFilters = False
         if self.bHasParameters:
@@ -690,7 +697,7 @@ class BasicList(ListView):
                     qs = self.model.objects.filter(*lstQ).distinct()
                     # Only set the [bFilter] value if there is an overt specified filter
                     for filter in self.filters:
-                        if filter['enabled']:
+                        if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
                             self.bFilter = True
                             break
                     # OLD self.bFilter = True
