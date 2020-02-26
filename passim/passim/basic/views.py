@@ -18,11 +18,16 @@ from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
 
 import json
+import fnmatch
 from datetime import datetime
 
-# More specific for LENTENSERMONS
-from passim.settings import APP_PREFIX
-from passim.basic.utils import ErrHandle
+# provide error handling
+from .utils import ErrHandle
+
+# Provide application-specific information
+from ..settings import PROJECT_NAME
+app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_editor = "{}_editor".format(PROJECT_NAME.lower())
 
 # Some constants that can be used
 paginateSize = 20
@@ -117,6 +122,13 @@ def has_list_value(field, obj):
 def has_obj_value(field, obj):
     response = (field != None and field in obj and obj[field] != None)
     return response
+
+def adapt_search(val):
+    # First trim
+    val = val.strip()
+    # Then add start and en matter 
+    val = '^' + fnmatch.translate(val) + '$'
+    return val
 
 def make_search_list(filters, oFields, search_list, qd):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
@@ -292,9 +304,12 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                         # Reset this sort order
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
-            for order_item in order_default[0].split(";"):
+            orderings = order_default
+            if ";" in order_default[0]: orderings = order_default[0].split(";")
+            for order_item in orderings:
                 if order_item != "":
                     order.append(Lower(order_item))
+
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
             if len(order) > 0:
@@ -338,6 +353,8 @@ class BasicList(ListView):
     basic_name_prefix = ""
     basic_edit = ""
     basic_details = ""
+    basic_add = ""
+    add_text = "Add a new"
     prefix = ""
     order_default = []
     order_cols = []
@@ -349,6 +366,7 @@ class BasicList(ListView):
     list_fields = []
     uploads = []
     delete_line = False
+    none_on_empty = False
     lst_typeaheads = []
     sort_order = ""
     page_function = "ru.basic.search_paged_start"
@@ -388,9 +406,6 @@ class BasicList(ListView):
         # Determine the count 
         context['entrycount'] = self.entrycount # self.get_queryset().count()
 
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
         # Make sure the paginate-values are available
         context['paginateValues'] = paginateValues
 
@@ -422,7 +437,11 @@ class BasicList(ListView):
                 self.basic_name = "{}{}".format(self.basic_name_prefix, self.prefix)
         context['titlesg'] = self.sg_name if self.sg_name != "" else self.basic_name.capitalize()
         context['basic_name'] = self.basic_name
-        context['basic_add'] = reverse("{}_details".format(self.basic_name))
+        if self.basic_add:
+            basic_add = reverse(self.basic_add)
+        else:
+            basic_add = reverse("{}_details".format(self.basic_name))
+        context['basic_add'] = basic_add
         context['basic_list'] = reverse("{}_list".format(self.basic_name))
         context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
         context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
@@ -433,6 +452,7 @@ class BasicList(ListView):
         context['sortOrder'] = self.sort_order
 
         context['new_button'] = self.new_button
+        context['add_text'] = self.add_text
 
         # Adapt possible downloads
         if len(self.downloads) > 0:
@@ -521,8 +541,8 @@ class BasicList(ListView):
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['authenticated'] = context['is_authenticated'] 
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -592,6 +612,10 @@ class BasicList(ListView):
             result_list.append(result)
         return result_list
 
+    def get_template_names(self):
+        names = [ self.template_name ]
+        return names
+
     def get_field_value(self, instance, custom):
         return "", ""
 
@@ -608,10 +632,6 @@ class BasicList(ListView):
     def adapt_search(self, fields):
         return fields
   
-    def get_template_names(self):
-        names = [ self.template_name ]
-        return names
-
     def get_queryset(self):
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
@@ -625,6 +645,9 @@ class BasicList(ListView):
             bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
             if not bHasListFilters:
                 self.basketview = ("usebasket" in get and get['usebasket'] == "True")
+
+        # Initial setting of qs
+        qs = self.model.objects.none()
 
         # Get the queryset and the filters
         if self.basketview:
@@ -659,7 +682,7 @@ class BasicList(ListView):
                 self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
                 
                 # Calculate the final qs
-                if len(lstQ) == 0:
+                if len(lstQ) == 0 and not self.none_on_empty:
                     # Just show everything
                     qs = self.model.objects.all()
                 else:
@@ -671,7 +694,7 @@ class BasicList(ListView):
                             self.bFilter = True
                             break
                     # OLD self.bFilter = True
-            else:
+            elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
 
@@ -679,6 +702,7 @@ class BasicList(ListView):
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         else:
+            # No filter and no basked: show all
             self.basketview = False
             qs = self.model.objects.all().distinct()
             order = self.order_default
@@ -890,8 +914,8 @@ class BasicDetails(DetailView):
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
