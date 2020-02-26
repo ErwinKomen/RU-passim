@@ -56,6 +56,174 @@ var ru = (function ($, ru) {
     // Public methods
     return {
       /**
+       * add_new_select2
+       *    Show [table_new] element
+       *
+       */
+      add_new_select2: function (el, prefix, template_selection) {
+        var elTr = null,
+            elRow = null,
+            options = {},
+            elDiv = null;
+
+        try {
+          elTr = $(el).closest("tr");           // Nearest <tr>
+          elDiv = $(elTr).find(".new-mode");    // The div with new-mode in it
+          // Show it
+          $(elDiv).removeClass("hidden");
+          // Find the first row
+          elRow = $(elDiv).find("tbody tr").first();
+          options['select2'] = true;
+          options['prefix'] = prefix;
+          options['table'] = prefix + "_formset";
+          options['events'] = ru.basic.init_typeahead;
+          options['counter'] = false;
+          if (template_selection !== undefined) {
+            options['select2_options'] = { "templateSelection": template_selection }
+          }
+          ru.basic.tabular_addrow($(elRow), options);
+
+          // Add
+        } catch (ex) {
+          private_methods.errMsg("add_new_select2", ex);
+        }
+      },
+
+      /**
+       *  cloneMore
+       *      Add a form to the formset
+       *      selector = the element that should be duplicated
+       *      type     = the formset type
+       *      number   = boolean indicating that re-numbering on the first <td> must be done
+       *
+       */
+      cloneMore: function (selector, type, number) {
+        var elTotalForms = null,
+            total = 0;
+
+        try {
+          // Clone the element in [selector]
+          var newElement = $(selector).clone(true);
+          // Find the total number of [type] elements
+          elTotalForms = $('#id_' + type + '-TOTAL_FORMS').first();
+          // Determine the total of already available forms
+          if (elTotalForms === null || elTotalForms.length === 0) {
+            // There is no TOTAL_FORMS for this type, so calculate myself
+          } else {
+            // Just copy the TOTAL_FORMS value
+            total = parseInt($(elTotalForms).val(), 10);
+          }
+
+          // Find each <input> element
+          newElement.find(':input').each(function (idx, el) {
+            var name = "",
+                id = "",
+                val = "",
+                td = null;
+
+            if ($(el).attr("name") !== undefined) {
+              // Get the name of this element, adapting it on the fly
+              name = $(el).attr("name").replace("__prefix__", total.toString());
+              // Produce a new id for this element
+              id = $(el).attr("id").replace("__prefix__", total.toString());
+              // Adapt this element's name and id, unchecking it
+              $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              // Possibly set a default value
+              td = $(el).parent('td');
+              if (td.length === 0) {
+                td = $(el).parent("div").parent("td");
+              }
+              if (td.length === 1) {
+                val = $(td).attr("defaultvalue");
+                if (val !== undefined && val !== "") {
+                  $(el).val(val);
+                }
+              }
+            }
+          });
+          newElement.find('select').each(function (idx, el) {
+            var td = null;
+
+            if ($(el).attr("name") !== undefined) {
+              td = $(el).parent('td');
+              if (td.length === 0) { td = $(el).parent("div").parent("td"); }
+              if (td.length === 0 || (td.length === 1 && $(td).attr("defaultvalue") === undefined)) {
+                // Get the name of this element, adapting it on the fly
+                var name = $(el).attr("name").replace("__prefix__", total.toString());
+                // Produce a new id for this element
+                var id = $(el).attr("id").replace("__prefix__", total.toString());
+                // Adapt this element's name and id, unchecking it
+                $(el).attr({ 'name': name, 'id': id }).val('').removeAttr('checked');
+              }
+            }
+          });
+
+          // Find each <label> under newElement
+          newElement.find('label').each(function (idx, el) {
+            if ($(el).attr("for") !== undefined) {
+              // Adapt the 'for' attribute
+              var newFor = $(el).attr("for").replace("__prefix__", total.toString());
+              $(el).attr('for', newFor);
+            }
+          });
+
+          // Look at the inner text of <td>
+          newElement.find('td').each(function (idx, el) {
+            var elInsideTd = $(el).find("td");
+            var elText = $(el).children().first();
+            if (elInsideTd.length === 0 && elText !== undefined) {
+              var sHtml = $(elText).html();
+              if (sHtml !== undefined && sHtml !== "") {
+                sHtml = sHtml.replace("__counter__", (total + 1).toString());
+                $(elText).html(sHtml);
+              }
+              // $(elText).html($(elText).html().replace("__counter__", total.toString()));
+            }
+          });
+          // Look at the attributes of <a> and of <input>
+          newElement.find('a, input').each(function (idx, el) {
+            // Iterate over all attributes
+            var elA = el;
+            $.each(elA.attributes, function (i, attrib) {
+              var attrText = $(elA).attr(attrib.name).replace("__counter__", total.toString());
+              // EK (20/feb): $(this).attr(attrib.name, attrText);
+              $(elA).attr(attrib.name, attrText);
+            });
+          });
+
+
+          // Adapt the total number of forms in this formset
+          total++;
+          $('#id_' + type + '-TOTAL_FORMS').val(total);
+
+          // Adaptations on the new <tr> itself
+          newElement.attr("id", "arguments-" + (total - 1).toString());
+          newElement.attr("class", "form-row row" + total.toString());
+
+          // Insert the new element before the selector = empty-form
+          $(selector).before(newElement);
+
+          // Should we re-number?
+          if (number !== undefined && number) {
+            // Walk all <tr> elements of the table
+            var iRow = 1;
+            $(selector).closest("tbody").children("tr.form-row").not(".empty-form").each(function (idx, el) {
+              var elFirstCell = $(el).find("td").not(".hidden").first();
+              $(elFirstCell).html(iRow);
+              iRow += 1;
+            });
+          }
+
+          // Return the new <tr> 
+          return newElement;
+
+        } catch (ex) {
+          private_methods.errMsg("cloneMore", ex);
+          return null;
+        }
+      },
+
+      /**
        * delete_cancel
        *   Hide this <tr> and cancel the delete
        *
@@ -1152,7 +1320,7 @@ var ru = (function ($, ru) {
        *    Gather the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method, iPage) {
+      search_start: function (elStart, method, iPage, sOrder) {
         var frm = null,
             url = "",
             targetid = null,
@@ -1184,6 +1352,12 @@ var ru = (function ($, ru) {
                   $(this).val(iPage);
                 });
               }
+              // If there is a sort order, we need to process it
+              if (sOrder !== undefined) {
+                $(elStart).find("input[name=o]").each(function (el) {
+                  $(this).val(sOrder);
+                });
+              }
               // Now submit the form
               frm.submit();
               break;
@@ -1201,6 +1375,9 @@ var ru = (function ($, ru) {
               // Get the page we need to go to
               if (iPage === undefined) { iPage = 1; }
               data.push({ 'name': 'page', 'value': iPage });
+              if (sOrder !== undefined) {
+                data.push({ 'name': 'o', 'value': sOrder });
+              }
 
               // Issue a post
               $.post(targeturl, data, function (response) {
@@ -1216,8 +1393,8 @@ var ru = (function ($, ru) {
                       // Possibly do some initialisations again??
 
                       // Make sure events are re-established
-                      // ru.basic.init_events();
-                      ru.basic.init_typeahead();
+                      // ru.passim.seeker.init_events();
+                      ru.passim.init_typeahead();
                       break;
                     case "error":
                       // Show the error
@@ -1251,7 +1428,7 @@ var ru = (function ($, ru) {
         try {
           // And then go to the first element within the form that is of any use
           elStart = $(".search_ordered_start").first();
-          ru.passim.seeker.search_start(elStart, 'submit', 1, order)
+          ru.basic.search_start(elStart, 'submit', 1, order)
         } catch (ex) {
           private_methods.errMsg("search_ordered_start", ex);
         }
@@ -1271,6 +1448,68 @@ var ru = (function ($, ru) {
           ru.basic.search_start(elStart, 'submit', iPage)
         } catch (ex) {
           private_methods.errMsg("search_paged_start", ex);
+        }
+      },
+
+      /**
+       * tabular_addrow
+       *   Add one row into a tabular inline
+       *
+       */
+      tabular_addrow: function (elStart, options) {
+        // NOTE: see the definition of lAddTableRow above
+        var oTdef = {},
+            rowNew = null,
+            elTable = null,
+            select2_options = {},
+            iNum = 0,     // Number of <tr class=form-row> (excluding the empty form)
+            sId = "",
+            bSelect2 = false,
+            i;
+
+        try {
+          // Find out just where we are
+          if (elStart === undefined || elStart === null || $(elStart).closest("div").length === 0)
+            elStart = $(this);
+          sId = $(elStart).closest("div[id]").attr("id");
+          // Process options
+          if (options !== undefined) {
+            for (var prop in options) {
+              switch (prop) {
+                case "select2": bSelect2 = options[prop]; break;
+              }
+            }
+          }
+          // Get the definition
+          oTdef = options;
+          if (sId === oTdef.table || sId.indexOf(oTdef.table) >= 0) {
+            // Go to the <tbody> and find the last form-row
+            elTable = $(elStart).closest("tbody").children("tr.form-row.empty-form")
+
+            if ("select2_options" in oTdef) {
+              select2_options = oTdef.select2_options;
+            }
+
+            // Perform the cloneMore function to this <tr>
+            rowNew = ru.basic.cloneMore(elTable, oTdef.prefix, oTdef.counter);
+            // Call the event initialisation again
+            if (oTdef.events !== null) {
+              oTdef.events();
+            }
+            // Possible Select2 follow-up
+            if (bSelect2) {
+              // Remove previous .select2
+              $(rowNew).find(".select2").remove();
+              // Execute djangoSelect2()
+              $(rowNew).find(".django-select2").djangoSelect2(select2_options);
+            }
+            // Any follow-up activity
+            if ('follow' in oTdef && oTdef['follow'] !== null) {
+              oTdef.follow(rowNew);
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("tabular_addrow", ex);
         }
       },
 

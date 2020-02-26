@@ -608,6 +608,10 @@ class BasicList(ListView):
     def adapt_search(self, fields):
         return fields
   
+    def get_template_names(self):
+        names = [ self.template_name ]
+        return names
+
     def get_queryset(self):
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
