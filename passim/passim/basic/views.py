@@ -2,6 +2,7 @@
 Definition of views for the BASIC app.
 """
 
+from django.apps import apps
 from django.contrib.auth.models import User, Group
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -19,15 +20,12 @@ from django.views.generic import ListView, View
 
 import json
 import fnmatch
+import os
 from datetime import datetime
 
 # provide error handling
 from .utils import ErrHandle
 
-# Provide application-specific information
-from ..settings import PROJECT_NAME
-app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
-app_editor = "{}_editor".format(PROJECT_NAME.lower())
 
 # Some constants that can be used
 paginateSize = 20
@@ -38,6 +36,24 @@ paginateValues = (100, 50, 20, 10, 5, 2, 1, )
 bDebug = False
 
 # General functions serving the list and details views
+
+def get_application_name():
+    """Try to get the name of this application"""
+
+    # Walk through all the installed apps
+    for app in apps.get_app_configs():
+        # Check if this is a site-package
+        if "site-package" not in app.path:
+            # Get the name of this app
+            name = app.name
+            # Take the first part before the dot
+            project_name = name.split(".")[0]
+            return project_name
+    return "unknown"
+# Provide application-specific information
+PROJECT_NAME = get_application_name()
+app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_editor = "{}_editor".format(PROJECT_NAME.lower())
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -177,6 +193,7 @@ def make_search_list(filters, oFields, search_list, qd):
                 infield = get_value(search_item, "infield")
                 dbfield = get_value(search_item, "dbfield")
                 fkfield = get_value(search_item, "fkfield")
+                keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
                 s_q = ""
                
@@ -239,6 +256,15 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
+                    elif keyType == "has":
+                        # Check the count for the db field
+                        val = oFields[filter_type]
+                        if val == "yes" or val == "no":
+                            enable_filter(filter_type, head_id)
+                            if val == "yes":
+                                s_q = Q(**{"{}__gt".format(dbfield): 0})
+                            else:
+                                s_q = Q(**{"{}".format(dbfield): 0})
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):

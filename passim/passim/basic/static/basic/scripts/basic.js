@@ -31,6 +31,7 @@ var ru = (function ($, ru) {
     // Define variables for ru.basic here
     var loc_divErr = "basic_err",
         loc_urlStore = "",      // Keep track of URL to be shown
+        loc_progr = [],         // Progress tracking
         loc_bManuSaved = false,
         KEYS = {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
@@ -41,21 +42,61 @@ var ru = (function ($, ru) {
     // Private methods specification
     var private_methods = {
       /**
-       * methodNotVisibleFromOutside - example of a private method
+       * aaaaaaNotVisibleFromOutside - example of a private method
        * @returns {String}
        */
-      methodNotVisibleFromOutside: function () {
+      aaaaaaNotVisibleFromOutside: function () {
         return "something";
       },
+
+      /** 
+       *  errClear - clear the error <div>
+       */
       errClear: function () {
         $("#" + loc_divErr).html("");
       },
+
+      /** 
+       *  errMsg - show error message in <div> loc_divErr
+       */
       errMsg: function (sMsg, ex) {
         var sHtml = "Error in [" + sMsg + "]<br>";
         if (ex !== undefined && ex !== null) {
           sHtml = sHtml + ex.message;
         }
         $("#" + loc_divErr).html(sHtml);
+      },
+
+      /** 
+       *  waitInit - initialize waiting
+       */
+      waitInit: function (el) {
+        var elWaith = null;
+
+        try {
+          // Right now no initialization is defined
+          return elWait;
+        } catch (ex) {
+          private_methods.errMsg("waitInit", ex);
+        }
+      },
+
+      /** 
+       *  waitStart - Start waiting by removing 'hidden' from the DOM point
+       */
+      waitStart: function (el) {
+        if (el !== null) {
+          $(el).removeClass("hidden");
+        }
+      },
+
+      /** 
+       *  waitStop - Stop waiting by adding 'hidden' to the DOM point
+       */
+      waitStop: function (el) {
+        if (el !== null) {
+          $(el).addClass("hidden");
+        }
       }
     }
     // Public methods
@@ -91,6 +132,62 @@ var ru = (function ($, ru) {
           // Add
         } catch (ex) {
           private_methods.errMsg("add_new_select2", ex);
+        }
+      },
+
+      /**
+       * check_progress
+       *    Check the progress of reading e.g. codices
+       *
+       */
+      check_progress: function (progrurl, sTargetDiv) {
+        var elTarget = "#" + sTargetDiv,
+            sMsg = "",
+            lHtml = [];
+
+        try {
+          $(elTarget).removeClass("hidden");
+          // Call the URL
+          $.get(progrurl, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "finished":
+                  // NO NEED for further action
+                  //// Indicate we are ready
+                  //$(elTarget).html("READY");
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(elTarget).html(response.msg);
+                  } else {
+                    $(elTarget).html("An error has occurred");
+                  }
+                  break;
+                default:
+                  if ("msg" in response) { sMsg = response.msg; }
+                  // Combine the status
+                  sMsg = "<tr><td>" + response.status + "</td><td>" + sMsg + "</td></tr>";
+                  // Check if it is on the stack already
+                  if ($.inArray(sMsg, loc_progr) < 0) {
+                    loc_progr.push(sMsg);
+                  }
+                  // Combine the status HTML
+                  sMsg = "<div style=\"max-height: 200px; overflow-y: scroll;\"><table>" + loc_progr.reverse().join("\n") + "</table></div>";
+                  $(elTarget).html(sMsg);
+                  // Make sure we check again
+                  window.setTimeout(function () { ru.basic.check_progress(progrurl, sTargetDiv); }, 200);
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("check_progress", ex);
         }
       },
 
