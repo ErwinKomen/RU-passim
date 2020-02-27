@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{31da21b7-7fe4-4fbd-b762-c33297642943}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>setup.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+    <InterpreterVersion />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="basic\static\basic\content\basic.css" />
+    <Content Include="basic\static\basic\scripts\basic.js" />
+    <Content Include="basic\templates\basic\basic_details.html" />
+    <Content Include="basic\templates\basic\basic_edit.html" />
+    <Content Include="basic\templates\basic\basic_list.html" />
+    <Content Include="LICENSE" />
+    <Content Include="MANIFEST.in" />
+    <Content Include="README.rst" />
+    <Content Include="ru_basic.egg-info\dependency_links.txt" />
+    <Content Include="ru_basic.egg-info\SOURCES.txt" />
+    <Content Include="ru_basic.egg-info\top_level.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="basic\admin.py" />
+    <Compile Include="basic\apps.py" />
+    <Compile Include="basic\migrations\__init__.py" />
+    <Compile Include="basic\models.py" />
+    <Compile Include="basic\tests.py" />
+    <Compile Include="basic\utils.py" />
+    <Compile Include="basic\views.py" />
+    <Compile Include="basic\__init__.py" />
+    <Compile Include="setup.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="basic" />
+    <Folder Include="basic\migrations" />
+    <Folder Include="basic\static\" />
+    <Folder Include="basic\static\basic\" />
+    <Folder Include="basic\static\basic\content" />
+    <Folder Include="basic\static\basic\scripts" />
+    <Folder Include="basic\templates\" />
+    <Folder Include="basic\templates\basic" />
+    <Folder Include="ru_basic.egg-info" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>
