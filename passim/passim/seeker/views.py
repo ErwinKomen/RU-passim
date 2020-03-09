@@ -7666,8 +7666,13 @@ class EqualGoldEdit(BasicDetails):
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
                                        fk_name="super", extra=0)
+    GeqFormSet = inlineformset_factory(EqualGold, SermonGold, 
+                                         form=EqualGoldForm, min_num=0,
+                                         fk_name = "equal",
+                                         extra=0, can_delete=True, can_order=False)
     
-    formset_objects = [{'formsetClass': EqgcolFormSet, 'prefix': 'eqgcol', 'readonly': False, 'noinit': True, 'linkfield': 'super'}]
+    formset_objects = [{'formsetClass': EqgcolFormSet, 'prefix': 'eqgcol', 'readonly': False, 'noinit': True, 'linkfield': 'super'},
+                       {'formsetClass': GeqFormSet, 'prefix': 'geq', 'readonly': False}]
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7719,29 +7724,6 @@ class EqualGoldEdit(BasicDetails):
                 bResult = False
         return None
 
-    #def before_save(self, form, instance):
-    #    """Action to be performed after saving an item preliminarily, and before saving completely
-        
-    #    Process any [authorname] into an [author] if possible
-    #    """
-
-    #    oErr = ErrHandle()
-    #    msg = ""
-    #    bResult = True
-        
-    #    try:
-    #        cleaned_data = form.cleaned_data
-    #        #if 'authorname' in cleaned_data: 
-    #        #    authorname = cleaned_data['authorname']
-    #        #    if authorname:
-    #        #        author = Author.objects.filter(name=authorname).first()
-    #        #        if author:
-    #        #            instance.author = author
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        bResult = False
-    #    return bResult, msg
-
     def after_save(self, form, instance):
         msg = ""
         bResult = True
@@ -7775,7 +7757,7 @@ class EqualGoldDetails(EqualGoldEdit):
         related_objects = []
 
         # First list: gold-sermons within the equality set
-        goldsermons = dict(title="Gold sermons that are part of this Super Sermon Gold")
+        goldsermons = dict(prefix="gs", title="Gold sermons that are part of this Super Sermon Gold")
         # Get the list of SG that are part of the equality set
         qs = instance.equal_goldsermons.all().order_by('author__name')
         if qs.count() > 0:
@@ -7787,9 +7769,18 @@ class EqualGoldDetails(EqualGoldEdit):
             goldsermons['rel_list'] = rel_list
             goldsermons['columns'] = ['Summary']
             goldsermons['use_counter'] = True
+            goldsermons['editable'] = True
             related_objects.append(goldsermons)
 
         context['related_objects'] = related_objects
+
+        ## List of formset objects
+        #formset_objects = []
+        #goldsermons = dict(prefix="geq", title="Gold sermons that are part of this Super Sermon Gold")
+        #formset_objects.append(goldsermons)
+
+        #context['formset_objects'] = formset_objects
+
         # Return the context we have made
         return context
 

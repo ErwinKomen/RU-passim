@@ -129,3 +129,38 @@ The generic details view allows specifying two additional matters:
 
 1. ``sections``: Sets of object details that are hidden by default, but appear when pressing a button
 2. ``related_objects``: listviews of objects that link with it.
+
+*Sections*
+
+As for the ``sections``: TODO explain
+
+*Related Objects*
+
+The ``related_objects`` is a list of objects. Each related object boils down to a **table** that is shown with a list of objects.
+A related object can have the following fields:
+
+================= ============================================================================
+key               meaning
+================= ============================================================================
+``*title``        a title of this table shown to the user
+``*columns``      a list of names (strings) for each of the columns to be shown
+``*rel_list``     a list of related item objects (the rows in the table to be shown)
+``*prefix``       short prefix that uniquely identifies this related object
+``[use_counter]`` boolean: True means that each line in the table must have a number
+``[editable]``    boolean: True means that add/edit/delete options are added
+================= ============================================================================
+
+Note that when ``editable`` is set to True, and the user has editing rights, several items are added.
+Each row gets an 'edit' button and a 'delete' button. The table as a whole gets an additional row that forms the 'add' button.
+The add facility makes use of a hidden empty row that is added.
+
+Each item in the ``rel_list`` is an object that can have the following fields:
+
+================= ============================================================================
+key               meaning
+================= ============================================================================
+``*value``        the HTML of what is shown in this row
+``[title]``       a popup title shown when a user hovers over this row
+``[link]``        a link (URL) to which the user is directed when pressing this row
+================= ============================================================================
+

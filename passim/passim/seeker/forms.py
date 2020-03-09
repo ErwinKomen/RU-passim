@@ -868,7 +868,7 @@ class SuperSermonGoldForm(forms.ModelForm):
             if authorname:
                 # Figure out what the author is
                 author = Author.objects.filter(name=authorname).first()
-        if self.instance:
+        if self.instance and self.instance.author:
             if self.instance.author.id != author.id:
                 # Create a copy of the object I used to be
                 moved = EqualGold.create_moved(self.instance)
