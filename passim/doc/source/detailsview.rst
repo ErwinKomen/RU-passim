@@ -28,7 +28,6 @@ Here is an example of an EditView:
       title = "Super Sermon Gold"
       rtype = "json"   
       mainitems = []
-      is_basic = True      
 
       def add_to_context(self, context, instance):
          """Add to the existing context"""
@@ -78,6 +77,9 @@ key               meaning
 ``*label``        the label shown in the details view for this item
 ``*value``        the value to be displayed (use ``instance`` to derive it)
 ``*link``         the URL that the user can link to from this value
+``[title]``       the popup text displayed when hovering over
+``[multiple]``    boolean that indicates whether this field may contain multiple values
+``[align]``       the alignment of the ``<td>``
 ``[field_key]``   the name of the form field for this item
 ``[field_ta]``    the name of the typeahead form field for this item
 ``[key_ta]``      the 'key' used for typeahead (CSS class name, e.g. "author-key")

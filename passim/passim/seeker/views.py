@@ -7753,6 +7753,19 @@ class EqualGoldDetails(EqualGoldEdit):
 
         context['sections'] = []
 
+        # List of post-load objects
+        postload_objects = []
+        # (1) postload: gold equality
+        gold = instance.equal_goldsermons.first()
+        geq_obj = dict(prefix="geq", url=reverse('gold_eqset', kwargs={'pk': gold.id}))
+        postload_objects.append(geq_obj)
+
+        # (2) postload: relation to other
+        glink_obj = dict(prefix="glink", url=reverse('gold_linkset', kwargs={'pk': gold.id}))
+        postload_objects.append(glink_obj)
+
+        context['postload_objects'] = postload_objects
+
         # Lists of related objects
         related_objects = []
 
