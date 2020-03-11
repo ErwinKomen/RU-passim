@@ -86,6 +86,14 @@
               {% endfor %}
             {% endif %}
 
+            <!-- List of post-load items -->
+            {% for postload in postload_objects %}
+              <div class="row">&nbsp;</div>
+              <div id="{{postload.prefix}}_set" class="post-load" targeturl="{{postload.url}}">
+                <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+              </div>
+            {% endfor %}
+
 
             <!-- Lists of related items -->
             {% for related in related_objects %}
@@ -168,14 +176,6 @@
                   </table>
                 </div>
 
-              </div>
-            {% endfor %}
-
-            <!-- List of post-load formsets -->
-            {% for fsobj in formset_objects %}
-              <div class="row">&nbsp;</div>
-              <div id="{{fsobj.prefix}}_set" class="post-load" targeturl="{{fsobj.url}}">
-                <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
               </div>
             {% endfor %}
 
