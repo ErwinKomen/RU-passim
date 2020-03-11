@@ -95,6 +95,20 @@ class EdirefSgWidget(ModelSelect2MultipleWidget):
         return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class EqualGoldWidget(ModelSelect2Widget):
+    model = EqualGold
+    search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Determine the full text
+        full = obj.get_text()
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return EqualGold.objects.all().order_by('code').distinct()
+
+
 class ProjectWidget(ModelSelect2MultipleWidget):
     model = Project
     search_fields = [ 'name__icontains' ]
@@ -157,9 +171,6 @@ class ProjectOneWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return Project.objects.all().order_by('name').distinct()
-
-
-#class ManuIdnoWidget(HeavySelect2Widget):
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
@@ -823,7 +834,7 @@ class SuperSermonGoldForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-    typeaheads = ["authors", "gldincipits", "gldexplicits"]
+    typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -860,7 +871,7 @@ class SuperSermonGoldForm(forms.ModelForm):
         return None
 
     def clean_author(self):
-        """Possibly determin the author if not known"""
+        """Possibly determine the author if not known"""
         
         author = self.cleaned_data.get("author", None)
         if not author:
@@ -872,10 +883,13 @@ class SuperSermonGoldForm(forms.ModelForm):
             if self.instance.author.id != author.id:
                 # Create a copy of the object I used to be
                 moved = EqualGold.create_moved(self.instance)
+                # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
         return author
 
 
 class EqualGoldLinkForm(forms.ModelForm):
+    target_list = ModelChoiceField(queryset=None, required=False,
+                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     gold = forms.CharField(label=_("Destination gold sermon"), required=False)
 
     class Meta:
@@ -893,6 +907,8 @@ class EqualGoldLinkForm(forms.ModelForm):
         init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
         # Make sure to set required and optional fields
         self.fields['dst'].required = False
+        self.fields['target_list'].required = False
+        self.fields['target_list'].queryset = EqualGold.objects.all().order_by('code')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -900,6 +916,7 @@ class EqualGoldLinkForm(forms.ModelForm):
                 #  NOTE: the following has no effect because we use bound fields
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
+                self.fields['target_list'].queryset = EqualGold.objects.exclude(id=instance.id).order_by('code')
                 pass
 
 

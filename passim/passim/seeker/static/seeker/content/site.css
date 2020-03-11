@@ -1298,6 +1298,12 @@ a.sermon:link, a.sermon:visited {
   color: darkblue;
 }
 
+.passimcode {
+  /* font-family: monospace; */
+  font-size: smaller;
+  color: darkgreen;
+}
+
 div.view-mode a {
   text-decoration: none;
   color: inherit;

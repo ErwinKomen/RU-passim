@@ -89,7 +89,7 @@
             <!-- List of post-load items -->
             {% for postload in postload_objects %}
               <div class="row">&nbsp;</div>
-              <div id="{{postload.prefix}}_set" class="post-load" targeturl="{{postload.url}}">
+              <div id="{{postload.prefix}}_postload_set" class="post-load" targeturl="{{postload.url}}">
                 <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
               </div>
             {% endfor %}

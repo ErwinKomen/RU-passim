@@ -65,7 +65,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
                                 SuperSermonGoldCollectionForm
-from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, add_gold2equal, add_equal2equal, Country, City, Author, Manuscript, \
+from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
@@ -333,6 +334,8 @@ def action_model_changes(form, instance):
                         rep_str = str(rep)
                         rep_list.append(rep_str)
                     representation = json.dumps(rep_list)
+                elif isinstance(representation, object):
+                    representation = [ representation.id ]
                 changes[item] = representation
             except:
                 changes[item] = "(unavailable)"
@@ -2944,6 +2947,31 @@ def get_litrefs(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_ssg(request):
+    """Get ONE particular short representation of a SSG"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            ssg = EqualGold.objects.filter(Q(id=sId)).first()
+            if ssg:
+                short = ssg.get_short()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_litref")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_manuidnos(request):
     """Get a list of manuscript identifiers for autocomplete"""
 
@@ -4417,11 +4445,6 @@ class PassimDetails(DetailView):
         # Return the form we made
         return frm
     
-
-# NOTE: this has now been surpassed by the 'basic' app with basic.BasicDetails
-#class BasicDetails(PassimDetails):
-#    is_basic = True
-
 
 class BasicListView(ListView):
     """Basic listview
@@ -7756,12 +7779,12 @@ class EqualGoldDetails(EqualGoldEdit):
         # List of post-load objects
         postload_objects = []
         # (1) postload: gold equality
-        gold = instance.equal_goldsermons.first()
-        geq_obj = dict(prefix="geq", url=reverse('gold_eqset', kwargs={'pk': gold.id}))
+        # gold = instance.equal_goldsermons.first()
+        geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
         postload_objects.append(geq_obj)
 
         # (2) postload: relation to other
-        glink_obj = dict(prefix="glink", url=reverse('gold_linkset', kwargs={'pk': gold.id}))
+        glink_obj = dict(prefix="ssglink", url=reverse('equalgold_linkset', kwargs={'pk': instance.id}))
         postload_objects.append(glink_obj)
 
         context['postload_objects'] = postload_objects
@@ -7769,30 +7792,23 @@ class EqualGoldDetails(EqualGoldEdit):
         # Lists of related objects
         related_objects = []
 
-        # First list: gold-sermons within the equality set
-        goldsermons = dict(prefix="gs", title="Gold sermons that are part of this Super Sermon Gold")
-        # Get the list of SG that are part of the equality set
-        qs = instance.equal_goldsermons.all().order_by('author__name')
-        if qs.count() > 0:
-            rel_list = []
-            for item in qs:
-                rel_item = []
-                rel_item.append({'value': item.get_view(), 'title': 'View this gold sermon', 'link': reverse('gold_details', kwargs={'pk': item.id})})
-                rel_list.append(rel_item)
-            goldsermons['rel_list'] = rel_list
-            goldsermons['columns'] = ['Summary']
-            goldsermons['use_counter'] = True
-            goldsermons['editable'] = True
-            related_objects.append(goldsermons)
+        ## First list: gold-sermons within the equality set
+        #goldsermons = dict(prefix="gs", title="Gold sermons that are part of this Super Sermon Gold")
+        ## Get the list of SG that are part of the equality set
+        #qs = instance.equal_goldsermons.all().order_by('author__name')
+        #if qs.count() > 0:
+        #    rel_list = []
+        #    for item in qs:
+        #        rel_item = []
+        #        rel_item.append({'value': item.get_view(), 'title': 'View this gold sermon', 'link': reverse('gold_details', kwargs={'pk': item.id})})
+        #        rel_list.append(rel_item)
+        #    goldsermons['rel_list'] = rel_list
+        #    goldsermons['columns'] = ['Summary']
+        #    goldsermons['use_counter'] = True
+        #    goldsermons['editable'] = True
+        #    related_objects.append(goldsermons)
 
         context['related_objects'] = related_objects
-
-        ## List of formset objects
-        #formset_objects = []
-        #goldsermons = dict(prefix="geq", title="Gold sermons that are part of this Super Sermon Gold")
-        #formset_objects.append(goldsermons)
-
-        #context['formset_objects'] = formset_objects
 
         # Return the context we have made
         return context
@@ -7877,6 +7893,176 @@ class EqualGoldListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
+
+
+class EqualGoldEqualset(BasicPart):
+    """The set of gold sermons that are part of one SSG = EqualGold object"""
+
+    MainModel = EqualGold
+    template_name = 'seeker/super_eqset.html'
+    title = "SuperSermonGoldEqualset"
+    SSGeqFormSet = inlineformset_factory(EqualGold, SermonGold, 
+                                         form=EqualGoldForm, min_num=0,
+                                         fk_name = "equal",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SSGeqFormSet, 'prefix': 'ssgeq', 'readonly': False}]
+
+    def get_queryset(self, prefix):
+        qs = None
+        if prefix == "ssgeq":
+            # Get all SermonGold instances with the same EqualGold
+            #  (those are all SermonGold instances that have a FK linking to me)
+            qs = self.obj.equal_goldsermons.all()
+        return qs
+
+    def get_instance(self, prefix):
+        if prefix == "ssgeq" or "ssgeq" in prefix:
+            return self.obj
+        else:
+            return self.obj
+
+    def process_formset(self, prefix, request, formset):
+        if prefix == "ssgeq":
+            for form in formset:
+                # Check if this has an instance
+                if form.instance == None or form.instance.id == None:
+                    # This has no SermonGold instance: retrieve it from the 'gold' value
+                    if 'gold' in form.fields:
+                        gold_id = form['gold'].data
+                        if gold_id != "":
+                            gold = SermonGold.objects.filter(id=gold_id).first()
+                            form.instance = gold
+        # No return value needed
+        return True
+
+    def remove_from_eqset(self, instance):
+        # In fact, a new 'EqualGold' instance must be created
+        geq = instance.equal.create_new()
+        # Set the SermonGold instance to this new equality set
+        instance.equal = geq
+        instance.save()
+        # Check if we need to retain any partial or other links
+        gdkeep = [x for x in self.qd if "gdkeep-" in x]
+        for keep in gdkeep:
+            eqgl = EqualGoldLink.objects.filter(id=self.qd[keep]).first()
+            # Create a new link
+            lnk = EqualGoldLink(src=geq, dst=eqgl.dst, linktype=eqgl.linktype)
+            lnk.save()
+        # Return positively
+        return True
+
+    def before_delete(self, prefix = None, instance = None):
+        """Check if moving of non-equal links should take place"""
+
+        # NOTE: this is already part of a transaction.atomic() area!!!
+        bDoDelete = True
+        if prefix != None and prefix == "ssgeq" and instance != None:
+            # No actual deletion of anything should take place...
+            bDoDelete = False
+            # Perform the operation
+            self.remove_from_eqset(instance)
+        return bDoDelete
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        # Use [self.gold] to communicate with [after_save()]
+
+        bNeedSaving = False
+        if prefix == "ssgeq":
+            self.gold = None
+            if 'gold' in form.cleaned_data:
+                # Get the form's 'gold' value
+                gold_id = form.cleaned_data['gold']
+                if gold_id != "":
+                    # Find the gold to attach to
+                    gold = SermonGold.objects.filter(id=gold_id).first()
+                    if gold != None and gold.id != instance.id:
+                        self.gold = gold
+        return bNeedSaving
+
+    def after_save(self, prefix, instance = None, form = None):
+        # The instance here is the geq-instance, so an instance of SermonGold
+        # Now make sure all related material is updated
+
+        if self.gold == None:
+            # Add this gold sermon to the equality group of the target
+            added, lst_res = add_gold2equal(instance, self.obj)
+        else:
+            # The user wants to change the gold-sermon inside the equality set: 
+            # (1) Keep track of the current equality set
+            eqset = self.obj
+            # (2) Remove [instance] from the equality set
+            self.remove_from_eqset(instance)
+            # (3) Add [gold] to the current equality set
+            added, lst_res = add_gold2equal(self.gold, eqset)
+            # (4) Save changes to the instance
+            self.obj.save()
+            # bNeedSaving = True
+        return True
+
+    def add_to_context(self, context):
+        # Get the EqualGold instances to which I am associated
+        context['associations'] = self.obj.equalgold_src.all()
+
+        return context
+
+    
+class EqualGoldLinkset(BasicPart):
+    """The set of EqualGold instances that link to an EqualGold one, but that are not 'equal' """
+
+    MainModel = EqualGold
+    template_name = 'seeker/super_linkset.html'
+    title = "SermonGoldLinkset"
+    SSGlinkFormSet = inlineformset_factory(EqualGold, EqualGoldLink,
+                                         form=EqualGoldLinkForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
+    formset_objects = [{'formsetClass': SSGlinkFormSet, 'prefix': 'ssglink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
+
+    def process_formset(self, prefix, request, formset):
+        if prefix == "ssglink":
+            # Check the forms in the formset, and set the correct 'dst' values where possible
+            for form in formset:
+                if 'gold' in form.changed_data and 'dst' in form.fields and 'gold' in form.fields:
+                    gold_id = form['gold'].data
+                    dst_id = form['dst'].data
+                    if gold_id != None and gold_id != "":
+                        gold = SermonGold.objects.filter(id=gold_id).first()
+                        if gold != None:
+                            # Gaat niet: form['dst'].data = gold.equal
+                            #            form['dst'].data = gold.equal.id
+                            #            form.fields['dst'].initial = gold.equal.id
+                            form.instance.dst = gold.equal
+                # x = form.instance.src.relations.all()
+        # No need to return a value
+        return True
+
+    def before_delete(self, prefix = None, instance = None):
+        id = instance.id
+        return True
+
+    def before_save(self, prefix, request, instance = None, form = None):
+        bNeedSaving = False
+        if prefix == "ssglink":
+            if 'gold' in form.cleaned_data:
+                # Get the form's 'gold' value
+                gold_id = form.cleaned_data['gold']
+                if gold_id != "":
+                    # Find the gold to attach to
+                    gold = SermonGold.objects.filter(id=gold_id).first()
+                    if gold != None:
+                        # The destination must be an EqualGold instance
+                        instance.dst = gold.equal
+                        bNeedSaving = True
+        return bNeedSaving
+
+    def after_save(self, prefix, instance = None, form = None):
+        # The instance here is the glink-instance, so an instance of EqualGoldLink
+        # Now make sure all related material is updated
+
+        # WAS: added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
+
+        added, lst_res = add_ssg_equal2equal(self.obj, instance.dst, instance.linktype)
+        return True
 
 
 class AuthorEdit(PassimDetails):

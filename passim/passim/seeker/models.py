@@ -630,6 +630,72 @@ def add_gold2gold(src, dst, ltype, eq_log = None):
     # Return the number of added relations
     return added, lst_total
 
+def add_ssg_equal2equal(src, dst_eq, ltype):
+    """Add a EqualGold-to-EqualGold relation from src to dst of type ltype"""
+
+    # Initialisations
+    lst_add = []
+    lst_total = []
+    added = 0
+    oErr = ErrHandle()
+
+    try:
+        # Main body of add_equal2equal()
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Action depends on the kind of relationship that is added
+        if ltype == LINK_EQUAL:
+            eq_added, eq_list = add_gold2equal(src, dst_eq)
+
+            for item in eq_list: lst_total.append(item)
+
+            # (6) Bookkeeping
+            added += eq_added
+        elif src == dst_eq:
+            # Trying to add an equal link to two gold-sermons that already are in the same equality group
+            pass
+        else:
+            # What is added is a partially equals link - between equality groups
+            prt_added = 0
+
+            # (1) save the source group
+            groups = []
+            groups.append({'grp_src': src, 'grp_dst': dst_eq})
+            groups.append({'grp_src': dst_eq, 'grp_dst': src})
+            #grp_src = src.equal
+            #grp_dst = dst_eq
+
+            for group in groups:
+                grp_src = group['grp_src']
+                grp_dst = group['grp_dst']
+                # (2) Check existing link(s) between the groups
+                obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+                if obj == None:
+                    # (3a) there is no link yet: add it
+                    obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                    obj.save()
+                    # Bookkeeping
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
+                    prt_added += 1
+                else:
+                    # (3b) There is a link, but possibly of a different type
+                    obj.linktype = ltype
+                    obj.save()
+
+            # (3) Bookkeeping
+            added += prt_added
+
+        # Finish the report list
+        lst_total.append("</tbody></table>")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_ssg_equal2equal")
+
+    # Return the number of added relations
+    return added, lst_total
+
 def add_equal2equal(src, dst_eq, ltype):
     """Add a EqualGold-to-EqualGold relation from src to dst of type ltype"""
 
@@ -3117,14 +3183,23 @@ class EqualGold(models.Model):
     def create_moved(self):
         """Create a copy of [self], and indicate in that copy that it moved to [self]"""
 
+        # Get a copy of self
+        org = self.create_new()
+        # Now indicate where the original moved to
+        org.moved = self
+        # Save the result
+        org.save()
+        return org
+
+    def create_new(self):
+        """Create a copy of [self]"""
+
         fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code']
         org = EqualGold()
         for field in fields:
             value = getattr(self, field)
             if value != None:
                 setattr(org, field, value)
-        # Now indicate where the original moved to
-        org.moved = self
         # Save the result
         org.save()
         return org
@@ -3139,6 +3214,82 @@ class EqualGold(models.Model):
         else:
             iNumber = qs_ssg.first().number + 1
         return iNumber
+
+    def get_short(self):
+        """Get a very short textual summary"""
+
+        lHtml = []
+        # Add the PASSIM code
+        lHtml.append("{}".format(self.code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append(" {} ".format(" | ".join(lSign)))
+        # Treat the author
+        if self.author:
+            lHtml.append(" {} ".format(self.author.name))
+        # Return the results
+        return "".join(lHtml)
+
+    def get_text(self):
+        """Get a short textual representation"""
+
+        lHtml = []
+        # Add the PASSIM code
+        lHtml.append("{}".format(self.code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append(" {} ".format(" | ".join(lSign)))
+        # Treat the author
+        if self.author:
+            lHtml.append(" {} ".format(self.author.name))
+        # Treat incipit
+        if self.incipit: lHtml.append(" {}".format(self.srchincipit))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.srchexplicit))
+        # Return the results
+        return "".join(lHtml)
+
+    def get_view(self):
+        """Get a HTML valid view of myself"""
+
+        lHtml = []
+        # Add the PASSIM code
+        lHtml.append("<span class='passimcode'>{}</span>".format(self.code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append("<span class='signature'>{}</span>".format(" | ".join(lSign)))
+        else:
+            lHtml.append("[-]")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
+        else:
+            lHtml.append("(by <i>Unknwon Author</i>) ")
+        # Treat incipit
+        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+        # Return the results
+        return "".join(lHtml)
 
     def passim_code(auth_num, iNumber):
         """determine a passim code based on author number and sermon number"""

@@ -657,6 +657,7 @@ var ru = (function ($, ru) {
             elA = null,
             object_id = "",
             targetid = null,
+            post_loads = [],
             sHtml = "";
 
         try {
@@ -682,48 +683,52 @@ var ru = (function ($, ru) {
 
           // See if there are any post-loads to do
           $(".post-load").each(function (idx, value) {
-            var targetid = $(this),
-                data = [],
+            var targetid = $(this);
+            post_loads.push(targetid);
+            // Remove the class
+            $(targetid).removeClass("post-load");
+          });
+
+          // Now address all items from the list of post-load items
+          post_loads.forEach(function (targetid, index) {
+            var data = [],
                 lst_ta = [],
                 i = 0,
                 targeturl = $(targetid).attr("targeturl");
 
-            // Only do this on the first one
-            if (idx === 0) {
-              // Load this one with a GET action
-              $.get(targeturl, data, function (response) {
-                // Remove the class
-                $(targetid).removeClass("post-load");
+            // Load this one with a GET action
+            $.get(targeturl, data, function (response) {
+              // Remove the class
+              $(targetid).removeClass("post-load");
 
-                // Action depends on the response
-                if (response === undefined || response === null || !("status" in response)) {
-                  private_methods.errMsg("No status returned");
-                } else {
-                  switch (response.status) {
-                    case "ok":
-                      // Show the result
-                      $(targetid).html(response['html']);
-                      // Call initialisation again
-                      ru.basic.init_events(sUrlShow);
-                      // Handle type aheads
-                      if ("typeaheads" in response) {
-                        // Perform typeahead for these ones
-                        // TODO: implement?? ru.basic.init_event_listeners(response.typeaheads);
-                      }
-                      break;
-                    case "error":
-                      // Show the error
-                      if ('msg' in response) {
-                        $(targetid).html(response.msg);
-                      } else {
-                        $(targetid).html("An error has occurred");
-                      }
-                      break;
-                  }
+              // Action depends on the response
+              if (response === undefined || response === null || !("status" in response)) {
+                private_methods.errMsg("No status returned");
+              } else {
+                switch (response.status) {
+                  case "ok":
+                    // Show the result
+                    $(targetid).html(response['html']);
+                    // Call initialisation again
+                    ru.basic.init_events(sUrlShow);
+                    // Handle type aheads
+                    if ("typeaheads" in response) {
+                      // Perform typeahead for these ones
+                      ru.basic.init_event_listeners(response.typeaheads);
+                    }
+                    break;
+                  case "error":
+                    // Show the error
+                    if ('msg' in response) {
+                      $(targetid).html(response.msg);
+                    } else {
+                      $(targetid).html("An error has occurred");
+                    }
+                    break;
                 }
+              }
 
-              });
-            }
+            });
           });
 
           // Allow "Search on ENTER" from typeahead fields

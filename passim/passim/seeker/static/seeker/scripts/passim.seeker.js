@@ -33,6 +33,11 @@ var ru = (function ($, ru) {
           },
           // super
           { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead },
+          {
+            "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.ssg_template }
+          },
 
           // gold
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
@@ -1182,52 +1187,86 @@ var ru = (function ($, ru) {
             elA = null,
             object_id = "",
             targetid = null,
+            post_loads = [],
+            options = {},
             sHtml = "";
 
         try {
           // See if there are any post-loads to do
           $(".post-load").each(function (idx, value) {
+            var targetid = $(this);
+            post_loads.push(targetid);
+            // Remove the class
+            $(targetid).removeClass("post-load");
+          });
+
+          // Now address all items from the list of post-load items
+          post_loads.forEach(function (targetid, index) {
             var targetid = $(this),
                 data = [],
                 lst_ta = [],
                 i = 0,
                 targeturl = $(targetid).attr("targeturl");
 
-            // Only do this on the first one
-            if (idx === 0) {
-              // Load this one with a GET action
-              $.get(targeturl, data, function (response) {
-                // Remove the class
-                $(targetid).removeClass("post-load");
+            // Load this one with a GET action
+            $.get(targeturl, data, function (response) {
+              // Remove the class
+              $(targetid).removeClass("post-load");
 
-                // Action depends on the response
-                if (response === undefined || response === null || !("status" in response)) {
-                  private_methods.errMsg("No status returned");
-                } else {
-                  switch (response.status) {
-                    case "ok":
-                      // Show the result
-                      $(targetid).html(response['html']);
-                      // Call initialisation again
-                      ru.passim.seeker.init_events(sUrlShow);
-                      // Handle type aheads
-                      if ("typeaheads" in response) {
-                        // Perform typeahead for these ones
-                        ru.passim.init_event_listeners(response.typeaheads);
-                      }
-                      break;
-                    case "error":
-                      // Show the error
-                      if ('msg' in response) {
-                        $(targetid).html(response.msg);
-                      } else {
-                        $(targetid).html("An error has occurred");
-                      }
-                      break;
-                  }
+              // Action depends on the response
+              if (response === undefined || response === null || !("status" in response)) {
+                private_methods.errMsg("No status returned");
+              } else {
+                switch (response.status) {
+                  case "ok":
+                    // Show the result
+                    $(targetid).html(response['html']);
+                    // Call initialisation again
+                    ru.passim.seeker.init_events(sUrlShow);
+                    // Handle type aheads
+                    if ("typeaheads" in response) {
+                      // Perform typeahead for these ones
+                      ru.passim.init_event_listeners(response.typeaheads);
+                    }
+                    break;
+                  case "error":
+                    // Show the error
+                    if ('msg' in response) {
+                      $(targetid).html(response.msg);
+                    } else {
+                      $(targetid).html("An error has occurred");
+                    }
+                    break;
                 }
+              }
 
-              });
+            });
+          });
+
+          options = { "templateSelection": ru.passim.ssg_template };
+          $(".django-select2.select2-ssg").djangoSelect2(options);
+          $(".django-select2.select2-ssg").select2({
+            templateSelection: ru.passim.ssg_template
+          });
+          $(".django-select2.select2-ssg").on("select2:select", function (e) {
+            var sId = $(this).val(),
+                sText = "",
+                sHtml = "",
+                idx = 0,
+                elOption = null,
+                elRendered = null;
+
+            elRendered = $(this).parent().find(".select2-selection__rendered");
+            sHtml = $(elRendered).html();
+            idx = sHtml.indexOf("</span>");
+            if (idx > 0) {
+              idx += 7;
+              sText = sHtml.substring(idx);
+              if (sText.length > 50) {
+                sText = sText.substring(0, 50) + "...";
+                sHtml = sHtml.substring(0, idx) + sText;
+                $(elRendered).html(sHtml);
+              }
             }
           });
 

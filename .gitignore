@@ -307,3 +307,4 @@ ModelManifest.xml
 /ru-basic/basic/migrations
 /ru-basic/dist
 /ru-basic/ru_basic.egg-info
+/passim/passim/seeker/templates/seeker/super_linkset_ORG.html
