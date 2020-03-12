@@ -3219,6 +3219,7 @@ class EqualGold(models.Model):
         """Get a very short textual summary"""
 
         lHtml = []
+        lHtml.append("SHORT")
         # Add the PASSIM code
         lHtml.append("{}".format(self.code))
         # Treat signatures

@@ -1243,32 +1243,32 @@ var ru = (function ($, ru) {
             });
           });
 
-          options = { "templateSelection": ru.passim.ssg_template };
-          $(".django-select2.select2-ssg").djangoSelect2(options);
-          $(".django-select2.select2-ssg").select2({
-            templateSelection: ru.passim.ssg_template
-          });
-          $(".django-select2.select2-ssg").on("select2:select", function (e) {
-            var sId = $(this).val(),
-                sText = "",
-                sHtml = "",
-                idx = 0,
-                elOption = null,
-                elRendered = null;
+          //options = { "templateSelection": ru.passim.ssg_template };
+          //$(".django-select2.select2-ssg").djangoSelect2(options);
+          //$(".django-select2.select2-ssg").select2({
+          //  templateSelection: ru.passim.ssg_template
+          //});
+          //$(".django-select2.select2-ssg").on("select2:select", function (e) {
+          //  var sId = $(this).val(),
+          //      sText = "",
+          //      sHtml = "",
+          //      idx = 0,
+          //      elOption = null,
+          //      elRendered = null;
 
-            elRendered = $(this).parent().find(".select2-selection__rendered");
-            sHtml = $(elRendered).html();
-            idx = sHtml.indexOf("</span>");
-            if (idx > 0) {
-              idx += 7;
-              sText = sHtml.substring(idx);
-              if (sText.length > 50) {
-                sText = sText.substring(0, 50) + "...";
-                sHtml = sHtml.substring(0, idx) + sText;
-                $(elRendered).html(sHtml);
-              }
-            }
-          });
+          //  elRendered = $(this).parent().find(".select2-selection__rendered");
+          //  sHtml = $(elRendered).html();
+          //  idx = sHtml.indexOf("</span>");
+          //  if (idx > 0) {
+          //    idx += 7;
+          //    sText = sHtml.substring(idx);
+          //    if (sText.length > 50) {
+          //      sText = sText.substring(0, 50) + "...";
+          //      sHtml = sHtml.substring(0, idx) + sText;
+          //      $(elRendered).html(sHtml);
+          //    }
+          //  }
+          //});
 
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
           $("tr.add-row").each(function () {
@@ -1331,6 +1331,38 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      init_select2: function (elName) {
+        var select2_options = null,
+            i = 0,
+            elDiv = "#" + elName,
+            oRow = null;
+
+        try {
+          for (i = 0; i < lAddTableRow.length; i++) {
+            oRow = lAddTableRow[i];
+            if (oRow['table'] === elName) {
+              if ("select2_options" in oRow) {
+                select2_options = oRow['select2_options'];
+                // Remove previous .select2
+                $(elDiv).find(".select2").remove();
+                // Execute djangoSelect2()
+                $(elDiv).find(".django-select2").djangoSelect2(select2_options);
+                return true;
+              }
+            }
+          }
+          return false;
+        } catch (ex) {
+          private_methods.errMsg("init_select2", ex);
+          return false;
         }
       },
 
@@ -3195,8 +3227,9 @@ var ru = (function ($, ru) {
        *   Switch everything in the current <tr> according to the mode
        *
        */
-      gold_row_edit: function (el, mode) {
-        var elTr = null;
+      gold_row_edit: function (el, mode, option) {
+        var elTr = null,
+            elDiv = null;
 
         try {
           // Get to the <tr>
@@ -3208,6 +3241,11 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").removeClass("hidden");
               $(elTr).find(".view-mode").addClass("hidden");
               $(el).closest("td").addClass("hightlighted");
+              if (option !== undefined && option === "select2") {
+                elDiv = $(el).closest("div[id]");
+
+                ru.passim.seeker.init_select2($(elDiv).attr("id"));
+              }
               break;
             case "view":
               $(el).closest("td").removeClass("hightlighted");
@@ -3663,6 +3701,11 @@ var ru = (function ($, ru) {
               switch (prop) {
                 case "select2": bSelect2 = options[prop]; break;
               }
+            }
+          } else {
+            options = $(elStart).attr("options");
+            if (options !== undefined && options === "select2") {
+              bSelect2 = true;
             }
           }
           // Walk all tables

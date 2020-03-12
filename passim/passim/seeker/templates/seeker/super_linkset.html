@@ -27,7 +27,7 @@
                 <td valign="top" class="clickable"  style="min-width: 20px;">
                   {% if is_passim_editor %}
                     <div class="view-mode">
-                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
+                      <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit', 'select2');" title="Edit this link">
                         <span class="glyphicon glyphicon-pencil"></span>
                       </a>
                     </div>
@@ -127,7 +127,7 @@
                     {% include 'seeker/sermongold_view.html' with msitem=ssglink_formset.empty_form.instance.dst %}
                   </div>
                   <div class="edit-mode" >
-                    Search and select a super sermon gold to link to
+                    {{ssglink_formset.empty_form.target_list}}
                   </div>
                   <!-- Confirmation of delete -->
                   <div class="delete-confirm hidden">
@@ -151,7 +151,7 @@
               <tr class="add-row">
                 <td colspan="5">
                   <span id="add_gold_link">
-                    <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a link from this super sermon gold to another one</a>
+                    <a href="#" options="select2"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add a link from this super sermon gold to another one</a>
                   </span>
                 </td>
               </tr>
@@ -167,5 +167,6 @@
 
 <script>
   ru.passim.seeker.init_events();
+  ru.passim.seeker.init_select2("ssglink_formset");
 </script>
 

@@ -714,7 +714,7 @@ var ru = (function ($, ru) {
                     // Handle type aheads
                     if ("typeaheads" in response) {
                       // Perform typeahead for these ones
-                      ru.basic.init_event_listeners(response.typeaheads);
+                      // ru.basic.init_event_listeners(response.typeaheads);
                     }
                     break;
                   case "error":
