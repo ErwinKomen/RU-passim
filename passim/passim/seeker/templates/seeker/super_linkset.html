@@ -53,7 +53,9 @@
                   <!-- deleted id_glink-NUM-gold inputs here -->
 
                   <!-- Necessary DST ?? -->
-                  <div class="hidden">{{linkform.dst}}</div>
+                  <div class="hidden">
+                    <input id="id_ssglink-{{forloop.counter0}}-dst" name="ssglink-{{forloop.counter0}}-dst" value="{{linkform.instance.dst.id}}" />
+                  </div>
 
                   <!-- View-mode: show the destination SSG according to the specs-->
                   <div class="view-mode">
@@ -74,7 +76,7 @@
                       <span>
                         <a class="btn btn-xs jumbo-4" 
                            onclick="ru.passim.seeker.formset_update(this, 'delete');"
-                           targetid="sermongold_linkset"
+                           targetid="ssglink_postload_set"
                            targeturl="{% url 'equalgold_linkset' pk=object_id %}">Delete</a>
                       </span>
                     </div>
@@ -107,7 +109,7 @@
                   <div class="edit-mode">
                     <a title="Save changes to this link"
                         onclick="ru.passim.seeker.formset_update(this);"
-                        targetid="sermongold_linkset"
+                        targetid="ssglink_postload_set"
                         targeturl="{% url 'equalgold_linkset' pk=object_id %}">
                       <span class="glyphicon glyphicon-ok"></span>
                     </a>

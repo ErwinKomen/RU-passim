@@ -224,17 +224,22 @@ def getText(nodeStart):
 def get_searchable(sText):
     sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
 
-    # Move to lower case
-    sText = sText.lower()
+    # Validate
+    if sText == None:
+        sText = ""
+    else:
 
-    # Remove punctuation with nothing
-    sText = re.sub(sRemove, "", sText)
-    #sText = sText.replace("<", "")
-    #sText = sText.replace(">", "")
-    #sText = sText.replace("_", "")
+        # Move to lower case
+        sText = sText.lower()
 
-    # Make sure to TRIM the text
-    sText = sText.strip()
+        # Remove punctuation with nothing
+        sText = re.sub(sRemove, "", sText)
+        #sText = sText.replace("<", "")
+        #sText = sText.replace(">", "")
+        #sText = sText.replace("_", "")
+
+        # Make sure to TRIM the text
+        sText = sText.strip()
     return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
@@ -283,13 +288,15 @@ def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     # We do not use defaults
     return choice_list;
 
-def build_abbr_list(field, position=None, subcat=None, maybe_empty=False):
+def build_abbr_list(field, position=None, subcat=None, maybe_empty=False, exclude=None):
     """Create a list of choice-tuples"""
 
     choice_list = [];
     unique_list = [];   # Check for uniqueness
 
     try:
+        if exclude ==None:
+            exclude = []
         # check if there are any options at all
         if FieldChoice.objects == None:
             # Take a default list
@@ -314,7 +321,7 @@ def build_abbr_list(field, position=None, subcat=None, maybe_empty=False):
                             sEngName = arName[2]
 
                 # Sanity check
-                if sEngName != "" and not sEngName in unique_list:
+                if sEngName != "" and not sEngName in unique_list and not (str(choice.abbr) in exclude):
                     # Add it to the REAL list
                     choice_list.append((str(choice.abbr),sEngName));
                     # Add it to the list that checks for uniqueness
@@ -3158,27 +3165,34 @@ class EqualGold(models.Model):
         return name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
-        # Double check the number and the code
-        if self.author:
-            # There is an author--is this different than the author we used to have?
 
-            if not self.number:
-                # Check the highest sermon number for this author
-                self.number = EqualGold.sermon_number(self.author)
-            # Get the author number
-            auth_num = self.author.get_number()
-            # Now we have both an author and a number...
-            passim_code = EqualGold.passim_code(auth_num, self.number)
-            if not self.code or self.code != passim_code:
-                # Now save myself with the new code
-                self.code = passim_code
+        oErr = ErrHandle()
+        try:
+            # Adapt the incipit and explicit
+            self.srchincipit = get_searchable(self.incipit)
+            self.srchexplicit = get_searchable(self.explicit)
+            # Double check the number and the code
+            if self.author:
+                # There is an author--is this different than the author we used to have?
 
-        # Do the saving initially
-        response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
-        return response
+                if not self.number:
+                    # Check the highest sermon number for this author
+                    self.number = EqualGold.sermon_number(self.author)
+                # Get the author number
+                auth_num = self.author.get_number()
+                # Now we have both an author and a number...
+                passim_code = EqualGold.passim_code(auth_num, self.number)
+                if not self.code or self.code != passim_code:
+                    # Now save myself with the new code
+                    self.code = passim_code
+
+            # Do the saving initially
+            response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
+            return response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Equalgold.save")
+            return None
 
     def create_moved(self):
         """Create a copy of [self], and indicate in that copy that it moved to [self]"""
@@ -3219,7 +3233,6 @@ class EqualGold(models.Model):
         """Get a very short textual summary"""
 
         lHtml = []
-        lHtml.append("SHORT")
         # Add the PASSIM code
         lHtml.append("{}".format(self.code))
         # Treat signatures
@@ -3897,6 +3910,7 @@ class EqualGoldLink(models.Model):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
 
+
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
 
@@ -3962,8 +3976,6 @@ class ManuscriptExt(models.Model):
     def short(self):
         return self.url
        
-# aanpassen en geschikt maken zodat in 1 Collection tabel alle collecties kunnen worden geregistreed, dus voor alle entiteiten
-
 
 class Collection(models.Model):
     """A collection can contain one or more sermons, manuscripts, gold sermons or super super golds"""

@@ -10,10 +10,10 @@ from django.forms.widgets import *
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
 
-def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False):
+def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False, exclude=None):
     if (obj.fields != None and sFieldName in obj.fields):
         if bUseAbbr:
-            obj.fields[sFieldName].choices = build_abbr_list(sSet, maybe_empty=maybe_empty)
+            obj.fields[sFieldName].choices = build_abbr_list(sSet, maybe_empty=maybe_empty, exclude=exclude)
         else:
             obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
         obj.fields[sFieldName].help_text = get_help(sSet)
@@ -904,7 +904,7 @@ class EqualGoldLinkForm(forms.ModelForm):
         # Start by executing the standard handling
         super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
         # Make sure to set required and optional fields
         self.fields['dst'].required = False
         self.fields['target_list'].required = False

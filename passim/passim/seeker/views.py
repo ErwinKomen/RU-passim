@@ -1764,7 +1764,9 @@ def do_ssgmigrate(request):
 
         # Walk all the EqualGold items
         qs = EqualGold.objects.all()
-        for obj in qs:
+        number = qs.count()
+        for idx, obj in enumerate(qs):
+            print("SSG migration item {} of {}".format(idx+1, number))
             # Need treatment?
             if not obj.author or not obj.number:
                 # Check how many SG items there are within this EqualGold (=ssg)
@@ -7764,7 +7766,6 @@ class EqualGoldEdit(BasicDetails):
 
 
 class EqualGoldDetails(EqualGoldEdit):
-    # template_name = 'seeker/generic_details.html'
     rtype = "html"
     # titlesg = "Super sermon gold"
 
@@ -7779,7 +7780,6 @@ class EqualGoldDetails(EqualGoldEdit):
         # List of post-load objects
         postload_objects = []
         # (1) postload: gold equality
-        # gold = instance.equal_goldsermons.first()
         geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
         postload_objects.append(geq_obj)
 
@@ -7791,23 +7791,6 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Lists of related objects
         related_objects = []
-
-        ## First list: gold-sermons within the equality set
-        #goldsermons = dict(prefix="gs", title="Gold sermons that are part of this Super Sermon Gold")
-        ## Get the list of SG that are part of the equality set
-        #qs = instance.equal_goldsermons.all().order_by('author__name')
-        #if qs.count() > 0:
-        #    rel_list = []
-        #    for item in qs:
-        #        rel_item = []
-        #        rel_item.append({'value': item.get_view(), 'title': 'View this gold sermon', 'link': reverse('gold_details', kwargs={'pk': item.id})})
-        #        rel_list.append(rel_item)
-        #    goldsermons['rel_list'] = rel_list
-        #    goldsermons['columns'] = ['Summary']
-        #    goldsermons['use_counter'] = True
-        #    goldsermons['editable'] = True
-        #    related_objects.append(goldsermons)
-
         context['related_objects'] = related_objects
 
         # Return the context we have made
@@ -8043,16 +8026,23 @@ class EqualGoldLinkset(BasicPart):
     def before_save(self, prefix, request, instance = None, form = None):
         bNeedSaving = False
         if prefix == "ssglink":
-            if 'gold' in form.cleaned_data:
-                # Get the form's 'gold' value
-                gold_id = form.cleaned_data['gold']
-                if gold_id != "":
-                    # Find the gold to attach to
-                    gold = SermonGold.objects.filter(id=gold_id).first()
-                    if gold != None:
-                        # The destination must be an EqualGold instance
-                        instance.dst = gold.equal
-                        bNeedSaving = True
+            if 'target_list' in form.cleaned_data:
+                # Get the one single destination id number
+                dst = form.cleaned_data['target_list']
+                if dst != None:
+                    # Fill in the destination
+                    instance.dst = dst
+                    bNeedSaving = True
+            #if 'gold' in form.cleaned_data:
+            #    # Get the form's 'gold' value
+            #    gold_id = form.cleaned_data['gold']
+            #    if gold_id != "":
+            #        # Find the gold to attach to
+            #        gold = SermonGold.objects.filter(id=gold_id).first()
+            #        if gold != None:
+            #            # The destination must be an EqualGold instance
+            #            instance.dst = gold.equal
+            #            bNeedSaving = True
         return bNeedSaving
 
     def after_save(self, prefix, instance = None, form = None):
