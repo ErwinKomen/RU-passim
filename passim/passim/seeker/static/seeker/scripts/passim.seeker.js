@@ -3647,7 +3647,7 @@ var ru = (function ($, ru) {
                 ru.passim.seeker.simple_update();
                 break;
               case "ssglink_formset":
-                if (deleteurl !== undefined && deleteurl !== "") {
+                if (deleteurl !== undefined &&  deleteurl !== "") {
                   // prepare data
                   data = $(frm).serializeArray();
                   data.push({ 'name': 'action', 'value': 'delete' });
