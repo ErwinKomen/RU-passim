@@ -3358,6 +3358,46 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * elevate_confirm
+       *   Open the next <tr> to get delete confirmation (or not)
+       *
+       */
+      elevate_confirm: function (el, bNeedConfirm) {
+        var elDiv = null;
+
+        try {
+          if (bNeedConfirm === undefined) { bNeedConfirm = true; }
+          // Action depends on the need for confirmation
+          if (bNeedConfirm) {
+            // Find the [.elevate-row] to be shown
+            elDiv = $(el).closest("tr").find(".elevate-confirm").first();
+            if (elDiv.length === 0) {
+              // Try goint to the next <tr>
+              elDiv = $(el).closest("tr").next("tr.elevate-confirm");
+            }
+            $(elDiv).removeClass("hidden");
+          } else {
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("elevate_confirm", ex);
+        }
+      },
+
+      /**
+       * elevate_cancel
+       *   Hide this <tr> and cancel the delete
+       *
+       */
+      elevate_cancel: function (el) {
+        try {
+          $(el).closest("div.elevate-confirm").addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("elevate_cancel", ex);
+        }
+      },
+
+      /**
        * formset_setdel
        *   Set the delete checkbox of me
        *

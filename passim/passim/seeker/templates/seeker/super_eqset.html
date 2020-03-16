@@ -1,4 +1,4 @@
-﻿{% load i18n %}
+{% load i18n %}
 
 <div id="ssgeq_formset" class="row">
   <form action="">
@@ -178,9 +178,17 @@
                 <td style="width: 100%;">
                   <div class="hidden"><input id="id_ssgeq-{{forloop.counter0}}-gold" name="ssgeq-{{forloop.counter0}}-gold" value="{{linkform.instance.id}}" /></div>
                   <div class="view-mode">
-                    <a href="{% url 'gold_details' linkform.instance.id %}">
-                      {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
-                    </a>
+                    <span>
+                      <a class="btn btn-xs jumbo-1" 
+                         onclick="ru.passim.seeker.elevate_confirm(this)"
+                         title="Elevate this Gold Sermon to Super Sermon Gold (Author, incipit, explicit)">
+                        Elevate <span class="glyphicon glyphicon-share-alt"></span>
+                      </a>
+                    </span>
+                    <!-- The actual gold-sermon information -->
+                    <span>
+                      <a href="{% url 'gold_details' linkform.instance.id %}">{{linkform.instance.get_view|safe}}</a>
+                    </span>
                   </div>
                   <div class="edit-mode hidden selected clickable"
                        data-toggle="modal" 
@@ -191,6 +199,22 @@
                     {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
                   </div>
 
+                  <!-- Confirmation of ELEVATE -->
+                  {% if is_passim_editor %}
+                    <div class="elevate-confirm hidden">
+                      <span>Do you really want to elevate this one as Super Gold Sermon?</span>
+                      <span>
+                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.elevate_cancel(this);">Cancel</a>
+                      </span>
+                      <span>
+                        <a class="btn btn-xs jumbo-4" 
+                            href="{% url 'equalgold_details' object_id %}?goldcopy={{linkform.instance.id}}"
+                            title="Elevate this Gold Sermon to Super Sermon Gold (Author, incipit, explicit)">
+                          Elevate <span class="glyphicon glyphicon-share-alt"></span>
+                        </a>
+                      </span>
+                    </div>
+                  {% endif %}
                 </td>
 
                 <!-- A delete button -->
