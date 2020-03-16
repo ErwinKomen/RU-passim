@@ -1069,7 +1069,7 @@ table.compact-table td:hover {
 
 .error, .err-msg {
     background-color: lightgoldenrodyellow;
-    color: darkred;
+    color: red;
     font-family: monospace;
     font-size: smaller;
 }

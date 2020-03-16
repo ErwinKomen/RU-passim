@@ -919,6 +919,24 @@ class EqualGoldLinkForm(forms.ModelForm):
                 self.fields['target_list'].queryset = EqualGold.objects.exclude(id=instance.id).order_by('code')
                 pass
 
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(EqualGoldLinkForm, self).clean()
+
+        # Get the source
+        src = cleaned_data.get("src")
+        if src != None:
+            # Any new destination is added in target_list
+            dst = cleaned_data.get("target_list")
+            if dst != None:
+                # WE have a DST, now check how many links there are with this one
+                existing = src.relations.filter(id=dst.id)
+                if existing.count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "This Super Sermon Gold is already linked"
+                        )
+
 
 class SermonGoldSignatureForm(forms.ModelForm):
     newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 

@@ -138,7 +138,7 @@
                       <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.delete_cancel(this);">Cancel</a>
                     </span>
                     <span>
-                      <a class="btn btn-xs jumbo-4 delete-row" extra="glink">Delete</a>
+                      <a class="btn btn-xs jumbo-4 delete-row" extra="ssglink">Delete</a>
                     </span>
                   </div>
                 </td>
@@ -146,6 +146,15 @@
                 <!-- A delete button -->
                 <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
                   <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+                </td>
+              </tr>
+
+              <!-- Row with waiting symbol -->
+              <tr class="formset-wait hidden">
+                <td></td>
+                <td colspan="4">
+                  <span>The information is being processed...</span>
+                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
                 </td>
               </tr>
 
@@ -162,7 +171,7 @@
         </table>
       {% endif %}
 
-      <div id="error_location"></div>
+      <div id="error_location" class="error"></div>
     </div>
   </form>
 </div>

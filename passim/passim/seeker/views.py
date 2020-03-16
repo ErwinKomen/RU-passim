@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
-from django.forms import formset_factory, modelformset_factory, inlineformset_factory
+from django.forms import formset_factory, modelformset_factory, inlineformset_factory, ValidationError
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
 from django.shortcuts import get_object_or_404, render, redirect
@@ -3572,59 +3572,64 @@ class BasicPart(View):
                         if not formsetObj['readonly']:
                             # Is the formset valid?
                             if formset.is_valid():
+                                # Possibly handle the clean() for this formset
+                                if 'clean' in formsetObj:
+                                    # Call the clean function
+                                    self.clean(formset, prefix)
                                 has_deletions = False
-                                # Make sure all changes are saved in one database-go
-                                with transaction.atomic():
-                                    # Walk all the forms in the formset
-                                    for form in formset:
-                                        # At least check for validity
-                                        if form.is_valid() and self.is_custom_valid(prefix, form):
-                                            # Should we delete?
-                                            if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
-                                                # Check if deletion should be done
-                                                if self.before_delete(prefix, form.instance):
-                                                    # Log the delete action
-                                                    details = {'id': form.instance.id}
-                                                    Action.add(request.user.username, itemtype, "delete", json.dumps(details))
-                                                    # Delete this one
-                                                    form.instance.delete()
-                                                    # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                    has_deletions = True
+                                if len(self.arErr) == 0:
+                                    # Make sure all changes are saved in one database-go
+                                    with transaction.atomic():
+                                        # Walk all the forms in the formset
+                                        for form in formset:
+                                            # At least check for validity
+                                            if form.is_valid() and self.is_custom_valid(prefix, form):
+                                                # Should we delete?
+                                                if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
+                                                    # Check if deletion should be done
+                                                    if self.before_delete(prefix, form.instance):
+                                                        # Log the delete action
+                                                        details = {'id': form.instance.id}
+                                                        Action.add(request.user.username, itemtype, "delete", json.dumps(details))
+                                                        # Delete this one
+                                                        form.instance.delete()
+                                                        # NOTE: the template knows this one is deleted by looking at form.DELETE
+                                                        has_deletions = True
+                                                else:
+                                                    # Check if anything has changed so far
+                                                    has_changed = form.has_changed()
+                                                    # Save it preliminarily
+                                                    sub_instance = form.save(commit=False)
+                                                    # Any actions before saving
+                                                    if self.before_save(prefix, request, sub_instance, form):
+                                                        has_changed = True
+                                                    # Save this construction
+                                                    if has_changed and len(self.arErr) == 0: 
+                                                        # Save the instance
+                                                        sub_instance.save()
+                                                        # Adapt the last save time
+                                                        context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
+                                                        # Log the delete action
+                                                        details = {'id': sub_instance.id}
+                                                        if form.changed_data != None:
+                                                            details['changes'] = action_model_changes(form, sub_instance)
+                                                        Action.add(request.user.username, itemtype, "save", json.dumps(details))
+                                                        # Store the instance id in the data
+                                                        self.data[prefix + '_instanceid'] = sub_instance.id
+                                                        # Any action after saving this form
+                                                        self.after_save(prefix, sub_instance)
                                             else:
-                                                # Check if anything has changed so far
-                                                has_changed = form.has_changed()
-                                                # Save it preliminarily
-                                                sub_instance = form.save(commit=False)
-                                                # Any actions before saving
-                                                if self.before_save(prefix, request, sub_instance, form):
-                                                    has_changed = True
-                                                # Save this construction
-                                                if has_changed and len(self.arErr) == 0: 
-                                                    # Save the instance
-                                                    sub_instance.save()
-                                                    # Adapt the last save time
-                                                    context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
-                                                    # Log the delete action
-                                                    details = {'id': sub_instance.id}
-                                                    if form.changed_data != None:
-                                                        details['changes'] = action_model_changes(form, sub_instance)
-                                                    Action.add(request.user.username, itemtype, "save", json.dumps(details))
-                                                    # Store the instance id in the data
-                                                    self.data[prefix + '_instanceid'] = sub_instance.id
-                                                    # Any action after saving this form
-                                                    self.after_save(prefix, sub_instance)
-                                        else:
-                                            if len(form.errors) > 0:
-                                                self.arErr.append(form.errors)
+                                                if len(form.errors) > 0:
+                                                    self.arErr.append(form.errors)
                                 
-                                # Rebuild the formset if it contains deleted forms
-                                if has_deletions or not has_deletions:
-                                    # Or: ALWAYS
-                                    if qs == None:
-                                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                                    else:
-                                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                                    formsetObj['formsetinstance'] = formset
+                                    # Rebuild the formset if it contains deleted forms
+                                    if has_deletions or not has_deletions:
+                                        # Or: ALWAYS
+                                        if qs == None:
+                                            formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                                        else:
+                                            formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                                        formsetObj['formsetinstance'] = formset
                             else:
                                 # Iterate over all errors
                                 for idx, err_this in enumerate(formset.errors):
@@ -7999,7 +8004,27 @@ class EqualGoldLinkset(BasicPart):
                                          form=EqualGoldLinkForm, min_num=0,
                                          fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
-    formset_objects = [{'formsetClass': SSGlinkFormSet, 'prefix': 'ssglink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
+    formset_objects = [{'formsetClass': SSGlinkFormSet, 'prefix': 'ssglink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }], 'clean': True}]
+
+    def clean(self, formset, prefix):
+        # Clean method
+        if prefix == "ssglink":
+            # Iterate over all forms and get the destinations
+            lDstList = []
+            for form in formset.forms:
+                dst = form.cleaned_data['dst']
+                if dst == None:
+                    dst = form.cleaned_data['target_list']
+                # Check if we have a destination
+                if dst != None:
+                    # Check if it is already in the list
+                    if dst in lDstList:
+                        # Something is wrong: double desination
+                        self.arErr.append("A target Super Sermon Gold can only be used once")
+                        return False
+                    # Add it to the list
+                    lDstList.append(dst)
+        return True
 
     def process_formset(self, prefix, request, formset):
         if prefix == "ssglink":
@@ -8015,7 +8040,7 @@ class EqualGoldLinkset(BasicPart):
                             #            form['dst'].data = gold.equal.id
                             #            form.fields['dst'].initial = gold.equal.id
                             form.instance.dst = gold.equal
-                # x = form.instance.src.relations.all()
+                # end if
         # No need to return a value
         return True
 
@@ -8033,23 +8058,11 @@ class EqualGoldLinkset(BasicPart):
                     # Fill in the destination
                     instance.dst = dst
                     bNeedSaving = True
-            #if 'gold' in form.cleaned_data:
-            #    # Get the form's 'gold' value
-            #    gold_id = form.cleaned_data['gold']
-            #    if gold_id != "":
-            #        # Find the gold to attach to
-            #        gold = SermonGold.objects.filter(id=gold_id).first()
-            #        if gold != None:
-            #            # The destination must be an EqualGold instance
-            #            instance.dst = gold.equal
-            #            bNeedSaving = True
         return bNeedSaving
 
     def after_save(self, prefix, instance = None, form = None):
         # The instance here is the glink-instance, so an instance of EqualGoldLink
         # Now make sure all related material is updated
-
-        # WAS: added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
 
         added, lst_res = add_ssg_equal2equal(self.obj, instance.dst, instance.linktype)
         return True

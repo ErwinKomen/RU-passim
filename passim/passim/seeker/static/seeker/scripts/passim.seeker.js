@@ -3381,6 +3381,8 @@ var ru = (function ($, ru) {
         var targetid = "",
             err = "#error_location",
             errdiv = null,
+            waitclass = ".formset-wait",
+            elWaitRow = null,
             data = [],
             lHtml = [],
             i = 0,
@@ -3414,6 +3416,10 @@ var ru = (function ($, ru) {
             }
           }
 
+          // Check if there is a waiting row
+          elWaitRow = $(elStart).closest("table").find(waitclass);
+          if (elWaitRow.length > 0) { $(elWaitRow).removeClass('hidden');}
+
           // Gather the data
           frm = $(elStart).closest("form");
           data = $(frm).serializeArray();
@@ -3421,6 +3427,9 @@ var ru = (function ($, ru) {
             return (item['value'].indexOf("__counter__") < 0 && item['value'].indexOf("__prefix__") < 0);
           });
           $.post(targeturl, data, function (response) {
+            // Show we have a response
+            if (elWaitRow.length > 0) { $(elWaitRow).addClass('hidden'); }
+
             // Action depends on the response
             if (response === undefined || response === null || !("status" in response)) {
               private_methods.errMsg("No status returned");
@@ -3541,6 +3550,7 @@ var ru = (function ($, ru) {
             case "gcol_formset":
             // super
             case "scol_formset":
+            case "ssglink_formset":
             // sermo 
             case "stog_formset":
             case "sdsignformset":
@@ -3636,8 +3646,8 @@ var ru = (function ($, ru) {
                 // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
                 ru.passim.seeker.simple_update();
                 break;
-              case "glink_formset_OLD":
-                if (deleteurl !== "") {
+              case "ssglink_formset":
+                if (deleteurl !== undefined && deleteurl !== "") {
                   // prepare data
                   data = $(frm).serializeArray();
                   data.push({ 'name': 'action', 'value': 'delete' });
