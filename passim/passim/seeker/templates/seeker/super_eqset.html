@@ -202,17 +202,27 @@
                   <!-- Confirmation of ELEVATE -->
                   {% if is_passim_editor %}
                     <div class="elevate-confirm hidden">
-                      <span>Do you really want to elevate this one as Super Gold Sermon?</span>
-                      <span>
-                        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.elevate_cancel(this);">Cancel</a>
-                      </span>
-                      <span>
-                        <a class="btn btn-xs jumbo-4" 
-                            href="{% url 'equalgold_details' object_id %}?goldcopy={{linkform.instance.id}}"
-                            title="Elevate this Gold Sermon to Super Sermon Gold (Author, incipit, explicit)">
-                          Elevate <span class="glyphicon glyphicon-share-alt"></span>
-                        </a>
-                      </span>
+                      <div>
+                        <span>The information that will be copied is:</span>
+                        <table>
+                          <tr><td>Author</td><td>{{linkform.instance.author.name}}</td></tr>
+                          <tr><td>Incipit</td><td>{{linkform.instance.get_incipit_markdown}}</td></tr>
+                          <tr><td>Explicit</td><td>{{linkform.instance.get_explicit_markdown}}</td></tr>
+                        </table>
+                      </div>
+                      <div>
+                        <span>Do you really want to elevate this one as Super Gold Sermon?</span>
+                        <span>
+                          <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.elevate_cancel(this);">Cancel</a>
+                        </span>
+                        <span>
+                          <a class="btn btn-xs jumbo-4" 
+                              href="{% url 'equalgold_details' object_id %}?goldcopy={{linkform.instance.id}}"
+                              title="Elevate this Gold Sermon to Super Sermon Gold (Author, incipit, explicit)">
+                            Elevate <span class="glyphicon glyphicon-share-alt"></span>
+                          </a>
+                        </span>
+                      </div>
                     </div>
                   {% endif %}
                 </td>

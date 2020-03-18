@@ -7780,23 +7780,47 @@ class EqualGoldDetails(EqualGoldEdit):
         # Start by executing the standard handling
         super(EqualGoldDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        # Are we copying information??
+        if 'goldcopy' in self.qd:
+            # Get the ID of the gold sermon from which information is to be copied to the SSG
+            goldid = self.qd['goldcopy']
+            # Get the GOLD SERMON instance
+            gold = SermonGold.objects.filter(id=goldid).first()
 
-        # List of post-load objects
-        postload_objects = []
-        # (1) postload: gold equality
-        geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
-        postload_objects.append(geq_obj)
+            if gold != None:
+                # Copy all relevant information to the EqualGold obj (which as a SSG)
+                obj = self.object
+                # (1) copy author
+                if gold.author != None: obj.author = gold.author
+                # (2) copy incipit
+                if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
+                # (3) copy explicit
+                if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
 
-        # (2) postload: relation to other
-        glink_obj = dict(prefix="ssglink", url=reverse('equalgold_linkset', kwargs={'pk': instance.id}))
-        postload_objects.append(glink_obj)
+                # Now save the adapted EqualGold obj
+                obj.save()
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
+        else:
 
-        context['postload_objects'] = postload_objects
 
-        # Lists of related objects
-        related_objects = []
-        context['related_objects'] = related_objects
+            context['sections'] = []
+
+            # List of post-load objects
+            postload_objects = []
+            # (1) postload: gold equality
+            geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
+            postload_objects.append(geq_obj)
+
+            # (2) postload: relation to other
+            glink_obj = dict(prefix="ssglink", url=reverse('equalgold_linkset', kwargs={'pk': instance.id}))
+            postload_objects.append(glink_obj)
+
+            context['postload_objects'] = postload_objects
+
+            # Lists of related objects
+            related_objects = []
+            context['related_objects'] = related_objects
 
         # Return the context we have made
         return context
@@ -7821,13 +7845,14 @@ class EqualGoldListView(BasicList):
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['code', 'author', 'number', '' ]
+    order_cols = ['code', 'author', 'number', '', '' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',       'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
         {'name': 'Number',       'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
         {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True }
+        {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True },
+        {'name': 'Size',         'order': ''   , 'type': 'int', 'custom': 'size'}
         ]
     filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
                {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
@@ -7867,6 +7892,9 @@ class EqualGoldListView(BasicList):
         elif custom == "number":
             sNumber = "-" if instance.number  == None else instance.number
             html.append("{}".format(sNumber))
+        elif custom == "size":
+            iSize = instance.equal_goldsermons.all().count()
+            html.append("{}".format(iSize))
         elif custom == "code":
             sCode = "-" if instance.code  == None else instance.code
             html.append("{}".format(sCode))

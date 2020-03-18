@@ -3150,8 +3150,7 @@ class EqualGold(models.Model):
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
     number = models.IntegerField("Number", blank=True, null=True)
-    # [0-1] The number of the sermon to which this one has moved
-    # moved = models.IntegerField("Moved to", blank=True, null=True)
+    # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
     # [m] Many-to-many: all the gold sermons linked to me
