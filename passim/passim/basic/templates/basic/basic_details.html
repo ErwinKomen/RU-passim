@@ -101,79 +101,86 @@
                 <div class="col-md-12">
                   <h4>{{related.title}}</h4>
 
-                  <!-- List of related items -->
-                  <table class="func-view compact-simple" style="width: 100%;">
-                    <thead>
-                      <tr>
-                        {% if related.use_counter %}
-                          <th colspan="{% if related.editable %}2{% else %}1{% endif %}">#</th>
-                        {% endif %}
-                        {% for col in related.columns %}<th>{{col}}</th>{% endfor %}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for relrow in related.rel_list %}
-                      <tr class="form-row">
-                        <!-- Counter-->
-                        {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+                  <!-- Check if there is any contents -->
+                  {% if related.rel_list|length == 0 %}
+                    <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
+                  {% else %}
+                    <!-- List of related items -->
+                    <table class="func-view compact-simple" style="width: 100%;">
+                      <thead>
+                        <tr>
+                          {% if related.use_counter %}
+                            <th colspan="{% if related.editable %}2{% else %}1{% endif %}">#</th>
+                          {% endif %}
+                          {% for col in related.columns %}<th>{{col}}</th>{% endfor %}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for relrow in related.rel_list %}
+                        <tr class="form-row">
+                          <!-- Counter-->
+                          {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
-                        <!-- Remaining cells -->
-                        {% for relcol in relrow %}
-                          <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                              {% if relcol.link %}class="clickable "{% endif %}
-                              >
-                            {% if relcol.value %}
-                              {% if relcol.link %}
-                                <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
-                              {% else %}
-                                {{relcol.value|safe}}
+                          <!-- Remaining cells -->
+                          {% for relcol in relrow %}
+                            <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
+                                class="tdnowrap {% if relcol.link %}clickable{% endif %}"
+                                {% if relcol.align %}align="{{relcol.align}}"{% endif %}
+                                {% if relcol.main %}style="width: 100%;"{% endif %}
+                                >
+                              {% if relcol.value %}
+                                {% if relcol.link %}
+                                  <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                                {% else %}
+                                  {{relcol.value|safe}}
+                                {% endif %}
                               {% endif %}
-                            {% endif %}
-                          </td>
+                            </td>
+                          {% endfor %}
+
+                          <!-- Possible delete cell -->
+
+                        </tr>
                         {% endfor %}
 
-                        <!-- Possible delete cell -->
+                        {% if related.editable and is_app_editor %}
+                          <!-- Provide an empty row that can be added -->
+                          <tr class="form-row empty-form">
+                            <!-- A 1-based counter for the forms in this set-->
+                            {% if related.use_counter %}<td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
 
-                      </tr>
-                      {% endfor %}
+                            <!-- A button to edit or save this item -->
+                            <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                              <div class="view-mode hidden">
+                                <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
+                                  <span class="glyphicon glyphicon-pencil"></span>
+                                </a>
+                              </div>
+                              <div class="edit-mode">
+                                <a title="Save changes to this item"
+                                    onclick="ru.basic.formset_update(this);"
+                                    targetid="sermongold_eqset"
+                                    targeturl="">
+                                  <span class="glyphicon glyphicon-ok"></span>
+                                </a>
+                              </div>
+                            </td>
 
-                      {% if related.editable and is_app_editor %}
-                        <!-- Provide an empty row that can be added -->
-                        <tr class="form-row empty-form">
-                          <!-- A 1-based counter for the forms in this set-->
-                          {% if related.use_counter %}<td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
+                          </tr>
 
-                          <!-- A button to edit or save this item -->
-                          <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
-                            <div class="view-mode hidden">
-                              <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
-                                <span class="glyphicon glyphicon-pencil"></span>
-                              </a>
-                            </div>
-                            <div class="edit-mode">
-                              <a title="Save changes to this item"
-                                  onclick="ru.basic.formset_update(this);"
-                                  targetid="sermongold_eqset"
-                                  targeturl="">
-                                <span class="glyphicon glyphicon-ok"></span>
-                              </a>
-                            </div>
-                          </td>
+                          <!-- Add row -->
+                          <tr class="add-row">
+                            <td colspan="5">
+                              <span id="add_one_{{related.prefix}}">
+                                <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
+                              </span>
+                            </td>
+                          </tr>
+                        {% endif %}
 
-                        </tr>
-
-                        <!-- Add row -->
-                        <tr class="add-row">
-                          <td colspan="5">
-                            <span id="add_one_{{related.prefix}}">
-                              <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
-                            </span>
-                          </td>
-                        </tr>
-                      {% endif %}
-
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  {% endif %}
                 </div>
 
               </div>

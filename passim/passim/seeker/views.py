@@ -2,6 +2,7 @@
 Definition of views for the SEEKER app.
 """
 
+from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
@@ -116,6 +117,24 @@ GOLD_SEARCH_FILTERS = [
         {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
     ]
+
+def get_application_name():
+    """Try to get the name of this application"""
+
+    # Walk through all the installed apps
+    for app in apps.get_app_configs():
+        # Check if this is a site-package
+        if "site-package" not in app.path:
+            # Get the name of this app
+            name = app.name
+            # Take the first part before the dot
+            project_name = name.split(".")[0]
+            return project_name
+    return "unknown"
+# Provide application-specific information
+PROJECT_NAME = get_application_name()
+app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_editor = "{}_editor".format(PROJECT_NAME.lower())
 
 
 def treat_bom(sHtml):
@@ -7772,7 +7791,6 @@ class EqualGoldEdit(BasicDetails):
 
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
-    # titlesg = "Super sermon gold"
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7780,8 +7798,8 @@ class EqualGoldDetails(EqualGoldEdit):
         # Start by executing the standard handling
         super(EqualGoldDetails, self).add_to_context(context, instance)
 
-        # Are we copying information??
-        if 'goldcopy' in self.qd:
+        # Are we copying information?? (only allowed if we are the app_editor)
+        if 'goldcopy' in self.qd and context['is_app_editor']:
             # Get the ID of the gold sermon from which information is to be copied to the SSG
             goldid = self.qd['goldcopy']
             # Get the GOLD SERMON instance
@@ -7802,8 +7820,6 @@ class EqualGoldDetails(EqualGoldEdit):
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
         else:
-
-
             context['sections'] = []
 
             # List of post-load objects
@@ -7820,6 +7836,29 @@ class EqualGoldDetails(EqualGoldEdit):
 
             # Lists of related objects
             related_objects = []
+
+            # List of manuscripts related to the SSG via sermon descriptions
+            manuscripts = dict(title="Manuscripts", prefix="manu")
+            # Get all ID's of sermondescr instances linking to the correct eqg instance
+            # manu_ids = SermonDescr.goldsermons.filter(equal=instance).distinct().values('manu__id')
+            manu_ids = SermonDescr.objects.filter(goldsermons__equal=instance).distinct().values('manu__id')
+            qs = Manuscript.objects.filter(id__in=manu_ids).order_by('idno')
+            rel_list =[]
+            for item in qs:
+                manu_name = "<span class='signature'>{}</span> {}".format(item.idno, item.name)
+                rel_item = []
+                rel_item.append({'value': item.library.lcity.name})
+                rel_item.append({'value': item.library.name})
+                rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                 'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+                rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
+                rel_item.append({'value': item.yearstart, 'align': "right"})
+                rel_item.append({'value': item.yearfinish, 'align': "right"})
+                rel_list.append(rel_item)
+            manuscripts['rel_list'] = rel_list
+            manuscripts['columns'] = ['City', 'Library', 'Name', 'Items', 'From', 'Until']
+            related_objects.append(manuscripts)
+
             context['related_objects'] = related_objects
 
         # Return the context we have made

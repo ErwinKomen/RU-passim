@@ -190,14 +190,16 @@
                       <a href="{% url 'gold_details' linkform.instance.id %}">{{linkform.instance.get_view|safe}}</a>
                     </span>
                   </div>
-                  <div class="edit-mode hidden selected clickable"
-                       data-toggle="modal" 
-                       data-target="#modal-goldlink-{{object_id}}"
-                       onclick="ru.passim.seeker.gold_search_prepare(this);"
-                       targeturl="{% if object_id %}{% url 'select_gold' %}?source_id={{object_id}}{% else %}{% url 'select_gold' %}{% endif %}"
-                       targetid="edit-goldlink-{{object_id}}">
-                    {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
-                  </div>
+                  {% if is_passim_editor %}
+                    <div class="edit-mode hidden selected clickable"
+                         data-toggle="modal" 
+                         data-target="#modal-goldlink-{{object_id}}"
+                         onclick="ru.passim.seeker.gold_search_prepare(this);"
+                         targeturl="{% if object_id %}{% url 'select_gold' %}?source_id={{object_id}}{% else %}{% url 'select_gold' %}{% endif %}"
+                         targetid="edit-goldlink-{{object_id}}">
+                      {% include 'seeker/sermongold_view.html' with msitem=linkform.instance %}
+                    </div>
+                  {% endif %}
 
                   <!-- Confirmation of ELEVATE -->
                   {% if is_passim_editor %}
