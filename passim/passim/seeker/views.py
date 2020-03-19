@@ -1812,13 +1812,12 @@ def do_ssgmigrate(request):
                             obj.save()
                             added += 1
                             lst_total.append(obj.code)
-                    else:
-                        # Set the author to 'undecided'
-                        author = Author.objects.filter(name__iexact="undecided").first()
-                        if author == None:
-                            author = Author(name="Undecided")
-                            author.save()
-                        obj.author = author
+
+                # Double check on author
+                if obj.author == None:
+                    # Set the author to 'undecided'
+                    author = Author.get_undecided()
+                    obj.author = author
 
             # Double check to see if something has changed
             if obj.code == "DETERMINE":

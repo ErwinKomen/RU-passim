@@ -3109,6 +3109,13 @@ class Author(models.Model):
             iNumber = self.number
         return iNumber
 
+    def get_undecided():
+        author = Author.objects.filter(name__iexact="undecided").first()
+        if author == None:
+            author = Author(name="Undecided")
+            author.save()
+        return author
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """
@@ -3219,11 +3226,9 @@ class EqualGold(models.Model):
             if value != None:
                 setattr(org, field, value)
         # Possibly set the author to UNDECIDED
-        author = Author.objects.filter(name__iexact="undecided").first()
-        if author == None:
-            author = Author(name="Undecided")
-            author.save()
-        org.author = author
+        if org.author == None: 
+            author = Author.get_undecided()
+            org.author = author
         # Save the result
         org.save()
         return org
@@ -3290,7 +3295,8 @@ class EqualGold(models.Model):
 
         lHtml = []
         # Add the PASSIM code
-        lHtml.append("<span class='passimcode'>{}</span>".format(self.code))
+        code = self.code if self.code else "(no Passim code)"
+        lHtml.append("<span class='passimcode'>{}</span> ".format(code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
         qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
@@ -3305,7 +3311,7 @@ class EqualGold(models.Model):
         if self.author:
             lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
         else:
-            lHtml.append("(by <i>Unknwon Author</i>) ")
+            lHtml.append("(by <i>Unknown Author</i>) ")
         # Treat incipit
         if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
         # Treat intermediate dots
