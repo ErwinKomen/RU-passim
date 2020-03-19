@@ -6993,16 +6993,20 @@ class SermonGoldListView(BasicList):
     has_select2 = True
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
-    order_default = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
+    order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
     # order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+                   {'name': 'Passim Code', 'order': 'o=3', 'type': 'str', 'custom': 'code'}, 
+                   {'name': 'Incipit ... Explicit', 'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
                    {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
+
+    # ORIGINAL
     filters = SERMON_SEARCH_FILTERS
+    # TH replacement
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",       "enabled": False},
                 {"name": "Author",          "id": "filter_author",           "enabled": False},
                 {"name": "Incipit",         "id": "filter_incipit",          "enabled": False},
@@ -7012,7 +7016,29 @@ class SermonGoldListView(BasicList):
                 {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
                 {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
                 {"name": "Collection super","id": "filter_collection_super", "enabled": False},]
-       
+    # EK new
+    filters = [
+        {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False},
+        {"name": "Passim code",     "id": "filter_code",        "enabled": False},
+        {"name": "Author",          "id": "filter_author",      "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
+        {"name": "Collection...",   "id": "filter_collection",  "enabled": False, "head_id": "none"},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Manuscript",      "id": "filter_collection_sermo", "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collection_sermo","enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collection_super","enabled": False, "head_id": "filter_collection"},
+        ]       
     
     searches = [
         {'section': '', 'filterlist': [
@@ -7020,6 +7046,7 @@ class SermonGoldListView(BasicList):
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
             {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
             {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
@@ -7039,15 +7066,16 @@ class SermonGoldListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-                          #{% for sig in gold.get_signatures %}
-                          #<span class="badge signature" title="{{sig}}">{{sig}}</span>
-                          #{% endfor %}
             for sig in instance.goldsignatures.all():
                 editype = sig.editype
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
-            # sTitle = instance.signatures()
+        elif custom == "code":
+            equal = instance.equal
+            code = "(undetermined)" if equal.code == None else equal.code
+            url = reverse('equalgold_details', kwargs={'pk': equal.id})
+            html.append("<span class='passimcode'><a class='nostyle' href='{}'>{}</a></span>".format(url, code))
         elif custom == "edition":
             html.append("<span>{}</span>".format(instance.editions()[:20]))
             sTitle = instance.editions()

@@ -45,6 +45,18 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
+class CodeWidget(ModelSelect2MultipleWidget):
+    # NOTE: only use the [Signature] table - don't use [SermonSignature]
+    model = EqualGold
+    search_fields = [ 'code__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        return EqualGold.objects.all().order_by('code').distinct()
+
+
 class KeywordWidget(ModelSelect2MultipleWidget):
     model = Keyword
     search_fields = [ 'name__icontains' ]
@@ -720,6 +732,8 @@ class SermonGoldForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    codelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=CodeWidget(attrs={'data-placeholder': 'Select multiple Passim Codes...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -766,6 +780,7 @@ class SermonGoldForm(forms.ModelForm):
         # Some fields are not required
         self.fields['stype'].required = False
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
