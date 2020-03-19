@@ -1812,6 +1812,14 @@ def do_ssgmigrate(request):
                             obj.save()
                             added += 1
                             lst_total.append(obj.code)
+                    else:
+                        # Set the author to 'undecided'
+                        author = Author.objects.filter(name__iexact="undecided").first()
+                        if author == None:
+                            author = Author(name="Undecided")
+                            author.save()
+                        obj.author = author
+
             # Double check to see if something has changed
             if obj.code == "DETERMINE":
                 obj.code = "ZZZ_DETERMINE"
@@ -7729,7 +7737,8 @@ class EqualGoldEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
-            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'title': 'This is the automatically assigned sermon number for this particular author' },
+            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
+             'title': 'This is the automatically assigned sermon number for this particular author' },
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
@@ -7773,6 +7782,14 @@ class EqualGoldEdit(BasicDetails):
                 errors.append(form.errors)
                 bResult = False
         return None
+
+    def before_save(self, form, instance):
+        # Check for author
+        if instance.author == None:
+            # Set to "undecided" author if possible
+            author = Author.objects.filter(name__iexact="undecided").first()
+            if author != None: instance.author = author
+        return True, ""
 
     def after_save(self, form, instance):
         msg = ""

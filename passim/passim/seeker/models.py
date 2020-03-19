@@ -3172,18 +3172,23 @@ class EqualGold(models.Model):
             self.srchexplicit = get_searchable(self.explicit)
             # Double check the number and the code
             if self.author:
-                # There is an author--is this different than the author we used to have?
-
-                if not self.number:
-                    # Check the highest sermon number for this author
-                    self.number = EqualGold.sermon_number(self.author)
                 # Get the author number
                 auth_num = self.author.get_number()
-                # Now we have both an author and a number...
-                passim_code = EqualGold.passim_code(auth_num, self.number)
-                if not self.code or self.code != passim_code:
-                    # Now save myself with the new code
-                    self.code = passim_code
+
+                # Can we process this author further into a code?
+                if auth_num < 0:
+                    self.code = None
+                else:
+                    # There is an author--is this different than the author we used to have?
+
+                    if not self.number:
+                        # Check the highest sermon number for this author
+                        self.number = EqualGold.sermon_number(self.author)
+                    # Now we have both an author and a number...
+                    passim_code = EqualGold.passim_code(auth_num, self.number)
+                    if not self.code or self.code != passim_code:
+                        # Now save myself with the new code
+                        self.code = passim_code
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -3213,6 +3218,12 @@ class EqualGold(models.Model):
             value = getattr(self, field)
             if value != None:
                 setattr(org, field, value)
+        # Possibly set the author to UNDECIDED
+        author = Author.objects.filter(name__iexact="undecided").first()
+        if author == None:
+            author = Author(name="Undecided")
+            author.save()
+        org.author = author
         # Save the result
         org.save()
         return org
@@ -3318,6 +3329,8 @@ class EqualGold(models.Model):
         sBack = ""
         if self.moved:
             sBack = self.moved.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
         return sBack
 
     def get_moved_url(self):
@@ -3334,7 +3347,10 @@ class EqualGold(models.Model):
         sBack = ""
         # Find out if I have moved from anywhere or not
         origin = EqualGold.objects.filter(moved=self).first()
-        if origin != None: sBack = origin.code
+        if origin != None: 
+            sBack = origin.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
         # REturn the information
         return sBack
 

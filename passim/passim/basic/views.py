@@ -1116,6 +1116,7 @@ class BasicDetails(DetailView):
             for mobj in context['mainitems']:
                 # Check for possible form field information
                 if 'field_key' in mobj: mobj['field_key'] = frm[mobj['field_key']]
+                if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
                 if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
                 if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
