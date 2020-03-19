@@ -76,7 +76,7 @@ key               meaning
 ``*type``         normally 'plain'. Alternatives: ``bold``, ``line``, ``safe``, ``safeline``
 ``*label``        the label shown in the details view for this item
 ``*value``        the value to be displayed (use ``instance`` to derive it)
-``*link``         the URL that the user can link to from this value
+``[link]``        the URL that the user can link to from this value (provided type=``bold``)
 ``[title]``       the popup text displayed when hovering over
 ``[multiple]``    boolean that indicates whether this field may contain multiple values
 ``[align]``       the alignment of the ``<td>``

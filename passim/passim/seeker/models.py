@@ -3320,6 +3320,34 @@ class EqualGold(models.Model):
             sBack = self.moved.code
         return sBack
 
+    def get_moved_url(self):
+        """Get the URL of the SSG to which I have been moved"""
+
+        url = ""
+        if self.moved:
+            url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
+        return url
+
+    def get_previous_code(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: sBack = origin.code
+        # REturn the information
+        return sBack
+
+    def get_previous_url(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: sBack = reverse('equalgold_details', kwargs={'pk': origin.id})
+        # REturn the information
+        return sBack
+
     def get_incipit_markdown(self):
         """Get the contents of the incipit field using markdown"""
         # Perform

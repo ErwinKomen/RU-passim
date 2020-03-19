@@ -7728,12 +7728,13 @@ class EqualGoldEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author', 'field_ta': 'authorname', 'key_ta': 'author-key'},
+            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
             {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'title': 'This is the automatically assigned sermon number for this particular author' },
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
-            {'type': 'plain', 'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide'},
+            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide', 'link': instance.get_moved_url},
+            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code, 'empty': 'hide', 'link': instance.get_previous_url},
             {'type': 'plain', 'label': "Collections:",   'value': instance.collections.all().order_by('name'), 
                 'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
             ]
@@ -7884,14 +7885,15 @@ class EqualGoldListView(BasicList):
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['code', 'author', 'number', '', '' ]
+    order_cols = ['code', 'author', 'number', '', 'srchincipit', '' ]
     order_default= order_cols
     order_heads = [
-        {'name': 'Author',       'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
-        {'name': 'Number',       'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
-        {'name': 'Code',         'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis','order': ''   , 'type': 'str', 'custom': 'sig',    'main': True },
-        {'name': 'Size',         'order': ''   , 'type': 'int', 'custom': 'size'}
+        {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
+        {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+        {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
+        {'name': 'Gryson/Clavis',           'order': ''   , 'type': 'str', 'custom': 'sig' },
+        {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+        {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size'}
         ]
     filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
                {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
@@ -7937,6 +7939,11 @@ class EqualGoldListView(BasicList):
         elif custom == "code":
             sCode = "-" if instance.code  == None else instance.code
             html.append("{}".format(sCode))
+        elif custom == "incexpl":
+            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+            dots = "..." if instance.incipit else ""
+            html.append("<span style='color: blue;'>{}</span>".format(dots))
+            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "sig":
             # Get all the associated signatures
             qs = Signature.objects.filter(gold__equal=instance).order_by('editype', 'code')
@@ -8234,7 +8241,7 @@ class AuthorListView(BasicList):
             if number > 0:
                 url = reverse('search_gold')
                 html.append("<span class='badge jumbo-2' title='linked gold sermons'>")
-                html.append(" <a href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
+                html.append(" <a class='nostyle' href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
             number = instance.author_sermons.count()
             if number > 0:
                 url = reverse('sermon_list')

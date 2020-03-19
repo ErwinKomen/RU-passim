@@ -147,18 +147,22 @@ class CollectionWidget(ModelSelect2MultipleWidget):
 
 
 class CollectionSermoWidget(CollectionWidget):
+    """Like Collection, but then for: Sermon"""
     type = "sermo"
 
 
 class CollectionManuWidget(CollectionWidget):
+    """Like Collection, but then for: Manuscript"""
     type = "manu"
 
 
 class CollectionGoldWidget(CollectionWidget):
+    """Like Collection, but then for: SermonGold"""
     type = "gold"
 
 
 class CollectionSuperWidget(CollectionWidget):
+    """Like Collection, but then for: EqualGold = super sermon gold"""
     type = "super"
 
 
@@ -174,6 +178,17 @@ class ProjectOneWidget(ModelSelect2Widget):
 
 
 class AuthorWidget(ModelSelect2MultipleWidget):
+    model = Author
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Author.objects.all().order_by('name').distinct()
+
+
+class AuthorOneWidget(ModelSelect2Widget):
     model = Author
     search_fields = [ 'name__icontains']
 
@@ -841,7 +856,7 @@ class SuperSermonGoldForm(forms.ModelForm):
 
         model = EqualGold
         fields = ['author', 'incipit', 'explicit', 'code', 'number']
-        widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+        widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Passim code'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
