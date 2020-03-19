@@ -1835,10 +1835,10 @@ class Litref(models.Model):
                     # Get the short title (for books and book sections)
                     short_title = "(no short title)" if "shortTitle" not in data else data['shortTitle']
                    
-                   # Get the abbreviation of the journal 
+                    # Get the abbreviation of the journal 
                     journal_abbr = "(no abbr journal title)" if "publicationTitle" not in data else data['publicationTitle']
                    
-                   # Get the volume
+                    # Get the volume
                     volume = "?" if "volume" not in data else data['volume']
                     
                     # Get the coding for edition ("ed") or catalogue ("cat")
@@ -1916,6 +1916,13 @@ class Litref(models.Model):
                             # If there is a short title
                             elif short_title != "":
                                 result = "{} ({})".format(short_title, year)
+                        elif authors != "" and year != "":
+                            # If there is no short title
+                            if short_title == "": 
+                                result = "{} ({})".format(authors, year)
+                            else:
+                                result = "{} ({})".format(short_title, year)
+
  
                     if result != "":
                         # update the full field
@@ -3233,6 +3240,14 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def create_empty(self):
+        """Create an empty new one"""
+
+        org = EqualGold()
+        org.author = Author.get_undecided()
+        org.save()
+        return org
+
     def sermon_number(author):
         """Determine what the sermon number *would be* for the indicated author"""
 
@@ -3449,6 +3464,14 @@ class SermonGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_eqset(self):
+        """Return an HTML representation of the *other* members in my equality set"""
+
+        html = []
+        html.append("<span><i>(to be implemented)</i></span>")
+
+        return "".join(html)
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
@@ -3565,6 +3588,18 @@ class SermonGold(models.Model):
             lKeyword.append(item.name)
         return " | ".join(lKeyword)
 
+    def get_keywords_markdown(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
@@ -3590,6 +3625,18 @@ class SermonGold(models.Model):
         # Sort the items
         lEdition.sort()
         return lEdition
+
+    def get_editions_markdown(self):
+        lHtml = []
+        # Visit all keywords
+        for edi in self.sermon_gold_editions.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.id)
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def ftxtlinks(self):
         """Combine all editions into one string"""

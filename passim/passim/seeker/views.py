@@ -7464,23 +7464,20 @@ class SermonGoldFtxtset(BasicPart):
     formset_objects = [{'formsetClass': GftextFormSet, 'prefix': 'gftxt', 'readonly': False}]
 
 
-class SermonGoldEdit(PassimDetails):
+class SermonGoldEdit(BasicDetails):
     """The details of one sermon"""
 
     model = SermonGold
     mForm = SermonGoldForm
-    template_name = 'seeker/sermongold_edit.html'   
-    prefix = "gold"
-    title = "SermonGold" 
+    prefix = 'gold'
+    title = "Sermon Gold"
+    rtype = "json"
+    mainitems = []
     basic_name = "gold"
-    afternewurl = ""
+
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,
                                        fk_name="gold", extra=0)
-    GlinkFormSet = inlineformset_factory(SermonGold, SermonGoldSame,
-                                         form=SermonGoldSameForm, min_num=0,
-                                         fk_name = "src",
-                                         extra=0, can_delete=True, can_order=False)
     GsignFormSet = inlineformset_factory(SermonGold, Signature,
                                          form=SermonGoldSignatureForm, min_num=0,
                                          fk_name = "gold",
@@ -7493,8 +7490,229 @@ class SermonGoldEdit(PassimDetails):
                                        form=SermonGoldCollectionForm, min_num=0,
                                        fk_name="gold", extra=0)
     
-    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False},
-                       {'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+    formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}, 
+                       {'formsetClass': GcolFormSet,  'prefix': 'gcol',  'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Belongs to:",           'value': instance.equal.code,   
+             'title': 'The Super Sermon Gold to which this Sermon Gold belongs'}, 
+            {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
+            {'type': 'plain', 'label': "Attributed author:",    'value': instance.author, 'field_key': 'author'},
+            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
+             'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
+             'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
+            {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+             'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+            {'type': 'plain', 'label': "Gryson/Clavis codes:",  'value': instance.goldsignatures.all().order_by('editype', 'name'), 
+             'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
+            {'type': 'plain', 'label': "Collections:",          'value': instance.collections.all().order_by('name'), 
+             'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[3] },
+            {'type': 'line', 'label': "Editions:",             'value': instance.get_editions_markdown(), 
+             'field_list': 'edilist', 'fso': self.formset_objects[2]},
+            ]
+        # Notes:
+        # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        # Set the 'afternew' URL
+        self.afternewurl = reverse('search_gold')
+
+        # Create a new equality set to which we add this Gold sermon
+        if instance.equal == None:
+            geq = EqualGold.create_empty()
+            instance.equal = geq
+            instance.save()
+
+        # Return positively
+        return True, "" 
+
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "gsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
+                elif prefix == "gkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "gcol":
+                    # Collection processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='gold', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "gedi":
+                    # Edition processing
+                    newpages = ""
+                    if 'newpages' in cleaned and cleaned['newpages'] != "":
+                        newpages = cleaned['newpages']
+                    # Also get the litref
+                    litref = cleaned['oneref']
+                    # Check if all is in order
+                    if litref:
+                        form.instance.reference = litref
+                        if newpages:
+                            form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
+            edilist = form.cleaned_data['edilist']
+            adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
+            collist_sg = form.cleaned_data['collist_sg']
+            adapt_m2m(CollectionGold, instance, "gold", collist_sg, "collection")
+
+            # Process many-to-one changes
+            # (1) 'goldsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(Signature, instance, "gold", siglist)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+
+class SermonGoldDetails(SermonGoldEdit):
+    """The details of one sermon"""
+
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(SermonGoldDetails, self).add_to_context(context, instance)
+
+        # Are we copying information?? (only allowed if we are the app_editor)
+        if 'goldcopy' in self.qd and context['is_app_editor']:
+            # Get the ID of the gold sermon from which information is to be copied to the SSG
+            goldid = self.qd['goldcopy']
+        else:
+            context['sections'] = []
+
+            # List of post-load objects
+            postload_objects = []
+            # (1) postload: full-text
+            ftxt_obj = dict(prefix="ftxt", url=reverse('gold_ftxtset', kwargs={'pk': instance.id}))
+            postload_objects.append(ftxt_obj)
+
+            # (2) postload: literature
+            lit_obj = dict(prefix="lit", url=reverse('gold_litset', kwargs={'pk': instance.id}))
+            postload_objects.append(lit_obj)
+
+            context['postload_objects'] = postload_objects
+
+            # Lists of related objects
+            related_objects = []
+            context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
+
+
+class SermonGoldEdit_ORIGINAL(PassimDetails):
+    """The details of one sermon"""
+
+    model = SermonGold
+    mForm = SermonGoldForm
+    template_name = 'seeker/sermongold_edit.html'   
+    prefix = "gold"
+    title = "SermonGold" 
+    basic_name = "gold"
+    afternewurl = ""
+    GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
+                                       form=SermonGoldKeywordForm, min_num=0,
+                                       fk_name="gold", extra=0)
+    GsignFormSet = inlineformset_factory(SermonGold, Signature,
+                                         form=SermonGoldSignatureForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
+    GediFormSet = inlineformset_factory(SermonGold, EdirefSG,
+                                         form = SermonGoldEditionForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
+    GcolFormSet = inlineformset_factory(SermonGold, CollectionGold,
+                                       form=SermonGoldCollectionForm, min_num=0,
+                                       fk_name="gold", extra=0)
+    
+    formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}, 
                        {'formsetClass': GcolFormSet,  'prefix': 'gcol',  'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
@@ -7635,11 +7853,10 @@ class SermonGoldEdit(PassimDetails):
         return context
 
 
-class SermonGoldDetails(SermonGoldEdit):
+class SermonGoldDetails_ORIGINAL(SermonGoldEdit):
     """The details of one sermon"""
 
-    template_name = 'seeker/sermongold_details.html'    # Use this for GET and for POST requests
-    template_post = 'seeker/sermongold_details.html'
+    template_name = 'seeker/sermongold_details.html'  
     rtype = "html"
 
     def after_new(self, form, instance):
@@ -7716,7 +7933,7 @@ class SermonGoldLitset(BasicPart):
     formset_objects = [{'formsetClass': SGlitFormSet, 'prefix': 'sglit', 'readonly': False}]
 
     def get_queryset(self, prefix):
-        qs = None
+        qs = LitrefSG.objects.none()
         if prefix == "sglit":
             # List the litrefs for this SermonGold correctly
             qs = LitrefSG.objects.filter(sermon_gold=self.obj).order_by('reference__short')
@@ -7814,8 +8031,8 @@ class EqualGoldEdit(BasicDetails):
         # Check for author
         if instance.author == None:
             # Set to "undecided" author if possible
-            author = Author.objects.filter(name__iexact="undecided").first()
-            if author != None: instance.author = author
+            author = Author.get_undecided()
+            instance.author = author
         return True, ""
 
     def after_save(self, form, instance):

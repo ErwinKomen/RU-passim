@@ -1202,8 +1202,7 @@ var ru = (function ($, ru) {
 
           // Now address all items from the list of post-load items
           post_loads.forEach(function (targetid, index) {
-            var targetid = $(this),
-                data = [],
+            var data = [],
                 lst_ta = [],
                 i = 0,
                 targeturl = $(targetid).attr("targeturl");
