@@ -3394,6 +3394,15 @@ class EqualGold(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+    def get_collections_markdown(self):
+
+        lHtml = []
+        for obj in self.collections.all().order_by('name'):
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        sBack = ", ".join(lHtml)
+        return sBack
+
 
 class SermonGold(models.Model):
     """The signature of a standard sermon"""

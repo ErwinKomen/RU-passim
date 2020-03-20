@@ -7989,8 +7989,10 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide', 'link': instance.get_moved_url},
             {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code, 'empty': 'hide', 'link': instance.get_previous_url},
-            {'type': 'plain', 'label': "Collections:",   'value': instance.collections.all().order_by('name'), 
-                'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
+            {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
+                'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] }
+            #{'type': 'plain', 'label': "Collections:",   'value': instance.collections.all().order_by('name'), 
+            #    'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[0] }
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection

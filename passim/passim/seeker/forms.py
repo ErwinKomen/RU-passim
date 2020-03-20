@@ -213,12 +213,14 @@ class AuthorOneWidget(ModelSelect2Widget):
 
 class SuperOneWidget(ModelSelect2Widget):
     model = EqualGold
-    search_fields = ['code__icontains', 'id']
+    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains']
 
     def label_from_instance(self, obj):
         sLabel = obj.code
         if sLabel == None:
-            sLabel = "(ssg {})".format(obj.id)
+            sLabel = "ssg id {}".format(obj.id)
+        elif obj.author != None:
+            sLabel = "{} {}".format(sLabel, obj.author.name)
         return sLabel
 
     def get_queryset(self):
