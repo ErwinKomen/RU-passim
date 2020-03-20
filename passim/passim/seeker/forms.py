@@ -211,6 +211,20 @@ class AuthorOneWidget(ModelSelect2Widget):
         return Author.objects.all().order_by('name').distinct()
 
 
+class SuperOneWidget(ModelSelect2Widget):
+    model = EqualGold
+    search_fields = ['code__icontains', 'id']
+
+    def label_from_instance(self, obj):
+        sLabel = obj.code
+        if sLabel == None:
+            sLabel = "(ssg {})".format(obj.id)
+        return sLabel
+
+    def get_queryset(self):
+        return EqualGold.objects.all().order_by('code', 'id').distinct()
+
+
 class LocationWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains']
@@ -766,11 +780,12 @@ class SermonGoldForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype', 'srchincipit', 'srchexplicit' ]
-        widgets={'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+        fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype', 'srchincipit', 'srchexplicit', 'equal' ]
+        widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'bibliography':forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace', 'class': 'searching'}),
+                 'equal':       SuperOneWidget(attrs={'data-placeholder': 'Select one Super Sermon Gold...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 

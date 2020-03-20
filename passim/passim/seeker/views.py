@@ -7500,8 +7500,8 @@ class SermonGoldEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Belongs to:",           'value': instance.equal.code,   
-             'title': 'The Super Sermon Gold to which this Sermon Gold belongs'}, 
+            {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
+             'title': 'The Super Sermon Gold to which this Sermon Gold belongs', 'field_key': "equal"}, 
             {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset},
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
             {'type': 'plain', 'label': "Attributed author:",    'value': instance.author, 'field_key': 'author'},
@@ -7511,16 +7511,17 @@ class SermonGoldEdit(BasicDetails):
              'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'field_list': 'kwlist', 'fso': self.formset_objects[1]},
-            {'type': 'plain', 'label': "Gryson/Clavis codes:",  'value': instance.goldsignatures.all().order_by('editype', 'name'), 
+             'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+            {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(), 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
-            {'type': 'plain', 'label': "Collections:",          'value': instance.collections.all().order_by('name'), 
-             'multiple': True, 'field_list': 'collist_ssg', 'qlist': 'collist_ssg', 'link': reverse('equalgold_list'), 'fso': self.formset_objects[3] },
+            {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
+             'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
             {'type': 'line', 'label': "Editions:",             'value': instance.get_editions_markdown(), 
              'field_list': 'edilist', 'fso': self.formset_objects[2]},
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+        # TODO: add [sermongold_litset] unobtrusively
 
         # Signal that we have select2
         context['has_select2'] = True

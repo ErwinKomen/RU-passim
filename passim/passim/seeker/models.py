@@ -3567,17 +3567,58 @@ class SermonGold(models.Model):
             lSign.append(item.short())
         return " | ".join(lSign)
 
+    def signatures_ordered(self):
+        return self.goldsignatures.all().order_by("editype", "code")
+
     def get_signatures(self):
         lSign = []
         for item in self.goldsignatures.all():
             lSign.append(item.short())
         return lSign
 
-    def signatures_ordered(self):
-        return self.goldsignatures.all().order_by("editype", "code")
+    def do_signatures(self):
+        """Create or re-make a JSON list of signatures"""
+
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        self.siglist = json.dumps(lSign)
+        # And save myself
+        self.save()
+
+    def get_signatures_markdown(self):
+        lHtml = []
+        # Visit all signatures
+        for sig in self.goldsignatures.all().order_by('editype', 'code'):
+            # Determine where clicking should lead to
+            url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def collections_ordered(self):
         return self.collections_gold.all().order_by("name")
+
+    def get_collections_markdown(self):
+        lHtml = []
+        # Visit all collections
+        for col in self.collections.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
+            # Create a display for this topic
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_ssg_markdown(self):
+        lHtml = []
+        url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, self.equal.code))
+        sBack = "".join(lHtml)
+        return sBack
 
     def get_keywords(self):
         """Combine all keywords into one string"""
@@ -3599,16 +3640,6 @@ class SermonGold(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
-
-    def do_signatures(self):
-        """Create or re-make a JSON list of signatures"""
-
-        lSign = []
-        for item in self.goldsignatures.all():
-            lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
 
     def editions(self):
         """Combine all editions into one string: the editions are retrieved from litrefSG"""

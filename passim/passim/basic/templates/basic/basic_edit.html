@@ -76,7 +76,7 @@
             <!-- Cell with the name of the field-->
             <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
               <span>{{mainitem.label}}</span>
-              {% if mainitem.multiple %}
+              {% if is_app_editor and mainitem.multiple %}
                 <!-- Multiple value field, i.e. select2 -->
                 <span>
                   <a class="edit-mode hidden btn" onclick="ru.basic.add_new_select2(this, '{{mainitem.fso.prefix}}');">
@@ -90,7 +90,7 @@
             <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} 
                 {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
 
-              {% if mainitem.multiple %}
+              {% if mainitem.multiple and not 'field_list' in mainitem %}
                 <!-- Multiple instances choosing using Select2 -->
                 <div class="{% if 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
                   {% if mainitem.value|length > 0 %}
@@ -110,7 +110,7 @@
 
               {% else %}
                 <!-- Basic view mode -->
-                <div class="{% if 'field_key' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
+                <div class="{% if 'field_key' in mainitem or 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
                   {% spaceless %}
                   {% if mainitem.type == "bold" %}{% if mainitem.link == "" %}<b>{{mainitem.value}}</b>{% else %}<a href="{{mainitem.link}}"><b>{{mainitem.value}}</b></a>{% endif %}
                   {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
@@ -127,6 +127,13 @@
                   <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
                 {% elif 'field_key' in mainitem %}
                   <div class="edit-mode hidden">{{mainitem.field_key}}</div>
+                {% elif 'field_list' in mainitem %}
+                  <div class="edit-mode hidden">{{mainitem.field_list}}</div>
+                  {% if is_app_editor and 'fso' in mainitem %}
+                    <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
+                      {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                    </div>
+                  {% endif %}
                 {% elif 'field_view' in mainitem %}
                   <div class="hidden">{{mainitem.field_view}}</div>
                 {% endif %}
