@@ -8212,9 +8212,12 @@ class EqualGoldListView(BasicList):
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
         {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
         {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis',           'order': ''   , 'type': 'str', 'custom': 'sig' },
-        {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
-        {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size'}
+        {'name': 'Gryson/Clavis',           'order': ''   , 'type': 'str', 'custom': 'sig',
+         'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
+        {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
+         'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
+        {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
+         'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"}
         ]
     filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
                {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
