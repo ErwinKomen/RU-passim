@@ -5196,7 +5196,7 @@ class OriginEdit(BasicPart):
 
 
 class SermonEdit(PassimDetails):
-    """The details of one sermon HIERMEE bezig"""
+    """The details of one sermon description"""
     
     model = SermonDescr
     mForm = SermonForm

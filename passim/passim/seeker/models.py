@@ -4396,6 +4396,18 @@ class SermonDescr(models.Model):
         # Return the ordered list
         return sig_ordered
 
+    def goldauthors(self):
+        # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
+        lst_author = []
+        # Visit all linked gold sermons
+        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Does this one have an author?
+            if gold.author != None:
+                lst_author.append(gold.author)
+        return lst_author
+
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
 

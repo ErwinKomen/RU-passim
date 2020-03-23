@@ -326,6 +326,24 @@
           </div>
         </td>
       </tr>
+
+      <!-- All the authors linked to me through the Sermons Gold that I am 'equal' to -->
+      <tr class="form-row">
+        <td valign="top" class="tdnowrap" title="Authors related to me via linked gold sermons">
+          <span>Authors (g)</span>
+        </td>
+        <td class="manuscript-format" align="left">
+          <div class="any-mode">
+            {% if sermoForm.instance.goldauthors|length == 0 %}
+              <span>(none)</span>
+            {% else %}
+              {% for author in sermoForm.instance.goldauthors %}
+                <span>{{author.name}}</span>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </td>
+      </tr>
     </table>
     
 </form>
