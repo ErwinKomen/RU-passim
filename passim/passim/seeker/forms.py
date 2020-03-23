@@ -95,6 +95,18 @@ class LitrefSgWidget(ModelSelect2MultipleWidget):
         return LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class FtextlinkWidget(ModelSelect2MultipleWidget):
+    model = Ftextlink
+    search_fields = [ 'url__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.url
+
+    def get_queryset(self):
+        return Ftextlink.objects.all().order_by('url').distinct()
+
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -759,7 +771,11 @@ class SermonGoldForm(forms.ModelForm):
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
+    litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=LitrefSgWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ftxtlist    = ModelMultipleChoiceField(queryset=None, required=False,
+                widget=FtextlinkWidget(attrs={'data-placeholder': 'Select links to full texts...', 'style': 'width: 100%;', 'class': 'searching'}))
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False, 
@@ -801,10 +817,12 @@ class SermonGoldForm(forms.ModelForm):
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+        self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
         self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+        self.fields['ftxtlist'].queryset = Ftextlink.objects.all().order_by('url')
         
         # Get the instance
         if 'instance' in kwargs:
@@ -817,7 +835,9 @@ class SermonGoldForm(forms.ModelForm):
             self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
             self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
             self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
+            self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
             self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+            self.fields['ftxtlist'].initial = [x.pk for x in instance.goldftxtlinks.all().order_by('url')]
         return None
 
 
@@ -1273,6 +1293,12 @@ class SermonDescrCollectionForm(forms.ModelForm):
 
                 
 class SermonGoldLitrefForm(forms.ModelForm):
+    # EK: Added for Sermon Gold new approach 
+    oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
+    # ORIGINAL:
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
@@ -1292,6 +1318,10 @@ class SermonGoldLitrefForm(forms.ModelForm):
         self.fields['reference'].required = False
         self.fields['litref'].required = False
         self.fields['litref_ta'].required = False
+        # EK: Added for Sermon Gold new approach 
+        self.fields['newpages'].required = False
+        self.fields['oneref'].required = False
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1302,8 +1332,9 @@ class SermonGoldLitrefForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super(SermonGoldLitrefForm, self).clean()
         litref = cleaned_data.get("litref")
+        oneref = cleaned_data.get("oneref")
         reference = cleaned_data.get("reference")
-        if reference == None and (litref == None or litref == ""):
+        if reference == None and (litref == None or litref == "") and (oneref == None or oneref == ""):
             #litref_ta = cleaned_data.get("litref_ta")
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
@@ -1508,6 +1539,9 @@ class LibraryForm(forms.ModelForm):
 
 
 class SermonGoldFtextlinkForm(forms.ModelForm):
+    newurl  = forms.CharField(label=_("Full text link"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'URL to full text...',  'style': 'width: 100%;'}))
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -1515,6 +1549,14 @@ class SermonGoldFtextlinkForm(forms.ModelForm):
         fields = ['url', 'gold']
         widgets={'url':     forms.URLInput(attrs={'placeholder': 'Full text URLs...', 'style': 'width: 100%;'})
                  }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SermonGoldFtextlinkForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['url'].required = False
+        self.fields['newurl'].required = False
+        self.fields['gold'].required = False
 
 
 class ManuscriptForm(forms.ModelForm):

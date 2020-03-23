@@ -47,6 +47,7 @@ var ru = (function ($, ru) {
           { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
 
           // manu
           { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },

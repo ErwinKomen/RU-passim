@@ -7073,17 +7073,25 @@ class SermonGoldListView(BasicList):
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
         elif custom == "code":
             equal = instance.equal
-            code = "(undetermined)" if equal.code == None else equal.code
-            url = reverse('equalgold_details', kwargs={'pk': equal.id})
+            if equal:
+                code = "(undetermined)" if equal.code == None else equal.code
+                url = reverse('equalgold_details', kwargs={'pk': equal.id})
+            else:
+                code = "(not specified)"
+                url = "#"
             html.append("<span class='passimcode'><a class='nostyle' href='{}'>{}</a></span>".format(url, code))
         elif custom == "edition":
             html.append("<span>{}</span>".format(instance.editions()[:20]))
             sTitle = instance.editions()
         elif custom == "incexpl":
-            html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
-            dots = "..." if instance.incipit else ""
-            html.append("<span style='color: blue;'>{}</span>".format(dots))
-            html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
+            if instance.incipit == "" and instance.explicit == "":
+                url = reverse('gold_details', kwargs={'pk': instance.id})
+                html.append("<span><a href='{}'><i>(not specified)</i></a></span>".format(url))
+            else:
+                html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
+                dots = "..." if instance.incipit else ""
+                html.append("<span style='color: blue;'>{}</span>".format(dots))
+                html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "links":
             for link_def in instance.link_oview():
                 if link_def['count'] > 0:
@@ -7489,11 +7497,21 @@ class SermonGoldEdit(BasicDetails):
     GcolFormSet = inlineformset_factory(SermonGold, CollectionGold,
                                        form=SermonGoldCollectionForm, min_num=0,
                                        fk_name="gold", extra=0)
+    GlitFormSet = inlineformset_factory(SermonGold, LitrefSG,
+                                         form = SermonGoldLitrefForm, min_num=0,
+                                         fk_name = "sermon_gold",
+                                         extra=0, can_delete=True, can_order=False)
+    GftxtFormSet = inlineformset_factory(SermonGold, Ftextlink,
+                                         form=SermonGoldFtextlinkForm, min_num=0,
+                                         fk_name = "gold",
+                                         extra=0, can_delete=True, can_order=False)
     
     formset_objects = [{'formsetClass': GsignFormSet, 'prefix': 'gsign', 'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GkwFormSet,   'prefix': 'gkw',   'readonly': False, 'noinit': True, 'linkfield': 'gold'},
                        {'formsetClass': GediFormSet,  'prefix': 'gedi',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'}, 
-                       {'formsetClass': GcolFormSet,  'prefix': 'gcol',  'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
+                       {'formsetClass': GcolFormSet,  'prefix': 'gcol',  'readonly': False, 'noinit': True, 'linkfield': 'gold'},
+                       {'formsetClass': GlitFormSet,  'prefix': 'glit',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'},
+                       {'formsetClass': GftxtFormSet, 'prefix': 'gftxt', 'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7501,10 +7519,11 @@ class SermonGoldEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
-             'title': 'The Super Sermon Gold to which this Sermon Gold belongs', 'field_key': "equal"}, 
-            {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset},
+             'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
+            {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
+             'title': 'Other Sermons Gold members of the same equality set'},
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
-            {'type': 'plain', 'label': "Attributed author:",    'value': instance.author, 'field_key': 'author'},
+            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author, 'field_key': 'author'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
@@ -7516,11 +7535,17 @@ class SermonGoldEdit(BasicDetails):
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
             {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
              'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
-            {'type': 'line', 'label': "Editions:",             'value': instance.get_editions_markdown(), 
-             'field_list': 'edilist', 'fso': self.formset_objects[2]},
+            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
+             'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
+            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+             'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
+            {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
+             'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+
         # TODO: add [sermongold_litset] unobtrusively
 
         # Signal that we have select2
@@ -7604,13 +7629,33 @@ class SermonGoldEdit(BasicDetails):
                     if 'newpages' in cleaned and cleaned['newpages'] != "":
                         newpages = cleaned['newpages']
                     # Also get the litref
-                    litref = cleaned['oneref']
-                    # Check if all is in order
-                    if litref:
-                        form.instance.reference = litref
-                        if newpages:
-                            form.instance.pages = newpages
+                    if 'oneref' in cleaned:
+                        litref = cleaned['oneref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.reference = litref
+                            if newpages:
+                                form.instance.pages = newpages
                     # Note: it will get saved with form.save()
+                elif prefix == "glit":
+                    # Literature reference processing
+                    newpages = ""
+                    if 'newpages' in cleaned and cleaned['newpages'] != "":
+                        newpages = cleaned['newpages']
+                    # Also get the litref
+                    if 'oneref' in cleaned:
+                        litref = cleaned['oneref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.reference = litref
+                            if newpages:
+                                form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
+                elif prefix == "gftxt":
+                    # Process many-to-ONE full-text links
+                    if 'newurl' in cleaned and cleaned['newurl'] != "":
+                        form.instance.url = cleaned['newurl']
+                        # Note: it will get saved with formset.save()
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -7626,15 +7671,27 @@ class SermonGoldEdit(BasicDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
+
+            # (2) 'editions'
             edilist = form.cleaned_data['edilist']
             adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
+
+            # (3) 'collections'
             collist_sg = form.cleaned_data['collist_sg']
             adapt_m2m(CollectionGold, instance, "gold", collist_sg, "collection")
 
-            # Process many-to-one changes
+            # (5) 'literature'
+            litlist = form.cleaned_data['litlist']
+            adapt_m2m(LitrefSG, instance, "sermon_gold", litlist, "reference", extra=['pages'], related_is_through = True)
+
+            # Process many-to-ONE changes
             # (1) 'goldsignatures'
             siglist = form.cleaned_data['siglist']
             adapt_m2o(Signature, instance, "gold", siglist)
+
+            # (2) 'full text links'
+            ftxtlist = form.cleaned_data['ftxtlist']
+            adapt_m2o(Ftextlink, instance, "gold", ftxtlist)
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -7661,13 +7718,13 @@ class SermonGoldDetails(SermonGoldEdit):
 
             # List of post-load objects
             postload_objects = []
-            # (1) postload: full-text
-            ftxt_obj = dict(prefix="ftxt", url=reverse('gold_ftxtset', kwargs={'pk': instance.id}))
-            postload_objects.append(ftxt_obj)
+            ## (1) postload: full-text
+            #ftxt_obj = dict(prefix="gftxt", url=reverse('gold_ftxtset', kwargs={'pk': instance.id}))
+            #postload_objects.append(ftxt_obj)
 
-            # (2) postload: literature
-            lit_obj = dict(prefix="lit", url=reverse('gold_litset', kwargs={'pk': instance.id}))
-            postload_objects.append(lit_obj)
+            ## (2) postload: literature
+            #lit_obj = dict(prefix="lit", url=reverse('gold_litset', kwargs={'pk': instance.id}))
+            #postload_objects.append(lit_obj)
 
             context['postload_objects'] = postload_objects
 

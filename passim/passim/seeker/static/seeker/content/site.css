@@ -1262,7 +1262,7 @@ span.badge.signature.gr {
 span.badge.signature.cl {
   background-color: lightgreen;
 }
-span.badge.signature.ot {
+span.badge.signature.ot, span.badge.signature.eqset  {
   background-color: lightgoldenrodyellow;
 }
 
@@ -1322,7 +1322,7 @@ a.sermon:link, a.sermon:visited {
   color: darkgreen;
 }
 
-div.view-mode a {
+div.view-mode a, div.any-mode a {
   text-decoration: none;
   color: inherit;
 }

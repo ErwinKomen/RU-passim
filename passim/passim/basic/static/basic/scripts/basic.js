@@ -1258,6 +1258,7 @@ var ru = (function ($, ru) {
                         // If an 'afternewurl' is specified, go there
                         if ('afterdelurl' in response && response['afterdelurl'] !== "") {
                           window.location = response['afterdelurl'];
+                          return;
                         } else if (afterurl === undefined || afterurl === "") {
                           // Delete visually
                           $(targetid).remove();
@@ -1265,6 +1266,7 @@ var ru = (function ($, ru) {
                         } else {
                           // Make sure we go to the afterurl
                           window.location = afterurl;
+                          return;
                         }
                         break;
                       case "error":
@@ -1662,6 +1664,103 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("tabular_addrow", ex);
+        }
+      },
+
+      /**
+       * tabular_deleterow
+       *   Delete one row from a tabular inline
+       *
+       */
+      tabular_deleterow: function (elStart) {
+        var sId = "",
+            elDiv = null,
+            elRow = null,
+            elPrev = null,
+            elDel = null,   // The delete inbox
+            sPrefix = "",
+            elForms = "",
+            counter = $(elStart).attr("counter"),
+            deleteurl = "",
+            data = [],
+            frm = null,
+            bCounter = false,
+            bHideOnDelete = false,
+            iForms = 0,
+            prefix = "simplerel";
+
+        try {
+          // Get the prefix, if possible
+          sPrefix = $(elStart).attr("extra");
+          bCounter = (typeof counter !== typeof undefined && counter !== false && counter !== "");
+          elForms = "#id_" + sPrefix + "-TOTAL_FORMS"
+          // Find out just where we are
+          elDiv = $(elStart).closest("div[id]")
+          sId = $(elDiv).attr("id");
+          // Find out how many forms there are right now
+          iForms = $(elForms).val();
+          frm = $(elStart).closest("form");
+
+          // Get the deleteurl (if existing)
+          deleteurl = $(elStart).attr("targeturl");
+          // Only delete the current row
+          elRow = $(elStart).closest("tr");
+          // Do we need to hide or delete?
+          if ($(elRow).hasClass("hide-on-delete")) {
+            bHideOnDelete = true;
+            $(elRow).addClass("hidden");
+          } else {
+            $(elRow).remove();
+          }
+
+          // Further action depends on whether the row just needs to be hidden
+          if (bHideOnDelete) {
+            // Row has been hidden: now find and set the DELETE checkbox
+            elDel = $(elRow).find("input:checkbox[name$='DELETE']");
+            if (elDel !== null) {
+              $(elDel).prop("checked", true);
+            }
+          } else {
+            // Decrease the amount of forms
+            iForms -= 1;
+            $(elForms).val(iForms);
+
+            // Re-do the numbering of the forms that are shown
+            $(elDiv).find(".form-row").not(".empty-form").each(function (idx, elThisRow) {
+              var iCounter = 0, sRowId = "", arRowId = [];
+
+              iCounter = idx + 1;
+              // Adapt the ID attribute -- if it EXISTS
+              sRowId = $(elThisRow).attr("id");
+              if (sRowId !== undefined) {
+                arRowId = sRowId.split("-");
+                arRowId[1] = idx;
+                sRowId = arRowId.join("-");
+                $(elThisRow).attr("id", sRowId);
+              }
+
+              if (bCounter) {
+                // Adjust the number in the FIRST <td>
+                $(elThisRow).find("td").first().html(iCounter.toString());
+              }
+
+              // Adjust the numbering of the INPUT and SELECT in this row
+              $(elThisRow).find("input, select").each(function (j, elInput) {
+                // Adapt the name of this input
+                var sName = $(elInput).attr("name");
+                if (sName !== undefined) {
+                  var arName = sName.split("-");
+                  arName[1] = idx;
+                  sName = arName.join("-");
+                  $(elInput).attr("name", sName);
+                  $(elInput).attr("id", "id_" + sName);
+                }
+              });
+            });
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("tabular_deleterow", ex);
         }
       },
 

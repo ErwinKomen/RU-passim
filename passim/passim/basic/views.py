@@ -1109,7 +1109,8 @@ class BasicDetails(DetailView):
                 context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # Possibly add to context by the calling function
-        context = self.add_to_context(context, instance)
+        if instance.id:
+            context = self.add_to_context(context, instance)
 
         # fill in the form values
         if frm and 'mainitems' in context:
@@ -1178,7 +1179,8 @@ class BasicDetails(DetailView):
                 self.rtype = "json"
 
                 # Possibly add to context by the calling function
-                context = self.add_to_context(context, instance)
+                if instance.id:
+                    context = self.add_to_context(context, instance)
 
                 # No need to retern a form anymore - we have been deleting
                 return None

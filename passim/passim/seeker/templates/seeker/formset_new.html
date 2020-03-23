@@ -34,7 +34,9 @@
 
         <!-- A delete button -->
         <td title="Delete this item" style="vertical-align: middle; width: 20px" class="clickable">
-          <a class="delete-row" extra="{{prefix}}" counter="true"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+          <a class="delete-row" extra="{{prefix}}" counter="true" onclick="ru.basic.tabular_deleterow(this);">
+            <span class="glyphicon glyphicon-remove">&nbsp;</span>
+          </a>
         </td>
 
       </tr>
@@ -57,7 +59,9 @@
 
       <!-- A delete button -->
       <td title="Delete this item" style="vertical-align: middle; width: 20px" class="clickable">
-        <a class="delete-row" extra="{{prefix}}" counter="true"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
+        <a class="delete-row" extra="{{prefix}}" counter="true"  onclick="ru.basic.tabular_deleterow(this);">
+          <span class="glyphicon glyphicon-remove">&nbsp;</span>
+        </a>
       </td>
     </tr>
 

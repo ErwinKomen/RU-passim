@@ -63,6 +63,7 @@
                   Delete
                 </a>
               </span>
+              <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
             </div>
           {% endif %}
         </td>
@@ -79,7 +80,8 @@
               {% if is_app_editor and mainitem.multiple %}
                 <!-- Multiple value field, i.e. select2 -->
                 <span>
-                  <a class="edit-mode hidden btn" onclick="ru.basic.add_new_select2(this, '{{mainitem.fso.prefix}}');">
+                  <a class="edit-mode hidden btn" 
+                     onclick="ru.basic.add_new_select2(this, '{{mainitem.fso.prefix}}' {% if 'template_selection' in mainitem %}, {{mainitem.template_selection}}{% endif %});">
                     <span class="glyphicon glyphicon-plus"></span>
                   </a>
                 </span>

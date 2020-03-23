@@ -3240,7 +3240,7 @@ class EqualGold(models.Model):
         org.save()
         return org
 
-    def create_empty(self):
+    def create_empty():
         """Create an empty new one"""
 
         org = EqualGold()
@@ -3477,10 +3477,25 @@ class SermonGold(models.Model):
         """Return an HTML representation of the *other* members in my equality set"""
 
         html = []
-        html.append("<span><i>(to be implemented)</i></span>")
+        # Make available the set of Gold Sermons that belongs to the same EqualGold
+        qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
+        for item in qs:
+            sigs = json.loads(item.siglist)
+            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+            url = reverse('gold_details', kwargs={'pk': item.id})
+            html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+        # Return the combination
+        return " ".join(html)
 
-        return "".join(html)
+    def get_author(self):
+        """Get the name of the author"""
 
+        if self.author:
+            sName = self.author.name
+        else:
+            sName = "-"
+        return sName
+    
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
@@ -3625,7 +3640,8 @@ class SermonGold(models.Model):
     def get_ssg_markdown(self):
         lHtml = []
         url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
-        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, self.equal.code))
+        code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
+        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
         sBack = "".join(lHtml)
         return sBack
 
@@ -3668,12 +3684,24 @@ class SermonGold(models.Model):
 
     def get_editions_markdown(self):
         lHtml = []
-        # Visit all keywords
+        # Visit all editions
         for edi in self.sermon_gold_editions.all().order_by('reference__short'):
             # Determine where clicking should lead to
-            url = "{}#edi_{}".format(reverse('literature_list'), edi.id)
-            # Create a display for this topic
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
+            # Create a display for this item
             lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_litrefs_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for litref in self.sermon_gold_litrefs.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -3685,6 +3713,18 @@ class SermonGold(models.Model):
         for item in self.goldftxtlinks.all():
             lFtxtlink.append(item.short())
         return ", ".join(lFtxtlink)
+
+    def get_ftxtlinks_markdown(self):
+        lHtml = []
+        # Visit all full text links
+        for item in self.goldftxtlinks.all().order_by('url'):
+            # Determine where clicking should lead to
+            url = item.url
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, url))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_bibliography_markdown(self):
         """Get the contents of the bibliography field using markdown"""

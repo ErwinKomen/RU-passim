@@ -166,3 +166,37 @@ key               meaning
 ``[link]``        a link (URL) to which the user is directed when pressing this row
 ================= ============================================================================
 
+
+Adding a many-to-one element
+----------------------------
+
+Suppose there is a details view and an edit view for an item of type ``Library``.
+Suppose, then, that there is an item ``Book`` that links with a foreign key to Library.
+(It will have a field ``name`` for the name of the book and ``library`` linking to the ``Library``.)
+There is a many-to-one relation between Book and Library.
+How can the 'books' be added to the details view of ``Library``?
+Here are the steps:
+
+#. Forms
+
+   (#) Adapt the ``LibraryForm``: 
+   
+       * Add an element ``booklist`` to the form
+       * Initialize the `queryset` and `initial` values of ``booklist`` in method ``__init__()``
+
+   (#) Make sure to have a form ``LibraryBookForm``:
+       
+       * Make it have a field like ``newname`` where the user can add a new name
+       * Have the property `required` set to `False`
+
+#. Model: process ``Library``
+
+   (#) Add a method like ``get__book__markdown()`` that creates a HTML string to show the contents of a book.
+
+#. Views
+
+   (#) There needs to be a formset that provides a set of forms linking ``Library`` with ``Book``
+   (#) Method ``add_to_context()``: Make sure the Books are mentioned in ``context['mainitems']``
+   (#) Method ``process_formset()``: make sure the form's ``newname`` is handled properly
+   (#) Method ``after_save()``:  make sure the procedure ``adapt_m2o()`` is called correctly
+
