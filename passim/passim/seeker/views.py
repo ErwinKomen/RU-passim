@@ -2975,6 +2975,31 @@ def get_litrefs(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_sg(request):
+    """Get ONE particular short representation of a SG"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            sg = SermonGold.objects.filter(Q(id=sId)).first()
+            if sg:
+                short = sg.get_view()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sg")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_ssg(request):
     """Get ONE particular short representation of a SSG"""
     
@@ -2993,7 +3018,7 @@ def get_ssg(request):
             data = json.dumps(co_json)
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("get_litref")
+            oErr.DoError("get_ssg")
     else:
         data = "Request is not ajax"
     mimetype = "application/json"
@@ -5195,7 +5220,238 @@ class OriginEdit(BasicPart):
         return context
 
 
-class SermonEdit(PassimDetails):
+class SermonEdit(BasicDetails):
+    """The editable part of one sermon description (manifestation)"""
+    
+    model = SermonDescr
+    mForm = SermonForm
+    prefix = "sermo"
+    title = "Sermon" 
+    rtype = "json"
+    mainitems = []
+    basic_name = "sermon"
+
+    StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
+                                         form=SermonDescrGoldForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+    SDkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
+                                       form=SermonDescrKeywordForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+    SDcolFormSet = inlineformset_factory(SermonDescr, CollectionSerm,
+                                       form=SermonDescrCollectionForm, min_num=0,
+                                       fk_name="sermon", extra=0)
+    SDsignFormSet = inlineformset_factory(SermonDescr, SermonSignature,
+                                         form=SermonDescrSignatureForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
+
+    formset_objects = [{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False},
+                       {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
+                       {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
+       
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        iStop = 1
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display,'field_key': 'stype'},
+            {'type': 'plain', 'label': "Manuscript id",         'value': instance.manu.id,          'field_key': "manu", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
+            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author,       'field_key': 'author'},
+            {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
+            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle'},
+            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
+             'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
+             'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
+            {'type': 'safe',  'label': "Quote:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
+            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes'},
+            {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
+            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
+            {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
+            {'type': 'plain', 'label': "Note:",                 'value': instance.note,             'field_key': 'note'},
+            {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+             'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+            {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
+             'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
+            {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
+             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 
+             'multiple': True,  'field_list': 'siglist',        'fso': self.formset_objects[3]},
+            {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
+             'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
+            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
+            {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
+            {'type': 'line',    'label': "Gold Sermon links:",  'value': instance.get_goldlinks_markdown(), 
+             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 'template_selection': 'ru.passim.gold_template'}
+            ]
+        # Notes:
+        # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
+
+        # Add a button back to the Manuscript
+        topleftlist = []
+        if instance.manu:
+            buttonspecs = {'label': "M", 
+                 'title': "Go to manuscript {}".format(instance.manu.idno), 
+                 'url': reverse('manuscript_details', kwargs={'pk': instance.manu.id})}
+            topleftlist.append(buttonspecs)
+        context['topleftbuttons'] = topleftlist
+        # Add something right to the SermonDetails title
+        context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+        # Add the manuscript's IDNO completely right
+        context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(instance.manu.idno)
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def after_new(self, form, instance):
+        """Action to be performed after adding a new item"""
+
+        ## Set the 'afternew' URL
+        #self.afternewurl = reverse('sermon_list')
+
+        # Return positively
+        return True, "" 
+
+    def process_formset(self, prefix, request, formset):
+
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+                if prefix == "sdsign":
+                    # Signature processing
+                    editype = ""
+                    code = ""
+                    if 'newgr' in cleaned and cleaned['newgr'] != "":
+                        # Add gryson
+                        editype = "gr"
+                        code = cleaned['newgr']
+                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                        # Add gryson
+                        editype = "cl"
+                        code = cleaned['newcl']
+                    elif 'newot' in cleaned and cleaned['newot'] != "":
+                        # Add gryson
+                        editype = "ot"
+                        code = cleaned['newot']
+                    if editype != "":
+                        # Set the correct parameters
+                        form.instance.code = code
+                        form.instance.editype = editype
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the KW already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj == None:
+                            obj = Keyword.objects.create(name=newkw)
+                        # Make sure we set the keyword
+                        form.instance.keyword = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "sdcol":
+                    # Collection processing
+                    if 'newcol' in cleaned and cleaned['newcol'] != "":
+                        newcol = cleaned['newcol']
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='sermo', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "stog":
+                    # SermonDescr-To-SermonGold processing
+                    if 'newgold' in cleaned and cleaned['newgold'] != "":
+                        newgold = cleaned['newgold']
+                        # There also must be a linktype
+                        if 'linktype' in cleaned and cleaned['linktype'] != "":
+                            linktype = cleaned['linktype']
+                            # Check existence
+                            obj = SermonDescrGold.objects.filter(sermon=instance, gold=newgold, linktype=linktype).first()
+                            if obj == None:
+                                # Create it
+                                obj = SermonDescrGold.objects.create(sermon=instance, gold=newgold, linktype=linktype)
+                            ## Make sure the correct value is set
+                            #form.instance.
+
+                    # Note: it will get saved with form.save()
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
+
+            # (3) 'collections'
+            collist_s = form.cleaned_data['collist_s']
+            adapt_m2m(CollectionSerm, instance, "sermo", collist_s, "collection")
+
+            # Process many-to-ONE changes
+            # (1) 'sermonsignatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2o(SermonSignature, instance, "sermon", siglist)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+
+class SermonDetails(SermonEdit):
+    """The details of one sermon manifestation (SermonDescr)"""
+
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(SermonDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        # List of post-load objects
+        context['postload_objects'] = []
+
+        # Lists of related objects
+        context['related_objects'] = []
+
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
+
+
+class SermonEdit_ORIGINAL(PassimDetails):
     """The details of one sermon description"""
     
     model = SermonDescr
@@ -5349,7 +5605,7 @@ class SermonEdit(PassimDetails):
         return context
 
 
-class SermonDetails(SermonEdit):
+class SermonDetails_ORIGINAL(SermonEdit_ORIGINAL):
     """The details of one sermon"""
 
     template_name = 'seeker/sermon_details.html'    # Use this for GET and for POST requests
@@ -7911,7 +8167,7 @@ class SermonGoldEdit_ORIGINAL(PassimDetails):
         return context
 
 
-class SermonGoldDetails_ORIGINAL(SermonGoldEdit):
+class SermonGoldDetails_ORIGINAL(SermonGoldEdit_ORIGINAL):
     """The details of one sermon"""
 
     template_name = 'seeker/sermongold_details.html'  

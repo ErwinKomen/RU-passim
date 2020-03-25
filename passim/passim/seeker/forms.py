@@ -223,6 +223,36 @@ class AuthorOneWidget(ModelSelect2Widget):
         return Author.objects.all().order_by('name').distinct()
 
 
+class SermonGoldOneWidget(ModelSelect2Widget):
+    model = SermonGold
+    search_fields = [ 'siglist__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Determine the full text
+        full = obj.get_label()
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return SermonGold.objects.all().order_by('author__name', 'siglist').distinct()
+
+
+class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
+    model = SermonDescrGold
+    search_fields = ['sermon__siglist__icontains',      'sermon__author__name__icontains', 
+                     'sermon__srchincipit__icontains',  'sermon__srchexplicit__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Determine the full text
+        full = obj.get_label()
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        # return SermonDescrGold.objects.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist').distinct()
+        return SermonDescrGold.unique_list()
+
+
 class SuperOneWidget(ModelSelect2Widget):
     model = EqualGold
     search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains']
@@ -474,11 +504,14 @@ class SermonForm(forms.ModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    goldlist = ModelChoiceField(queryset=None, required=False,
+                widget=SermonDescrGoldWidget(attrs={'data-placeholder': 'Select links...', 
+                                                  'placeholder': 'Linked sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False, 
@@ -524,7 +557,6 @@ class SermonForm(forms.ModelForm):
         model = SermonDescr
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype']
-                  #, 'clavis', 'gryson', 'keyword']
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'author':      forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -553,6 +585,7 @@ class SermonForm(forms.ModelForm):
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
         self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
@@ -564,6 +597,9 @@ class SermonForm(forms.ModelForm):
             instance = kwargs['instance']
             # If there is an instance, then check the author specification
             sAuthor = "" if not instance.author else instance.author.name
+
+            # Make sure I myself do not occur in the goldlist
+            self.fields['goldlist'].queryset = SermonDescrGold.unique_list(exclude=instance)
 
             ## If there is an instance, then check the nickname specification
             #sNickName = "" if not instance.nickname else instance.nickname.name
@@ -577,6 +613,7 @@ class SermonForm(forms.ModelForm):
             self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
             # Note: what we *show* are the signatures that have actually been copied
             self.fields['siglist'].initial = instance.goldsignatures_ordered()
+            self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
 
 
 class KeywordForm(forms.ModelForm):
@@ -677,8 +714,14 @@ class CollectionForm(forms.ModelForm):
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
-    newsdsign  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
-               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
+    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
+    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
+    #newsdsign  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+    #           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -686,7 +729,6 @@ class SermonDescrSignatureForm(forms.ModelForm):
 
         model = SermonSignature
         fields = ['code', 'editype', 'sermon']
-        # fields = ['code', 'editype']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
@@ -695,12 +737,59 @@ class SermonDescrSignatureForm(forms.ModelForm):
         # Start by executing the standard handling
         super(SermonDescrSignatureForm, self).__init__(*args, **kwargs)
         # Set some parameters to optional for best processing
-        self.fields['newsdsign'].required = False
+        #self.fields['newsdsign'].required = False
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
+        # Set the keyword to optional for best processing
+        self.fields['code'].required = False
+        self.fields['editype'].required = False
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonDescrSignatureForm, self).clean()
+        sermon = cleaned_data.get("sermon")
+        editype = cleaned_data.get("editype")
+        code = cleaned_data.get("code")
+        if editype == "":
+            newgr = cleaned_data.get("newgr")
+            if newgr != "":
+                code = newgr
+                editype = "gr"
+            else:
+                newcl = cleaned_data.get("newcl")
+                if newcl != "":
+                    code = newcl
+                    editype = "cl"
+                else:
+                    newot = cleaned_data.get("newot")
+                    if newot != "":
+                        code = newot
+                        editype = "ot"
+        # Do we actually have something?
+
+        # Check if any of [name] or [newkw] already exists
+        if code == "" or editype == "":
+            # No keyword chosen
+            raise forms.ValidationError(
+                    "No signature specified to attach to this manifestation sermon"
+                )
+        else:
+            # Check if [code|editype] already exists
+            signature = SermonSignature.objects.filter(sermon=sermon, code=code, editype=editype).first()
+            if signature:
+                # This combination already exists
+                raise forms.ValidationError(
+                        "This signature already exists for this manifestation sermon"
+                    )
 
 
 class SermonDescrGoldForm(forms.ModelForm):
+    newgold  = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select links...', 
+                                                  'placeholder': 'Select a sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newlinktype = forms.CharField(label=_("Linktype"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;'}))
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -714,6 +803,11 @@ class SermonDescrGoldForm(forms.ModelForm):
         super(SermonDescrGoldForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
         init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+        # Set the keyword to optional for best processing
+        self.fields['newgold'].required = False
+        self.fields['newlinktype'].required = False
+        # Initialize queryset
+        self.fields['newgold'].queryset = SermonGold.objects.order_by('author__name', 'siglist')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -721,7 +815,8 @@ class SermonDescrGoldForm(forms.ModelForm):
                 #  NOTE: the following has no effect because we use bound fields
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
-                pass
+                self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
+
 
 
 class SermonDescrKeywordForm(forms.ModelForm):

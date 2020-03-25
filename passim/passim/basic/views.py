@@ -952,6 +952,8 @@ class BasicDetails(DetailView):
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
+        context['topleftbuttons'] = ""
+
         # Possibly define where a listview is
         classname = self.model._meta.model_name
         if self.basic_name == None or self.basic_name == "":

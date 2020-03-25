@@ -25,6 +25,10 @@
             <a class="btn jumbo-1" 
                href="{{listview}}"
                title="Return to the list of items">&lt;&lt;</a>
+            <!-- Any additional buttons here in the topleft -->
+            {% for buttonspec in topleftbuttons %}
+              <a class="btn jumbo-1" href="{{buttonspec.url}}" title="{{buttonspec.title}}">{{buttonspec.label}}</a>
+            {% endfor %}
           </div>
 
           <!-- Actual contents -->
@@ -32,7 +36,15 @@
 
             <div class="row">
               <div class="col-md-12">
-                <h3>{{titlesg}} details</h3>
+                <h3>
+                  <span>{{titlesg}} details</span>
+                  {% if title_addition %}
+                    <span>{{title_addition|safe}}</span>
+                  {% endif %}
+                  {% if title_right %}
+                    <span class="pull-right">{{title_right|safe}}</span>
+                  {% endif %}
+                </h3>
 
                 {% block detailsview %}{% endblock detailsview %}
 

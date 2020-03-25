@@ -72,7 +72,13 @@
       <!-- Walk all the fields in mainitems -->
       {% for mainitem in mainitems %}
         <!-- Check if this may be shown or not -->
-        {% if mainitem.empty != "hide" or mainitem.value != "" %}
+        {% if 'empty' in mainitem and mainitem.empty == "idonly" %}
+        <tr class="hidden">
+          <td colspan="2">
+            <input id="id_{{mainitem.field_key}}_id" name="{{mainitem.field_key}}_id" type="text" value="{{mainitem.value}}" />
+          </td>
+        </tr>
+        {% elif mainitem.empty != "hide" or mainitem.value != "" %}
           <tr class="view-row">
             <!-- Cell with the name of the field-->
             <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
@@ -89,7 +95,8 @@
             </td>
 
             <!-- Cell with the value of the field (or editing) -->
-            <td class="hoverable" {% if mainitem.align %}align="{{mainitem.align}}"{% endif %} 
+            <td class="hoverable {% if mainitem.hidden %}hidden {% endif %}"  
+                {% if mainitem.align %}align="{{mainitem.align}}"{% endif %}
                 {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
 
               {% if mainitem.multiple and not 'field_list' in mainitem %}
@@ -114,11 +121,15 @@
                 <!-- Basic view mode -->
                 <div class="{% if 'field_key' in mainitem or 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
                   {% spaceless %}
-                  {% if mainitem.type == "bold" %}{% if mainitem.link == "" %}<b>{{mainitem.value}}</b>{% else %}<a href="{{mainitem.link}}"><b>{{mainitem.value}}</b></a>{% endif %}
-                  {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
-                  {% elif mainitem.type == "safe" %}{{mainitem.value|safe}}
-                  {% elif mainitem.type == "safeline" %}<div style="white-space: pre-line;">{{mainitem.value|safe}}</div>
-                  {% else %}{{mainitem.value}}
+                  {% if mainitem.type == "bold" %}
+                    {% if mainitem.link == "" %}<b>{% if mainitem.value %}{{mainitem.value}}
+                    {% else %}-{% endif %}</b>{% else %}<a href="{{mainitem.link}}"><b>{% if mainitem.value %}{{mainitem.value}}{% else %}-{% endif %}</b></a>
+                    {% endif %}
+                  {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}</div>
+                  {% elif mainitem.type == "safe" %}{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}
+                  {% elif mainitem.type == "safeline" %}<div style="white-space: pre-line;">{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}</div>
+                  {% else %}
+                    {% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}
                   {% endif %}
                   {% endspaceless %}
                 </div>
