@@ -3653,6 +3653,34 @@ class SermonGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_label(self, do_incexpl=False):
+        """Get a string view of myself to be put on a label"""
+
+        lHtml = []
+        # do_incexpl = False
+
+        # Treat signatures
+        if self.goldsignatures.all().count() > 0:
+            lHtml.append("{} ".format(self.signatures()))
+        else:
+            lHtml.append(" ")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by {}) ".format(self.author.name))
+        else:
+            lHtml.append("(by Unknwon Author) ")
+
+        if do_incexpl:
+            # Treat incipit
+            if self.incipit: lHtml.append("{}".format(self.srchincipit))
+            # Treat intermediate dots
+            if self.incipit and self.explicit: lHtml.append("...-...")
+            # Treat explicit
+            if self.explicit: lHtml.append("{}".format(self.srchexplicit))
+
+        # Return the results
+        return "".join(lHtml)
+
     def get_litrefs_markdown(self):
         lHtml = []
         # Visit all literature references
@@ -3692,34 +3720,6 @@ class SermonGold(models.Model):
         explicit = "" if self.explicit == None else self.explicit
         return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
     
-    def get_label(self):
-        """Get a string view of myself to be put on a label"""
-
-        lHtml = []
-        do_incexpl = False
-
-        # Treat signatures
-        if self.goldsignatures.all().count() > 0:
-            lHtml.append("{} ".format(self.signatures()))
-        else:
-            lHtml.append(" ")
-        # Treat the author
-        if self.author:
-            lHtml.append("(by {}) ".format(self.author.name))
-        else:
-            lHtml.append("(by Unknwon Author) ")
-
-        if do_incexpl:
-            # Treat incipit
-            if self.incipit: lHtml.append("{}".format(self.srchincipit))
-            # Treat intermediate dots
-            if self.incipit and self.explicit: lHtml.append("...-...")
-            # Treat explicit
-            if self.explicit: lHtml.append("{}".format(self.srchexplicit))
-
-        # Return the results
-        return "".join(lHtml)
-
     def get_signatures(self):
         lSign = []
         for item in self.goldsignatures.all():
@@ -4448,13 +4448,16 @@ class SermonDescr(models.Model):
         """Return all the gold links = type + gold"""
 
         lHtml = []
+        sBack = ""
         for goldlink in self.sermondescr_gold.all().order_by('sermon__author__name', 'sermon__siglist'):
+            lHtml.append("<tr class='view-row'>")
+            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(goldlink.get_linktype_display()))
             # for gold in self.goldsermons.all().order_by('author__name', 'siglist'):
             url = reverse('gold_details', kwargs={'pk': goldlink.gold.id})
-            sView = "{}: {}".format(goldlink.get_linktype_display(), goldlink.gold.get_view())
-            lHtml.append("<span class=''><a href='{}'>{}</a></span>".format(url, sView))
-
-        sBack = ", ".join(lHtml)
+            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, goldlink.gold.get_view()))
+            lHtml.append("</tr>")
+        if len(lHtml) > 0:
+            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         return sBack
 
     def get_incipit(self):
@@ -4724,7 +4727,7 @@ class SermonDescrGold(models.Model):
         # Temporary fix: sermon.id
         # Should be changed to something more significant in the future
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
-        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
+        combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.gold.siglist)
         return combi
 
     def get_label(self):

@@ -5246,7 +5246,7 @@ class SermonEdit(BasicDetails):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False},
+    formset_objects = [{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
@@ -5377,16 +5377,16 @@ class SermonEdit(BasicDetails):
                     if 'newgold' in cleaned and cleaned['newgold'] != "":
                         newgold = cleaned['newgold']
                         # There also must be a linktype
-                        if 'linktype' in cleaned and cleaned['linktype'] != "":
-                            linktype = cleaned['linktype']
+                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                            linktype = cleaned['newlinktype']
                             # Check existence
                             obj = SermonDescrGold.objects.filter(sermon=instance, gold=newgold, linktype=linktype).first()
                             if obj == None:
-                                # Create it
-                                obj = SermonDescrGold.objects.create(sermon=instance, gold=newgold, linktype=linktype)
-                            ## Make sure the correct value is set
-                            #form.instance.
-
+                                gold = SermonGold.objects.filter(id=newgold).first()
+                                if gold != None:
+                                    # Set the right parameters for creation later on
+                                    form.instance.linktype = linktype
+                                    form.instance.gold = gold
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -5403,6 +5403,10 @@ class SermonEdit(BasicDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
+
+            # (2) 'Links to Gold Sermons'
+            goldlist = form.cleaned_data['goldlist']
+            adapt_m2m(SermonDescrGold, instance, "sermon", goldlist, "gold", extra = ['linktype'], related_is_through=True)
 
             # (3) 'collections'
             collist_s = form.cleaned_data['collist_s']

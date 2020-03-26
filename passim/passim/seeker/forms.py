@@ -10,13 +10,14 @@ from django.forms.widgets import *
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
 
-def init_choices(obj, sFieldName, sSet, maybe_empty=False, bUseAbbr=False, exclude=None):
+def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bUseAbbr=False, exclude=None):
     if (obj.fields != None and sFieldName in obj.fields):
         if bUseAbbr:
             obj.fields[sFieldName].choices = build_abbr_list(sSet, maybe_empty=maybe_empty, exclude=exclude)
         else:
             obj.fields[sFieldName].choices = build_choice_list(sSet, maybe_empty=maybe_empty)
-        obj.fields[sFieldName].help_text = get_help(sSet)
+        if use_helptext:
+            obj.fields[sFieldName].help_text = get_help(sSet)
 
 
 # ================= WIDGETS =====================================
@@ -229,7 +230,7 @@ class SermonGoldOneWidget(ModelSelect2Widget):
 
     def label_from_instance(self, obj):
         # Determine the full text
-        full = obj.get_label()
+        full = obj.get_label(do_incexpl=True)
         # Determine here what to return...
         return full
 
@@ -509,7 +510,7 @@ class SermonForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    goldlist = ModelChoiceField(queryset=None, required=False,
+    goldlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrGoldWidget(attrs={'data-placeholder': 'Select links...', 
                                                   'placeholder': 'Linked sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     collection_m = forms.CharField(label=_("Collection m"), required=False,
@@ -585,12 +586,15 @@ class SermonForm(forms.ModelForm):
         self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
         self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
         self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+        # Note: what we show the user is the set of GOLD-signatures
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        # The available Sermondescr-Gold list
+        # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
+        self.fields['goldlist'].queryset = SermonDescrGold.objects
 
         # Get the instance
         if 'instance' in kwargs:
@@ -598,8 +602,8 @@ class SermonForm(forms.ModelForm):
             # If there is an instance, then check the author specification
             sAuthor = "" if not instance.author else instance.author.name
 
-            # Make sure I myself do not occur in the goldlist
-            self.fields['goldlist'].queryset = SermonDescrGold.unique_list(exclude=instance)
+            ## Make sure I myself do not occur in the goldlist
+            #self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
 
             ## If there is an instance, then check the nickname specification
             #sNickName = "" if not instance.nickname else instance.nickname.name
@@ -611,9 +615,12 @@ class SermonForm(forms.ModelForm):
             self.fields['collist_s'].initial = [x.pk for x in instance.collections.filter(type='sermo').order_by('name')]
             self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
             self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
-            # Note: what we *show* are the signatures that have actually been copied
-            self.fields['siglist'].initial = instance.goldsignatures_ordered()
+            # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
+            self.fields['siglist'].initial = instance.signatures_ordered()
+            # Note: this is the list of links between SermonDesrc-Gold
             self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
+            iStop = 1
+        return None
 
 
 class KeywordForm(forms.ModelForm):
@@ -784,11 +791,13 @@ class SermonDescrSignatureForm(forms.ModelForm):
 
 
 class SermonDescrGoldForm(forms.ModelForm):
+    #newlinktype = forms.Select(label=_("Linktype"), required=False, help_text="editable", 
+    #           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;'}))
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+               widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;'}))
     newgold  = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
                 widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select links...', 
                                                   'placeholder': 'Select a sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
-    newlinktype = forms.CharField(label=_("Linktype"), required=False, help_text="editable", 
-               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -803,19 +812,23 @@ class SermonDescrGoldForm(forms.ModelForm):
         super(SermonDescrGoldForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
         init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
-        self.fields['newgold'].required = False
         self.fields['newlinktype'].required = False
+        self.fields['newgold'].required = False
+        self.fields['gold'].required = False
+        self.fields['linktype'].required = False
         # Initialize queryset
         self.fields['newgold'].queryset = SermonGold.objects.order_by('author__name', 'siglist')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
             if instance != None:
+                # Make sure we exclude the instance from the queryset
+                self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
                 #  NOTE: the following has no effect because we use bound fields
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
-                self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
 
 
 
