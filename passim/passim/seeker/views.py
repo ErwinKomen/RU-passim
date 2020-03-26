@@ -188,7 +188,7 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
         msg = errHandle.get_error_message()
         return False
 
-def adapt_m2o(cls, instance, field, qs, **kwargs):
+def adapt_m2o(cls, instance, field, qs, link_to_obj = None, **kwargs):
     """Adapt the instances of [cls] pointing to [instance] with [field] to only include [qs] """
 
     errHandle = ErrHandle()
@@ -196,9 +196,11 @@ def adapt_m2o(cls, instance, field, qs, **kwargs):
         # Get all the [cls] items currently linking to [instance]
         lstQ = [Q(**{field: instance})]
         linked_qs = cls.objects.filter(*lstQ)
+        if link_to_obj != None:
+            linked_through = [getattr(x, link_to_obj) for x in linked_qs]
         # make sure all items in [qs] are linked to [instance]
         for obj in qs:
-            if obj not in linked_qs:
+            if (obj not in linked_qs) and (link_to_obj == None or obj not in linked_through):
                 # Create new object
                 oNew = cls()
                 setattr(oNew, field, instance)
@@ -210,6 +212,9 @@ def adapt_m2o(cls, instance, field, qs, **kwargs):
                         setattr(oNew, fname, getattr(obj, fname))
                 for k, v in kwargs.items():
                     setattr(oNew, k, v)
+                # Need to add an object link?
+                if link_to_obj != None:
+                    setattr(oNew, link_to_obj, obj)
                 oNew.save()
         # Remove links that are not in [qs]
         for obj in linked_qs:
@@ -2988,7 +2993,7 @@ def get_sg(request):
             lstQ.append(Q(id=sId))
             sg = SermonGold.objects.filter(Q(id=sId)).first()
             if sg:
-                short = sg.get_view()
+                short = sg.get_label()
                 co_json['name'] = short
             data = json.dumps(co_json)
         except:
@@ -3261,6 +3266,29 @@ def get_srmsignatures(request):
     except:
         msg = oErr.get_error_message()
         data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_sermosig(request):
+    """Get the correct GOLD signature, given a SERMON signature"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            sermosig = SermonSignature.objects.filter(Q(id=sId)).first()
+            if sermosig:
+                short = sermosig.gsig.code
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermosig")
+    else:
+        data = "Request is not ajax"
     mimetype = "application/json"
     return HttpResponse(data, mimetype)
 
@@ -5278,14 +5306,14 @@ class SermonEdit(BasicDetails):
             {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
              'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
-             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 
-             'multiple': True,  'field_list': 'siglist',        'fso': self.formset_objects[3]},
+             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True,
+             'multiple': True,  'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
             {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
             {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
             {'type': 'line',    'label': "Gold Sermon links:",  'value': instance.get_goldlinks_markdown(), 
-             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 'template_selection': 'ru.passim.gold_template'}
+             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 'template_selection': 'ru.passim.sg_template'}
             ]
         # Notes:
         # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
@@ -5319,6 +5347,7 @@ class SermonEdit(BasicDetails):
         return True, "" 
 
     def process_formset(self, prefix, request, formset):
+        """This is for processing *NEWLY* added items (using the '+' sign)"""
 
         errors = []
         bResult = True
@@ -5344,6 +5373,10 @@ class SermonEdit(BasicDetails):
                         editype = "ot"
                         code = cleaned['newot']
                     if editype != "":
+                        # Find this item in the Gold Signatures
+                        gsig = Signature.objects.filter(editype=editype, code=code).first()
+                        if gsig != None:
+                            form.instance.gsig = gsig
                         # Set the correct parameters
                         form.instance.code = code
                         form.instance.editype = editype
@@ -5394,6 +5427,8 @@ class SermonEdit(BasicDetails):
         return None
 
     def after_save(self, form, instance):
+        """This is for processing items from the list of available ones"""
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
@@ -5415,7 +5450,7 @@ class SermonEdit(BasicDetails):
             # Process many-to-ONE changes
             # (1) 'sermonsignatures'
             siglist = form.cleaned_data['siglist']
-            adapt_m2o(SermonSignature, instance, "sermon", siglist)
+            adapt_m2o(SermonSignature, instance, "sermon", siglist, link_to_obj='gsig')
 
         except:
             msg = oErr.get_error_message()
@@ -7791,7 +7826,7 @@ class SermonGoldEdit(BasicDetails):
             {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
-            {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(), 
+            {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
             {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
              'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },

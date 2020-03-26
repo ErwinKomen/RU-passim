@@ -4730,8 +4730,8 @@ class SermonDescrGold(models.Model):
         combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.gold.siglist)
         return combi
 
-    def get_label(self):
-        sBack = "{}: {}".format(self.get_linktype_display(), self.gold.get_label())
+    def get_label(self, do_incexpl=False):
+        sBack = "{}: {}".format(self.get_linktype_display(), self.gold.get_label(do_incexpl))
         return sBack
 
     def unique_list(exclude=None):

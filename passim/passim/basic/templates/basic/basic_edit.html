@@ -96,6 +96,7 @@
 
             <!-- Cell with the value of the field (or editing) -->
             <td class="hoverable {% if mainitem.hidden %}hidden {% endif %}"  
+                {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}
                 {% if mainitem.align %}align="{{mainitem.align}}"{% endif %}
                 {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
 
@@ -112,7 +113,11 @@
                   <div class="edit-mode hidden">{{mainitem.field_list}}</div>
                   {% if is_app_editor %}
                     <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
-                      {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                      {% if mainitem.unique %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
+                      {% else %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                      {% endif %}
                     </div>
                   {% endif %}
                 {% endif %}
@@ -144,7 +149,11 @@
                   <div class="edit-mode hidden">{{mainitem.field_list}}</div>
                   {% if is_app_editor and 'fso' in mainitem %}
                     <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
-                      {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                      {% if mainitem.unique %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
+                      {% else %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                      {% endif %}
                     </div>
                   {% endif %}
                 {% elif 'field_view' in mainitem %}

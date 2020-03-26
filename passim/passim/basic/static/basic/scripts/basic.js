@@ -731,6 +731,9 @@ var ru = (function ($, ru) {
             });
           });
 
+          // Set handling of unique-field
+          $("td.unique-field input").unbind("change").change(ru.basic.unique_change);
+
           // Allow "Search on ENTER" from typeahead fields
           $(".form-row:not(.empty-form) .searching").on("keypress",
             function (evt) {
@@ -755,6 +758,23 @@ var ru = (function ($, ru) {
           // NOTE: what about select2_options?
           //    $(".django-select2").djangoSelect2(select2_options);
           $(".django-select2").djangoSelect2();
+          $(".django-select2").each(function (idx, el) {
+            var elTd = null,
+                template_fn = null,
+                template_sel = null;
+
+            elTd = $(el).closest("td");
+            template_sel = $(elTd).attr("select2init");
+            if (template_sel !== undefined && template_sel != "") {
+              // Should be a function 
+              template_fn = window[template_sel];
+              if (typeof template_fn === "function") {
+                $(el).find(".django-select2").djangoSelect2(template_fn);
+              } else {
+                $(el).find(".django-select2").djangoSelect2(template_sel);
+              }
+            }
+          });
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
@@ -767,6 +787,9 @@ var ru = (function ($, ru) {
        */
       init_typeahead: function () {
         try {
+
+          // Set handling of unique-field
+          $("td.unique-field input").unbind("change").change(ru.basic.unique_change);
 
           // First destroy them
           $(".typeahead.keywords").typeahead('destroy');
@@ -1792,6 +1815,28 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("toggle_click", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      unique_change: function () {
+        var el = $(this),
+            elTr = null;
+
+        try {
+          elTr = $(el).closest("tr");
+          $(elTr).find("td.unique-field").find("input").each(function (idx, elInput) {
+            if ($(el).attr("id") !== $(elInput).attr("id")) {
+              $(elInput).prop("disabled", true);
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("unique_change", ex);
         }
       }
 

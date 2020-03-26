@@ -23,27 +23,26 @@ def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bU
 # ================= WIDGETS =====================================
 
 
-class ManuidWidget(ModelSelect2MultipleWidget):
-    model = Manuscript
-    search_fields = [ 'idno__icontains']
+class AuthorOneWidget(ModelSelect2Widget):
+    model = Author
+    search_fields = [ 'name__icontains']
 
     def label_from_instance(self, obj):
-        return obj.idno
+        return obj.name
 
     def get_queryset(self):
-        return Manuscript.objects.all().order_by('idno').distinct()
+        return Author.objects.all().order_by('name').distinct()
 
 
-class SignatureWidget(ModelSelect2MultipleWidget):
-    # NOTE: only use the [Signature] table - don't use [SermonSignature]
-    model = Signature
-    search_fields = [ 'code__icontains' ]
+class AuthorWidget(ModelSelect2MultipleWidget):
+    model = Author
+    search_fields = [ 'name__icontains']
 
     def label_from_instance(self, obj):
-        return obj.code
+        return obj.name
 
     def get_queryset(self):
-        return Signature.objects.all().order_by('code').distinct()
+        return Author.objects.all().order_by('name').distinct()
 
 
 class CodeWidget(ModelSelect2MultipleWidget):
@@ -56,6 +55,79 @@ class CodeWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return EqualGold.objects.all().order_by('code').distinct()
+
+
+class CollectionWidget(ModelSelect2MultipleWidget):
+    model = Collection
+    search_fields = [ 'name__icontains' ]
+    type = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.type:
+            return Collection.objects.filter(type=self.type).order_by('name').distinct()
+        else:
+            return Collection.objects.filter().order_by('name').distinct()
+
+
+class CollectionGoldWidget(CollectionWidget):
+    """Like Collection, but then for: SermonGold"""
+    type = "gold"
+
+
+class CollectionManuWidget(CollectionWidget):
+    """Like Collection, but then for: Manuscript"""
+    type = "manu"
+
+
+class CollectionSermoWidget(CollectionWidget):
+    """Like Collection, but then for: Sermon"""
+    type = "sermo"
+
+
+class CollectionSuperWidget(CollectionWidget):
+    """Like Collection, but then for: EqualGold = super sermon gold"""
+    type = "super"
+
+
+class EdirefSgWidget(ModelSelect2MultipleWidget):
+    model = EdirefSG
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+
+
+class EqualGoldWidget(ModelSelect2Widget):
+    model = EqualGold
+    search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Determine the full text
+        full = obj.get_text()
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return EqualGold.objects.all().order_by('code').distinct()
+
+
+class FtextlinkWidget(ModelSelect2MultipleWidget):
+    model = Ftextlink
+    search_fields = [ 'url__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.url
+
+    def get_queryset(self):
+        return Ftextlink.objects.all().order_by('url').distinct()
 
 
 class KeywordWidget(ModelSelect2MultipleWidget):
@@ -96,42 +168,36 @@ class LitrefSgWidget(ModelSelect2MultipleWidget):
         return LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
-class FtextlinkWidget(ModelSelect2MultipleWidget):
-    model = Ftextlink
-    search_fields = [ 'url__icontains' ]
+class LocationWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
 
     def label_from_instance(self, obj):
-        # The label only gives the SHORT version!!
-        return obj.url
-
-    def get_queryset(self):
-        return Ftextlink.objects.all().order_by('url').distinct()
+        sLabel = "{} ({})".format(obj.name, obj.loctype)
+        # sLabel = obj.name
+        return sLabel
 
 
-class EdirefSgWidget(ModelSelect2MultipleWidget):
-    model = EdirefSG
-    search_fields = [ 'reference__full__icontains' ]
+class ManuidWidget(ModelSelect2MultipleWidget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
 
     def label_from_instance(self, obj):
-        # The label only gives the SHORT version!!
-        return obj.get_short()
+        return obj.idno
 
     def get_queryset(self):
-        return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+        return Manuscript.objects.all().order_by('idno').distinct()
 
 
-class EqualGoldWidget(ModelSelect2Widget):
-    model = EqualGold
-    search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+class ProjectOneWidget(ModelSelect2Widget):
+    model = Project
+    search_fields = [ 'name__icontains' ]
 
     def label_from_instance(self, obj):
-        # Determine the full text
-        full = obj.get_text()
-        # Determine here what to return...
-        return full
+        return obj.name
 
     def get_queryset(self):
-        return EqualGold.objects.all().order_by('code').distinct()
+        return Project.objects.all().order_by('name').distinct()
 
 
 class ProjectWidget(ModelSelect2MultipleWidget):
@@ -156,72 +222,20 @@ class ProfileWidget(ModelSelect2MultipleWidget):
         return Profile.objects.all().order_by('user__username').distinct()
 
 
-class CollectionWidget(ModelSelect2MultipleWidget):
-    model = Collection
-    search_fields = [ 'name__icontains' ]
-    type = None
+class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
+    model = SermonDescrGold
+    search_fields = ['sermon__siglist__icontains',      'sermon__author__name__icontains', 
+                     'sermon__srchincipit__icontains',  'sermon__srchexplicit__icontains' ]
 
     def label_from_instance(self, obj):
-        return obj.name
+        # Determine the full text
+        full = obj.get_label(do_incexpl=True)
+        # Determine here what to return...
+        return full
 
     def get_queryset(self):
-        if self.type:
-            return Collection.objects.filter(type=self.type).order_by('name').distinct()
-        else:
-            return Collection.objects.filter().order_by('name').distinct()
-
-
-class CollectionSermoWidget(CollectionWidget):
-    """Like Collection, but then for: Sermon"""
-    type = "sermo"
-
-
-class CollectionManuWidget(CollectionWidget):
-    """Like Collection, but then for: Manuscript"""
-    type = "manu"
-
-
-class CollectionGoldWidget(CollectionWidget):
-    """Like Collection, but then for: SermonGold"""
-    type = "gold"
-
-
-class CollectionSuperWidget(CollectionWidget):
-    """Like Collection, but then for: EqualGold = super sermon gold"""
-    type = "super"
-
-
-class ProjectOneWidget(ModelSelect2Widget):
-    model = Project
-    search_fields = [ 'name__icontains' ]
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Project.objects.all().order_by('name').distinct()
-
-
-class AuthorWidget(ModelSelect2MultipleWidget):
-    model = Author
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Author.objects.all().order_by('name').distinct()
-
-
-class AuthorOneWidget(ModelSelect2Widget):
-    model = Author
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        return obj.name
-
-    def get_queryset(self):
-        return Author.objects.all().order_by('name').distinct()
+        # return SermonDescrGold.objects.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist').distinct()
+        return SermonDescrGold.unique_list()
 
 
 class SermonGoldOneWidget(ModelSelect2Widget):
@@ -238,20 +252,16 @@ class SermonGoldOneWidget(ModelSelect2Widget):
         return SermonGold.objects.all().order_by('author__name', 'siglist').distinct()
 
 
-class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
-    model = SermonDescrGold
-    search_fields = ['sermon__siglist__icontains',      'sermon__author__name__icontains', 
-                     'sermon__srchincipit__icontains',  'sermon__srchexplicit__icontains' ]
+class SignatureWidget(ModelSelect2MultipleWidget):
+    # NOTE: only use the [Signature] table - don't use [SermonSignature]
+    model = Signature
+    search_fields = [ 'code__icontains' ]
 
     def label_from_instance(self, obj):
-        # Determine the full text
-        full = obj.get_label()
-        # Determine here what to return...
-        return full
+        return obj.code
 
     def get_queryset(self):
-        # return SermonDescrGold.objects.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist').distinct()
-        return SermonDescrGold.unique_list()
+        return Signature.objects.all().order_by('code').distinct()
 
 
 class SuperOneWidget(ModelSelect2Widget):
@@ -268,16 +278,6 @@ class SuperOneWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return EqualGold.objects.all().order_by('code', 'id').distinct()
-
-
-class LocationWidget(ModelSelect2MultipleWidget):
-    model = Location
-    search_fields = [ 'name__icontains']
-
-    def label_from_instance(self, obj):
-        sLabel = "{} ({})".format(obj.name, obj.loctype)
-        # sLabel = obj.name
-        return sLabel
 
 
 # ================= FORMS =======================================
@@ -727,15 +727,13 @@ class SermonDescrSignatureForm(forms.ModelForm):
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
     newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
-    #newsdsign  = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
-    #           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonSignature
-        fields = ['code', 'editype', 'sermon']
+        fields = ['code', 'editype', 'sermon', 'gsig']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
                  'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
@@ -743,13 +741,12 @@ class SermonDescrSignatureForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonDescrSignatureForm, self).__init__(*args, **kwargs)
-        # Set some parameters to optional for best processing
-        #self.fields['newsdsign'].required = False
         # Initialize choices for editype
         init_choices(self, 'editype', EDI_TYPE, bUseAbbr=True)
-        # Set the keyword to optional for best processing
+        # Set some parameters to optional for best processing
         self.fields['code'].required = False
         self.fields['editype'].required = False
+        self.fields['gsig'].required = False
 
     def clean(self):
         # Run any super class cleaning

@@ -1056,6 +1056,15 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sigs_template
+       *    Construct the template for a Sermon Gold
+       *
+       */
+      sigs_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/sermosig/");
+      },
+
+      /**
        *  tt_country
        *    Bloodhound / remote / replace function for: COUNTRY
        */
