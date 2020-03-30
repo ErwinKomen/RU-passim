@@ -1021,6 +1021,9 @@ class Information(models.Model):
     # [0-1] The value for this piece of information
     kvalue = models.TextField("Key value", default = "", null=True, blank=True)
 
+    class Meta:
+        verbose_name_plural = "Information Items"
+
     def __str__(self):
         return self.name
 
@@ -1030,6 +1033,15 @@ class Information(models.Model):
             return ''
         else:
             return info.kvalue
+
+    def set_kvalue(name, value):
+        info = Information.objects.filter(name=name).first()
+        if info == None:
+            info = Information(name=name)
+            info.save()
+        info.kvalue = value
+        info.save()
+        return True
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         return super(Information, self).save(force_insert, force_update, using, update_fields)
@@ -4292,8 +4304,19 @@ class SermonDescr(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
 
+    # ================ MANYTOMANY relations ============================
+
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
+    # [0-n] Link to one or more golden standard sermons
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [m] Many-to-many: one sermon can be a part of a series of collections 
+    collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
+
+    # [m] Many-to-many: signatures linked manually through SermonSignature
+    signatures = models.ManyToManyField("Signature", through="SermonSignature", related_name="signatures_sermon")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
@@ -4314,14 +4337,8 @@ class SermonDescr(models.Model):
     # [1]
     order = models.IntegerField("Order", default = -1)
 
-    # [0-n] Link to one or more golden standard sermons
-    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
-
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
-
-    # [m] Many-to-many: one sermon can be a part of a series of collections 
-    collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
         if self.author:
@@ -4598,7 +4615,9 @@ class SermonDescr(models.Model):
         # Visit all signatures
         for sig in self.sermonsignatures.all().order_by('editype', 'code'):
             # Determine where clicking should lead to
-            url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.id)
+            url = ""
+            if sig.gsig:
+                url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
             # Create a display for this topic
             lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
@@ -4672,7 +4691,7 @@ class SermonDescr(models.Model):
         response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def signatures(self):
+    def signature_string(self):
         """Combine all signatures into one string"""
 
         lSign = []
@@ -4845,6 +4864,17 @@ class SermonSignature(models.Model):
         # Return what I am in the end
         return self.gsig
 
+    def adapt_gsig():
+        """Make sure all the items in SermonSignature point to a gsig, if possible"""
+
+        qs = SermonSignature.objects.all()
+        iCount = 0
+        with transaction.atomic():
+            for obj in qs:
+                if obj.gsig == None:
+                    gsig = obj.get_goldsig()
+                    iCount += 1
+        return True
     
 class Basket(models.Model):
     """The basket is the user's vault of search results (sermondescr items)"""

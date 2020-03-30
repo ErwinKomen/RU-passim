@@ -252,6 +252,18 @@ class SermonGoldOneWidget(ModelSelect2Widget):
         return SermonGold.objects.all().order_by('author__name', 'siglist').distinct()
 
 
+class ManualSignatureWidget(ModelSelect2MultipleWidget):
+    # NOTE: experimental
+    model = SermonSignature
+    search_fields = [ 'code__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        return SermonSignatureSignature.objects.all().order_by('code').distinct()
+
+
 class SignatureWidget(ModelSelect2MultipleWidget):
     # NOTE: only use the [Signature] table - don't use [SermonSignature]
     model = Signature
@@ -262,6 +274,34 @@ class SignatureWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Signature.objects.all().order_by('code').distinct()
+
+
+class SignatureOneWidget(ModelSelect2Widget):
+    model = Signature
+    search_fields = [ 'code__icontains' ]
+    editype = None
+
+    def label_from_instance(self, obj):
+        return obj.code
+
+    def get_queryset(self):
+        if self.editype == None:
+            qs = Signature.objects.all().order_by('code').distinct()
+        else:
+            qs = Signature.objects.filter(editype=self.editype).order_by('code').distinct()
+        return qs
+
+
+class SignatureGrysonWidget(SignatureOneWidget):
+    editype = "gr"
+
+
+class SignatureClavisWidget(SignatureOneWidget):
+    editype = "cl"
+
+
+class SignatureOtherWidget(SignatureOneWidget):
+    editype = "ot"
 
 
 class SuperOneWidget(ModelSelect2Widget):
@@ -506,6 +546,10 @@ class SermonForm(forms.ModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    siglist_a = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    siglist_m = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=ManualSignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -592,6 +636,8 @@ class SermonForm(forms.ModelForm):
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
         # Note: what we show the user is the set of GOLD-signatures
         self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+        self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
+        self.fields['siglist_m'].queryset = SermonSignature.objects.all().order_by('code')
         # The available Sermondescr-Gold list
         # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
         self.fields['goldlist'].queryset = SermonDescrGold.objects
@@ -616,7 +662,8 @@ class SermonForm(forms.ModelForm):
             self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
             self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
             # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
-            self.fields['siglist'].initial = instance.signatures_ordered()
+            # self.fields['siglist'].initial = instance.signatures_ordered()
+            self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
             # Note: this is the list of links between SermonDesrc-Gold
             self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
             iStop = 1
@@ -721,21 +768,16 @@ class CollectionForm(forms.ModelForm):
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
-    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
-               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
-    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
-               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
-    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
-               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
-    typeaheads = ["signatures", "gldsiggrysons", "gldsigclavises"]
+    """The link between SermonDescr and manually identified Signature"""
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonSignature
-        fields = ['code', 'editype', 'sermon', 'gsig']
+        fields = ['sermon', 'gsig', 'code', 'editype']
         widgets={'editype':     forms.Select(attrs={'style': 'width: 100%;'}),
-                 'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 'placeholder': 'Signature...', 'style': 'width: 100%;'})
+                 'code':        forms.TextInput(attrs={'class': 'typeahead searching signaturetype input-sm', 
+                                                       'placeholder': 'Signature...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -747,44 +789,6 @@ class SermonDescrSignatureForm(forms.ModelForm):
         self.fields['code'].required = False
         self.fields['editype'].required = False
         self.fields['gsig'].required = False
-
-    def clean(self):
-        # Run any super class cleaning
-        cleaned_data = super(SermonDescrSignatureForm, self).clean()
-        sermon = cleaned_data.get("sermon")
-        editype = cleaned_data.get("editype")
-        code = cleaned_data.get("code")
-        if editype == "":
-            newgr = cleaned_data.get("newgr")
-            if newgr != "":
-                code = newgr
-                editype = "gr"
-            else:
-                newcl = cleaned_data.get("newcl")
-                if newcl != "":
-                    code = newcl
-                    editype = "cl"
-                else:
-                    newot = cleaned_data.get("newot")
-                    if newot != "":
-                        code = newot
-                        editype = "ot"
-        # Do we actually have something?
-
-        # Check if any of [name] or [newkw] already exists
-        if code == "" or editype == "":
-            # No keyword chosen
-            raise forms.ValidationError(
-                    "No signature specified to attach to this manifestation sermon"
-                )
-        else:
-            # Check if [code|editype] already exists
-            signature = SermonSignature.objects.filter(sermon=sermon, code=code, editype=editype).first()
-            if signature:
-                # This combination already exists
-                raise forms.ValidationError(
-                        "This signature already exists for this manifestation sermon"
-                    )
 
 
 class SermonDescrGoldForm(forms.ModelForm):
@@ -821,11 +825,12 @@ class SermonDescrGoldForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
             if instance != None:
-                # Make sure we exclude the instance from the queryset
-                self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
                 #  NOTE: the following has no effect because we use bound fields
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
+
+                # Make sure we exclude the instance from the queryset
+                self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
 
 
 

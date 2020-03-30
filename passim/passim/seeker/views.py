@@ -67,7 +67,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
                                 SuperSermonGoldCollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
-    add_gold2equal, add_equal2equal, add_ssg_equal2equal, Country, City, Author, Manuscript, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
@@ -5307,7 +5307,7 @@ class SermonEdit(BasicDetails):
              'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
              'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True,
-             'multiple': True,  'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
+             'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
             {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
             {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
@@ -5349,6 +5349,7 @@ class SermonEdit(BasicDetails):
     def process_formset(self, prefix, request, formset):
         """This is for processing *NEWLY* added items (using the '+' sign)"""
 
+        bAllowNewSignatureManually = False
         errors = []
         bResult = True
         instance = formset.instance
@@ -5356,8 +5357,9 @@ class SermonEdit(BasicDetails):
             if form.is_valid():
                 cleaned = form.cleaned_data
                 # Action depends on prefix
-                if prefix == "sdsign":
+                if prefix == "sdsign" and bAllowNewSignatureManually:
                     # Signature processing
+                    # NOTE: this should never be reached, because we do not allow adding *new* signatures manually here
                     editype = ""
                     code = ""
                     if 'newgr' in cleaned and cleaned['newgr'] != "":
@@ -5439,18 +5441,17 @@ class SermonEdit(BasicDetails):
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
 
-            # (2) 'Links to Gold Sermons'
+            # (2) 'Links to Gold Signatures'
+            siglist = form.cleaned_data['siglist']
+            adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
+
+            # (3) 'Links to Gold Sermons'
             goldlist = form.cleaned_data['goldlist']
             adapt_m2m(SermonDescrGold, instance, "sermon", goldlist, "gold", extra = ['linktype'], related_is_through=True)
 
-            # (3) 'collections'
+            # (4) 'collections'
             collist_s = form.cleaned_data['collist_s']
             adapt_m2m(CollectionSerm, instance, "sermo", collist_s, "collection")
-
-            # Process many-to-ONE changes
-            # (1) 'sermonsignatures'
-            siglist = form.cleaned_data['siglist']
-            adapt_m2o(SermonSignature, instance, "sermon", siglist, link_to_obj='gsig')
 
         except:
             msg = oErr.get_error_message()
@@ -5800,8 +5801,6 @@ class SermonListView(BasicList):
     listform = SermonForm
     prefix = "sermo"
     paginate_by = 20
-    # template_name = 'seeker/sermon_list.html'
-    # template_name = 'seeker/sermondescr_list.html'
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Sermons"
@@ -5847,7 +5846,7 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname','keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature',     'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'signature',     'fkfield': 'signatures',        'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
             ]},
         {'section': 'collection', 'filterlist': [
@@ -5865,6 +5864,10 @@ class SermonListView(BasicList):
             {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'datestart',     'dbfield': 'manu__yearstart__gte',    'keyS': 'date_from'},
             {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'signatures_a',  'fkfield': 'goldsermons__goldsignatures',   'keyFk': 'code', 'keyList': 'siglist_a','infield': 'code' },
+            {'filter': 'signatures_m',  'fkfield': 'sermonsignatures',              'keyFk': 'code', 'keyList': 'siglist_m','infield': 'code' }
             ]}
          ]
 
@@ -5898,8 +5901,8 @@ class SermonListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-            html.append("<span>{}</span>".format(instance.signatures()[:20]))
-            sTitle = instance.signatures()
+            html.append("<span>{}</span>".format(instance.signature_string()[:20]))
+            sTitle = instance.signature_string()
         elif custom == "incexpl":
             html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
             dots = "..." if instance.incipit else ""
@@ -7397,6 +7400,17 @@ class SermonGoldListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
+
+    def initializations(self):
+        # Check if signature adaptation is needed
+        gsig_done = Information.get_kvalue("sermon_gsig")
+        if gsig_done == None or gsig_done == "":
+            # Perform adaptations
+            if SermonSignature.adapt_gsig():
+                # Success
+                Information.set_kvalue("sermon_gsig", "done")
+
+        return None
 
 
 class SermonGoldSelect(BasicPart):
