@@ -1047,6 +1047,15 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sglink_template
+       *    Construct the template for a *link* to a Sermon Gold
+       *
+       */
+      sglink_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/sglink/");
+      },
+
+      /**
        * ssg_template
        *    Construct the template for a Super Sermon Gold
        *

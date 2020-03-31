@@ -3005,6 +3005,31 @@ def get_sg(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_sglink(request):
+    """Get ONE particular short representation of a *link* to a SG"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            sg = SermonDescrGold.objects.filter(Q(id=sId)).first()
+            if sg:
+                short = sg.get_label()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sglink")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_ssg(request):
     """Get ONE particular short representation of a SSG"""
     
@@ -5313,7 +5338,8 @@ class SermonEdit(BasicDetails):
             {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
             {'type': 'line',    'label': "Gold Sermon links:",  'value': instance.get_goldlinks_markdown(), 
-             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 'template_selection': 'ru.passim.sg_template'}
+             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 
+             'inline_selection': 'ru.passim.sglink_template',   'template_selection': 'ru.passim.sg_template'}
             ]
         # Notes:
         # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
@@ -7321,23 +7347,15 @@ class SermonGoldListView(BasicList):
         {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
         {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
         {"name": "Collection...",   "id": "filter_collection",  "enabled": False, "head_id": "none"},
-        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Manuscript",      "id": "filter_collection_sermo", "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon",          "id": "filter_collection_sermo","enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon Gold",     "id": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
-        {"name": "Super sermon gold","id": "filter_collection_super","enabled": False, "head_id": "filter_collection"},
+        {"name": "Manuscript",      "id": "filter_collmanu",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collsermo",   "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collgold",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collsuper",  "enabled": False, "head_id": "filter_collection"},
         ]       
     
-    searches = [
+    # EK: This one is superseded by the next one
+    searches_ACHTERHAALD = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
@@ -7350,6 +7368,24 @@ class SermonGoldListView(BasicList):
             {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
             {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
         ]
+
+    # EK: This is the most up to date version of [searches] for SermonGoldListview
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
+            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' } ]},
+        {'section': 'collection', 'filterlist': [
+            {'filter': 'collmanu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collsermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collgold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' } 
+            ]}
+        ]
+
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
     def get_field_value(self, instance, custom):

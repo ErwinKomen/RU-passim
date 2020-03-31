@@ -757,22 +757,39 @@ var ru = (function ($, ru) {
           // Make sure select2 is initialized correctly
           // NOTE: what about select2_options?
           //    $(".django-select2").djangoSelect2(select2_options);
-          $(".django-select2").djangoSelect2();
+          // $(".django-select2").djangoSelect2();
           $(".django-select2").each(function (idx, el) {
             var elTd = null,
+                lst_parts = [],
+                i = 0,
+                options = {},
                 template_fn = null,
                 template_sel = null;
 
-            elTd = $(el).closest("td");
+            // elTd = $(el).closest("td");
+            elTd = $(el).closest("[select2init]");
             template_sel = $(elTd).attr("select2init");
             if (template_sel !== undefined && template_sel != "") {
               // Should be a function 
               template_fn = window[template_sel];
               if (typeof template_fn === "function") {
-                $(el).find(".django-select2").djangoSelect2(template_fn);
+                //$(el).find(".django-select2").djangoSelect2(template_fn);
               } else {
-                $(el).find(".django-select2").djangoSelect2(template_sel);
+                lst_parts = template_sel.split(".");
+                template_fn = window;
+                for (i = 0; i < lst_parts.length; i++) {
+                  template_fn = template_fn[lst_parts[i]];
+                }
+                //$(el).find(".django-select2").djangoSelect2(template_fn);
               }
+              // Create the option to be passed on
+              options["templateSelection"] = template_fn;
+              options["templateResult"] = template_fn;
+              // options["templateSelection"] = template_sel;
+              // Remove previous .select2
+              $(el).find(".select2").remove();
+              // Now make it happen
+              $(el).find(".django-select2").djangoSelect2(options);
             }
           });
 

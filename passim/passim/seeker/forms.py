@@ -229,7 +229,7 @@ class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
 
     def label_from_instance(self, obj):
         # Determine the full text
-        full = obj.get_label(do_incexpl=True)
+        full = obj.get_label(do_incexpl=False)
         # Determine here what to return...
         return full
 
@@ -640,7 +640,7 @@ class SermonForm(forms.ModelForm):
         self.fields['siglist_m'].queryset = SermonSignature.objects.all().order_by('code')
         # The available Sermondescr-Gold list
         # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
-        self.fields['goldlist'].queryset = SermonDescrGold.objects
+        self.fields['goldlist'].queryset = SermonDescrGold.objects.all()
 
         # Get the instance
         if 'instance' in kwargs:

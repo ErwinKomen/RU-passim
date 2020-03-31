@@ -4838,44 +4838,70 @@ class SermonSignature(models.Model):
         # Then return the super-response
         return response
 
-    def get_goldsig(self):
+    def get_goldsig(self, bCleanUp = False):
         """Get the equivalent gold-signature for me"""
 
-        # See if this sermosig has an equivalent goldsig
-        if self.gsig == None:
-            # No gsig given, so depend on the self.editype and self.code
-            qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
-            for obj in qs:
-                if obj.editype == self.editype and obj.code == self.code:
-                    # Found it
-                    self.gsig = obj
-                    break
+        oErr = ErrHandle()
+        try:
+            if bCleanUp and self.gsig:
+                # There seems to be a gsig
+                qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
+                for obj in qs:
+                    if obj.editype == self.editype and obj.code == self.code:
+                        self.delete()
+                        return None
+            # See if this sermosig has an equivalent goldsig
             if self.gsig == None:
-                # Get the first gold signature that exists
-                obj = Signature.objects.filter(editype=self.editype, code=self.code).first()
-                if obj:
-                    self.gsig = obj
-                else:
-                    # There is a signature that is not a gold signature -- this cannot be...
-                    pass
-            # Save the sermonsignature with the new information
-            if self.gsig:
-                self.save()
-        # Return what I am in the end
-        return self.gsig
+                # No gsig given, so depend on the self.editype and self.code
+                qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
+                for obj in qs:
+                    if obj.editype == self.editype and obj.code == self.code:
+                        # Found it
+                        if bCleanUp:
+                            self.delete()
+                            return None
+                        else:
+                            self.gsig = obj
+                            break
+                if self.gsig == None:
+                    # Get the first gold signature that exists
+                    obj = Signature.objects.filter(editype=self.editype, code=self.code).first()
+                    if obj:
+                        self.gsig = obj
+                    else:
+                        # There is a signature that is not a gold signature -- this cannot be...
+                        pass
+                # Save the sermonsignature with the new information
+                if self.gsig:
+                    self.save()
+            # Return what I am in the end
+            return self.gsig
+        except:
+            #y = (hasattr(self,"gsig"))
+            msg = oErr.get_error_message()
+            oErr.DoError("get_goldsig")
+            return None
 
     def adapt_gsig():
         """Make sure all the items in SermonSignature point to a gsig, if possible"""
 
         qs = SermonSignature.objects.all()
+        iTotal = qs.count()
         iCount = 0
-        with transaction.atomic():
-            for obj in qs:
-                if obj.gsig == None:
-                    gsig = obj.get_goldsig()
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in qs:
+                    obj.get_goldsig(bCleanUp=True)
                     iCount += 1
-        return True
+                    oErr.Status("adapt_gsig: id={} count={}/{}".format(obj.id, iCount, iTotal))
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_gsig")
+            return False
     
+
 class Basket(models.Model):
     """The basket is the user's vault of search results (sermondescr items)"""
 
