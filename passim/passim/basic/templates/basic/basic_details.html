@@ -43,8 +43,29 @@
                   {% endif %}
                   {% if title_right %}
                     <span class="pull-right">{{title_right|safe}}</span>
+                  {% elif is_app_editor and new_button %}
+                    <span id="add_{{new_button_name}}" class="pull-right">
+                      {% csrf_token %}
+                      <a class="btn btn-xs jumbo-3" role="button" 
+                          onclick="document.getElementById('create_new_{{new_button_name}}').submit();" >
+                        <span class="glyphicon glyphicon-plus"></span>{{add_text}} {{new_button_title}}
+                      </a>
+                    </span>
                   {% endif %}
                 </h3>
+
+                <!-- Room to have the form-link to create a new list-item -->
+                <div class="hidden" >
+                  <form action="{{new_button_url}}" method="post" id="create_new_{{new_button_name}}">
+                    {% csrf_token %}
+                    <!-- Any parameters that need adding -->
+                    {% if new_button_params %}
+                      {% for item in new_button_params %}
+                        <input name="{{item.name}}" value="{{item.value}}" />
+                      {% endfor %}
+                    {% endif %}
+                  </form>
+                </div>
 
                 {% block detailsview %}{% endblock detailsview %}
 

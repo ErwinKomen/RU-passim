@@ -7312,12 +7312,13 @@ class SermonGoldListView(BasicList):
     basic_name = "gold"
     plural_name = "Gold sermons"
     sg_name = "Gold sermon"
+    new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
+                            # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
     # template_name = 'seeker/sermongold.html'
     has_select2 = True
     paginate_by = 20
     page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
-    # order_cols = ['author__name', 'siglist', 'srchincipit;srchexplicit', '', '', '']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
@@ -8364,6 +8365,7 @@ class EqualGoldEdit(BasicDetails):
     prefix = 'ssg'
     title = "Super Sermon Gold"
     rtype = "json"
+    new_button = True
     mainitems = []
     
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
@@ -8400,6 +8402,14 @@ class EqualGoldEdit(BasicDetails):
 
         # Signal that we have select2
         context['has_select2'] = True
+
+        # SPecification of the new button
+        context['new_button_title'] = "Sermon Gold"
+        context['new_button_name'] = "gold"
+        context['new_button_url'] = reverse("gold_details")
+        context['new_button_params'] = [
+            {'name': 'gold-n-equal', 'value': instance.id}
+            ]
 
         # Return the context we have made
         return context

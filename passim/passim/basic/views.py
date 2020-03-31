@@ -790,6 +790,9 @@ class BasicDetails(DetailView):
     mForm = None            # Model form
     basic_name = None
     basic_name_prefix = ""
+    basic_add = ""
+    add_text = "Add a new"
+    new_button = False
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
@@ -988,6 +991,15 @@ class BasicDetails(DetailView):
             context['listview'] = reverse(listviewname)
         except:
             context['listview'] = reverse('home')
+
+        if self.basic_add:
+            basic_add = reverse(self.basic_add)
+        else:
+            basic_add = reverse("{}_details".format(basic_name))
+        context['basic_add'] = basic_add
+
+        context['new_button'] = self.new_button
+        context['add_text'] = self.add_text
 
         if self.is_basic:
             context['afterdelurl'] = context['listview']
