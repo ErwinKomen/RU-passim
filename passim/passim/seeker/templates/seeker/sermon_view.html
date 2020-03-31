@@ -1,9 +1,9 @@
 ﻿{% load i18n %}
 
     {% if msitem.sermonsignatures.all|length > 0 %}
-      <span class="signature">{{msitem.signatures}}</span>
+      <span class="signature">{{msitem.signature_string}}</span>
     {% elif msitem.goldsignatures.all|length > 0 %}
-      <span class="signature">{{msitem.signatures}}</span>
+      <span class="signature">{{msitem.signature_string}}</span>
     {% else %}
       [-]
     {% endif %}
