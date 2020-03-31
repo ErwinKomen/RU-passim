@@ -5867,10 +5867,6 @@ class SermonListView(BasicList):
             {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'datestart',     'dbfield': 'manu__yearstart__gte',    'keyS': 'date_from'},
             {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
-            ]},
-        {'section': 'other', 'filterlist': [
-            {'filter': 'signatures_a',  'fkfield': 'goldsermons__goldsignatures',   'keyFk': 'code', 'keyList': 'siglist_a','infield': 'code' },
-            {'filter': 'signatures_m',  'fkfield': 'sermonsignatures',              'keyFk': 'code', 'keyList': 'siglist_m','infield': 'code' }
             ]}
          ]
 
