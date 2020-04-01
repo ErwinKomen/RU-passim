@@ -17,14 +17,14 @@
       <li>
         <a id="basket_create" title="Create basket from current search results" href="#" operation="create" 
             targetid="basket_buttons"
-            ajaxurl="{% url 'basket_update' %}" onclick="ru.passim.seeker.do_basket(this);">
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
           <span class="glyphicon glyphicon-send"></span>
           <span>Create</span>
         </a>
       </li>
     {% else %}
       <li>
-        <a id="basket_show" title="Show the contents of the basket" href="{% url 'basket_show' %}" >
+        <a id="basket_show" title="Show the contents of the basket" href="{{basket_show}}" >
           <span>Show</span>
         </a>
       </li>
@@ -32,7 +32,7 @@
       <li>
         <a id="basket_add" title="Add search results to the basket" href="#" operation="add" 
             targetid="basket_buttons"
-            ajaxurl="{% url 'basket_update' %}" onclick="ru.passim.seeker.do_basket(this);">
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
           <span class="glyphicon glyphicon-plus"></span>
           <span>Add</span>
         </a>
@@ -40,15 +40,23 @@
       <li>
         <a id="basket_remove" title="Remove these search results from the basket" href="#" operation="remove" 
             targetid="basket_buttons"
-            ajaxurl="{% url 'basket_update' %}" onclick="ru.passim.seeker.do_basket(this);">
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
           <span class="glyphicon glyphicon-minus"></span>
           <span>Remove</span>
         </a>
       </li>
       <li>
+        <a id="basket_add" title="Add search results to a collection" href="#" operation="add" 
+            targetid="basket_buttons"
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+          <span class="glyphicon glyphicon-plus"></span>
+          <span>Add to collection...</span>
+        </a>
+      </li>
+      <li>
         <a id="basket_reset" title="Clear the basket" href="#" operation="reset" 
             targetid="basket_buttons"
-            ajaxurl="{% url 'basket_update' %}" onclick="ru.passim.seeker.do_basket(this);">
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
           <span class="glyphicon glyphicon-off"></span>
           <span>Clear</span>
         </a>

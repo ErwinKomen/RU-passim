@@ -43,6 +43,7 @@ EDI_TYPE = "seeker.editype"
 STATUS_TYPE = "seeker.stype"
 COLLECTION_TYPE = "seeker.coltype" 
 
+
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
@@ -972,9 +973,29 @@ class Profile(models.Model):
 
     # [1] Current size of the user's basket
     basketsize = models.IntegerField("Basket size", default=0)
-    # Many-to-many field for the contents of a search basket per user
-    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
 
+    # [1] Current size of the user's basket (manuscripts)
+    basketsize_manu = models.IntegerField("Basket size manuscripts", default=0)
+
+    # [1] Current size of the user's basket (sermons gold)
+    basketsize_gold = models.IntegerField("Basket size sermons gold", default=0)
+
+    # [1] Current size of the user's basket (super sermons gold)
+    basketsize_super = models.IntegerField("Basket size super sermons gold", default=0)
+    
+    # Many-to-many field for the contents of a search basket per user (sermons)
+    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
+    
+    # Many-to-many field for the contents of a search basket per user (manuscripts)
+    basketitems_manu = models.ManyToManyField("Manuscript", through="BasketMan", related_name="basketitems_user_manu")
+
+    # Many-to-many field for the contents of a search basket per user (sermons gold)
+    basketitems_gold = models.ManyToManyField("SermonGold", through="BasketGold", related_name="basketitems_user_gold")
+
+    # Many-to-many field for the contents of a search basket per user (super sermons gold)
+    basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
+           
+   
     def __str__(self):
         sStack = self.stack
         return sStack
@@ -3778,13 +3799,13 @@ class Collection(models.Model):
     # [1] Each collection has only 1 name 
     name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
 
-    # [1] Each collecttion has only 1 owner
+    # [1] Each collection has only 1 owner
     owner = models.ForeignKey(Profile, null=True)
     
     # [0-1] Each collection can be marked a "read only" by Passim-team  ERUIT
     readonly = models.BooleanField(default=False)
 
-    # [1] Each collection has only 1 type    
+    # [1] Each "Collection" has only 1 type    
     type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
                             max_length=5)
 
@@ -3798,7 +3819,7 @@ class Collection(models.Model):
     path = models.TextField("History of collection", null=True, blank=True)
 
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
-   # date = models.DateTimeField(default=get_current_datetime)
+    # date = models.DateTimeField(default=get_current_datetime)
    
     # [0-1] Each collection can be marked as "private" by each user 
     
@@ -4206,9 +4227,19 @@ class SermonSignature(models.Model):
         # Return what I am in the end
         return self.gsig
 
+# Aanpassen Profile?
+ 
+    # Every user/profile has a maximum of four baskets, namely for manu, sermo, super and gold
+    # The baskets should store one or more of the four entities named above
+    # and the number of items (basketitems) in Profile
+    # how to reduce the redundancy?
+
+    # Add type to Profile model, this way in Profile only the users are redundant, just as is 
+    # Create three extra tussentabellen voor 
+    # The way of Collection zullen we maar zeggen
     
 class Basket(models.Model):
-    """The basket is the user's vault of search results (sermondescr items)"""
+    """The basket is the user's vault of search results (of sermondescr items)"""
 
     # [1] The sermondescr
     sermon = models.ForeignKey(SermonDescr, related_name="basket_contents")
@@ -4218,6 +4249,43 @@ class Basket(models.Model):
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
         return combi
+
+class BasketMan(models.Model):
+    """The basket is the user's vault of search results (of manuscript items)"""
+    
+    # [1] The manuscript
+    manu = models.ForeignKey(Manuscript, related_name="basket_contents_manu")
+    # [1] The user
+    profile = models.ForeignKey(Profile, related_name="basket_contents_manu")
+
+    def __str__(self):
+        combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
+        return combi
+
+class BasketGold(models.Model):
+    """The basket is the user's vault of search results (of sermon gold items)"""
+    
+    # [1] The sermon gold
+    gold = models.ForeignKey(SermonGold, related_name="basket_contents_gold")
+    # [1] The user
+    profile = models.ForeignKey(Profile, related_name="basket_contents_gold")
+
+    def __str__(self):
+        combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
+        return combi
+
+class BasketSuper(models.Model):
+    """The basket is the user's vault of search results (of super sermon gold items)"""
+    
+    # [1] The super sermon gold
+    super = models.ForeignKey(EqualGold, related_name="basket_contents_super")
+    # [1] The user
+    profile = models.ForeignKey(Profile, related_name="basket_contents_super")
+
+    def __str__(self):
+        combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
+        return combi
+
 
 
 class ProvenanceMan(models.Model):

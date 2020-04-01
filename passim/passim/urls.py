@@ -121,9 +121,18 @@ urlpatterns = [
     
     # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
     
-    url(r'^basket/update', BasketUpdate.as_view(), name='basket_update'),
-    url(r'^basket/show', BasketView.as_view(), name='basket_show'),
+    url(r'^basket/sermo/update', BasketUpdate.as_view(), name='basket_update'),
+    url(r'^basket/sermo/show', BasketView.as_view(), name='basket_show'),
 
+    url(r'^basket/manu/update', BasketUpdateManu.as_view(), name='basket_update_manu'),
+    url(r'^basket/manu/show', BasketViewManu.as_view(), name='basket_show_manu'),
+
+    url(r'^basket/gold/update', BasketUpdateGold.as_view(), name='basket_update_gold'),
+    url(r'^basket/gold/show', BasketViewGold.as_view(), name='basket_show_gold'),
+
+    url(r'^basket/super/update', BasketUpdateSuper.as_view(), name='basket_update_super'),
+    url(r'^basket/super/show', BasketViewSuper.as_view(), name='basket_show_super'),
+    
     url(r'^author/list', AuthorListView.as_view(), name='author_list'),
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
