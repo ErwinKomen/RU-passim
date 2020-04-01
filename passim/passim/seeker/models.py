@@ -225,17 +225,22 @@ def getText(nodeStart):
 def get_searchable(sText):
     sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
 
-    # Move to lower case
-    sText = sText.lower()
+    # Validate
+    if sText == None:
+        sText = ""
+    else:
 
-    # Remove punctuation with nothing
-    sText = re.sub(sRemove, "", sText)
-    #sText = sText.replace("<", "")
-    #sText = sText.replace(">", "")
-    #sText = sText.replace("_", "")
+        # Move to lower case
+        sText = sText.lower()
 
-    # Make sure to TRIM the text
-    sText = sText.strip()
+        # Remove punctuation with nothing
+        sText = re.sub(sRemove, "", sText)
+        #sText = sText.replace("<", "")
+        #sText = sText.replace(">", "")
+        #sText = sText.replace("_", "")
+
+        # Make sure to TRIM the text
+        sText = sText.strip()
     return sText
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
@@ -284,13 +289,15 @@ def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     # We do not use defaults
     return choice_list;
 
-def build_abbr_list(field, position=None, subcat=None, maybe_empty=False):
+def build_abbr_list(field, position=None, subcat=None, maybe_empty=False, exclude=None):
     """Create a list of choice-tuples"""
 
     choice_list = [];
     unique_list = [];   # Check for uniqueness
 
     try:
+        if exclude ==None:
+            exclude = []
         # check if there are any options at all
         if FieldChoice.objects == None:
             # Take a default list
@@ -315,7 +322,7 @@ def build_abbr_list(field, position=None, subcat=None, maybe_empty=False):
                             sEngName = arName[2]
 
                 # Sanity check
-                if sEngName != "" and not sEngName in unique_list:
+                if sEngName != "" and not sEngName in unique_list and not (str(choice.abbr) in exclude):
                     # Add it to the REAL list
                     choice_list.append((str(choice.abbr),sEngName));
                     # Add it to the list that checks for uniqueness
@@ -627,6 +634,72 @@ def add_gold2gold(src, dst, ltype, eq_log = None):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("add_gold2gold")
+
+    # Return the number of added relations
+    return added, lst_total
+
+def add_ssg_equal2equal(src, dst_eq, ltype):
+    """Add a EqualGold-to-EqualGold relation from src to dst of type ltype"""
+
+    # Initialisations
+    lst_add = []
+    lst_total = []
+    added = 0
+    oErr = ErrHandle()
+
+    try:
+        # Main body of add_equal2equal()
+        lst_total.append("<table><thead><tr><th>item</th><th>src</th><th>dst</th><th>linktype</th><th>addtype</th></tr>")
+        lst_total.append("<tbody>")
+
+        # Action depends on the kind of relationship that is added
+        if ltype == LINK_EQUAL:
+            eq_added, eq_list = add_gold2equal(src, dst_eq)
+
+            for item in eq_list: lst_total.append(item)
+
+            # (6) Bookkeeping
+            added += eq_added
+        elif src == dst_eq:
+            # Trying to add an equal link to two gold-sermons that already are in the same equality group
+            pass
+        else:
+            # What is added is a partially equals link - between equality groups
+            prt_added = 0
+
+            # (1) save the source group
+            groups = []
+            groups.append({'grp_src': src, 'grp_dst': dst_eq})
+            groups.append({'grp_src': dst_eq, 'grp_dst': src})
+            #grp_src = src.equal
+            #grp_dst = dst_eq
+
+            for group in groups:
+                grp_src = group['grp_src']
+                grp_dst = group['grp_dst']
+                # (2) Check existing link(s) between the groups
+                obj = EqualGoldLink.objects.filter(src=grp_src, dst=grp_dst).first()
+                if obj == None:
+                    # (3a) there is no link yet: add it
+                    obj = EqualGoldLink(src=grp_src, dst=grp_dst, linktype=ltype)
+                    obj.save()
+                    # Bookkeeping
+                    lst_total.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format( 
+                        added+1, obj.src.equal_goldsermons.first().siglist, obj.dst.equal_goldsermons.first().siglist, ltype, "add" ))
+                    prt_added += 1
+                else:
+                    # (3b) There is a link, but possibly of a different type
+                    obj.linktype = ltype
+                    obj.save()
+
+            # (3) Bookkeeping
+            added += prt_added
+
+        # Finish the report list
+        lst_total.append("</tbody></table>")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_ssg_equal2equal")
 
     # Return the number of added relations
     return added, lst_total
@@ -949,6 +1022,9 @@ class Information(models.Model):
     # [0-1] The value for this piece of information
     kvalue = models.TextField("Key value", default = "", null=True, blank=True)
 
+    class Meta:
+        verbose_name_plural = "Information Items"
+
     def __str__(self):
         return self.name
 
@@ -958,6 +1034,15 @@ class Information(models.Model):
             return ''
         else:
             return info.kvalue
+
+    def set_kvalue(name, value):
+        info = Information.objects.filter(name=name).first()
+        if info == None:
+            info = Information(name=name)
+            info.save()
+        info.kvalue = value
+        info.save()
+        return True
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         return super(Information, self).save(force_insert, force_update, using, update_fields)
@@ -1783,10 +1868,10 @@ class Litref(models.Model):
                     # Get the short title (for books and book sections)
                     short_title = "(no short title)" if "shortTitle" not in data else data['shortTitle']
                    
-                   # Get the abbreviation of the journal 
+                    # Get the abbreviation of the journal 
                     journal_abbr = "(no abbr journal title)" if "publicationTitle" not in data else data['publicationTitle']
                    
-                   # Get the volume
+                    # Get the volume
                     volume = "?" if "volume" not in data else data['volume']
                     
                     # Get the coding for edition ("ed") or catalogue ("cat")
@@ -1864,6 +1949,13 @@ class Litref(models.Model):
                             # If there is a short title
                             elif short_title != "":
                                 result = "{} ({})".format(short_title, year)
+                        elif authors != "" and year != "":
+                            # If there is no short title
+                            if short_title == "": 
+                                result = "{} ({})".format(authors, year)
+                            else:
+                                result = "{} ({})".format(short_title, year)
+
  
                     if result != "":
                         # update the full field
@@ -3057,6 +3149,13 @@ class Author(models.Model):
             iNumber = self.number
         return iNumber
 
+    def get_undecided():
+        author = Author.objects.filter(name__iexact="undecided").first()
+        if author == None:
+            author = Author(name="Undecided")
+            author.save()
+        return author
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """
@@ -3098,8 +3197,7 @@ class EqualGold(models.Model):
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
     number = models.IntegerField("Number", blank=True, null=True)
-    # [0-1] The number of the sermon to which this one has moved
-    # moved = models.IntegerField("Moved to", blank=True, null=True)
+    # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
     # [m] Many-to-many: all the gold sermons linked to me
@@ -3113,12 +3211,163 @@ class EqualGold(models.Model):
         return name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
-        # Do the saving initially
-        response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
-        return response
+
+        oErr = ErrHandle()
+        try:
+            # Adapt the incipit and explicit
+            self.srchincipit = get_searchable(self.incipit)
+            self.srchexplicit = get_searchable(self.explicit)
+            # Double check the number and the code
+            if self.author:
+                # Get the author number
+                auth_num = self.author.get_number()
+
+                # Can we process this author further into a code?
+                if auth_num < 0:
+                    self.code = None
+                else:
+                    # There is an author--is this different than the author we used to have?
+
+                    if not self.number:
+                        # Check the highest sermon number for this author
+                        self.number = EqualGold.sermon_number(self.author)
+                    # Now we have both an author and a number...
+                    passim_code = EqualGold.passim_code(auth_num, self.number)
+                    if not self.code or self.code != passim_code:
+                        # Now save myself with the new code
+                        self.code = passim_code
+
+            # Do the saving initially
+            response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
+            return response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Equalgold.save")
+            return None
+
+    def create_moved(self):
+        """Create a copy of [self], and indicate in that copy that it moved to [self]"""
+
+        # Get a copy of self
+        org = self.create_new()
+        # Now indicate where the original moved to
+        org.moved = self
+        # Save the result
+        org.save()
+        return org
+
+    def create_new(self):
+        """Create a copy of [self]"""
+
+        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code']
+        org = EqualGold()
+        for field in fields:
+            value = getattr(self, field)
+            if value != None:
+                setattr(org, field, value)
+        # Possibly set the author to UNDECIDED
+        if org.author == None: 
+            author = Author.get_undecided()
+            org.author = author
+        # Save the result
+        org.save()
+        return org
+
+    def create_empty():
+        """Create an empty new one"""
+
+        org = EqualGold()
+        org.author = Author.get_undecided()
+        org.save()
+        return org
+
+    def sermon_number(author):
+        """Determine what the sermon number *would be* for the indicated author"""
+
+        # Check the highest sermon number for this author
+        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+        if qs_ssg.count() == 0:
+            iNumber = 1
+        else:
+            iNumber = qs_ssg.first().number + 1
+        return iNumber
+
+    def get_short(self):
+        """Get a very short textual summary"""
+
+        lHtml = []
+        # Add the PASSIM code
+        lHtml.append("{}".format(self.code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append(" {} ".format(" | ".join(lSign)))
+        # Treat the author
+        if self.author:
+            lHtml.append(" {} ".format(self.author.name))
+        # Return the results
+        return "".join(lHtml)
+
+    def get_text(self):
+        """Get a short textual representation"""
+
+        lHtml = []
+        # Add the PASSIM code
+        lHtml.append("{}".format(self.code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append(" {} ".format(" | ".join(lSign)))
+        # Treat the author
+        if self.author:
+            lHtml.append(" {} ".format(self.author.name))
+        # Treat incipit
+        if self.incipit: lHtml.append(" {}".format(self.srchincipit))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.srchexplicit))
+        # Return the results
+        return "".join(lHtml)
+
+    def get_view(self):
+        """Get a HTML valid view of myself"""
+
+        lHtml = []
+        # Add the PASSIM code
+        code = self.code if self.code else "(no Passim code)"
+        lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+        # Treat signatures
+        equal_set = self.equal_goldsermons.all()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        if qs.count() > 0:
+            lSign = []
+            for item in qs:
+                lSign.append(item.short())
+            lHtml.append("<span class='signature'>{}</span>".format(" | ".join(lSign)))
+        else:
+            lHtml.append("[-]")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
+        else:
+            lHtml.append("(by <i>Unknown Author</i>) ")
+        # Treat incipit
+        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+        # Return the results
+        return "".join(lHtml)
 
     def passim_code(auth_num, iNumber):
         """determine a passim code based on author number and sermon number"""
@@ -3134,6 +3383,39 @@ class EqualGold(models.Model):
         sBack = ""
         if self.moved:
             sBack = self.moved.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
+        return sBack
+
+    def get_moved_url(self):
+        """Get the URL of the SSG to which I have been moved"""
+
+        url = ""
+        if self.moved:
+            url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
+        return url
+
+    def get_previous_code(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: 
+            sBack = origin.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
+        # REturn the information
+        return sBack
+
+    def get_previous_url(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: sBack = reverse('equalgold_details', kwargs={'pk': origin.id})
+        # REturn the information
         return sBack
 
     def get_incipit_markdown(self):
@@ -3144,6 +3426,15 @@ class EqualGold(models.Model):
     def get_explicit_markdown(self):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
+
+    def get_collections_markdown(self):
+
+        lHtml = []
+        for obj in self.collections.all().order_by('name'):
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        sBack = ", ".join(lHtml)
+        return sBack
 
 
 class SermonGold(models.Model):
@@ -3192,41 +3483,35 @@ class SermonGold(models.Model):
             name = "RU_sg_{}".format(self.id)
         return name
 
-    def get_view(self):
-        """Get a HTML valid view of myself similar to [sermongold_view.html]"""
+    def add_relation(self, target, linktype):
+        """Add a relation from me to [target] with the indicated type"""
 
-        lHtml = []
-        # Treat signatures
-        if self.goldsignatures.all().count() > 0:
-            lHtml.append("<span class='signature'>{}</span>".format(self.signatures()))
-        else:
-            lHtml.append("[-]")
-        # Treat the author
-        if self.author:
-            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
-        else:
-            lHtml.append("(by <i>Unknwon Author</i>) ")
-        # Treat incipit
-        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
-        # Treat intermediate dots
-        if self.incipit and self.explicit: lHtml.append("...-...")
-        # Treat explicit
-        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
-        # Return the results
-        return "".join(lHtml)
+        relation, created = SermonGoldSame.objects.get_or_create(
+            src=self, dst=target, linktype=linktype)
+        # Return the new SermonGoldSame instance that has been created
+        return relation
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        istop = 1
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
+    def collections_ordered(self):
+        """Ordered sample of gold collections"""
+        return self.collections_gold.all().order_by("name")
+
+    def do_signatures(self):
+        """Create or re-make a JSON list of signatures"""
+
         lSign = []
         for item in self.goldsignatures.all():
             lSign.append(item.short())
         self.siglist = json.dumps(lSign)
-        # Do the saving initially
-        response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
-        return response
+        # And save myself
+        self.save()
+
+    def editions(self):
+        """Combine all editions into one string: the editions are retrieved from litrefSG"""
+
+        lEdition = []
+        for item in self.sermon_gold_editions.all():
+            lEdition.append(item.reference.short)
+        return " | ".join(lEdition)
 
     def find_or_create(author, incipit, explicit, stype="imp"):
         """Find or create a SermonGold"""
@@ -3284,43 +3569,101 @@ class SermonGold(models.Model):
         # Return what we found
         return obj
 
-    def init_latin():
-        """ One time ad-hoc function"""
+    def ftxtlinks(self):
+        """Combine all editions into one string"""
 
-        with transaction.atomic():
-            for obj in SermonGold.objects.all():
-                obj.srchincipit = get_searchable(obj.incipit)
-                obj.srchexplicit = get_searchable(obj.explicit)
-                obj.save()
-        return True
+        lFtxtlink = []
+        for item in self.goldftxtlinks.all():
+            lFtxtlink.append(item.short())
+        return ", ".join(lFtxtlink)
 
-    def get_incipit(self):
-        """Return the *searchable* incipit, without any additional formatting"""
-        return self.srchincipit
+    def get_author(self):
+        """Get the name of the author"""
+
+        if self.author:
+            sName = self.author.name
+        else:
+            sName = "-"
+        return sName
+    
+    def get_bibliography_markdown(self):
+        """Get the contents of the bibliography field using markdown"""
+        return adapt_markdown(self.bibliography, False)
+
+    def get_collections_markdown(self):
+        lHtml = []
+        # Visit all collections
+        for col in self.collections.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
+            # Create a display for this topic
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_editions(self):
+        lEdition = []
+        for item in self.sermon_gold_editions.all():
+            lEdition.append(item.get_short())
+        # Sort the items
+        lEdition.sort()
+        return lEdition
+
+    def get_editions_markdown(self):
+        lHtml = []
+        # Visit all editions
+        for edi in self.sermon_gold_editions.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_eqset(self):
+        """Return an HTML representation of the *other* members in my equality set"""
+
+        html = []
+        # Make available the set of Gold Sermons that belongs to the same EqualGold
+        qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
+        for item in qs:
+            sigs = json.loads(item.siglist)
+            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+            url = reverse('gold_details', kwargs={'pk': item.id})
+            html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+        # Return the combination
+        return " ".join(html)
 
     def get_explicit(self):
         """Return the *searchable* explicit, without any additional formatting"""
         return self.srchexplicit
 
-    def signatures(self):
-        """Combine all signatures into one string"""
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
 
-        lSign = []
-        for item in self.goldsignatures.all():
-            lSign.append(item.short())
-        return " | ".join(lSign)
+    def get_ftxtlinks_markdown(self):
+        lHtml = []
+        # Visit all full text links
+        for item in self.goldftxtlinks.all().order_by('url'):
+            # Determine where clicking should lead to
+            url = item.url
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, url))
 
-    def get_signatures(self):
-        lSign = []
-        for item in self.goldsignatures.all():
-            lSign.append(item.short())
-        return lSign
+        sBack = ", ".join(lHtml)
+        return sBack
 
-    def signatures_ordered(self):
-        return self.goldsignatures.all().order_by("editype", "code")
+    def get_incipit(self):
+        """Return the *searchable* incipit, without any additional formatting"""
+        return self.srchincipit
 
-    def collections_ordered(self):
-        return self.collections_gold.all().order_by("name")
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+        # Perform
+        return adapt_markdown(self.incipit)
 
     def get_keywords(self):
         """Combine all keywords into one string"""
@@ -3331,99 +3674,57 @@ class SermonGold(models.Model):
             lKeyword.append(item.name)
         return " | ".join(lKeyword)
 
-    def do_signatures(self):
-        """Create or re-make a JSON list of signatures"""
-
-        lSign = []
-        for item in self.goldsignatures.all():
-            lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
-
-    def editions(self):
-        """Combine all editions into one string: the editions are retrieved from litrefSG"""
-
-        lEdition = []
-        for item in self.sermon_gold_editions.all():
-            lEdition.append(item.reference.short)
-        return " | ".join(lEdition)
-
-    def get_editions(self):
-        lEdition = []
-        for item in self.sermon_gold_editions.all():
-            lEdition.append(item.get_short())
-        # Sort the items
-        lEdition.sort()
-        return lEdition
-
-    def ftxtlinks(self):
-        """Combine all editions into one string"""
-
-        lFtxtlink = []
-        for item in self.goldftxtlinks.all():
-            lFtxtlink.append(item.short())
-        return ", ".join(lFtxtlink)
-
-    def get_bibliography_markdown(self):
-        """Get the contents of the bibliography field using markdown"""
-        return adapt_markdown(self.bibliography, False)
-
-    def get_incipit_markdown(self):
-        """Get the contents of the incipit field using markdown"""
-        # Perform
-        return adapt_markdown(self.incipit)
-
-    def get_explicit_markdown(self):
-        """Get the contents of the explicit field using markdown"""
-        return adapt_markdown(self.explicit)
-
-    def link_oview(self):
-        """provide an overview of links from this gold sermon to others"""
-
-        link_list = [
-            {'abbr': 'eqs', 'class': 'eqs-link', 'count': 0, 'title': 'Is equal to' },
-            {'abbr': 'prt', 'class': 'prt-link', 'count': 0, 'title': 'Is part of' },
-            {'abbr': 'neq', 'class': 'neq-link', 'count': 0, 'title': 'Is nearly equal to' },
-            {'abbr': 'sim', 'class': 'sim-link', 'count': 0, 'title': 'Is similar to' },
-            {'abbr': 'use', 'class': 'use-link', 'count': 0, 'title': 'Makes us of' },
-            ]
+    def get_keywords_markdown(self):
         lHtml = []
-        for link_def in link_list:
-            lt = link_def['abbr']
-            links = SermonGoldSame.objects.filter(src=self, linktype=lt).count()
-            link_def['count'] = links
-        return link_list
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-    def get_sermon_string(self):
-        """Get a string summary of this one"""
+        sBack = ", ".join(lHtml)
+        return sBack
 
-        author = "" if self.author == None else self.author.name
-        incipit = "" if self.incipit == None else self.incipit
-        explicit = "" if self.explicit == None else self.explicit
-        return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
-    
-    def add_relation(self, target, linktype):
-        """Add a relation from me to [target] with the indicated type"""
+    def get_label(self, do_incexpl=False):
+        """Get a string view of myself to be put on a label"""
 
-        relation, created = SermonGoldSame.objects.get_or_create(
-            src=self, dst=target, linktype=linktype)
-        # Return the new SermonGoldSame instance that has been created
-        return relation
+        lHtml = []
+        # do_incexpl = False
 
-    def remove_relation(self, target, linktype):
-        """Find and remove all links to target with the indicated type"""
+        # Treat signatures
+        if self.goldsignatures.all().count() > 0:
+            lHtml.append("{} ".format(self.signatures()))
+        else:
+            lHtml.append(" ")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by {}) ".format(self.author.name))
+        else:
+            lHtml.append("(by Unknwon Author) ")
 
-        SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).delete()
-        # Return positively
-        return True
+        if do_incexpl:
+            # Treat incipit
+            if self.incipit: lHtml.append("{}".format(self.srchincipit))
+            # Treat intermediate dots
+            if self.incipit and self.explicit: lHtml.append("...-...")
+            # Treat explicit
+            if self.explicit: lHtml.append("{}".format(self.srchexplicit))
 
-    def has_relation(self, target, linktype):
-        """Check if the indicated linktype relation exists"""
+        # Return the results
+        return "".join(lHtml)
 
-        obj = SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).first()
-        # Return existance
-        return (obj != None)
+    def get_litrefs_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for litref in self.sermon_gold_litrefs.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_relations(self, linktype = None):
         """Get all SermonGoldSame instances with me as source and with the indicated linktype"""
@@ -3443,6 +3744,97 @@ class SermonGold(models.Model):
         qs = self.related_to.filter(sermongold_dst__linktype=linktype, sermongold_dst__dst=self)
         # Return the whole queryset that was found
         return qs
+
+    def get_sermon_string(self):
+        """Get a string summary of this one"""
+
+        author = "" if self.author == None else self.author.name
+        incipit = "" if self.incipit == None else self.incipit
+        explicit = "" if self.explicit == None else self.explicit
+        return "{} {} {} {}".format(author, self.signatures(), incipit, explicit)
+    
+    def get_signatures(self):
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return lSign
+
+    def get_signatures_markdown(self):
+        lHtml = []
+        # Visit all signatures
+        for sig in self.goldsignatures.all().order_by('editype', 'code'):
+            # Determine where clicking should lead to
+            url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_ssg_markdown(self):
+        lHtml = []
+        url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+        code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
+        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        sBack = "".join(lHtml)
+        return sBack
+
+    def get_view(self):
+        """Get a HTML valid view of myself similar to [sermongold_view.html]"""
+
+        lHtml = []
+        # Treat signatures
+        if self.goldsignatures.all().count() > 0:
+            lHtml.append("<span class='signature'>{}</span>".format(self.signatures()))
+        else:
+            lHtml.append("[-]")
+        # Treat the author
+        if self.author:
+            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
+        else:
+            lHtml.append("(by <i>Unknwon Author</i>) ")
+        # Treat incipit
+        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+        # Treat intermediate dots
+        if self.incipit and self.explicit: lHtml.append("...-...")
+        # Treat explicit
+        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+        # Return the results
+        return "".join(lHtml)
+
+    def has_relation(self, target, linktype):
+        """Check if the indicated linktype relation exists"""
+
+        obj = SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).first()
+        # Return existance
+        return (obj != None)
+
+    def init_latin():
+        """ One time ad-hoc function"""
+
+        with transaction.atomic():
+            for obj in SermonGold.objects.all():
+                obj.srchincipit = get_searchable(obj.incipit)
+                obj.srchexplicit = get_searchable(obj.explicit)
+                obj.save()
+        return True
+
+    def link_oview(self):
+        """provide an overview of links from this gold sermon to others"""
+
+        link_list = [
+            {'abbr': 'eqs', 'class': 'eqs-link', 'count': 0, 'title': 'Is equal to' },
+            {'abbr': 'prt', 'class': 'prt-link', 'count': 0, 'title': 'Is part of' },
+            {'abbr': 'neq', 'class': 'neq-link', 'count': 0, 'title': 'Is nearly equal to' },
+            {'abbr': 'sim', 'class': 'sim-link', 'count': 0, 'title': 'Is similar to' },
+            {'abbr': 'use', 'class': 'use-link', 'count': 0, 'title': 'Makes us of' },
+            ]
+        lHtml = []
+        for link_def in link_list:
+            lt = link_def['abbr']
+            links = SermonGoldSame.objects.filter(src=self, linktype=lt).count()
+            link_def['count'] = links
+        return link_list
 
     def read_gold(username, data_file, filename, arErr, objStat=None, xmldoc=None, sName = None):
         """Import an Excel file with golden sermon data and add it to the DB
@@ -3708,6 +4100,38 @@ class SermonGold(models.Model):
         # Return the object that has been created
         return oBack
 
+    def remove_relation(self, target, linktype):
+        """Find and remove all links to target with the indicated type"""
+
+        SermonGoldSame.objects.filter(src=self, dst=target, linktype=linktype).delete()
+        # Return positively
+        return True
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the incipit and explicit
+        istop = 1
+        self.srchincipit = get_searchable(self.incipit)
+        self.srchexplicit = get_searchable(self.explicit)
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        self.siglist = json.dumps(lSign)
+        # Do the saving initially
+        response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+        return response
+
+    def signatures(self):
+        """Combine all signatures into one string"""
+
+        lSign = []
+        for item in self.goldsignatures.all():
+            lSign.append(item.short())
+        return " | ".join(lSign)
+
+    def signatures_ordered(self):
+        """Ordered sample of gold signatures"""
+        return self.goldsignatures.all().order_by("editype", "code")
+
 
 class EqualGoldLink(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -3724,6 +4148,7 @@ class EqualGoldLink(models.Model):
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
         return combi
+
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -3790,8 +4215,6 @@ class ManuscriptExt(models.Model):
     def short(self):
         return self.url
        
-# aanpassen en geschikt maken zodat in 1 Collection tabel alle collecties kunnen worden geregistreed, dus voor alle entiteiten
-
 
 class Collection(models.Model):
     """A collection can contain one or more sermons, manuscripts, gold sermons or super super golds"""
@@ -3902,8 +4325,19 @@ class SermonDescr(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
                             max_length=5, default="man")
 
+    # ================ MANYTOMANY relations ============================
+
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
+    # [0-n] Link to one or more golden standard sermons
+    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [m] Many-to-many: one sermon can be a part of a series of collections 
+    collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
+
+    # [m] Many-to-many: signatures linked manually through SermonSignature
+    signatures = models.ManyToManyField("Signature", through="SermonSignature", related_name="signatures_sermon")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
@@ -3924,14 +4358,8 @@ class SermonDescr(models.Model):
     # [1]
     order = models.IntegerField("Order", default = -1)
 
-    # [0-n] Link to one or more golden standard sermons
-    goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
-
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
-
-    # [m] Many-to-many: one sermon can be a part of a series of collections 
-    collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
 
     def __str__(self):
         if self.author:
@@ -3943,42 +4371,15 @@ class SermonDescr(models.Model):
         sSignature = "{}/{}".format(sAuthor,self.locus)
         return sSignature
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        istop = 1
-        if self.incipit: self.srchincipit = get_searchable(self.incipit)
-        if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+    def do_signatures(self):
+        """Create or re-make a JSON list of signatures"""
+
         lSign = []
-        bNeedSave = False
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
-            bNeedSave = True
-        if bNeedSave: self.siglist = json.dumps(lSign)
-        # Do the saving initially
-        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
-        return response
-
-    def init_latin():
-        """ One time ad-hoc function"""
-
-        with transaction.atomic():
-            for obj in SermonDescr.objects.all():
-                bNeedSave = False
-                if obj.incipit: 
-                    bNeedSave = True
-                if obj.explicit: 
-                    bNeedSave = True
-                lSign = []
-                for item in obj.sermonsignatures.all():
-                    bNeedSave = True
-                if bNeedSave:
-                    obj.save()
-        return True
-
-    def target(self):
-        # Get the URL to edit this sermon
-        sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
-        return sUrl
+        self.siglist = json.dumps(lSign)
+        # And save myself
+        self.save()
 
     def getdepth(self):
         depth = 1
@@ -3994,47 +4395,214 @@ class SermonDescr(models.Model):
                 node = node.parent
         return depth
 
+    def get_author(self):
+        """Get the name of the author"""
+
+        if self.author:
+            sName = self.author.name
+        else:
+            sName = "-"
+        return sName
+    
+    def get_collections_markdown(self):
+        lHtml = []
+        # Visit all collections
+        for col in self.collections.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
+            # Create a display for this topic
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_editions_markdown(self):
+
+        # Initialisations
+        lHtml = []
+        gold_list = []
+
+        # Visit all linked gold sermons
+        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold_list.append(linked.gold.id)
+
+        # Visit all the editions references of this gold sermon 
+        for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('reference__short').distinct():
+            # Determine where clicking should lead to
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+                
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_explicit(self):
+        """Return the *searchable* explicit, without any additional formatting"""
+        return self.srchexplicit
+
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
+
+    def get_eqsetsignatures_markdown(self, type="all"):
+        """Get the signatures of all the sermon Gold instances in the same eqset"""
+
+        # Initialize
+        lHtml = []
+        lEqual = []
+        lSig = []
+        # Get all the SG linked to me with EQUAL
+        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Access the gold sermon's EQUAL
+            equal = linked.gold.equal
+            if equal not in lEqual: lEqual.append(equal)
+
+        # Visit all equality sets that I am part of
+        for eqset in lEqual:
+            # Visit all Sermons Gold in this set
+            for gold in eqset.equal_goldsermons.all():
+                # Visit all signatures
+                for sig in gold.goldsignatures.all():
+                    if sig.id not in lSig: lSig.append(sig.id)
+
+        # Get an ordered set of signatures
+        for sig in Signature.objects.filter(id__in=lSig).order_by('editype', 'code'):
+            # Create a display for this topic
+            if type == "first":
+                # Determine where clicking should lead to
+                url = reverse('gold_details', kwargs={'pk': sig.gold.id})
+                lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
+                break
+            else:
+                # Determine where clicking should lead to
+                url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_goldlinks_markdown(self):
+        """Return all the gold links = type + gold"""
+
+        lHtml = []
+        sBack = ""
+        for goldlink in self.sermondescr_gold.all().order_by('sermon__author__name', 'sermon__siglist'):
+            lHtml.append("<tr class='view-row'>")
+            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(goldlink.get_linktype_display()))
+            # for gold in self.goldsermons.all().order_by('author__name', 'siglist'):
+            url = reverse('gold_details', kwargs={'pk': goldlink.gold.id})
+            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, goldlink.gold.get_view()))
+            lHtml.append("</tr>")
+        if len(lHtml) > 0:
+            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        return sBack
+
+    def get_incipit(self):
+        """Return the *searchable* incipit, without any additional formatting"""
+        return self.srchincipit
+
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+
+        # Sanity check
+        if self.incipit != None and self.incipit != "":
+            if self.srchincipit == None or self.srchincipit == "":
+                SermonDescr.init_latin()
+
+        return adapt_markdown(self.incipit)
+
+    def get_keywords_markdown(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_litrefs_markdown(self):
+        # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
+               
+        # (1) First the litrefs from the manuscript: 
+        manu = self.manu
+        lref_list = []
+        for item in LitrefMan.objects.filter(manuscript=manu):
+            oAdd = {}
+            oAdd['reference_id'] = item.reference.id
+            oAdd['short'] = item.reference.short
+            oAdd['reference'] = item.reference
+            oAdd['pages'] = item.pages
+            oAdd['short_markdown'] = item.get_short_markdown()
+            lref_list.append(oAdd)
+       
+        # (2) Second the litrefs from the linked Gold sermons: 
+        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Get all the literature references of this gold sermon 
+            for item in LitrefSG.objects.filter(sermon_gold_id = gold):
+                
+                oAdd = {}
+                oAdd['reference_id'] = item.reference.id
+                oAdd['short'] = item.reference.short
+                oAdd['reference'] = item.reference
+                oAdd['pages'] = item.pages
+                oAdd['short_markdown'] = item.get_short_markdown()
+                lref_list.append(oAdd)
+                
+        # (3) Set the sort order TH: werkt
+        lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
+                
+        # (4) Remove duplicates 
+        unique_litref_list=[]                
+        previous = None
+        for item in lref_list:
+            # Keep the first
+            if previous == None:
+                unique_litref_list.append(item)
+            # Try to compare current item to previous
+            elif previous != None:
+                # Are they the same?
+                if item['reference_id'] == previous['reference_id'] and \
+                    item['pages'] == previous['pages']:
+                    # They are the same, no need to copy
+                    pass
+                            
+                # elif previous == None: 
+                #    unique_litref_list.append(item)
+                else:
+                    # Add this item to the new list
+                    unique_litref_list.append(item)
+
+            # assign previous
+            previous = item
+              
+        # (5) The outcome:              
+        litref_list = unique_litref_list
+        
+        # (6) Combine into HTML code
+        lHtml = []
+        for litref in litref_list:
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref['reference'].id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref['short_markdown']))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_manuscript(self):
         """Get the manuscript that links to this sermondescr"""
 
         return obj.manu
 
-    def signatures(self):
-        """Combine all signatures into one string"""
-
-        lSign = []
-        for item in self.sermonsignatures.all():
-            lSign.append(item.short())
-        return " | ".join(lSign)
-
-    def do_signatures(self):
-        """Create or re-make a JSON list of signatures"""
-
-        lSign = []
-        for item in self.sermonsignatures.all():
-            lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
-
-    def signatures_ordered(self):
-        # Provide an ordered list of signatures
-        return self.sermonsignatures.all().order_by("editype", "code")
-
-    def goldsignatures_ordered(self):
-        """Provide an ordered list of (gold) signatures that line up with the sermonsignatures linked to me"""
-
-        sig_ordered = []
-        # Get the list of sermon signatures connected to me
-        for sermosig in self.sermonsignatures.all().order_by("editype", "code"):
-            # See if this sermosig has an equivalent goldsig
-            gsig = sermosig.get_goldsig()
-            if gsig:
-                # Add the id to the list
-                sig_ordered.append(gsig.id)
-        
-        # Return the ordered list
-        return sig_ordered
+    def get_quote_markdown(self):
+        """Get the contents of the quote field using markdown"""
+        return adapt_markdown(self.quote)
 
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
@@ -4063,6 +4631,32 @@ class SermonDescr(models.Model):
         # Return the sermon signature
         return sermonsig
 
+    def get_sermonsignatures_markdown(self):
+        lHtml = []
+        # Visit all signatures
+        for sig in self.sermonsignatures.all().order_by('editype', 'code'):
+            # Determine where clicking should lead to
+            url = ""
+            if sig.gsig:
+                url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def goldauthors(self):
+        # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
+        lst_author = []
+        # Visit all linked gold sermons
+        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Access the gold sermon
+            gold = linked.gold
+            # Does this one have an author?
+            if gold.author != None:
+                lst_author.append(gold.author)
+        return lst_author
+
     def goldeditions_ordered(self):
         """Provide an ordered list of EdirefSG connected to me through related gold sermons"""
 
@@ -4071,27 +4665,69 @@ class SermonDescr(models.Model):
         edirefsg_ordered = EdirefSG.objects.filter(*lstQ).order_by("reference__short")
         return edirefsg_ordered
 
-    def get_incipit(self):
-        """Return the *searchable* incipit, without any additional formatting"""
-        return self.srchincipit
+    def goldsignatures_ordered(self):
+        """Provide an ordered list of (gold) signatures that line up with the sermonsignatures linked to me"""
 
-    def get_explicit(self):
-        """Return the *searchable* explicit, without any additional formatting"""
-        return self.srchexplicit
+        sig_ordered = []
+        # Get the list of sermon signatures connected to me
+        for sermosig in self.sermonsignatures.all().order_by("editype", "code"):
+            # See if this sermosig has an equivalent goldsig
+            gsig = sermosig.get_goldsig()
+            if gsig:
+                # Add the id to the list
+                sig_ordered.append(gsig.id)
+        
+        # Return the ordered list
+        return sig_ordered
 
-    def get_incipit_markdown(self):
-        """Get the contents of the incipit field using markdown"""
+    def init_latin():
+        """ One time ad-hoc function"""
 
-        # Sanity check
-        if self.incipit != None and self.incipit != "":
-            if self.srchincipit == None or self.srchincipit == "":
-                SermonDescr.init_latin()
+        with transaction.atomic():
+            for obj in SermonDescr.objects.all():
+                bNeedSave = False
+                if obj.incipit: 
+                    bNeedSave = True
+                if obj.explicit: 
+                    bNeedSave = True
+                lSign = []
+                for item in obj.sermonsignatures.all():
+                    bNeedSave = True
+                if bNeedSave:
+                    obj.save()
+        return True
 
-        return adapt_markdown(self.incipit)
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the incipit and explicit
+        istop = 1
+        if self.incipit: self.srchincipit = get_searchable(self.incipit)
+        if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        lSign = []
+        bNeedSave = False
+        for item in self.sermonsignatures.all():
+            lSign.append(item.short())
+            bNeedSave = True
+        if bNeedSave: self.siglist = json.dumps(lSign)
+        # Do the saving initially
+        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        return response
 
-    def get_explicit_markdown(self):
-        """Get the contents of the explicit field using markdown"""
-        return adapt_markdown(self.explicit)
+    def signature_string(self):
+        """Combine all signatures into one string"""
+
+        lSign = []
+        for item in self.sermonsignatures.all():
+            lSign.append(item.short())
+        return " | ".join(lSign)
+
+    def signatures_ordered(self):
+        # Provide an ordered list of signatures
+        return self.sermonsignatures.all().order_by("editype", "code")
+
+    def target(self):
+        # Get the URL to edit this sermon
+        sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
+        return sUrl
 
 
 class SermonDescrKeyword(models.Model):
@@ -4131,8 +4767,30 @@ class SermonDescrGold(models.Model):
         # Temporary fix: sermon.id
         # Should be changed to something more significant in the future
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
-        combi = "{} is {} of {}".format(self.sermon.id, self.linktype, self.gold.signature)
+        combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.gold.siglist)
         return combi
+
+    def get_label(self, do_incexpl=False):
+        sBack = "{}: {}".format(self.get_linktype_display(), self.gold.get_label(do_incexpl))
+        return sBack
+
+    def unique_list(exclude=None):
+        """Get a list of links that are unique in terms of combination [gold] [linktype]"""
+
+        try_unique_list = False
+
+        if try_unique_list:
+            if exclude:
+                uniques = SermonDescrGold.objects.exclude(sermon=exclude).order_by('linktype', 'sermon__author__name', 'sermon__siglist').values_list('gold', 'linktype').distinct()
+            else:
+                uniques = SermonDescrGold.objects.order_by('linktype', 'sermon__author__name', 'sermon__siglist').values_list('gold', 'linktype').distinct()
+        else:
+            # We're not really giving unique ones
+            if exclude:
+                uniques = SermonDescrGold.objects.exclude(sermon=exclude).order_by('linktype', 'sermon__author__name', 'sermon__siglist')
+            else:
+                uniques = SermonDescrGold.objects.order_by('linktype', 'sermon__author__name', 'sermon__siglist')
+        return uniques
 
 
 class Signature(models.Model):
@@ -4201,43 +4859,70 @@ class SermonSignature(models.Model):
         # Then return the super-response
         return response
 
-    def get_goldsig(self):
+    def get_goldsig(self, bCleanUp = False):
         """Get the equivalent gold-signature for me"""
 
-        # See if this sermosig has an equivalent goldsig
-        if self.gsig == None:
-            # No gsig given, so depend on the self.editype and self.code
-            qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
-            for obj in qs:
-                if obj.editype == self.editype and obj.code == self.code:
-                    # Found it
-                    self.gsig = obj
-                    break
+        oErr = ErrHandle()
+        try:
+            if bCleanUp and self.gsig:
+                # There seems to be a gsig
+                qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
+                for obj in qs:
+                    if obj.editype == self.editype and obj.code == self.code:
+                        self.delete()
+                        return None
+            # See if this sermosig has an equivalent goldsig
             if self.gsig == None:
-                # Get the first gold signature that exists
-                obj = Signature.objects.filter(editype=self.editype, code=self.code).first()
-                if obj:
-                    self.gsig = obj
-                else:
-                    # There is a signature that is not a gold signature -- this cannot be...
-                    pass
-            # Save the sermonsignature with the new information
-            if self.gsig:
-                self.save()
-        # Return what I am in the end
-        return self.gsig
+                # No gsig given, so depend on the self.editype and self.code
+                qs = Signature.objects.filter(Q(gold__in = self.sermon.goldsermons.all()))
+                for obj in qs:
+                    if obj.editype == self.editype and obj.code == self.code:
+                        # Found it
+                        if bCleanUp:
+                            self.delete()
+                            return None
+                        else:
+                            self.gsig = obj
+                            break
+                if self.gsig == None:
+                    # Get the first gold signature that exists
+                    obj = Signature.objects.filter(editype=self.editype, code=self.code).first()
+                    if obj:
+                        self.gsig = obj
+                    else:
+                        # There is a signature that is not a gold signature -- this cannot be...
+                        pass
+                # Save the sermonsignature with the new information
+                if self.gsig:
+                    self.save()
+            # Return what I am in the end
+            return self.gsig
+        except:
+            #y = (hasattr(self,"gsig"))
+            msg = oErr.get_error_message()
+            oErr.DoError("get_goldsig")
+            return None
 
-# Aanpassen Profile?
- 
-    # Every user/profile has a maximum of four baskets, namely for manu, sermo, super and gold
-    # The baskets should store one or more of the four entities named above
-    # and the number of items (basketitems) in Profile
-    # how to reduce the redundancy?
+    def adapt_gsig():
+        """Make sure all the items in SermonSignature point to a gsig, if possible"""
 
-    # Add type to Profile model, this way in Profile only the users are redundant, just as is 
-    # Create three extra tussentabellen voor 
-    # The way of Collection zullen we maar zeggen
+        qs = SermonSignature.objects.all()
+        iTotal = qs.count()
+        iCount = 0
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in qs:
+                    obj.get_goldsig(bCleanUp=True)
+                    iCount += 1
+                    oErr.Status("adapt_gsig: id={} count={}/{}".format(obj.id, iCount, iTotal))
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_gsig")
+            return False
     
+
 class Basket(models.Model):
     """The basket is the user's vault of search results (of sermondescr items)"""
 
@@ -4305,6 +4990,18 @@ class LitrefMan(models.Model):
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    def get_short(self):
+        short = ""
+        if self.reference:
+            short = self.reference.get_short()
+            if self.pages and self.pages != "":
+                short = "{}, pp {}".format(short, self.pages)
+        return short
+
+    def get_short_markdown(self):
+        short = self.get_short()
+        return adapt_markdown(short, lowercase=False)
 
 
 class LitrefSG(models.Model):

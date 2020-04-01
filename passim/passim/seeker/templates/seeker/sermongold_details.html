@@ -39,28 +39,11 @@
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
             </div>
              
-            <!-- SermonGold signatures (Gryson, Clavis): zero-to-many -->
-            <div class="row">&nbsp;</div>
-            <div id="sermongold_signset" class="EXTINCT_post-load" targeturl="{% url 'gold_signset' pk=goldForm.instance.id %}" >
-              <!-- The wait symbol will be overwritten 
-              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-                -->
-            </div>
-
-            <!-- SermonGold critical editions: zero-to-many -->
+            <!-- SermonGold fulltext: zero-to-many -->
             <div class="row">&nbsp;</div>
             <div class="row">
-              <!-- One or more critical editions -->
-              <div class="col-md-4">
-                <div id="sermongold_ediset" class="EXTINCT_post-load" targeturl="{% url 'gold_ediset' pk=goldForm.instance.id %}" >
-                  <!-- The wait symbol will be overwritten 
-                  <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-                  -->
-                </div>
-              </div>
-
               <!-- One or more fulltext links (to critical editions) -->
-              <div class="col-md-12" OLD_class="col-md-8">
+              <div class="col-md-12" >
                 <div id="sermongold_ftxtset" class="post-load" targeturl="{% url 'gold_ftxtset' pk=goldForm.instance.id %}" >
                   <!-- The wait symbol will be overwritten -->
                   <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
@@ -108,12 +91,6 @@
             <!-- Room for the equality links from this gold sermon -->
             <div class="row">&nbsp;</div>
             <div id="sermongold_eqset" class="post-load" targeturl="{% url 'gold_eqset' pk=goldForm.instance.id %}" >
-              <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-            </div>
-
-            <!-- Room for the other links from this gold sermon's equality set -->
-            <div class="row">&nbsp;</div>
-            <div id="sermongold_linkset" class="post-load" targeturl="{% url 'gold_linkset' pk=goldForm.instance.id %}" >
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
             </div>
 

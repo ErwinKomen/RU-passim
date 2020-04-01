@@ -1069,7 +1069,7 @@ table.compact-table td:hover {
 
 .error, .err-msg {
     background-color: lightgoldenrodyellow;
-    color: darkred;
+    color: red;
     font-family: monospace;
     font-size: smaller;
 }
@@ -1104,6 +1104,24 @@ table.compact-table td:hover {
 .manuscript-city, .manuscript-library {
   min-width: 92px;
 }
+
+.passimlink {
+    color: darkgreen;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.passimlink:hover {
+    color: whitesmoke;
+    background-color: darkblue;
+    cursor: pointer;
+}
+
+
 
 .keyword {
     color: darkblue;
@@ -1244,7 +1262,7 @@ span.badge.signature.gr {
 span.badge.signature.cl {
   background-color: lightgreen;
 }
-span.badge.signature.ot {
+span.badge.signature.ot, span.badge.signature.eqset  {
   background-color: lightgoldenrodyellow;
 }
 
@@ -1298,7 +1316,13 @@ a.sermon:link, a.sermon:visited {
   color: darkblue;
 }
 
-div.view-mode a {
+.passimcode {
+  /* font-family: monospace; */
+  font-size: smaller;
+  color: darkgreen;
+}
+
+div.view-mode a, div.any-mode a {
   text-decoration: none;
   color: inherit;
 }

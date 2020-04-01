@@ -4,7 +4,8 @@ Definition of views for the BASIC app.
 
 from django.apps import apps
 from django.contrib.auth.models import User, Group
-from django.core.urlresolvers import reverse
+# from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
@@ -59,7 +60,12 @@ def user_is_authenticated(request):
     # Is this user authenticated?
     username = request.user.username
     user = User.objects.filter(username=username).first()
-    response = False if user == None else user.is_authenticated()
+    response = False 
+    if user != None:
+        try:
+            response = user.is_authenticated()
+        except:
+            response = user.is_authenticated
     return response
 
 def user_is_ingroup(request, sGroup):
@@ -196,12 +202,10 @@ def make_search_list(filters, oFields, search_list, qd):
                 keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
                 s_q = ""
-                arFkField = []
-                if fkfield != None:
-                    arFkField = fkfield.split("|")
                
                 # Main differentiation: fkfield or dbfield
                 if fkfield:
+                    # We are dealing with a foreign key
                     # Check for keyS
                     if has_string_value(keyS, oFields):
                         # Check for ID field
@@ -221,21 +225,12 @@ def make_search_list(filters, oFields, search_list, qd):
                         else:
                             val = oFields[keyS]
                             enable_filter(filter_type, head_id)
-                            # We are dealing with a foreign key (or multiple)
-                            if len(arFkField) > 1:
-                                iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
-                            s_q = None
-                            for fkfield in arFkField:
-                                if "*" in val:
-                                    val = adapt_search(val)
-                                    s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
-                                else:
-                                    s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
-                                if s_q == None:
-                                    s_q = s_q_add
-                                else:
-                                    s_q |= s_q_add
+                            if "*" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+                            else:
+                                s_q = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
                     elif has_obj_value(fkfield, oFields):
                         val = oFields[fkfield]
                         enable_filter(filter_type, head_id)
@@ -283,17 +278,7 @@ def make_search_list(filters, oFields, search_list, qd):
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
-                        if len(arFkField) > 1:
-                            # THere are more foreign keys: combine in logical or
-                            s_q_lst = None
-                            for fkfield in arFkField:
-                                if s_q_lst == None:
-                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                                else:
-                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                        else:
-                            # Just one foreign key
-                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
                     elif dbfield:
                         s_q_lst = Q(**{"{}__in".format(infield): code_list})
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
@@ -790,9 +775,6 @@ class BasicDetails(DetailView):
     mForm = None            # Model form
     basic_name = None
     basic_name_prefix = ""
-    basic_add = ""
-    add_text = "Add a new"
-    new_button = False
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     redirectpage = ""       # Where to redirect to
@@ -976,8 +958,6 @@ class BasicDetails(DetailView):
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
-        context['topleftbuttons'] = ""
-
         # Possibly define where a listview is
         classname = self.model._meta.model_name
         if self.basic_name == None or self.basic_name == "":
@@ -991,15 +971,6 @@ class BasicDetails(DetailView):
             context['listview'] = reverse(listviewname)
         except:
             context['listview'] = reverse('home')
-
-        if self.basic_add:
-            basic_add = reverse(self.basic_add)
-        else:
-            basic_add = reverse("{}_details".format(basic_name))
-        context['basic_add'] = basic_add
-
-        context['new_button'] = self.new_button
-        context['add_text'] = self.add_text
 
         if self.is_basic:
             context['afterdelurl'] = context['listview']
@@ -1144,15 +1115,13 @@ class BasicDetails(DetailView):
                 context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
         # Possibly add to context by the calling function
-        if instance.id:
-            context = self.add_to_context(context, instance)
+        context = self.add_to_context(context, instance)
 
         # fill in the form values
         if frm and 'mainitems' in context:
             for mobj in context['mainitems']:
                 # Check for possible form field information
                 if 'field_key' in mobj: mobj['field_key'] = frm[mobj['field_key']]
-                if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
                 if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
                 if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
@@ -1214,8 +1183,7 @@ class BasicDetails(DetailView):
                 self.rtype = "json"
 
                 # Possibly add to context by the calling function
-                if instance.id:
-                    context = self.add_to_context(context, instance)
+                context = self.add_to_context(context, instance)
 
                 # No need to retern a form anymore - we have been deleting
                 return None

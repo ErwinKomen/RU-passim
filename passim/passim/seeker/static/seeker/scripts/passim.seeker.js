@@ -33,6 +33,11 @@ var ru = (function ($, ru) {
           },
           // super
           { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead },
+          {
+            "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.ssg_template }
+          },
 
           // gold
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
@@ -42,6 +47,7 @@ var ru = (function ($, ru) {
           { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
 
           // manu
           { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
@@ -1182,54 +1188,87 @@ var ru = (function ($, ru) {
             elA = null,
             object_id = "",
             targetid = null,
+            post_loads = [],
+            options = {},
             sHtml = "";
 
         try {
           // See if there are any post-loads to do
           $(".post-load").each(function (idx, value) {
-            var targetid = $(this),
-                data = [],
+            var targetid = $(this);
+            post_loads.push(targetid);
+            // Remove the class
+            $(targetid).removeClass("post-load");
+          });
+
+          // Now address all items from the list of post-load items
+          post_loads.forEach(function (targetid, index) {
+            var data = [],
                 lst_ta = [],
                 i = 0,
                 targeturl = $(targetid).attr("targeturl");
 
-            // Only do this on the first one
-            if (idx === 0) {
-              // Load this one with a GET action
-              $.get(targeturl, data, function (response) {
-                // Remove the class
-                $(targetid).removeClass("post-load");
+            // Load this one with a GET action
+            $.get(targeturl, data, function (response) {
+              // Remove the class
+              $(targetid).removeClass("post-load");
 
-                // Action depends on the response
-                if (response === undefined || response === null || !("status" in response)) {
-                  private_methods.errMsg("No status returned");
-                } else {
-                  switch (response.status) {
-                    case "ok":
-                      // Show the result
-                      $(targetid).html(response['html']);
-                      // Call initialisation again
-                      ru.passim.seeker.init_events(sUrlShow);
-                      // Handle type aheads
-                      if ("typeaheads" in response) {
-                        // Perform typeahead for these ones
-                        ru.passim.init_event_listeners(response.typeaheads);
-                      }
-                      break;
-                    case "error":
-                      // Show the error
-                      if ('msg' in response) {
-                        $(targetid).html(response.msg);
-                      } else {
-                        $(targetid).html("An error has occurred");
-                      }
-                      break;
-                  }
+              // Action depends on the response
+              if (response === undefined || response === null || !("status" in response)) {
+                private_methods.errMsg("No status returned");
+              } else {
+                switch (response.status) {
+                  case "ok":
+                    // Show the result
+                    $(targetid).html(response['html']);
+                    // Call initialisation again
+                    ru.passim.seeker.init_events(sUrlShow);
+                    // Handle type aheads
+                    if ("typeaheads" in response) {
+                      // Perform typeahead for these ones
+                      ru.passim.init_event_listeners(response.typeaheads);
+                    }
+                    break;
+                  case "error":
+                    // Show the error
+                    if ('msg' in response) {
+                      $(targetid).html(response.msg);
+                    } else {
+                      $(targetid).html("An error has occurred");
+                    }
+                    break;
                 }
+              }
 
-              });
-            }
+            });
           });
+
+          //options = { "templateSelection": ru.passim.ssg_template };
+          //$(".django-select2.select2-ssg").djangoSelect2(options);
+          //$(".django-select2.select2-ssg").select2({
+          //  templateSelection: ru.passim.ssg_template
+          //});
+          //$(".django-select2.select2-ssg").on("select2:select", function (e) {
+          //  var sId = $(this).val(),
+          //      sText = "",
+          //      sHtml = "",
+          //      idx = 0,
+          //      elOption = null,
+          //      elRendered = null;
+
+          //  elRendered = $(this).parent().find(".select2-selection__rendered");
+          //  sHtml = $(elRendered).html();
+          //  idx = sHtml.indexOf("</span>");
+          //  if (idx > 0) {
+          //    idx += 7;
+          //    sText = sHtml.substring(idx);
+          //    if (sText.length > 50) {
+          //      sText = sText.substring(0, 50) + "...";
+          //      sHtml = sHtml.substring(0, idx) + sText;
+          //      $(elRendered).html(sHtml);
+          //    }
+          //  }
+          //});
 
           // NOTE: only treat the FIRST <a> within a <tr class='add-row'>
           $("tr.add-row").each(function () {
@@ -1292,6 +1331,38 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
+        }
+      },
+
+      /**
+       * unique_change
+       *    Make sure only one input box is editable
+       *
+       */
+      init_select2: function (elName) {
+        var select2_options = null,
+            i = 0,
+            elDiv = "#" + elName,
+            oRow = null;
+
+        try {
+          for (i = 0; i < lAddTableRow.length; i++) {
+            oRow = lAddTableRow[i];
+            if (oRow['table'] === elName) {
+              if ("select2_options" in oRow) {
+                select2_options = oRow['select2_options'];
+                // Remove previous .select2
+                $(elDiv).find(".select2").remove();
+                // Execute djangoSelect2()
+                $(elDiv).find(".django-select2").djangoSelect2(select2_options);
+                return true;
+              }
+            }
+          }
+          return false;
+        } catch (ex) {
+          private_methods.errMsg("init_select2", ex);
+          return false;
         }
       },
 
@@ -3156,8 +3227,9 @@ var ru = (function ($, ru) {
        *   Switch everything in the current <tr> according to the mode
        *
        */
-      gold_row_edit: function (el, mode) {
-        var elTr = null;
+      gold_row_edit: function (el, mode, option) {
+        var elTr = null,
+            elDiv = null;
 
         try {
           // Get to the <tr>
@@ -3169,6 +3241,11 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").removeClass("hidden");
               $(elTr).find(".view-mode").addClass("hidden");
               $(el).closest("td").addClass("hightlighted");
+              if (option !== undefined && option === "select2") {
+                elDiv = $(el).closest("div[id]");
+
+                ru.passim.seeker.init_select2($(elDiv).attr("id"));
+              }
               break;
             case "view":
               $(el).closest("td").removeClass("hightlighted");
@@ -3281,6 +3358,46 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * elevate_confirm
+       *   Open the next <tr> to get delete confirmation (or not)
+       *
+       */
+      elevate_confirm: function (el, bNeedConfirm) {
+        var elDiv = null;
+
+        try {
+          if (bNeedConfirm === undefined) { bNeedConfirm = true; }
+          // Action depends on the need for confirmation
+          if (bNeedConfirm) {
+            // Find the [.elevate-row] to be shown
+            elDiv = $(el).closest("tr").find(".elevate-confirm").first();
+            if (elDiv.length === 0) {
+              // Try goint to the next <tr>
+              elDiv = $(el).closest("tr").next("tr.elevate-confirm");
+            }
+            $(elDiv).removeClass("hidden");
+          } else {
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("elevate_confirm", ex);
+        }
+      },
+
+      /**
+       * elevate_cancel
+       *   Hide this <tr> and cancel the delete
+       *
+       */
+      elevate_cancel: function (el) {
+        try {
+          $(el).closest("div.elevate-confirm").addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("elevate_cancel", ex);
+        }
+      },
+
+      /**
        * formset_setdel
        *   Set the delete checkbox of me
        *
@@ -3304,6 +3421,8 @@ var ru = (function ($, ru) {
         var targetid = "",
             err = "#error_location",
             errdiv = null,
+            waitclass = ".formset-wait",
+            elWaitRow = null,
             data = [],
             lHtml = [],
             i = 0,
@@ -3337,6 +3456,10 @@ var ru = (function ($, ru) {
             }
           }
 
+          // Check if there is a waiting row
+          elWaitRow = $(elStart).closest("table").find(waitclass);
+          if (elWaitRow.length > 0) { $(elWaitRow).removeClass('hidden');}
+
           // Gather the data
           frm = $(elStart).closest("form");
           data = $(frm).serializeArray();
@@ -3344,6 +3467,9 @@ var ru = (function ($, ru) {
             return (item['value'].indexOf("__counter__") < 0 && item['value'].indexOf("__prefix__") < 0);
           });
           $.post(targeturl, data, function (response) {
+            // Show we have a response
+            if (elWaitRow.length > 0) { $(elWaitRow).addClass('hidden'); }
+
             // Action depends on the response
             if (response === undefined || response === null || !("status" in response)) {
               private_methods.errMsg("No status returned");
@@ -3464,6 +3590,7 @@ var ru = (function ($, ru) {
             case "gcol_formset":
             // super
             case "scol_formset":
+            case "ssglink_formset":
             // sermo 
             case "stog_formset":
             case "sdsignformset":
@@ -3559,8 +3686,8 @@ var ru = (function ($, ru) {
                 // Update -- NOTE: THIS IS A LEFT-OVER FROM CESAR
                 ru.passim.seeker.simple_update();
                 break;
-              case "glink_formset_OLD":
-                if (deleteurl !== "") {
+              case "ssglink_formset":
+                if (deleteurl !== undefined &&  deleteurl !== "") {
                   // prepare data
                   data = $(frm).serializeArray();
                   data.push({ 'name': 'action', 'value': 'delete' });
@@ -3624,6 +3751,11 @@ var ru = (function ($, ru) {
               switch (prop) {
                 case "select2": bSelect2 = options[prop]; break;
               }
+            }
+          } else {
+            options = $(elStart).attr("options");
+            if (options !== undefined && options === "select2") {
+              bSelect2 = true;
             }
           }
           // Walk all tables

@@ -28,7 +28,6 @@ Here is an example of an EditView:
       title = "Super Sermon Gold"
       rtype = "json"   
       mainitems = []
-      is_basic = True      
 
       def add_to_context(self, context, instance):
          """Add to the existing context"""
@@ -77,7 +76,10 @@ key               meaning
 ``*type``         normally 'plain'. Alternatives: ``bold``, ``line``, ``safe``, ``safeline``
 ``*label``        the label shown in the details view for this item
 ``*value``        the value to be displayed (use ``instance`` to derive it)
-``*link``         the URL that the user can link to from this value
+``[link]``        the URL that the user can link to from this value (provided type=``bold``)
+``[title]``       the popup text displayed when hovering over
+``[multiple]``    boolean that indicates whether this field may contain multiple values
+``[align]``       the alignment of the ``<td>``
 ``[field_key]``   the name of the form field for this item
 ``[field_ta]``    the name of the typeahead form field for this item
 ``[key_ta]``      the 'key' used for typeahead (CSS class name, e.g. "author-key")
@@ -129,3 +131,72 @@ The generic details view allows specifying two additional matters:
 
 1. ``sections``: Sets of object details that are hidden by default, but appear when pressing a button
 2. ``related_objects``: listviews of objects that link with it.
+
+*Sections*
+
+As for the ``sections``: TODO explain
+
+*Related Objects*
+
+The ``related_objects`` is a list of objects. Each related object boils down to a **table** that is shown with a list of objects.
+A related object can have the following fields:
+
+================= ============================================================================
+key               meaning
+================= ============================================================================
+``*title``        a title of this table shown to the user
+``*columns``      a list of names (strings) for each of the columns to be shown
+``*rel_list``     a list of related item objects (the rows in the table to be shown)
+``*prefix``       short prefix that uniquely identifies this related object
+``[use_counter]`` boolean: True means that each line in the table must have a number
+``[editable]``    boolean: True means that add/edit/delete options are added
+================= ============================================================================
+
+Note that when ``editable`` is set to True, and the user has editing rights, several items are added.
+Each row gets an 'edit' button and a 'delete' button. The table as a whole gets an additional row that forms the 'add' button.
+The add facility makes use of a hidden empty row that is added.
+
+Each item in the ``rel_list`` is an object that can have the following fields:
+
+================= ============================================================================
+key               meaning
+================= ============================================================================
+``*value``        the HTML of what is shown in this row
+``[title]``       a popup title shown when a user hovers over this row
+``[link]``        a link (URL) to which the user is directed when pressing this row
+================= ============================================================================
+
+
+Adding a many-to-one element
+----------------------------
+
+Suppose there is a details view and an edit view for an item of type ``Library``.
+Suppose, then, that there is an item ``Book`` that links with a foreign key to Library.
+(It will have a field ``name`` for the name of the book and ``library`` linking to the ``Library``.)
+There is a many-to-one relation between Book and Library.
+How can the 'books' be added to the details view of ``Library``?
+Here are the steps:
+
+#. Forms
+
+   (#) Adapt the ``LibraryForm``: 
+   
+       * Add an element ``booklist`` to the form
+       * Initialize the `queryset` and `initial` values of ``booklist`` in method ``__init__()``
+
+   (#) Make sure to have a form ``LibraryBookForm``:
+       
+       * Make it have a field like ``newname`` where the user can add a new name
+       * Have the property `required` set to `False`
+
+#. Model: process ``Library``
+
+   (#) Add a method like ``get__book__markdown()`` that creates a HTML string to show the contents of a book.
+
+#. Views
+
+   (#) There needs to be a formset that provides a set of forms linking ``Library`` with ``Book``
+   (#) Method ``add_to_context()``: Make sure the Books are mentioned in ``context['mainitems']``
+   (#) Method ``process_formset()``: make sure the form's ``newname`` is handled properly
+   (#) Method ``after_save()``:  make sure the procedure ``adapt_m2o()`` is called correctly
+

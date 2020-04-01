@@ -304,3 +304,7 @@ ModelManifest.xml
 /passim/doc/source/conf.py
 /passim/passim/basic/migrations
 /passim/my_project.dot
+/ru-basic/basic/migrations
+/ru-basic/dist
+/ru-basic/ru_basic.egg-info
+/passim/passim/seeker/templates/seeker/super_linkset_ORG.html

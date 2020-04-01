@@ -7,6 +7,12 @@
     font-size: 13px;
 }
 
+.view-row {
+    overflow: hidden;
+    padding: 3px;
+    font-size: 14px;
+}
+
 .form-row img, .form-row input {
     vertical-align: middle;
 }
@@ -24,6 +30,10 @@ form .form-row p {
    background-color: yellow;
 }
 .form-row:hover {
+    background-color: palegoldenrod !important;
+}
+
+.view-row:hover {
     background-color: palegoldenrod !important;
 }
 

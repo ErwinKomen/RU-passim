@@ -96,6 +96,39 @@ var ru = (function ($, ru) {
       methodNotVisibleFromOutside: function () {
         return "something";
       },
+      get_template: function(sel_item, url) {
+        var $back = $('<span><span></span></span>'),
+            sText = "",
+            frm = null,
+            data = [],
+            id = "";
+
+        try {
+          // Figure out what the correct text should be
+          id = sel_item.id;
+          // Normal behaviour:
+          if (id !== undefined && id !== "") {
+            // Figure out what the correct text should be
+            data = { "id": sel_item.id };
+            url = $("#__baseurl__").attr("url_home") + url;
+            // Ask for the text
+            $.get(url, data, function (response) {
+              var short = "";
+
+              short = response.name;
+              $back.find("span").text(short);
+              return $back;
+            });
+          } else {
+            // Just showing...
+            $back.find("span").text(sel_item.text);
+          }
+
+          return $back;
+        } catch (ex) {
+          private_methods.errMsg("get_template", ex);
+        }
+      },
       errClear: function() {
         $("#" + loc_divErr).html("");
       },
@@ -1001,44 +1034,44 @@ var ru = (function ($, ru) {
        *
        */
       litref_template: function (sel_item) {
-        var $back = $('<span><span></span></span>'),
-            sText = "",
-            url = "api/litref/",
-            frm = null,
-            data = [],
-            id = "";
-
-        try {
-          // Figure out what the correct text should be
-          id = sel_item.id;
-          // Normal behaviour:
-          if (id !== undefined && id !== "") {
-            // Figure out what the correct text should be
-            // frm = $("#__form__").find("form").first();
-            // data = $(frm).serializeArray();
-            // data.push({ "name": "id", "value": sel_item.id });
-            // data.append('id', sel_item.id);
-            data = { "id": sel_item.id };
-            url = $("#__baseurl__").attr("url_home") + url;
-            // Ask for the text
-            $.get(url, data, function (response) {
-              var short = "";
-
-              short = response.name;
-              $back.find("span").text(short);
-              return $back;
-            });
-          } else {
-            // Just showing...
-            $back.find("span").text(sel_item.text);
-          }
-
-          return $back;
-        } catch (ex) {
-          private_methods.errMsg("litref_template", ex);
-        }
+        return private_methods.get_template(sel_item, "api/litref/");
       },
 
+      /**
+       * sg_template
+       *    Construct the template for a Sermon Gold
+       *
+       */
+      sg_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/sg/");
+      },
+
+      /**
+       * sglink_template
+       *    Construct the template for a *link* to a Sermon Gold
+       *
+       */
+      sglink_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/sglink/");
+      },
+
+      /**
+       * ssg_template
+       *    Construct the template for a Super Sermon Gold
+       *
+       */
+      ssg_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/ssg/");
+      },
+
+      /**
+       * sigs_template
+       *    Construct the template for a Sermon Gold
+       *
+       */
+      sigs_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/sermosig/");
+      },
 
       /**
        *  tt_country

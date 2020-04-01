@@ -46,27 +46,6 @@
               {% include 'seeker/sermon_edit.html' %}
             </div>
 
-            <!-- Show information of Gold-Sermon-linked authors-->
-            <div>
-              <table class="func-view">
-                <tbody>
-                  <tr class="form-row">
-                    <td>Author[s] (SermonGold)</td>
-                    <td>
-                      {% if goldauthors|length == 0 %}
-                        <span>(none)</span>
-                      {% else %}
-                        {% for author in goldauthors %}
-                          <span>{{author.name}}</span>
-                        {% endfor %}
-                      {% endif %}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-
             <!-- Post-fetched information -->
             <div class="row">
               <!-- A button to show/hide the table of literature -->
