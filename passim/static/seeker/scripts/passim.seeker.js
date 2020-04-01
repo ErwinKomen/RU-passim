@@ -31,25 +31,33 @@ var ru = (function ($, ru) {
           { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
             "select2_options": { "templateSelection": ru.passim.litref_template }
           },
+          // super
+          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+
+          // gold
           { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "skw_formset", "prefix": "skw", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+
+          // manu
+          { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "mcol_formset", "prefix": "mcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
+                    
+          // sermon
           { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sdsign_formset", "prefix": "sdsign", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sdkw_formset", "prefix": "sdkw", "counter": false, "events": ru.passim.init_typeahead },
+          { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
 
@@ -3447,18 +3455,25 @@ var ru = (function ($, ru) {
           frm = $(this).closest("form");
           // The validation action depends on this id
           switch (sId) {
+            // gold
             case "glink_formset":
             case "gedi_formset":
             case "gftxt_formset":
             case "gsign_formset":
             case "gkw_formset":
             case "gcol_formset":
-            case "mcol_formset":
+            // super
             case "scol_formset":
+            // sermo 
+            case "stog_formset":
+            case "sdsignformset":
             case "sdcol_formset":
+            case "sdkw_formset":
+            // manu
             case "mprov_formset":
             case "mdr_formset":
             case "mkw_formset":
+            case "mcol_formset":
             case "manu_search":
               //// Indicate that deep evaluation is needed
               //if (!confirm("Do you really want to remove this gold sermon? (All links to and from this gold sermon will also be removed)")) {
