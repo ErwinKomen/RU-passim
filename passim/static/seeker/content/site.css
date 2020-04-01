@@ -1067,7 +1067,7 @@ table.compact-table td:hover {
   padding: 5px;
 }
 
-.error {
+.error, .err-msg {
     background-color: lightgoldenrodyellow;
     color: darkred;
     font-family: monospace;
@@ -1118,6 +1118,22 @@ table.compact-table td:hover {
 .keyword:hover {
     color: whitesmoke;
     background-color: darkblue;
+    cursor: pointer;
+}
+
+.collection {
+    color: darkgreen;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.collection:hover {
+    color: whitesmoke;
+    background-color: darkgreen;
     cursor: pointer;
 }
 
