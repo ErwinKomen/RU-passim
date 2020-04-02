@@ -88,39 +88,8 @@ bDebug = False
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
 # FILTER SPECIFICATIONS
-SERMON_SEARCH_FILTERS = [
-        {"name": "Author",          "id": "filter_author",      "enabled": False},
-        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
-        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-        {"name": "Title",           "id": "filter_title",       "enabled": False},
-        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
-        {"name": "Feast",           "id": "filter_feast",       "enabled": False},
-        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
-        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection",      "id": "filter_collection",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection super","id": "filter_collection_super",  "enabled": False, "head_id": "filter_manuscript"},
-        ]
-GOLD_SEARCH_FILTERS = [
-        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
-        {"name": "Author",          "id": "filter_author",      "enabled": False},
-        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
-        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-        {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-        {"name": "Collection super","id": "filter_collection_super", "enabled": False},
-        ]   
+SERMON_SEARCH_FILTERS = SermonListView.filters
+GOLD_SEARCH_FILTERS = SermonGoldListView.filters
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -932,27 +901,8 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-def search_sermon(filters, qd):
-    """Create a queryset to search for a sermon"""
-    # Wijkt af van dat wat bij SermonListView te zien is. Dat aanpassen? Eerst maar def search_manu doen?
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
-            ]},
-        {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
-            ]}
-         ]
+def search_generic(filters, searches, cls, form, qd):
+    """Generic queryset generation for searching"""
 
     qs = None
     oErr = ErrHandle()
@@ -965,80 +915,7 @@ def search_sermon(filters, qd):
             # Get the formset from the input
             lstQ = []
 
-            sermoForm = SermonForm(qd, prefix='sermo')
-
-            if sermoForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = sermoForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = SermonDescr.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = SermonDescr.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = SermonDescr.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = SermonDescr.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_sermon")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-
-def search_manu(filters, qd):
-    """Create a queryset to search for a manuscript"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'manuid',           'dbfield': 'idno',                                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',          'fkfield': 'library__lcountry',                      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',             'fkfield': 'library__lcity',                         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',          'fkfield': 'library',                                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',          'fkfield': 'keywords',                               'keyS': 'keyword',       'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
-            {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
-            ]},
-        {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            ]},
-        {'section': 'other', 'filterlist': [
-            {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
-            ]}
-         ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            manuForm = ManuscriptForm(qd, prefix='manu')
+            manuForm = form(qd, prefix='manu')
 
             if manuForm.is_valid():
 
@@ -1051,152 +928,27 @@ def search_manu(filters, qd):
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # No filter: Just show everything
-                    qs = Manuscript.objects.all()
+                    qs = cls.objects.all()
                 else:
                     # There is a filter: apply it
-                    qs = Manuscript.objects.filter(*lstQ).distinct()
+                    qs = cls.objects.filter(*lstQ).distinct()
                     bFilter = True
             else:
                 # TODO: communicate the error to the user???
 
                 # Just show everything
-                qs = Manuscript.objects.all().distinct()
+                qs = cls.objects.all().distinct()
 
         else:
             # Just show everything
-            qs = Manuscript.objects.all().distinct()
+            qs = cls.objects.all().distinct()
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("search_manu")
+        oErr.DoError("search_generic")
         qs = None
         bFilter = False
     # Return the resulting filtered and sorted queryset
     return filters, bFilter, qs, qd
-
-def search_gold(filters, qd):
-    """Create a queryset to search for a gold sermon"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            goldForm = SermonGoldForm(qd, prefix='gold')
-
-            if goldForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = goldForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = SermonGold.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = SermonGold.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = SermonGold.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = SermonGold.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_gold")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-def search_super(filters, qd):
-    """Create a queryset to search for a sermon"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
-            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'collection_manu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            superForm = SuperSermonGoldForm(qd, prefix='sermo')
-
-            if sermoForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = superForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = EqualGold.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = EqualGold.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = EqualGold.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = EqualGold.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_super")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-
 
 def search_collection(request):
     """Search for a collection"""
@@ -6156,66 +5908,6 @@ class SermonListView(BasicList):
         return sBack, sTitle
 
 
-class BasketView(SermonListView):
-    """Like SermonListView, but then with the basket set true"""
-    basketview = True
-
-
-class BasketUpdate(BasicPart):
-    """Update contents of the sermondescr basket"""
-
-    MainModel = SermonDescr
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
-
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini =  search_sermon(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
- 
-
 class KeywordEdit(BasicDetails):
     """The details of one keyword"""
 
@@ -7184,9 +6876,6 @@ class ManuscriptListView(BasicList):
     has_select2 = True
     paginate_by = 20
     bUseFilter = True
-    # template_name = 'seeker/manuscript_list.html'
-    basketview = False
-    page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
     order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
@@ -7261,7 +6950,7 @@ class ManuscriptListView(BasicList):
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            qs = profile.basketitems_manu.all()
         else:
             qs = Manuscript.objects.all()
         return qs
@@ -7533,11 +7222,8 @@ class SermonGoldListView(BasicList):
     sg_name = "Gold sermon"
     new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
-    # template_name = 'seeker/sermongold.html'
-    basketview = False
     has_select2 = True
     paginate_by = 20
-    page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
@@ -7547,20 +7233,6 @@ class SermonGoldListView(BasicList):
                    {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
-
-    # ORIGINAL
-    filters = SERMON_SEARCH_FILTERS
-    # TH replacement
-    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",       "enabled": False},
-                {"name": "Author",          "id": "filter_author",           "enabled": False},
-                {"name": "Incipit",         "id": "filter_incipit",          "enabled": False},
-                {"name": "Explicit",        "id": "filter_explicit",         "enabled": False},
-                {"name": "Keyword",         "id": "filter_keyword",          "enabled": False}, 
-                {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-                {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-                {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-                {"name": "Collection super","id": "filter_collection_super", "enabled": False},]
-    # EK new
     filters = [
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False},
         {"name": "Passim code",     "id": "filter_code",        "enabled": False},
@@ -7574,23 +7246,6 @@ class SermonGoldListView(BasicList):
         {"name": "Sermon Gold",     "id": "filter_collgold",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Super sermon gold","id": "filter_collsuper",  "enabled": False, "head_id": "filter_collection"},
         ]       
-    
-    # EK: This one is superseded by the next one
-    searches_ACHTERHAALD = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    # EK: This is the most up to date version of [searches] for SermonGoldListview
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
@@ -7606,22 +7261,21 @@ class SermonGoldListView(BasicList):
             {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' } 
             ]}
         ]
-
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
     def add_to_context(self, context, initial):
         # Find out who the user is
         profile = Profile.get_user_profile(self.request.user.username)
-        context['basketsize'] = 0 if profile == None else profile.basketsize
+        context['basketsize'] = 0 if profile == None else profile.basketsize_gold
         context['basket_show'] = reverse('basket_show_gold')
         context['basket_update'] = reverse('basket_update_gold')
         return context
 
-
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            # TODO: chck the below -- is that SG??
+            qs = profile.basketitems_gold.all()
         else:
             qs = SermonGold.objects.all()
         return qs
@@ -8796,8 +8450,6 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    basketview = False
-    page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['code', 'author', 'number', '', 'srchincipit', '' ]
     order_default= order_cols
     order_heads = [
@@ -8847,7 +8499,7 @@ class EqualGoldListView(BasicList):
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            qs = profile.basketitems_super.all()
         else:
             qs = EqualGold.objects.all()
         return qs
@@ -9905,6 +9557,11 @@ class LitRefListView(ListView):
         return qs
 
 
+class BasketView(SermonListView):
+    """Like SermonListView, but then with the basket set true"""
+    basketview = True
+
+
 class BasketViewManu(ManuscriptListView):
     """Like ManuscriptListView, but then with the basket set true"""
     basketview = True
@@ -9920,167 +9577,132 @@ class BasketViewSuper(EqualGoldListView):
     basketview = True
 
 
-class BasketUpdateManu(BasicPart):
+class BasketUpdate(BasicPart):
+    """Update contents of the sermondescr basket"""
+
+    MainModel = SermonDescr
+    clsBasket = Basket
+    template_name = "seeker/basket_buttons.html"
+    entrycount = 0
+    bFilter = False
+    s_view = SermonListView
+    s_form = SermonForm
+    s_field = "sermon"
+
+    def add_to_context(self, context):
+        # Get the operation
+        if 'operation' in self.qd:
+            operation = self.qd['operation']
+        else:
+            return context
+
+        # Get our profile
+        profile = Profile.get_user_profile(self.request.user.username)
+        if profile != None:
+
+            # Get the queryset
+            self.filters, self.bFilter, qs, ini =  search_generic(self.s_view.filters, self.s_view.searches, self.MainModel, self.s_form, self.qd)
+
+            lstQ = []
+            lstQ.append(Q(profile=profile))
+            lstQ.append("")
+
+            # Action depends on the operation specified
+            if operation == "create":
+                # Remove anything there
+                clsBasket.objects.filter(profile=profile).delete()
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        # Basket.objects.create(profile=profile, sermon=item)
+
+                        # s_q = Q(**{"{}__id".format(fkfield): val})
+                        lstQ[1] = Q(**{self.s_field: item})
+                        clsBasket.objects.create(*lstQ)
+            elif operation == "add":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        # Basket.objects.create(profile=profile, sermon=item)
+                        lstQ[1] = Q(**{self.s_field: item})
+                        clsBasket.objects.create(*lstQ)
+            elif operation == "remove":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        # Basket.objects.filter(profile=profile,sermon=item).delete()
+                        lstQ[1] = Q(**{self.s_field: item})
+                        clsBasket.objects.filter(*lstQ).delete()
+            elif operation == "reset":
+                # Remove everything from our basket
+                clsBasket.objects.filter(profile=profile).delete()
+
+            # Adapt the basket size
+            context['basketsize'] = self.get_basketsize(profile)
+
+        # Return the updated context
+        return context
+
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems.count()
+        profile.basketsize = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
+
+ 
+class BasketUpdateManu(BasketUpdate):
     """Update contents of the manuscript basket"""
 
     MainModel = Manuscript
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = MANU_SEARCH_FILTERS # TH: aan te passen, eerst dit voor MANUSCRIPT_SEARCH_FILTERS bepalen
-    bFilter = False
+    clsBasket = BasketMan 
+    s_view = ManuscriptListView
+    s_form = ManuscriptForm
+    s_field = "manu"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset # TH: serach_sermon aanpassen
-            self.filters, self.bFilter, qs, ini =  search_manu(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                BasketMan.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.create(profile=profile, manu=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.create(profile=profile, manu=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.filter(profile=profile, manu=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                BasketMan.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_manu.count()
+        profile.basketsize_manu = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
 
 
-class BasketUpdateGold(BasicPart):
+class BasketUpdateGold(BasketUpdate):
     """Update contents of the sermondescr basket"""
 
     MainModel = SermonGold
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
+    clsBasket = BasketGold
+    s_view = SermonGoldListView
+    s_form = SermonGoldForm
+    s_field = "gold"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini = search_gold(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_gold.count()
+        profile.basketsize_gold = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
     
 
-class BasketUpdateSuper(BasicPart):
+class BasketUpdateSuper(BasketUpdate):
     """Update contents of the sermondescr basket"""
 
     MainModel = EqualGold
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
+    clsBasket = BasketSuper
+    s_view = EqualGoldListView
+    s_form = EqualGoldForm
+    s_field = "super"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_super.count()
+        profile.basketsize_super = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
 
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini = search_super(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
 

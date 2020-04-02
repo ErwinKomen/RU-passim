@@ -43,7 +43,6 @@ EDI_TYPE = "seeker.editype"
 STATUS_TYPE = "seeker.stype"
 COLLECTION_TYPE = "seeker.coltype" 
 
-
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
@@ -63,7 +62,7 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
-
+        
 
 class HelpChoice(models.Model):
     """Define the URL to link to for the help-text"""
@@ -88,6 +87,7 @@ class HelpChoice(models.Model):
                 help_text = "{} ({})".format(
                     self.display_name, self.help_url)
         return help_text
+
 
 def get_current_datetime():
     """Get the current time"""
@@ -4935,6 +4935,7 @@ class Basket(models.Model):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
         return combi
 
+
 class BasketMan(models.Model):
     """The basket is the user's vault of search results (of manuscript items)"""
     
@@ -4946,6 +4947,7 @@ class BasketMan(models.Model):
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
         return combi
+
 
 class BasketGold(models.Model):
     """The basket is the user's vault of search results (of sermon gold items)"""
@@ -4959,6 +4961,7 @@ class BasketGold(models.Model):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
         return combi
 
+
 class BasketSuper(models.Model):
     """The basket is the user's vault of search results (of super sermon gold items)"""
     
@@ -4970,8 +4973,7 @@ class BasketSuper(models.Model):
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
         return combi
-
-
+    
 
 class ProvenanceMan(models.Model):
 
