@@ -308,3 +308,4 @@ ModelManifest.xml
 /ru-basic/dist
 /ru-basic/ru_basic.egg-info
 /passim/passim/seeker/templates/seeker/super_linkset_ORG.html
+/passim/passim/reader/migrations

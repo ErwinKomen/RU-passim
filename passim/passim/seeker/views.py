@@ -6076,6 +6076,46 @@ class ProjectListView(BasicList):
         return sBack, sTitle
 
 
+class CollAnyEdit(BasicDetails):
+    """Manu: Manuscript collections"""
+
+    model = Collection
+    mForm = CollectionForm
+    prefix = "any"
+    basic_name_prefix = "coll"
+    rtype = "json"
+    title = "Any collection"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
+
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.type, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             ]
+          # Return the context we have made
+          return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # The collection type is now a parameter
+            # form.instance.type = self.prefix
+        return True, ""
+
+
+class CollAnyDetails(CollAnyEdit):
+    """Like CollAnyEdit, but then with html"""
+    rtype = "html"
+
+
 class CollManuEdit(BasicDetails):
     """Manu: Manuscript collections"""
 
@@ -6237,17 +6277,15 @@ class CollectionListView(BasicList):
 
     model = Collection
     listform = CollectionForm
-    prefix = "col"
+    prefix = "any"
     paginate_by = 20
     bUseFilter = True
     basic_name_prefix = "coll"
     plural_name = ""
-    page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
     order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                    {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}
-                   #{'name': 'Sermon', 'order': '', 'type': 'str', 'main': True }
                    ]
     filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
     searches = [
@@ -6271,6 +6309,17 @@ class CollectionListView(BasicList):
         elif self.prefix == "super":
             self.plural_name = "Super sermons gold Collections"
             self.sg_name = "Super sermon gold"        
+        elif self.prefix == "any":
+            self.new_button = False
+            self.plural_name = "All types Collections"
+            self.sg_name = "Collection"  
+            self.order_cols = ['type', 'name', '']
+            self.order_default = self.order_cols
+            self.order_heads  = [
+                {'name': 'Type',        'order': 'o=2', 'type': 'str', 'field': 'type'},
+                {'name': 'Collection',  'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+            ]  
         return None
 
     def adapt_search(self, fields):
@@ -6283,7 +6332,8 @@ class CollectionListView(BasicList):
             fields['ownlist'] = qs
 
             # Also make sure that we add the collection type, which is specified in "prefix"
-            fields['type'] = self.prefix
+            if self.prefix != "any":
+                fields['type'] = self.prefix
         return fields
 
     def get_field_value(self, instance, custom):

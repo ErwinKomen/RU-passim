@@ -59,7 +59,7 @@ urlpatterns = [
 
     url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
-    url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
+    url(r'^search/collection',  CollectionListView.as_view(prefix="any"), name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
 
@@ -106,16 +106,19 @@ urlpatterns = [
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
     url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
 
+    url(r'^collection/any/list', CollectionListView.as_view(prefix="any"), name='collany_list'),
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
     url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
     url(r'^collection/gold/list', CollectionListView.as_view(prefix="gold"), name='collgold_list'),
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
 
+    url(r'^collection/any/details(?:/(?P<pk>\d+))?/$', CollAnyDetails.as_view(), name='collany_details'),
     url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
     url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
     url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
     url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
 
+    url(r'^collection/any/edit(?:/(?P<pk>\d+))?/$', CollAnyEdit.as_view(), name='collany_edit'),
     url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),
     url(r'^collection/manu/edit(?:/(?P<pk>\d+))?/$', CollManuEdit.as_view(), name='collmanu_edit'),
     url(r'^collection/gold/edit(?:/(?P<pk>\d+))?/$', CollGoldEdit.as_view(), name='collgold_edit'),
