@@ -87,10 +87,6 @@ bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
 
-# FILTER SPECIFICATIONS
-SERMON_SEARCH_FILTERS = SermonListView.filters
-GOLD_SEARCH_FILTERS = SermonGoldListView.filters
-
 def get_application_name():
     """Try to get the name of this application"""
 
@@ -901,26 +897,29 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-def search_generic(filters, searches, cls, form, qd):
+def search_generic(s_view, cls, form, qd):
     """Generic queryset generation for searching"""
 
     qs = None
     oErr = ErrHandle()
     bFilter = False
-    sermoForm = None
+    genForm = None
     try:
         bHasFormset = (len(qd) > 0)
 
         if bHasFormset:
             # Get the formset from the input
             lstQ = []
+            prefix = s_view.prefix
+            filters = s_view.filters
+            searches = s_view.searches
 
-            manuForm = form(qd, prefix='manu')
+            genForm = form(qd, prefix=prefix)
 
-            if manuForm.is_valid():
+            if genForm.is_valid():
 
                 # Process the criteria from this form 
-                oFields = manuForm.cleaned_data
+                oFields = genForm.cleaned_data
 
                 # Create the search based on the specification in searches
                 filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
@@ -3506,6 +3505,7 @@ class BasicPart(View):
     formset_objects = []    # List of formsets to be processed
     previous = None         # Return to this
     bDebug = False          # Debugging information
+    redirectpage = ""       # Where to redirect to
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
     def post(self, request, pk=None):
@@ -3523,6 +3523,7 @@ class BasicPart(View):
             context['authenticated'] = user_is_authenticated(request)
             context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
             context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -3764,6 +3765,9 @@ class BasicPart(View):
             # Allow user to add to the context
             context = self.add_to_context(context)
 
+            # First look at redirect page
+            if self.redirectpage != "":
+                self.data['redirecturl'] = self.redirectpage
             # Check if 'afternewurl' needs adding
             # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
             if 'afternewurl' in context and self.add:
@@ -9588,6 +9592,7 @@ class BasketUpdate(BasicPart):
     s_view = SermonListView
     s_form = SermonForm
     s_field = "sermon"
+    colltype = "sermo"
 
     def add_to_context(self, context):
         # Get the operation
@@ -9601,41 +9606,60 @@ class BasketUpdate(BasicPart):
         if profile != None:
 
             # Get the queryset
-            self.filters, self.bFilter, qs, ini =  search_generic(self.s_view.filters, self.s_view.searches, self.MainModel, self.s_form, self.qd)
+            self.filters, self.bFilter, qs, ini = search_generic(self.s_view, self.MainModel, self.s_form, self.qd)
 
-            lstQ = []
-            lstQ.append(Q(profile=profile))
-            lstQ.append("")
+            kwargs = {'profile': profile}
 
             # Action depends on the operation specified
             if operation == "create":
                 # Remove anything there
-                clsBasket.objects.filter(profile=profile).delete()
+                self.clsBasket.objects.filter(profile=profile).delete()
                 # Add
                 with transaction.atomic():
                     for item in qs:
-                        # Basket.objects.create(profile=profile, sermon=item)
-
-                        # s_q = Q(**{"{}__id".format(fkfield): val})
-                        lstQ[1] = Q(**{self.s_field: item})
-                        clsBasket.objects.create(*lstQ)
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.create(**kwargs)
             elif operation == "add":
                 # Add
                 with transaction.atomic():
                     for item in qs:
-                        # Basket.objects.create(profile=profile, sermon=item)
-                        lstQ[1] = Q(**{self.s_field: item})
-                        clsBasket.objects.create(*lstQ)
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.create(**kwargs)
             elif operation == "remove":
                 # Add
                 with transaction.atomic():
                     for item in qs:
-                        # Basket.objects.filter(profile=profile,sermon=item).delete()
-                        lstQ[1] = Q(**{self.s_field: item})
-                        clsBasket.objects.filter(*lstQ).delete()
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.filter(**kwargs).delete()
             elif operation == "reset":
                 # Remove everything from our basket
-                clsBasket.objects.filter(profile=profile).delete()
+                self.clsBasket.objects.filter(profile=profile).delete()
+            elif operation == "collcreate":
+                # Queryset: the basket contents
+                qs = self.clsBasket.objects.filter(profile=profile)
+
+                # Save the current basket as a collection that needs to receive a name
+                coll = Collection.objects.create(name="CreatedFromBasket", owner=profile, type=self.colltype)
+                # Link the collection with the correct model
+                kwargs = {'collection': coll}
+                if self.colltype == "sermo":
+                    clsColl = CollectionSerm
+                    field = "sermon"
+                elif self.colltype == "gold":
+                    clsColl = CollectionGold
+                    field = "gold"
+                elif self.colltype == "manu":
+                    clsColl = CollectionMan
+                    field = "manuscript"
+                elif self.colltype == "super":
+                    clsColl = CollectionSuper
+                    field = "super"
+                with transaction.atomic():
+                    for item in qs:
+                        kwargs[field] = getattr( item, self.s_field)
+                        clsColl.objects.create(**kwargs)
+                # Make sure to redirect to this instance
+                self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
 
             # Adapt the basket size
             context['basketsize'] = self.get_basketsize(profile)
@@ -9660,6 +9684,7 @@ class BasketUpdateManu(BasketUpdate):
     s_view = ManuscriptListView
     s_form = ManuscriptForm
     s_field = "manu"
+    colltype = "manu"
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -9678,6 +9703,7 @@ class BasketUpdateGold(BasketUpdate):
     s_view = SermonGoldListView
     s_form = SermonGoldForm
     s_field = "gold"
+    colltype = "gold"
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -9696,6 +9722,7 @@ class BasketUpdateSuper(BasketUpdate):
     s_view = EqualGoldListView
     s_form = EqualGoldForm
     s_field = "super"
+    colltype = "super"
 
     def get_basketsize(self, profile):
         # Adapt the basket size
