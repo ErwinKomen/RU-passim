@@ -281,7 +281,11 @@
                     <span class="input-group-btn">
                       <span class="btn btn-default btn-xs btn-file">
                         Browse...
-                        <input id="id_{{uitem.title}}-file_source" name="file_source" required="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
+                        {% if uitem.type == "multiple" %}
+                          <input id="id_{{uitem.title}}-files_field" name="files_field" required="" multiple="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
+                        {% else %}
+                          <input id="id_{{uitem.title}}-file_source" name="file_source" required="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
+                        {% endif %}
                       </span>
                     </span>
                   </div>

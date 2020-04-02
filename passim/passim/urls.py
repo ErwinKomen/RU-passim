@@ -215,6 +215,7 @@ urlpatterns = [
 
     # ================ Any READER APP URLs should come here =======================================
     url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
+    url(r'^reader/import/ecodex2/$', ReaderEcodex.as_view(), name='import_ecodex2'),
     url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
     # =============================================================================================
 

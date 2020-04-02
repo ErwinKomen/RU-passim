@@ -5,7 +5,7 @@ Definition of views for the READER app.
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import login, authenticate
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.core.urlresolvers import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
@@ -55,9 +55,12 @@ from passim.basic.views import BasicList, BasicDetails
 
 # =================== This is imported by seeker/views.py ===============
 reader_uploads = [
-    {"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
-    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}
+    {"title": "ecodex",  "label": "e-codices",     "url": "import_ecodex",  "type": "multiple", "msg": "Upload e-codices XML files"},
+    {"title": "ecodex2", "label": "e-codices (n)", "url": "import_ecodex2", "type": "multiple","msg": "Upload e-codices XML files (n)"},
+    {"title": "ead",     "label": "EAD",           "url": "import_ead",     "type": "multiple","msg": "Upload 'archives et manuscripts' XML files"}
     ]
+# Global debugging 
+bDebug = False
 
 
 # =============== Helper functions ======================================
@@ -75,6 +78,24 @@ def getText(nodeStart):
             rc.append(getText(node))
     return ' '.join(rc)
 
+def user_is_ingroup(request, sGroup):
+    # Is this user part of the indicated group?
+    username = request.user.username
+    user = User.objects.filter(username=username).first()
+    # glist = user.groups.values_list('name', flat=True)
+
+    # Only look at group if the user is known
+    if user == None:
+        glist = []
+    else:
+        glist = [x.name for x in user.groups.all()]
+
+        # Only needed for debugging
+        if bDebug:
+            ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+    # Evaluate the list
+    bIsInGroup = (sGroup in glist)
+    return bIsInGroup
 
 def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
     """Import an XML from e-codices with manuscript data and add it to the DB
@@ -862,3 +883,267 @@ def import_ecodex(request):
     # Return the information
     return JsonResponse(data)
 
+
+class ReaderImport(View):
+    # Initialisations
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'reader/import_manuscripts.html'
+    obj = None
+    data_file = ""
+    bClean = False
+    import_type = "undefined"
+    sourceinfo_url = "undefined"
+    mForm = UploadFilesForm
+    
+    def post(self, request, pk=None):
+        # A POST request means we are trying to SAVE something
+        self.initializations(request, pk)
+
+        # Explicitly set the status to OK
+        self.data['status'] = "ok"
+
+        username = request.user.username
+
+        if self.checkAuthentication(request):
+            # Remove previous status object for this user
+            Status.objects.filter(user=username).delete()
+            # Create a status object
+            oStatus = Status(user=username, type=self.import_type, status="preparing")
+            oStatus.save()
+
+            form = self.mForm(request.POST, request.FILES)
+            lResults = []
+            if form.is_valid():
+                # NOTE: from here a breakpoint may be inserted!
+                print('import_{}: valid form'.format(self.import_type))
+                oErr = ErrHandle()
+                try:
+                    # The list of headers to be shown
+                    lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
+
+                    # Create a SourceInfo object for this extraction
+                    source = SourceInfo(url=self.sourceinfo_url, collector=username)
+                    source.save()
+
+                    # Process the request
+                    bOkay, code = self.process_files(request, lResults)
+
+                    if bOkay:
+                        # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
+                        source.code = code
+                        source.save()
+                        # Indicate we are ready
+                        oStatus.set("ready")
+                        # Get a list of errors
+                        error_list = [str(item) for item in arErr]
+
+                        # Create the context
+                        context = dict(
+                            statuscode=statuscode,
+                            results=lResults,
+                            error_list=error_list
+                            )
+                    else:
+                        arErr.append(code)
+
+                    if len(arErr) == 0:
+                        # Get the HTML response
+                        self.data['html'] = render_to_string(template_name, context, request)
+                    else:
+                        lHtml = []
+                        for item in arErr:
+                            lHtml.append(item)
+                        self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+                except:
+                    msg = oErr.get_error_message()
+                    oErr.DoError("import_{}".format(self.import_type))
+                    self.data['html'] = msg
+                    self.data['status'] = "error"
+
+            else:
+                self.data['html'] = 'invalid form: {}'.format(form.errors)
+                self.data['status'] = "error"
+        
+            # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+
+    def initializations(self, request, object_id):
+        # Clear errors
+        self.arErr = []
+        # COpy the request
+        self.request = request
+
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+        # ALWAYS: perform some custom initialisations
+        self.custom_init()
+
+    def custom_init(self):
+        pass    
+
+    def checkAuthentication(self,request):
+        # first check for authentication
+        if not request.user.is_authenticated:
+            # Provide error message
+            self.data['html'] = "Please log in to work on this project"
+            return False
+        elif not user_is_ingroup(request, 'passim_uploader'):
+            # Provide error message
+            self.data['html'] = "Sorry, you do not have the rights to upload anything"
+            return False
+        else:
+            return True
+
+    def add_manu(self, lst_manual, lst_read, status="", msg="", user="", name="", url="", yearstart="", yearfinish="",
+                    library="", idno="", filename=""):
+        oInfo = {}
+        oInfo['status'] = status
+        oInfo['msg'] = msg
+        oInfo['user'] = user
+        oInfo['name'] = name
+        oInfo['url'] = url
+        oInfo['yearstart'] = yearstart
+        oInfo['yearfinish'] = yearfinish
+        oInfo['library'] = library
+        oInfo['idno'] = idno
+        oInfo['filename'] = filename
+        if status == "error":
+            lst_manual.append(oInfo)
+        else:
+            lst_read.append(oInfo)
+        return True
+
+    def process_files(self, request, lResults):
+        bOkay = True
+        code = ""
+        return bOkay, code
+
+
+class ReaderEcodex(ReaderImport):
+    """Specific parameters for importing ECODEX"""
+
+    import_type = "ecodex"
+    sourceinfo_url = "http://e-codices.unifr.ch"
+
+    def process_files(self, request, lResults):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        try:
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = read_ecodex(username, data_file, filename, arErr, source=source)
+
+                            if oResult == None or oResult['status'] == "error":
+                                # Process results
+                                add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                                filename=oResult['filename'])
+                            else:
+                                # Get the results from oResult
+                                obj = oResult['obj']
+                                # Process results
+                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                name=oResult['name'], yearstart=obj.yearstart,
+                                                yearfinish=obj.yearfinish,library=obj.library.name,
+                                                idno=obj.idno,filename=oResult['filename'])
+
+                        elif extension == "txt":
+                            # Set the status
+                            oStatus.set("reading list", msg="file={}".format(filename))
+                            # (1) Read the TXT file
+                            lines = []
+                            bFirst = True
+                            for line in data_file:
+                                # Get a good view of the line
+                                sLine = line.decode("utf-8").strip()
+                                if bFirst:
+                                    if "\ufeff" in sLine:
+                                        sLine = sLine.replace("\ufeff", "")
+                                    bFirst = False
+                                lines.append(sLine)
+                            # (2) Walk through the list of XML file names
+                            for idx, xml_url in enumerate(lines):
+                                xml_url = xml_url.strip()
+                                if xml_url != "" and ".xml" in xml_url:
+                                    # Set the status
+                                    oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
+                                    # (3) Download the file from the internet and save it 
+                                    bOkay, sResult = download_file(xml_url)
+                                    if bOkay:
+                                        # We have the filename
+                                        xml_file = sResult
+                                        name = xml_url.split("/")[-1]
+                                        # (4) Read the e-codex manuscript
+                                        oResult = read_ecodex(username, xml_file, name, arErr, source=source)
+                                        # (5) Check before continuing
+                                        if oResult == None or oResult['status'] == "error":
+                                            msg = "unknown"  
+                                            if 'msg' in oResult: 
+                                                msg = oResult['msg']
+                                            elif 'status' in oResult:
+                                                msg = oResult['status']
+                                            arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
+                                            # Process results
+                                            add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                                            filename=oResult['filename'])
+                                        else:
+                                            # Get the results from oResult
+                                            obj = oResult['obj']
+                                            # Process results
+                                            add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                            name=oResult['name'], yearstart=obj.yearstart,
+                                                            yearfinish=obj.yearfinish,library=obj.library.name,
+                                                            idno=obj.idno,filename=oResult['filename'])
+
+                                    else:
+                                        aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "iecod", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+            code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+        return bOkay, code
