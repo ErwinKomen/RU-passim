@@ -10,7 +10,9 @@ import django.contrib.auth.views
 
 import passim.seeker.forms
 import passim.seeker.views
+import passim.reader.views
 from passim.seeker.views import *
+from passim.reader.views import *
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -200,10 +202,9 @@ urlpatterns = [
     url(r'^api/manuidnos/$', passim.seeker.views.get_manuidnos, name='api_manuidnos'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
-    url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
-    url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    # url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
+    #url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
+    #url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 
@@ -211,6 +212,11 @@ urlpatterns = [
     
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
+
+    # ================ Any READER APP URLs should come here =======================================
+    url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
+    url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
+    # =============================================================================================
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),

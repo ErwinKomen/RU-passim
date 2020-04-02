@@ -72,6 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT
+from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails
@@ -1797,73 +1798,6 @@ def do_ssgmigrate(request):
         oErr.DoError("ssgmigrate")
         return reverse('home')
 
-
-#def do_import_editions(request):
-#    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
-
-#    # Use double for-loop:
-#    last_old_edi = ""
-#    last_litref = None
-#    count = 0
-#    oErr = ErrHandle()
-#    template_name = 'tools.html'
-#    result_list = []
-#    context = {'status': 'ok', 'tools_part': 'import_edition'}
-#    try:
-#        for edi in Edition.objects.all().order_by('name'):
-#            edi.update = "NIETGEDAAN"
-#            edi.save()
-
-#            # DEBUG
-#            if edi.id == 1253:
-#                iStop = 1
-
-#            # Split the old editions into old_edi and pages
-#            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
-#            if old_edi != None and old_edi != "":
-#                litref = None
-#                if old_edi != last_old_edi:
-#                    # Compare the old editions with the new editions ("short"), using short without the year
-#                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
-#                        if old_edi == get_short_edit(litreftmp.short):
-#                            litref = litreftmp
-#                            last_litref = litreftmp
-#                            break
-#                else:
-#                    litref = last_litref
-#                # Continue...
-#                if litref != None:
-#                    # We can process him!
-#                    gold_obj = edi.gold
-#                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
-#                    if esg == None:
-#                        # Create EdirefSG record
-#                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
-#                    # Double check pages and add to new EdirefSG record
-#                    if pages != None:
-#                        esg.pages = pages
-#                        esg.save()
-#                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
-#                    count += 1
-#                    if status == "ok":
-#                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
-#                    else:
-#                        edi.update = "PAGES: " + status
-#                    edi.save()
-#                    # Show it in the result list
-#                    result_list.append({'part': count, 'result': edi.name})
-#            #else: # Hier moet het nog anders. 
-#        # All edition objects have been reviewed
-#        context['result_list'] = result_list
-#    except:
-#        sMsg = oErr.get_error_message()
-#        oErr.DoError("do_import_editions")
-#        context['status'] = "error"
-#        context['message'] = sMsg
-
-#    # Render and return the page
-#    return render(request, template_name, context)
-
 def get_old_edi(edi):
     """Split pages and year from edition, keep stripped edition and the pages
     The number of matches increase when the year in the name of the edition
@@ -2124,6 +2058,7 @@ def do_create_pdf_manu(request):
     # And return the pdf
     return response
 
+# ============== NOTE: superseded by the READER app ===================
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
 
@@ -2427,6 +2362,87 @@ def import_ecodex(request):
     # Return the information
     return JsonResponse(data)
 
+def search_ecodex(request):
+    arErr = []
+    error_list = []
+    data = {'status': 'ok', 'html': ''}
+    username = request.user.username
+    errHandle = ErrHandle()
+
+    # Check if the user is authenticated and if it is POST
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
+        # Create a regular expression
+        r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
+        # Get the parameters
+        if request.POST:
+            qd = request.POST
+        else:
+            qd = request.GET
+        if 'search_url' in qd:
+            # Get the parameter
+            s_url = qd['search_url']
+            # Make a search request and get the result into a string
+            try:
+                r = requests.get(s_url)
+            except:
+                sMsg = errHandle.get_error_message()
+                errHandle.DoError("Request problem")
+                return False
+            if r.status_code == 200:
+                # Get the text into a list
+                l_text = r.text.split('\n')
+                lHtml = []
+                iMatches = 0
+                lHtml.append("<table><thead><tr><th>#</th><th>Part</th><th>Text</th><th>Version</th><th>XML</th></tr></thead>")
+                lHtml.append("<tbody>")
+                # Walk the text
+                for line in l_text:
+                    # Check if this line contains information
+                    if ">Description<" in line:
+                        # Extract the information from this line
+                        match = r_href.search(line)
+                        if match:
+                            iMatches += 1
+                            # Get the HREF 
+                            href = match.group(2)
+                            # Split into parts
+                            parts = href.split("/")
+                            # Find the 'description' part
+                            for idx,part in enumerate(parts):
+                                if part == "description":
+                                    # Take array from one further
+                                    idx += 1
+                                    mparts = parts[idx:]
+                                    break
+                            # Reconstruct:
+                            xml_name = "{}-{}".format(mparts[0], mparts[1])
+                            version = ""
+                            if len(mparts) > 2 and mparts[2] != "":
+                                xml_name = "{}_{}".format(xml_name, mparts[2])
+                                version = mparts[2]
+                            xml_url = "{}/{}.xml".format("https://www.e-codices.unifr.ch/xml/tei_published", xml_name)
+
+                            # Add to the HTML table
+                            lHtml.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(iMatches,mparts[0], mparts[1],version,xml_url))
+                # We had all lines, now we need to return it in a good way
+                lHtml.append("</tbody></table>")
+                data['html'] = "\n".join(lHtml)
+                data['status'] = "ok"
+            else:
+                data['html'] = "Website returns status code {}".format(r.status_code)
+                data['status'] = "error"
+        else:
+            data['html'] = "Did not receive parameter search_url"
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
+# ============== NOTE: end of READER app superseded material ==========
+
 def import_gold(request):
     """Import one or more Excel files that each contain one Gold-Sermon definition in Excel"""
 
@@ -2594,85 +2610,6 @@ def download_file(url):
         sResult = "download_file received status {} for {}".format(r.status_code, url)
     # Return the result
     return bResult, sResult
-
-def search_ecodex(request):
-    arErr = []
-    error_list = []
-    data = {'status': 'ok', 'html': ''}
-    username = request.user.username
-    errHandle = ErrHandle()
-
-    # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
-        # Create a regular expression
-        r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
-        # Get the parameters
-        if request.POST:
-            qd = request.POST
-        else:
-            qd = request.GET
-        if 'search_url' in qd:
-            # Get the parameter
-            s_url = qd['search_url']
-            # Make a search request and get the result into a string
-            try:
-                r = requests.get(s_url)
-            except:
-                sMsg = errHandle.get_error_message()
-                errHandle.DoError("Request problem")
-                return False
-            if r.status_code == 200:
-                # Get the text into a list
-                l_text = r.text.split('\n')
-                lHtml = []
-                iMatches = 0
-                lHtml.append("<table><thead><tr><th>#</th><th>Part</th><th>Text</th><th>Version</th><th>XML</th></tr></thead>")
-                lHtml.append("<tbody>")
-                # Walk the text
-                for line in l_text:
-                    # Check if this line contains information
-                    if ">Description<" in line:
-                        # Extract the information from this line
-                        match = r_href.search(line)
-                        if match:
-                            iMatches += 1
-                            # Get the HREF 
-                            href = match.group(2)
-                            # Split into parts
-                            parts = href.split("/")
-                            # Find the 'description' part
-                            for idx,part in enumerate(parts):
-                                if part == "description":
-                                    # Take array from one further
-                                    idx += 1
-                                    mparts = parts[idx:]
-                                    break
-                            # Reconstruct:
-                            xml_name = "{}-{}".format(mparts[0], mparts[1])
-                            version = ""
-                            if len(mparts) > 2 and mparts[2] != "":
-                                xml_name = "{}_{}".format(xml_name, mparts[2])
-                                version = mparts[2]
-                            xml_url = "{}/{}.xml".format("https://www.e-codices.unifr.ch/xml/tei_published", xml_name)
-
-                            # Add to the HTML table
-                            lHtml.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(iMatches,mparts[0], mparts[1],version,xml_url))
-                # We had all lines, now we need to return it in a good way
-                lHtml.append("</tbody></table>")
-                data['html'] = "\n".join(lHtml)
-                data['status'] = "ok"
-            else:
-                data['html'] = "Website returns status code {}".format(r.status_code)
-                data['status'] = "error"
-        else:
-            data['html'] = "Did not receive parameter search_url"
-            data['status'] = "error"
-    else:
-        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
-        data['status'] = "error"
- 
-    # Return the information
-    return JsonResponse(data)
 
 @csrf_exempt
 def get_countries(request):
@@ -6982,8 +6919,9 @@ class ManuscriptListView(BasicList):
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
-    uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
-               {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    #uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
+    #           {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    uploads = reader_uploads
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def add_to_context(self, context, initial):
