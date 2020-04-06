@@ -5,7 +5,7 @@
   {% csrf_token %}
     <table class="library-details">
       <!-- Row to indicate editing, if possible -->
-      {% if is_passim_editor %}
+      {% if is_app_editor %}
         <tr>
           <td colspan="2"  class="ms editable table">
             <!-- Provide the necessary buttons: edit, cancel and save -->
@@ -41,7 +41,7 @@
         <td class="hoverable" valign="top"  style="min-width: 150px;">Name</td>
         <td  style="width: 100%;">
           <div class="view-mode">{{libForm.name.value}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{libForm.name}}</div>
           {% endif %}
         </td>
@@ -52,7 +52,7 @@
         <td class="hoverable" valign="top" >Library type</td>
         <td>
           <div class="view-mode">{{libForm.instance.get_libtype_display}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{libForm.libtype}}</div>
           {% endif %}
         </td>
@@ -63,7 +63,7 @@
         <td class="hoverable" valign="top" >CNRS library id</td>
         <td>
           <div class="view-mode">{{libForm.idLibrEtab.value}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{libForm.idLibrEtab}}</div>
           {% endif %}
         </td>

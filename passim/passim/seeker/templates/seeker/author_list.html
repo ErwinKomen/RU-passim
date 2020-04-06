@@ -37,7 +37,7 @@
               </ul>
             </div>
             <div class="col-md-1 text-right">
-              {% if is_passim_uploader %}
+              {% if is_app_uploader %}
                 <span><a title="upload authors" 
                    class="btn btn-success btn-xs" 
                    targetid="import_main"
@@ -147,7 +147,7 @@
         </form>
 
         <!-- Allow importing authors from Excel -->
-        {% if is_passim_uploader %}
+        {% if is_app_uploader %}
           <div id="import_main" class="row hidden container">
             <form action="{% url 'import_authors' %}" method="POST" enctype="multipart/form-data">
               {% csrf_token %}
@@ -185,7 +185,7 @@
 
             <h3>
               <span>Authors</span>
-              {% if is_passim_editor %}
+              {% if is_app_editor %}
                 <span id="add_author" class="pull-right">
                     {% csrf_token %}
                     <a class="btn btn-xs jumbo-3" role="button" 
@@ -247,7 +247,7 @@
                         <td style="width: 100%;" class="ms editable">
                           <span class="author-name clickable"><a href="{% url 'author_details' author.id %}" class="nostyle">{{author.name}}</a></span>
                           <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-                          {% if is_passim_editor %}
+                          {% if is_app_editor %}
                             <div class="delete-confirm hidden selected">
                               <form>
                                 {% csrf_token %}
@@ -291,7 +291,7 @@
 
                         <!-- Short indications for this author-->
                         <td style="min-width: 80px;" >
-                          {% if is_passim_editor %}
+                          {% if is_app_editor %}
                             <!-- Put the delete button completely to the right-->
                             <a mode="skip" class="view-mode btn btn-xs jumbo-1 pull-right"
                                onclick="ru.passim.seeker.delete_confirm(this);">

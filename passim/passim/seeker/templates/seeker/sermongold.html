@@ -30,7 +30,7 @@
                 </a>
 
                 <!-- Allow uploading sermongold Excel files -->
-                {% if is_passim_uploader %}
+                {% if is_app_uploader %}
                   <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_upload_goldexcel" 
                      role="button" title="Upload Excel files" >
                     <span class="glyphicon glyphicon-upload"></span>
@@ -189,7 +189,7 @@
 
         </form>
 
-        {% if is_passim_uploader %}
+        {% if is_app_uploader %}
           <!-- Upload tab for SermonGold Excel files -->
           <div class="inert collapse" id="tab_upload_goldexcel">
             <div id="import_gold" class="row container">
@@ -239,7 +239,7 @@
             <!-- <form> -->
               <h3>
                 <span>Gold sermons</span>
-                {% if is_passim_editor %}
+                {% if is_app_editor %}
                   <span id="add_sermongold" class="pull-right">
                       {% csrf_token %}
                       <a class="btn btn-xs jumbo-3" role="button" 

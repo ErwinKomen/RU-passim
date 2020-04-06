@@ -624,8 +624,8 @@ def home(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-    context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -654,7 +654,7 @@ def contact(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Contact", True)
@@ -668,7 +668,7 @@ def more(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "More", True)
@@ -682,7 +682,7 @@ def technical(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
@@ -696,7 +696,7 @@ def bibliography(request):
                 'year':datetime.now().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Add the edition references (abreviated and full)
 
@@ -758,7 +758,7 @@ def about(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "About", True)
@@ -773,7 +773,7 @@ def short(request):
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
                'year': get_current_datetime().year}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request, template, context)
 
 def nlogin(request):
@@ -782,7 +782,7 @@ def nlogin(request):
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
                     'year':get_current_datetime().year,}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
 
 def sync_entry(request):
@@ -967,7 +967,7 @@ def search_collection(request):
     context = dict(title="Search collection",
                    authenticated=authenticated,
                    searchForm=searchForm)
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Create and show the result
     return render(request, template_name, context)
@@ -1081,11 +1081,11 @@ def do_stype(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair Stype definitions"
@@ -1148,11 +1148,11 @@ def do_locations(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Establish location definitions"
@@ -1273,11 +1273,11 @@ def do_provenance(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Tweak Manuscript-Provenance connections"
@@ -1330,11 +1330,11 @@ def do_daterange(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Update from Manuscript to Daterange table"
@@ -1382,11 +1382,11 @@ def do_mext(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Copy Manuscript links to externals"
@@ -1436,11 +1436,11 @@ def do_goldsearch(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Re-create Gold sermon searching (incipit/explicit)"
@@ -1488,11 +1488,11 @@ def do_sermons(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair manuscript-sermons"
@@ -1581,11 +1581,11 @@ def do_goldtogold(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair gold-to-gold links"
@@ -1728,11 +1728,11 @@ def do_ssgmigrate(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Migrate SSG"
@@ -2082,7 +2082,7 @@ def import_ead(request):
     username = request.user.username
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
     
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -2182,7 +2182,7 @@ def import_ecodex(request):
     username = request.user.username
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
 
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -2370,7 +2370,7 @@ def search_ecodex(request):
     errHandle = ErrHandle()
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_editor):
         # Create a regular expression
         r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
         # Get the parameters
@@ -2458,7 +2458,7 @@ def import_gold(request):
     bClean = False
     username = request.user.username
 
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
 
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -3458,8 +3458,8 @@ class BasicPart(View):
             # Build the context
             context = dict(object_id = pk, savedate=None)
             context['authenticated'] = user_is_authenticated(request)
-            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+            context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
             # Action depends on 'action' value
             if self.action == "":
@@ -3769,8 +3769,8 @@ class BasicPart(View):
             context = dict(object_id = pk, savedate=None)
             context['prevpage'] = self.previous
             context['authenticated'] = user_is_authenticated(request)
-            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+            context['is_app_editor'] = user_is_ingroup(request, app_editor)
             # Walk all the form objects
             for formObj in self.form_objects:        
                 # Used to populate a NEW research project
@@ -4123,8 +4123,8 @@ class PassimDetails(DetailView):
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
@@ -4655,8 +4655,8 @@ class BasicListView(ListView):
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['authenticated'] = context['is_authenticated'] 
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -4863,8 +4863,8 @@ class LocationListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -4933,7 +4933,7 @@ class LocationDetailsView(PassimDetails):
         context['contained_locations'] = contained_locations
 
         # The standard information
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('location_list')
         crumbs = []
@@ -5120,7 +5120,7 @@ class OriginDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('origin_list')
         crumbs = []
@@ -5746,10 +5746,10 @@ class SermonListView(BasicList):
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
-                {"name": "Collection sermo", "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection gold",  "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection super", "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection manu",  "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
@@ -5940,7 +5940,7 @@ class ProjectEdit(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('project_list')
         context['prevpage'] = prevpage
@@ -6032,7 +6032,7 @@ class CollAnyEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.type, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display, 'field_key': 'type'},
              {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
              ]
           # Return the context we have made
@@ -6072,7 +6072,8 @@ class CollManuEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
              ]
           # Return the context we have made
           return context    
@@ -6111,7 +6112,8 @@ class CollSermoEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
              ]
           # Return the context we have made
           return context    
@@ -6150,7 +6152,8 @@ class CollGoldEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display, 'field_key': 'type'}
              ]
           # Return the context we have made
           return context    
@@ -6189,7 +6192,8 @@ class CollSuperEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
              ]
           # Return the context we have made
           return context    
@@ -6236,16 +6240,16 @@ class CollectionListView(BasicList):
     def initializations(self):
         if self.prefix == "sermo":
             self.plural_name = "Sermon collections"
-            self.sg_name = "Sermon"
+            self.sg_name = "Sermon collection"
         elif self.prefix == "manu":
             self.plural_name = "Manuscript Collections"
-            self.sg_name = "Manuscript"
+            self.sg_name = "Manuscript collection"
         elif self.prefix == "gold":
             self.plural_name = "Gold sermons Collections"
-            self.sg_name = "Sermon gold"
+            self.sg_name = "Sermon gold collection"
         elif self.prefix == "super":
             self.plural_name = "Super sermons gold Collections"
-            self.sg_name = "Super sermon gold"        
+            self.sg_name = "Super sermon gold collection"        
         elif self.prefix == "any":
             self.new_button = False
             self.plural_name = "All types Collections"
@@ -6323,7 +6327,7 @@ class CollectionEdit(PassimDetails):
         return True, "" 
         
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('collection_list')
         context['prevpage'] = prevpage
@@ -6887,12 +6891,13 @@ class ManuscriptListView(BasicList):
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
-        {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-        {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-        {"name": "Collection super","id": "filter_collection_super", "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
+        {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Manuscript",      "id": "filter_collection_manu",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collection_sermo", "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collection_super","enabled": False, "head_id": "filter_collection"},
         {"name": "Project",         "id": "filter_project",          "enabled": False, "head_id": "filter_other"},
       ]
 
@@ -6905,12 +6910,14 @@ class ManuscriptListView(BasicList):
             {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',          'fkfield': 'keywords',                               'keyS': 'keyword',       'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
+            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
+            ]},
+        {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
             {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
             {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -7376,8 +7383,8 @@ class SermonGoldSelect(BasicPart):
         # Add the result to the context
         context['results'] = self.qs
         context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Return the updated context
         return context
@@ -8455,16 +8462,22 @@ class EqualGoldListView(BasicList):
         {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"}
         ]
-    filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
-               {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
-               {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
-               {"name": "Passim code",     "id": "filter_code",              "enabled": False},
-               {"name": "Number",          "id": "filter_number",            "enabled": False},
-               {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
-               {"name": "Collection manu", "id": "filter_collection_manu",   "enabled": False},
-               {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False},
-               {"name": "Collection gold", "id": "filter_collection_gold",   "enabled": False},
-               {"name": "Collection super","id": "filter_collection_super",  "enabled": False},
+    filters = [
+        {"name": "Author",          "id": "filter_author",            "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
+        {"name": "Passim code",     "id": "filter_code",              "enabled": False},
+        {"name": "Number",          "id": "filter_number",            "enabled": False},
+        {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
+        {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
+        #{"name": "Collection manu", "id": "filter_collection_manu",   "enabled": False},
+        #{"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False},
+        #{"name": "Collection gold", "id": "filter_collection_gold",   "enabled": False},
+        #{"name": "Collection super","id": "filter_collection_super",  "enabled": False},
+        {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collsuper",        "enabled": False, "head_id": "filter_collection"},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -8473,11 +8486,14 @@ class EqualGoldListView(BasicList):
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'collection_manu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
+            ]},
+        {'section': 'collection', 'filterlist': [
+            {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collsuper', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }
+            ]}
         ]
     
     def add_to_context(self, context, initial):
@@ -8737,7 +8753,7 @@ class AuthorEdit(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Author edit", False)
 
@@ -8763,7 +8779,7 @@ class AuthorDetails(AuthorEdit):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         context['afterdelurl'] = ""
         # Process this visit and get the new breadcrumbs object
@@ -8864,8 +8880,8 @@ class LibraryListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
          # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9050,7 +9066,7 @@ class LibraryDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('library_list')
         context['prevpage'] = prevpage
@@ -9219,8 +9235,8 @@ class ReportListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9261,7 +9277,7 @@ class ReportDetailsView(PassimDetails):
     rtype = "html"
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('report_list')
         context['prevpage'] = prevpage
@@ -9391,7 +9407,7 @@ class SourceDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('source_list')
         context['prevpage'] = prevpage
@@ -9490,8 +9506,8 @@ class LitRefListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9627,7 +9643,9 @@ class BasketUpdate(BasicPart):
                 qs = self.clsBasket.objects.filter(profile=profile)
 
                 # Save the current basket as a collection that needs to receive a name
-                coll = Collection.objects.create(name="CreatedFromBasket", owner=profile, type=self.colltype)
+                coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", 
+                                                 descrip="Created from a {} listview basket".format(self.colltype), 
+                                                 owner=profile, type=self.colltype)
                 # Link the collection with the correct model
                 kwargs = {'collection': coll}
                 if self.colltype == "sermo":
@@ -9651,6 +9669,14 @@ class BasketUpdate(BasicPart):
 
             # Adapt the basket size
             context['basketsize'] = self.get_basketsize(profile)
+
+            # Set the other context parameters
+            if self.colltype == "sermo":
+                context['basket_show'] = reverse('basket_show' )
+                context['basket_update'] = reverse('basket_update')
+            else:
+                context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
+                context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
 
         # Return the updated context
         return context

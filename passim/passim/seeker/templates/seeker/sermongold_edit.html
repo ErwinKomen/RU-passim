@@ -12,7 +12,7 @@
       <tr>
         <td colspan="2"  class="ms editable table">
           <!-- Provide the necessary buttons: edit, cancel and save -->
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
           <a mode="edit" class="view-mode btn btn-xs jumbo-1">
             <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
           </a>
@@ -22,7 +22,7 @@
             <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
           </a>
 
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
           <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" 
              targetid=""
              targeturl="{% if goldForm.instance.id %}{% url 'gold_edit' goldForm.instance.id %}{% else %}{% url 'gold_edit' %}{% endif %}" >
@@ -36,7 +36,7 @@
           <!-- Little error message room -->
           <span id="gold_err_msg" class="err-msg"></span>
 
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
           <!-- Put the delete button completely to the right-->
           <a mode="delete" class="edit-mode btn btn-xs jumbo-3 pull-right hidden" 
              targetid="" oldtargetid="sermon_edit"
@@ -52,7 +52,7 @@
         <td valign="top">Status</td>
         <td class="sermon-status" align="left">
           <div class="view-mode">{{goldForm.instance.get_stype_display}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{goldForm.stype}}</div>
           {% endif %}
         </td>
@@ -124,7 +124,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{goldForm.kwlist}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="gkw_formset">
               {% include 'seeker/formset_new.html' with this_formset=gkw_formset prefix='gkw' linkfield=gkw_linkfield %}
             </div>
@@ -154,7 +154,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{goldForm.siglist}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="gsign_formset">
               {% include 'seeker/formset_new.html' with this_formset=gsign_formset prefix='gsign' linkfield=gsign_linkfield unique=1 %}
             </div>
@@ -182,7 +182,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{goldForm.collist_sg}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="gcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=gcol_formset prefix='gcol' linkfield=gcol_linkfield unique=1 %}
             </div>
@@ -209,7 +209,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{goldForm.edilist}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="gedi_formset">
               {% include 'seeker/formset_new.html' with this_formset=gedi_formset prefix='gedi' linkfield=gedi_linkfield %}
             </div>

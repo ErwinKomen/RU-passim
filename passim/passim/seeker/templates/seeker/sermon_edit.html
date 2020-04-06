@@ -9,7 +9,7 @@
   {% csrf_token %}
     <table class="sermon-details">
       <!-- Row to indicate editing, if possible -->
-      {% if is_passim_editor %}
+      {% if is_app_editor %}
         <tr>
           <td colspan="2"  class="ms editable table">
             <!-- Provide the necessary buttons: edit, cancel and save -->
@@ -70,7 +70,7 @@
         <td valign="top">Status</td>
         <td class="sermon-status" align="left">
           <div class="view-mode">{{sermoForm.instance.get_stype_display}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.stype}}</div>
           {% endif %}
         </td>
@@ -89,7 +89,7 @@
           <td class="hoverable" style="min-width: 150px;">Manuscript</td>
           <td  style="width: 100%;">
             <div class="view-mode">{% if sermoForm.manu.value %}{{sermoForm.manu.value}}{% else %}-{% endif %}</div>
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <div class="edit-mode hidden">{{sermoForm.manu}}</div>
             {% endif %}
           </td>
@@ -101,7 +101,7 @@
         <td class="hoverable" style="min-width: 150px;">Locus</td>
         <td  style="width: 100%;">
           <div class="view-mode">{% if sermoForm.locus.value %}{{sermoForm.locus.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.locus}}</div>
           {% endif %}
         </td>
@@ -112,7 +112,7 @@
         <td class="hoverable">Attributed author</td>
         <td>
           <div class="view-mode">{% if sermoForm.instance.author %}{{sermoForm.instance.author.name}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="author-key hidden">{{sermoForm.author}}</div>
             <div class="edit-mode hidden">{{sermoForm.authorname}}</div>
           {% endif %}
@@ -124,7 +124,7 @@
         <td class="hoverable">Title</td>
         <td >
           <div class="view-mode" style="font-variant: small-caps;">{% if sermoForm.title.value %}{{sermoForm.title.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.title}}</div>
           {% endif %}
         </td>
@@ -135,7 +135,7 @@
         <td class="hoverable">Sub title</td>
         <td>
           <div class="view-mode" style="font-variant: small-caps;">{% if sermoForm.subtitle.value %}{{sermoForm.subtitle.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.subtitle}}</div>
           {% endif %}
         </td>
@@ -146,7 +146,7 @@
         <td class="hoverable">Incipit</td>
         <td >
           <div class="view-mode">{% if sermoForm.incipit.value %}{{sermoForm.instance.get_incipit_markdown|safe}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.incipit}}</div>
           {% endif %}
         </td>
@@ -157,7 +157,7 @@
         <td class="hoverable">Explicit</td>
         <td >
           <div class="view-mode">{% if sermoForm.explicit.value %}{{sermoForm.instance.get_explicit_markdown|safe}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.explicit}}</div>
           {% endif %}
         </td>
@@ -168,7 +168,7 @@
         <td class="hoverable">Quote</td>
         <td >
           <div class="view-mode">{% if sermoForm.quote.value %}{{sermoForm.quote.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.quote}}</div>
           {% endif %}
         </td>
@@ -179,7 +179,7 @@
         <td class="hoverable">Bibliography notes</td>
         <td >
           <div class="view-mode">{% if sermoForm.bibnotes.value %}{{sermoForm.bibnotes.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.bibnotes}}</div>
           {% endif %}
         </td>
@@ -190,7 +190,7 @@
         <td class="hoverable">Feast</td>
         <td >
           <div class="view-mode">{% if sermoForm.feast.value %}{{sermoForm.feast.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.feast}}</div>
           {% endif %}
         </td>
@@ -201,7 +201,7 @@
         <td class="hoverable">Bible reference(s)</td>
         <td >
           <div class="view-mode">{% if sermoForm.bibleref.value %}{{sermoForm.bibleref.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.bibleref}}</div>
           {% endif %}
         </td>
@@ -212,7 +212,7 @@
         <td class="hoverable">Additional</td>
         <td >
           <div class="view-mode">{% if sermoForm.additional.value %}{{sermoForm.additional.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.additional}}</div>
           {% endif %}
         </td>
@@ -223,7 +223,7 @@
         <td class="hoverable">Note</td>
         <td >
           <div class="view-mode">{% if sermoForm.note.value %}{{sermoForm.note.value}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{sermoForm.note}}</div>
           {% endif %}
         </td>
@@ -271,7 +271,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{sermoForm.kwlist}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="sdkw_formset">
               {% include 'seeker/formset_new.html' with this_formset=sdkw_formset prefix='sdkw' linkfield=sdkw_linkfield %}
             </div>
@@ -299,7 +299,7 @@
             {% else %}-{% endif %}
           </div>
           <div class="edit-mode hidden">{{sermoForm.collist_s}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="new-mode hidden" id="sdcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=sdcol_formset prefix='sdcol' linkfield=sdcol_linkfield unique=1 %}
             </div>

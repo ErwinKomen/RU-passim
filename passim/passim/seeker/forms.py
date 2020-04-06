@@ -741,7 +741,7 @@ class CollectionForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Collection
-        fields = ['name', 'owner', 'descrip', 'readonly', 'url']
+        fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}), 
                  'owner':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'descrip':     forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -759,6 +759,7 @@ class CollectionForm(forms.ModelForm):
         self.fields['owner'].required = False
         self.fields['descrip'].required = False
         self.fields['readonly'].required = False
+        self.fields['type'].required = False
         self.fields['url'].required = False
         self.fields['collist'].queryset = Collection.objects.filter(type=prefix).order_by('name')
         self.fields['ownlist'].queryset = Profile.objects.all()

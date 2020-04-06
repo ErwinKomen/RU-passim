@@ -42,7 +42,7 @@
                 <!-- A button to show/hide the keywords -->
                 <span><a role="button" class="btn btn-xs jumbo-1" targetid="manuscript_kwset" title="Show/Hide keywords" onclick="ru.passim.seeker.toggle_click(this);">Keywords</a></span>
               </div>
-              {% if is_passim_editor %}
+              {% if is_app_editor %}
                 <div class="col-md-6" align="right">
                   <span ><!-- class="pull-right" -->
                     <a role="button" class="btn btn-xs jumbo-3"
@@ -60,7 +60,7 @@
               {% endif %}
             </div>
             <!-- This is where a NEW sermon definition can be edited -->
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <div class="row subform">
                 <div class="col-md-10 col-md-offset-1">
                   <div id="location_new">
@@ -152,7 +152,7 @@
                   <!-- Sermons in this manuscript -->
                   <h3>
                     <span>Contents</span>
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <span id="add_search_criteria" class="pull-right">
                         <!-- Completely manual sermon adding -->
                         <a class="btn btn-xs jumbo-3" role="button" 
@@ -181,7 +181,7 @@
                   </div>
 
                     <!-- This is where the sermon that is currently being edited shows up -->
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <div class="row edit-sermon hidden">
                         <div class="col-md-10 col-md-offset-1">
                           <div class="panel panel-default" 
@@ -194,7 +194,7 @@
                     {% endif %}
 
                     <!-- This is where a NEW sermon definition can be edited -->
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <div class="row subform">
                         <div class="col-md-10 col-md-offset-1">
                           <div id="sermon_new">
