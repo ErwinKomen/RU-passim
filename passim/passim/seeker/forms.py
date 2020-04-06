@@ -761,7 +761,10 @@ class CollectionForm(forms.ModelForm):
         self.fields['readonly'].required = False
         self.fields['type'].required = False
         self.fields['url'].required = False
-        self.fields['collist'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+        if prefix == "any":
+            self.fields['collist'].queryset = Collection.objects.all().order_by('name')
+        else:
+            self.fields['collist'].queryset = Collection.objects.filter(type=prefix).order_by('name')
         self.fields['ownlist'].queryset = Profile.objects.all()
         # Get the instance
         if 'instance' in kwargs:

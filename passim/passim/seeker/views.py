@@ -6221,6 +6221,7 @@ class CollectionListView(BasicList):
     prefix = "any"
     paginate_by = 20
     bUseFilter = True
+    has_select2 = True
     basic_name_prefix = "coll"
     plural_name = ""
     order_cols = ['name', '']
@@ -8470,10 +8471,6 @@ class EqualGoldListView(BasicList):
         {"name": "Number",          "id": "filter_number",            "enabled": False},
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
-        #{"name": "Collection manu", "id": "filter_collection_manu",   "enabled": False},
-        #{"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False},
-        #{"name": "Collection gold", "id": "filter_collection_gold",   "enabled": False},
-        #{"name": "Collection super","id": "filter_collection_super",  "enabled": False},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
@@ -9734,7 +9731,7 @@ class BasketUpdateSuper(BasketUpdate):
     MainModel = EqualGold
     clsBasket = BasketSuper
     s_view = EqualGoldListView
-    s_form = EqualGoldForm
+    s_form = SuperSermonGoldForm
     s_field = "super"
     colltype = "super"
 

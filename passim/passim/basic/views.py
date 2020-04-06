@@ -279,15 +279,16 @@ def make_search_list(filters, oFields, search_list, qd):
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):
+                    s_q_lst = ""
                     enable_filter(filter_type, head_id)
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
                         if len(arFkField) > 1:
                             # THere are more foreign keys: combine in logical or
-                            s_q_lst = None
+                            s_q_lst = ""
                             for fkfield in arFkField:
-                                if s_q_lst == None:
+                                if s_q_lst == "":
                                     s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
                                 else:
                                     s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
