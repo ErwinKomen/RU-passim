@@ -741,12 +741,13 @@ class CollectionForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Collection
-        fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type']
+        fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type', 'scope']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}), 
                  'owner':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'descrip':     forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'readonly':    forms.CheckboxInput(),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'scope':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -760,6 +761,7 @@ class CollectionForm(forms.ModelForm):
         self.fields['descrip'].required = False
         self.fields['readonly'].required = False
         self.fields['type'].required = False
+        self.fields['scope'].required = False
         self.fields['url'].required = False
         if prefix == "any":
             self.fields['collist'].queryset = Collection.objects.all().order_by('name')

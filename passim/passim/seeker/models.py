@@ -5,6 +5,7 @@ from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.db.models.query import QuerySet 
 from django.utils.html import mark_safe
 from django.utils import timezone
 from django.forms.models import model_to_dict
@@ -42,6 +43,7 @@ LINK_TYPE = "seeker.linktype"
 EDI_TYPE = "seeker.editype"
 STATUS_TYPE = "seeker.stype"
 COLLECTION_TYPE = "seeker.coltype" 
+COLLECTION_SCOPE = "seeker.colscope"
 
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
@@ -1056,6 +1058,12 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    # [1] Each of the four basket types has a history
+    historysermo = models.TextField("Sermon history", default="[]")
+    historymanu = models.TextField("Manuscript history", default="[]")
+    historygold = models.TextField("Sermon Gold history", default="[]")
+    historysuper = models.TextField("Super sermon Gold history", default="[]")
+
     # [1] Current size of the user's basket
     basketsize = models.IntegerField("Basket size", default=0)
 
@@ -1079,8 +1087,7 @@ class Profile(models.Model):
 
     # Many-to-many field for the contents of a search basket per user (super sermons gold)
     basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
-           
-   
+              
     def __str__(self):
         sStack = self.stack
         return sStack
@@ -1168,6 +1175,60 @@ class Profile(models.Model):
         # Get to the profile of this user
         profile = Profile.objects.filter(user=user).first()
         return profile
+
+    def history(self, action, type, oFields = None):
+        """Perform [action] on the history of [type]"""
+
+        def get_operation(action, oFields):
+            lstOr = {}
+            for k,v in oFields.items():
+                if v!=None and v!= "" and len(v) != 0:
+                    # Possibly adapt 'v'
+                    if isinstance(v, QuerySet):
+                        # This is a list
+                        rep_list = []
+                        for rep in v:
+                            # Get the id of this item
+                            rep_id = rep.id
+                            rep_list.append(rep_id)
+                        v = json.dumps(rep_list)
+                    elif isinstance(v, str) or isinstance(v,int):
+                        pass
+                    elif isinstance(v, object):
+                        v = [ v.id ]
+                    # Add v to the or-list-object
+                    lstOr[k] = v
+            oOperation = dict(action=action, item=lstOr)
+            return oOperation
+
+        # Initializations
+        h_field = "history{}".format(type)
+        s_list = getattr(self, h_field)
+        h_list = json.loads(s_list)
+        bChanged = False
+        history_actions = ["create", "remove", "add"]
+
+        # Process the actual change
+        if action == "reset":
+            # Reset the history stack of this type
+            setattr(self, "history{}".format(type), "[]")
+            bChanged = True
+        elif action in history_actions:
+            if oFields != None:
+                # Process removing items to the current history
+                bChanged = True
+                oOperation = get_operation(action, oFields)
+                if action == "create": h_list = []
+                h_list.append(oOperation)
+
+        # Only save changes if anything changed actually
+        if bChanged:
+            # Re-create the list
+            s_list = json.dumps(h_list)
+            setattr(self, h_field, s_list)
+            # Save the changes
+            self.save()
+        return True
 
 
 class Visit(models.Model):
@@ -4221,36 +4282,25 @@ class Collection(models.Model):
     
     # [1] Each collection has only 1 name 
     name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
-
     # [1] Each collection has only 1 owner
-    owner = models.ForeignKey(Profile, null=True)
-    
+    owner = models.ForeignKey(Profile, null=True)    
     # [0-1] Each collection can be marked a "read only" by Passim-team  ERUIT
     readonly = models.BooleanField(default=False)
-
     # [1] Each "Collection" has only 1 type    
     type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
                             max_length=5)
-
     # [0-1] Each collection can have one description
     descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
-
     # [0-1] Link to a description or bibliography (url) 
     url = models.URLField("Web info", null=True, blank=True)
-
-    # Path to register all additions and changes to each Collection (as stringified JSON list)
-    path = models.TextField("History of collection", null=True, blank=True)
-
+    # [1] Path to register all additions and changes to each Collection (as stringified JSON list)
+    path = models.TextField("History path", default="[]")
+    # [1] The scope of this collection: who can view it?
+    #     E.g: private, team, global - default is 'private'
+    scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv",
+                            max_length=5)
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
-    # date = models.DateTimeField(default=get_current_datetime)
-   
-    # [0-1] Each collection can be marked as "private" by each user 
-    
-    #private = models.BooleanField(default=True)
-    
-    # [0-1] Each collection can be marked as "team" by editors (only when private == False) 
-    #team = models.BooleanField(default=True)
-    
+    created = models.DateTimeField(default=get_current_datetime)
     
     def __str__(self):
         return self.name
@@ -4283,6 +4333,12 @@ class Collection(models.Model):
         """Return an appropriate name or label"""
 
         return self.name
+
+    def get_created(self):
+        """REturn the creation date in a readable form"""
+
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
 
 
 class SermonDescr(models.Model):

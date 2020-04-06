@@ -948,7 +948,7 @@ def search_generic(s_view, cls, form, qd):
         qs = None
         bFilter = False
     # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
+    return filters, bFilter, qs, qd, oFields
 
 def search_collection(request):
     """Search for a collection"""
@@ -6029,11 +6029,13 @@ class CollAnyEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display, 'field_key': 'type'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6069,11 +6071,13 @@ class CollManuEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
+             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6113,7 +6117,9 @@ class CollSermoEdit(BasicDetails):
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
              {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:", 'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6149,11 +6155,13 @@ class CollGoldEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display, 'field_key': 'type'}
+             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6189,11 +6197,13 @@ class CollSuperEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display}
+             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6224,10 +6234,12 @@ class CollectionListView(BasicList):
     has_select2 = True
     basic_name_prefix = "coll"
     plural_name = ""
-    order_cols = ['name', '']
+    order_cols = ['scope', 'name', 'created', '']
     order_default = order_cols
-    order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}
+    order_heads = [{'name': 'Scope',        'order': 'o=1', 'type': 'str', 'custom': 'scope'},
+                   {'name': 'Collection',   'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                   {'name': 'Created',      'order': 'o=3', 'type': 'str', 'custom': 'created'},
+                   {'name': 'Frequency',    'order': '',    'type': 'str', 'custom': 'links'}
                    ]
     filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
     searches = [
@@ -6255,11 +6267,13 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "All types Collections"
             self.sg_name = "Collection"  
-            self.order_cols = ['type', 'name', '']
+            self.order_cols = ['type', 'scope', 'name', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
-                {'name': 'Type',        'order': 'o=2', 'type': 'str', 'field': 'type'},
-                {'name': 'Collection',  'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
+                {'name': 'Scope',       'order': 'o=2', 'type': 'str', 'custom': 'scope'},
+                {'name': 'Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
         return None
@@ -6302,11 +6316,17 @@ class CollectionListView(BasicList):
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?super-collist_ssg={}'>".format(url, instance.id))
+                html.append("<a href='{}?ssg-collist_ssg={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
-            return sBack, sTitle
+        elif custom == "type":
+            sBack = instance.get_type_display()
+        elif custom == "scope":
+            sBack = instance.get_scope_display()
+        elif custom == "created":
+            sBack = get_crpp_date(instance.created)
+        return sBack, sTitle
 
 
 class CollectionEdit(PassimDetails):
@@ -9607,7 +9627,7 @@ class BasketUpdate(BasicPart):
         if profile != None:
 
             # Get the queryset
-            self.filters, self.bFilter, qs, ini = search_generic(self.s_view, self.MainModel, self.s_form, self.qd)
+            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd)
 
             kwargs = {'profile': profile}
 
@@ -9620,27 +9640,37 @@ class BasketUpdate(BasicPart):
                     for item in qs:
                         kwargs[self.s_field] = item
                         self.clsBasket.objects.create(**kwargs)
+                # Process history
+                profile.history(operation, self.colltype, oFields)
             elif operation == "add":
                 # Add
                 with transaction.atomic():
                     for item in qs:
                         kwargs[self.s_field] = item
                         self.clsBasket.objects.create(**kwargs)
+                # Process history
+                profile.history(operation, self.colltype, oFields)
             elif operation == "remove":
                 # Add
                 with transaction.atomic():
                     for item in qs:
                         kwargs[self.s_field] = item
                         self.clsBasket.objects.filter(**kwargs).delete()
+                # Process history
+                profile.history(operation, self.colltype, oFields)
             elif operation == "reset":
                 # Remove everything from our basket
                 self.clsBasket.objects.filter(profile=profile).delete()
+                # Reset the history for this one
+                profile.history(operation, self.colltype)
             elif operation == "collcreate":
                 # Queryset: the basket contents
                 qs = self.clsBasket.objects.filter(profile=profile)
 
+                # Get the history string
+                history = getattr(profile, "history{}".format(self.colltype))
                 # Save the current basket as a collection that needs to receive a name
-                coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", 
+                coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, 
                                                  descrip="Created from a {} listview basket".format(self.colltype), 
                                                  owner=profile, type=self.colltype)
                 # Link the collection with the correct model
@@ -9693,7 +9723,7 @@ class BasketUpdateManu(BasketUpdate):
     MainModel = Manuscript
     clsBasket = BasketMan 
     s_view = ManuscriptListView
-    s_form = ManuscriptForm
+    s_form = SearchManuForm
     s_field = "manu"
     colltype = "manu"
 
