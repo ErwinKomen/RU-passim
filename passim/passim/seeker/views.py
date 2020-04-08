@@ -394,12 +394,15 @@ def make_search_list(filters, oFields, search_list, qd):
                 infield = get_value(search_item, "infield")
                 dbfield = get_value(search_item, "dbfield")
                 fkfield = get_value(search_item, "fkfield")
+                keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
                 s_q = ""
+                arFkField = []
+                if fkfield != None:
+                    arFkField = fkfield.split("|")
                
                 # Main differentiation: fkfield or dbfield
                 if fkfield:
-                    # We are dealing with a foreign key
                     # Check for keyS
                     if has_string_value(keyS, oFields):
                         # Check for ID field
@@ -419,12 +422,21 @@ def make_search_list(filters, oFields, search_list, qd):
                         else:
                             val = oFields[keyS]
                             enable_filter(filter_type, head_id)
+                            # We are dealing with a foreign key (or multiple)
+                            if len(arFkField) > 1:
+                                iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
-                            if "*" in val:
-                                val = adapt_search(val)
-                                s_q = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
-                            else:
-                                s_q = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                            s_q = None
+                            for fkfield in arFkField:
+                                if "*" in val:
+                                    val = adapt_search(val)
+                                    s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+                                else:
+                                    s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                                if s_q == None:
+                                    s_q = s_q_add
+                                else:
+                                    s_q |= s_q_add
                     elif has_obj_value(fkfield, oFields):
                         val = oFields[fkfield]
                         enable_filter(filter_type, head_id)
@@ -456,14 +468,34 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
+                    elif keyType == "has":
+                        # Check the count for the db field
+                        val = oFields[filter_type]
+                        if val == "yes" or val == "no":
+                            enable_filter(filter_type, head_id)
+                            if val == "yes":
+                                s_q = Q(**{"{}__gt".format(dbfield): 0})
+                            else:
+                                s_q = Q(**{"{}".format(dbfield): 0})
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):
+                    s_q_lst = ""
                     enable_filter(filter_type, head_id)
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
-                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        if len(arFkField) > 1:
+                            # THere are more foreign keys: combine in logical or
+                            s_q_lst = ""
+                            for fkfield in arFkField:
+                                if s_q_lst == "":
+                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                                else:
+                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        else:
+                            # Just one foreign key
+                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
                     elif dbfield:
                         s_q_lst = Q(**{"{}__in".format(infield): code_list})
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
@@ -477,7 +509,6 @@ def make_search_list(filters, oFields, search_list, qd):
 
     # Return what we have created
     return filters, lstQ, qd
-
 def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     oErr = ErrHandle()
@@ -9632,7 +9663,7 @@ class BasketUpdate(BasicPart):
             kwargs = {'profile': profile}
 
             # Action depends on the operation specified
-            if operation == "create":
+            if qs and operation == "create":
                 # Remove anything there
                 self.clsBasket.objects.filter(profile=profile).delete()
                 # Add
@@ -9642,7 +9673,7 @@ class BasketUpdate(BasicPart):
                         self.clsBasket.objects.create(**kwargs)
                 # Process history
                 profile.history(operation, self.colltype, oFields)
-            elif operation == "add":
+            elif qs and operation == "add":
                 # Add
                 with transaction.atomic():
                     for item in qs:
@@ -9650,7 +9681,7 @@ class BasketUpdate(BasicPart):
                         self.clsBasket.objects.create(**kwargs)
                 # Process history
                 profile.history(operation, self.colltype, oFields)
-            elif operation == "remove":
+            elif qs and operation == "remove":
                 # Add
                 with transaction.atomic():
                     for item in qs:
@@ -9663,7 +9694,7 @@ class BasketUpdate(BasicPart):
                 self.clsBasket.objects.filter(profile=profile).delete()
                 # Reset the history for this one
                 profile.history(operation, self.colltype)
-            elif operation == "collcreate":
+            elif qs and operation == "collcreate":
                 # Queryset: the basket contents
                 qs = self.clsBasket.objects.filter(profile=profile)
 
