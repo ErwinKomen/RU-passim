@@ -1201,6 +1201,18 @@ var ru = (function ($, ru) {
             $(targetid).removeClass("post-load");
           });
 
+          // No closing of certain dropdown elements on clicking
+          $(".dropdown-toggle").on({
+            "click": function (event) {
+              var evtarget = $(event.target);
+              if ($(evtarget).closest(".nocloseonclick")) {
+                $(this).data("closable", false);
+              } else {
+                $(this).data("closable", true);
+              }
+            }
+          });
+
           // Now address all items from the list of post-load items
           post_loads.forEach(function (targetid, index) {
             var data = [],
@@ -1234,7 +1246,7 @@ var ru = (function ($, ru) {
                     if ('msg' in response) {
                       $(targetid).html(response.msg);
                     } else {
-                      $(targetid).html("An error has occurred");
+                      $(targetid).html("An error has occurred (passim.seeker post_loads)");
                     }
                     break;
                 }
@@ -1707,7 +1719,7 @@ var ru = (function ($, ru) {
                   if ('msg' in response) {
                     $(targetid).html(response.msg);
                   } else {
-                    $(targetid).html("An error has occurred");
+                    $(targetid).html("An error has occurred (passim.seeker do_get)");
                   }
                   break;
               }
@@ -1731,6 +1743,10 @@ var ru = (function ($, ru) {
             redirecturl = "",
             operation = "",
             targetid = "",
+            colladdid = "#colladdinterface",
+            basketwait = "#basket_waiting",
+            basketreport = "#basket_report",
+            basketlink = "#basket_coll_link",
             target = null,
             data = null;
 
@@ -1745,6 +1761,22 @@ var ru = (function ($, ru) {
           operation = $(elStart).attr("operation");
           // Get the targetid
           targetid = $(elStart).attr("targetid");
+          // Basket report is normally hidden
+          $(basketreport).addClass("hidden");
+
+          switch (operation) {
+            case "colladdstart":
+              $(colladdid).removeClass("hidden");
+              return;
+              break;
+            case "colladdcancel":
+              $(colladdid).addClass("hidden");
+              return;
+              break;
+            default:
+              $(colladdid).addClass("hidden");
+              break;
+          }
 
           // validation
           if (targeturl === undefined || targeturl === "" || operation === undefined || operation === "" ||
@@ -1755,6 +1787,9 @@ var ru = (function ($, ru) {
 
           // Add operation to data
           data.push({ "name": "operation", "value": operation });
+
+          // Show we are waiting
+          $(basketwait).removeClass("hidden");
 
           // Call the ajax POST method
           // Issue a post
@@ -1767,7 +1802,7 @@ var ru = (function ($, ru) {
                 case "ready":
                 case "ok":
                   // Should we do redirection?
-                  if ("redirecturl" in response) {
+                  if ("redirecturl" in response && response.redirecturl !== "") {
                     redirecturl = response.redirecturl;
                     window.location.href = redirecturl;
                   }
@@ -1775,16 +1810,34 @@ var ru = (function ($, ru) {
                   $(target).html(response['html']);
                   // Possibly do some initialisations again??
 
+                  // Hide the colladd interface
+                  $(colladdid).addClass("hidden");
+
+                  // Show we are no longer waiting
+                  $(basketwait).addClass("hidden");
+
+                  // Possibly show a report
+                  switch (operation) {
+                    case "colladd":
+                      // Add the correct parameters to the report
+                      $(basketlink).attr("href", response.collurl);
+                      $(basketlink).html("<span>" + response.collname + "</span>");
+                      // Show the report
+                      $(basketreport).removeClass("hidden");
+                      break;
+                  }
+
                   // Make sure events are re-established
-                  // ru.passim.seeker.init_events();
-                  ru.passim.init_typeahead();
+                  ru.passim.seeker.init_events();
+                  // ru.passim.init_typeahead();
+
                   break;
                 case "error":
                   // Show the error
                   if ('msg' in response) {
                     $(target).html(response.msg);
                   } else {
-                    $(target).html("An error has occurred");
+                    $(target).html("An error has occurred (passim.seeker do_basket)");
                   }
                   break;
               }
@@ -1946,7 +1999,7 @@ var ru = (function ($, ru) {
                       if ('msg' in response) {
                         $(targetid).html(response.msg);
                       } else {
-                        $(targetid).html("An error has occurred");
+                        $(targetid).html("An error has occurred (passim.seeker search_start)");
                       }
                       break;
                   }
@@ -2030,7 +2083,7 @@ var ru = (function ($, ru) {
                   if ('msg' in response) {
                     $("#" + targetid).html(response.msg);
                   } else {
-                    $("#" + targetid).html("An error has occurred");
+                    $("#" + targetid).html("An error has occurred (passim.seeker gold_search_prepare)");
                   }
                   break;
               }
@@ -2124,7 +2177,7 @@ var ru = (function ($, ru) {
                   if ('msg' in response) {
                     $(elTarget).html(response.msg);
                   } else {
-                    $(elTarget).html("An error has occurred");
+                    $(elTarget).html("An error has occurred (passim.seeker check_progress)");
                   }                  
                   break;
                 default:
@@ -3311,7 +3364,7 @@ var ru = (function ($, ru) {
                   if ('msg' in response) {
                     $(targetid).html(response.msg);
                   } else {
-                    $(targetid).html("An error has occurred");
+                    $(targetid).html("An error has occurred (passim.seeker base_sermon)");
                   }
                   break;
               }
@@ -3713,7 +3766,7 @@ var ru = (function ($, ru) {
                           if ('msg' in response) {
                             $(targetid).html(response.msg);
                           } else {
-                            $(targetid).html("An error has occurred");
+                            $(targetid).html("An error has occurred (passim.seeker tabular_deleterow)");
                           }
                           break;
                       }

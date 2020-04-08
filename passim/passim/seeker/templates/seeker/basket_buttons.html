@@ -1,76 +1,50 @@
 ﻿{% load i18n %}
 
-<div >
+<div id="basket_buttons">
+  <!-- Dynamic buttons updating -->
+  {% include 'seeker/basket_choices.html' %}
+</div>
+<div>
+  <!-- Show waiting sign -->
+  <div id="basket_waiting" class="hidden">
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
 
-  <a id="basketmenu" class="btn jumbo-1 btn-sm dropdown-toggle" role="button" data-toggle="dropdown" 
-          aria-haspopup="true" aria-expanded="false">
-    <span class="glyphicon glyphicon-shopping-cart"></span>
-    <span>Basket</span>
-    {% if basketsize > 0 %}
-      <span>({{basketsize}})</span>
-    {% endif %}
-    <span class="caret"></span>
-  </a>
-  
-  <ul class="dropdown-menu" aria-labelledby="basketmenu">
-    {% if basketsize == 0 %}
-      <li>
-        <a id="basket_create" title="Create basket from current search results" href="#" operation="create" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-send"></span>
-          <span>Create</span>
-        </a>
-      </li>
-    {% else %}
-      <li>
-        <a id="basket_show" title="Show the contents of the basket" href="{{basket_show}}" >
-          <span>Show</span>
-        </a>
-      </li>
-      <li role="separator" class="divider"></li>
-      <li>
-        <a id="basket_add" title="Add search results to the basket" href="#" operation="add" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-plus"></span>
-          <span>Add</span>
-        </a>
-      </li>
-      <li>
-        <a id="basket_remove" title="Remove these search results from the basket" href="#" operation="remove" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-minus"></span>
-          <span>Remove</span>
-        </a>
-      </li>
-      <li>
-        <a id="basket_reset" title="Clear the basket" href="#" operation="reset" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-off"></span>
-          <span>Clear</span>
-        </a>
-      </li>
-      <li role="separator" class="divider"></li>
-      <li>
-        <a id="basket_coll" title="Add search results to a collection" href="#" operation="collcreate" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-send"></span>
-          <span>Create collection</span>
-        </a>
-      </li>
-      <li>
-        <a id="basket_coll" title="Add search results to a collection" href="#" operation="colladd" 
-            targetid="basket_buttons"
-            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
-          <span class="glyphicon glyphicon-plus"></span>
-          <span>Add to collection...</span>
-        </a>
-      </li>
-    {% endif %}
-  </ul>
+  <!-- Static selection of target collection -->
+  {% if listForm.collone %}
+    <div id="colladdinterface" class="hidden">
+      <table style="width: 100%;">
+        <tr><td style="width: 100%;">{{listForm.collone}}</td></tr>
+        <tr>
+          <td align="right">
+            <a id="basket_colladdcancel" title="Cancel adding to a collection" 
+               class="btn btn-sm jumbo-1" 
+                href="#" operation="colladdcancel" targetid="colladdinterface"
+                onclick="ru.passim.seeker.do_basket(this);">
+              <span>Cancel</span>
+            </a>
+            <a id="basket_colladd" title="Add search results to a collection" 
+               class="btn btn-sm jumbo-3" 
+                href="#" operation="colladd" targetid="basket_buttons"
+                ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+              <span>Add to collection</span>
+            </a>
+          </td>
+        </tr>
+      </table>
+      <!-- Show the options to the user -->
+    </div>
+  {% endif %}
+
+  <!-- Report and link to Collection -->
+  <div id="basket_report" class="hidden">
+    <div>The collection has been updated.</div>
+    <div>
+      <a id="basket_coll_link" class="btn btn-sm jumbo-1"
+         href="{% url 'collany_details' 777 %}" title="Open this collection">
+        <span>Open...</span>
+      </a>
+    </div>
+  </div>
 </div>
 

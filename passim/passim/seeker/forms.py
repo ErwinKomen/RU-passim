@@ -92,6 +92,41 @@ class CollectionSuperWidget(CollectionWidget):
     type = "super"
 
 
+class CollOneWidget(ModelSelect2Widget):
+    model = Collection
+    search_fields = [ 'name__icontains' ]
+    type = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.type:
+            return Collection.objects.filter(type=self.type).order_by('name').distinct()
+        else:
+            return Collection.objects.filter().order_by('name').distinct()
+
+
+class CollOneGoldWidget(CollOneWidget):
+    """Like CollOne, but then for: SermonGold"""
+    type = "gold"
+
+
+class CollOneManuWidget(CollOneWidget):
+    """Like CollOne, but then for: Manuscript"""
+    type = "manu"
+
+
+class CollOneSermoWidget(CollOneWidget):
+    """Like CollOne, but then for: Sermon"""
+    type = "sermo"
+
+
+class CollOneSuperWidget(CollOneWidget):
+    """Like CollOne, but then for: EqualGold = super sermon gold"""
+    type = "super"
+
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -733,6 +768,8 @@ class CollectionForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False, 
+                widget=CollOneWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["collections"]
@@ -754,7 +791,7 @@ class CollectionForm(forms.ModelForm):
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
         # Get the prefix
-        prefix = kwargs['prefix']
+        prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['owner'].required = False
@@ -763,10 +800,18 @@ class CollectionForm(forms.ModelForm):
         self.fields['type'].required = False
         self.fields['scope'].required = False
         self.fields['url'].required = False
+        self.fields['collone'].required = False
+        #self.fields['collist'].required = False
         if prefix == "any":
             self.fields['collist'].queryset = Collection.objects.all().order_by('name')
+            self.fields['collone'].queryset = Collection.objects.all().order_by('name')
         else:
-            self.fields['collist'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            type = prefix.split("-")[0]
+            self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')
+            self.fields['collone'].queryset = Collection.objects.filter(type=type).order_by('name')
+            # Set the initial type
+            self.fields['type'].initial = type
+            self.initial['type'] = type
         self.fields['ownlist'].queryset = Profile.objects.all()
         # Get the instance
         if 'instance' in kwargs:
@@ -908,6 +953,8 @@ class SermonGoldForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False, 
+                widget=CollOneGoldWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits"]
 
     class Meta:
@@ -926,34 +973,43 @@ class SermonGoldForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SermonGoldForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['stype'].required = False
-        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
-        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
-        self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
-        self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-        self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-        self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-        self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
-        self.fields['ftxtlist'].queryset = Ftextlink.objects.all().order_by('url')
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['stype'].required = False
+            self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+            self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
+            self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+            self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+            self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+            self.fields['ftxtlist'].queryset = Ftextlink.objects.all().order_by('url')
+
+            # The CollOne information is needed for the basket (add basket to collection)
+            prefix = "gold"
+            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
         
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # If there is an instance, then check the author specification
-            sAuthor = "" if not instance.author else instance.author.name
-            self.fields['authorname'].initial = sAuthor
-            self.fields['authorname'].required = False
-            # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
-            self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
-            self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
-            self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
-            self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
-            self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
-            self.fields['ftxtlist'].initial = [x.pk for x in instance.goldftxtlinks.all().order_by('url')]
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # If there is an instance, then check the author specification
+                sAuthor = "" if not instance.author else instance.author.name
+                self.fields['authorname'].initial = sAuthor
+                self.fields['authorname'].required = False
+                # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
+                self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
+                self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
+                self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
+                self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+                self.fields['ftxtlist'].initial = [x.pk for x in instance.goldftxtlinks.all().order_by('url')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError()
         return None
 
 

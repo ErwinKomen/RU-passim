@@ -165,7 +165,7 @@ var ru = (function ($, ru) {
                   if ('msg' in response) {
                     $(elTarget).html(response.msg);
                   } else {
-                    $(elTarget).html("An error has occurred");
+                    $(elTarget).html("An error has occurred (basic check_progress)");
                   }
                   break;
                 default:
@@ -666,6 +666,26 @@ var ru = (function ($, ru) {
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
 
+          // No closing of certain dropdown elements on clicking
+          /*
+          $(".dropdown-toggle").on({
+            "click": function (event) {
+              var evtarget = $(event.target);
+              if ($(evtarget).closest(".nocloseonclick").length) {
+                $(this).data("closable", false);
+              } else {
+                $(this).data("closable", true);
+              }
+            }
+          });*/
+          $(".nocloseonclick").each(function (idx, value) {
+            var targetid = $(this);
+            $(targetid).data("closable", false);
+            $(targetid).on("click", function (event) {
+              event.stopPropagation();
+            });
+          });
+
           // Look for options
           if (options !== undefined) {
             // Evaluate that object
@@ -722,7 +742,7 @@ var ru = (function ($, ru) {
                     if ('msg' in response) {
                       $(targetid).html(response.msg);
                     } else {
-                      $(targetid).html("An error has occurred");
+                      $(targetid).html("An error has occurred (basic init_events)");
                     }
                     break;
                 }
@@ -1596,7 +1616,7 @@ var ru = (function ($, ru) {
                       if ('msg' in response) {
                         $(targetid).html(response.msg);
                       } else {
-                        $(targetid).html("An error has occurred");
+                        $(targetid).html("An error has occurred (basic search_start)");
                       }
                       break;
                   }

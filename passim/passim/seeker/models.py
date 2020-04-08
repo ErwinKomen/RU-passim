@@ -1179,56 +1179,77 @@ class Profile(models.Model):
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
 
+        oErr = ErrHandle()
+        bBack = True
+
         def get_operation(action, oFields):
             lstOr = {}
-            for k,v in oFields.items():
-                if v!=None and v!= "" and len(v) != 0:
-                    # Possibly adapt 'v'
+            oOperation = {}
+            try:
+                for k,v in oFields.items():
+                    lenOk = True
                     if isinstance(v, QuerySet):
-                        # This is a list
-                        rep_list = []
-                        for rep in v:
-                            # Get the id of this item
-                            rep_id = rep.id
-                            rep_list.append(rep_id)
-                        v = json.dumps(rep_list)
-                    elif isinstance(v, str) or isinstance(v,int):
-                        pass
+                        lenOk = (len(v) != 0)
                     elif isinstance(v, object):
-                        v = [ v.id ]
-                    # Add v to the or-list-object
-                    lstOr[k] = v
-            oOperation = dict(action=action, item=lstOr)
+                        pass
+                    else:
+                        lenOk = (len(v) != 0)
+                    if v!=None and v!= "" and lenOk:
+                        # Possibly adapt 'v'
+                        if isinstance(v, QuerySet):
+                            # This is a list
+                            rep_list = []
+                            for rep in v:
+                                # Get the id of this item
+                                rep_id = rep.id
+                                rep_list.append(rep_id)
+                            v = json.dumps(rep_list)
+                        elif isinstance(v, str) or isinstance(v,int):
+                            pass
+                        elif isinstance(v, object):
+                            v = [ v.id ]
+                        # Add v to the or-list-object
+                        lstOr[k] = v
+                oOperation = dict(action=action, item=lstOr)
+            except:
+                msg = oErr.get_error_message()
             return oOperation
 
-        # Initializations
-        h_field = "history{}".format(type)
-        s_list = getattr(self, h_field)
-        h_list = json.loads(s_list)
-        bChanged = False
-        history_actions = ["create", "remove", "add"]
+        try:
 
-        # Process the actual change
-        if action == "reset":
-            # Reset the history stack of this type
-            setattr(self, "history{}".format(type), "[]")
-            bChanged = True
-        elif action in history_actions:
-            if oFields != None:
-                # Process removing items to the current history
+            # Initializations
+            h_field = "history{}".format(type)
+            s_list = getattr(self, h_field)
+            h_list = json.loads(s_list)
+            bChanged = False
+            history_actions = ["create", "remove", "add"]
+
+            # Process the actual change
+            if action == "reset":
+                # Reset the history stack of this type
+                setattr(self, "history{}".format(type), "[]")
                 bChanged = True
-                oOperation = get_operation(action, oFields)
-                if action == "create": h_list = []
-                h_list.append(oOperation)
+            elif action in history_actions:
+                if oFields != None:
+                    # Process removing items to the current history
+                    bChanged = True
+                    oOperation = get_operation(action, oFields)
+                    if action == "create": h_list = []
+                    h_list.append(oOperation)
 
-        # Only save changes if anything changed actually
-        if bChanged:
-            # Re-create the list
-            s_list = json.dumps(h_list)
-            setattr(self, h_field, s_list)
-            # Save the changes
-            self.save()
-        return True
+            # Only save changes if anything changed actually
+            if bChanged:
+                # Re-create the list
+                s_list = json.dumps(h_list)
+                setattr(self, h_field, s_list)
+                # Save the changes
+                self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError()
+            bBack = False
+
+        return bBack
 
 
 class Visit(models.Model):
@@ -4339,6 +4360,20 @@ class Collection(models.Model):
 
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
+
+    def get_size(self):
+        """Count the items that belong to me, depending on my type"""
+
+        size = 0
+        if self.type == "sermo":
+            size = self.freqsermo()
+        elif self.type == "manu":
+            size = self.freqmanu()
+        elif self.type == "gold":
+            size = self.freqgold()
+        elif self.type == "super":
+            size = self.freqsuper()
+        return size
 
 
 class SermonDescr(models.Model):

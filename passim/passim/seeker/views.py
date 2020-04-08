@@ -509,6 +509,7 @@ def make_search_list(filters, oFields, search_list, qd):
 
     # Return what we have created
     return filters, lstQ, qd
+
 def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     oErr = ErrHandle()
@@ -3732,8 +3733,14 @@ class BasicPart(View):
 
             # Allow user to add to the context
             context = self.add_to_context(context)
+            
+            # Possibly add data from [context.data]
+            if 'data' in context:
+                for k,v in context['data'].items():
+                    self.data[k] = v
 
             # First look at redirect page
+            self.data['redirecturl'] = ""
             if self.redirectpage != "":
                 self.data['redirecturl'] = self.redirectpage
             # Check if 'afternewurl' needs adding
@@ -3770,6 +3777,8 @@ class BasicPart(View):
                     self.data['error_list'] = error_list
                     self.data['errors'] = self.arErr
                 self.data['html'] = ''
+                # We may not redirect if there is an error!
+                self.data['redirecturl'] = ''
             elif self.action == "delete":
                 self.data['html'] = "deleted" 
             else:
@@ -6066,8 +6075,10 @@ class CollAnyEdit(BasicDetails):
              {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
              {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
              {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created},
+             {'type': 'plain', 'label': "Size:",        'value': instance.get_size}
              ]
+          
           # Return the context we have made
           return context    
     
@@ -6081,46 +6092,37 @@ class CollAnyEdit(BasicDetails):
         return True, ""
 
 
+class CollManuEdit(CollAnyEdit):
+    """Manu: Manuscript collections"""
+
+    prefix = "manu"
+    title = "Manuscript collection"
+
+
+class CollSermoEdit(CollAnyEdit):
+    """Sermo: SermonDescr collections """
+
+    prefix = "sermo"
+    title = "Sermon collection"
+
+
+class CollGoldEdit(CollAnyEdit):
+    """Gold: SermonGold collections """
+
+    prefix = "gold"
+    title = "Gold collection"
+
+
+class CollSuperEdit(CollAnyEdit):
+    """Super: EqualGold collections = super sermon gold """
+
+    prefix = "super"
+    title = "Super collection"
+
+
 class CollAnyDetails(CollAnyEdit):
     """Like CollAnyEdit, but then with html"""
     rtype = "html"
-
-
-class CollManuEdit(BasicDetails):
-    """Manu: Manuscript collections"""
-
-    model = Collection
-    mForm = CollectionForm
-    prefix = "manu"
-    basic_name_prefix = "coll"
-    rtype = "json"
-    title = "Manuscript collection"
-    mainitems = []
-
-    def add_to_context(self, context, instance):
-          """Add to the existing context"""
-
-          # Define the main items to show and edit
-          context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
-             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
-             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
-             ]
-          # Return the context we have made
-          return context    
-    
-    def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # Also make sure that the correct type (=prefix) gets established
-            form.instance.type = self.prefix
-        return True, ""
 
 
 class CollManuDetails(CollManuEdit):
@@ -6128,49 +6130,22 @@ class CollManuDetails(CollManuEdit):
     rtype = "html"
 
 
-class CollSermoEdit(BasicDetails):
-    """Sermo: SermonDescr collections """
-
-    model = Collection
-    mForm = CollectionForm
-    prefix = "sermo"
-    basic_name_prefix = "coll"
-    rtype = "json"
-    title = "Sermon collection"
-    mainitems = []
-
-    def add_to_context(self, context, instance):
-          """Add to the existing context"""
-
-          # Define the main items to show and edit
-          context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display},
-             {'type': 'plain', 'label': "Created:", 'value': instance.get_created}
-             ]
-          # Return the context we have made
-          return context    
-    
-    def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # Also make sure that the correct type (=prefix) gets established
-            form.instance.type = self.prefix
-        return True, ""
-
-
 class CollSermoDetails(CollSermoEdit):
     """Like CollSermoEdit, but then with html"""
     rtype = "html"
 
 
-class CollGoldEdit(BasicDetails):
+class CollGoldDetails(CollGoldEdit):
+    """Like CollGoldEdit, but then with html"""
+    rtype = "html"
+
+
+class CollSuperDetails(CollSuperEdit):
+    """Like CollSuperEdit, but then with html"""
+    rtype = "html"
+
+
+class CollGoldEditORG(BasicDetails):
     """Gold: SermonGold collections """
 
     model = Collection
@@ -6207,12 +6182,7 @@ class CollGoldEdit(BasicDetails):
         return True, ""
 
 
-class CollGoldDetails(CollGoldEdit):
-    """Like CollGoldEdit, but then with html"""
-    rtype = "html"
-
-
-class CollSuperEdit(BasicDetails):
+class CollSuperEditORG(BasicDetails):
     """Super: EqualGold collections = super sermon gold """
 
     model = Collection
@@ -6247,11 +6217,6 @@ class CollSuperEdit(BasicDetails):
             # Also make sure that the correct type (=prefix) gets established
             form.instance.type = self.prefix
         return True, ""
-
-
-class CollSuperDetails(CollSuperEdit):
-    """Like CollSuperEdit, but then with html"""
-    rtype = "html"
 
 
 class CollectionListView(BasicList):
@@ -9638,15 +9603,19 @@ class BasketUpdate(BasicPart):
 
     MainModel = SermonDescr
     clsBasket = Basket
-    template_name = "seeker/basket_buttons.html"
+    template_name = "seeker/basket_choices.html"
     entrycount = 0
     bFilter = False
     s_view = SermonListView
     s_form = SermonForm
     s_field = "sermon"
     colltype = "sermo"
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
 
     def add_to_context(self, context):
+        # Reset the redirect page
+        self.redirectpage = ""
+
         # Get the operation
         if 'operation' in self.qd:
             operation = self.qd['operation']
@@ -9694,36 +9663,67 @@ class BasketUpdate(BasicPart):
                 self.clsBasket.objects.filter(profile=profile).delete()
                 # Reset the history for this one
                 profile.history(operation, self.colltype)
-            elif qs and operation == "collcreate":
+            elif qs and (operation == "collcreate" or operation == "colladd"):
                 # Queryset: the basket contents
                 qs = self.clsBasket.objects.filter(profile=profile)
 
                 # Get the history string
                 history = getattr(profile, "history{}".format(self.colltype))
-                # Save the current basket as a collection that needs to receive a name
-                coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, 
-                                                 descrip="Created from a {} listview basket".format(self.colltype), 
-                                                 owner=profile, type=self.colltype)
-                # Link the collection with the correct model
-                kwargs = {'collection': coll}
-                if self.colltype == "sermo":
-                    clsColl = CollectionSerm
-                    field = "sermon"
-                elif self.colltype == "gold":
-                    clsColl = CollectionGold
-                    field = "gold"
-                elif self.colltype == "manu":
-                    clsColl = CollectionMan
-                    field = "manuscript"
-                elif self.colltype == "super":
-                    clsColl = CollectionSuper
-                    field = "super"
-                with transaction.atomic():
-                    for item in qs:
-                        kwargs[field] = getattr( item, self.s_field)
-                        clsColl.objects.create(**kwargs)
-                # Make sure to redirect to this instance
-                self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+
+                # New collection or existing one?
+                coll = None
+                bChanged = False
+                if operation == "collcreate":
+                    # Save the current basket as a collection that needs to receive a name
+                    coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, 
+                                                     descrip="Created from a {} listview basket".format(self.colltype), 
+                                                     owner=profile, type=self.colltype)
+                elif oFields['collone']:
+                    coll = oFields['collone']
+                if coll == None:
+                    # TODO: provide some kind of error??
+                    pass
+                else:
+                    # Link the collection with the correct model
+                    kwargs = {'collection': coll}
+                    if self.colltype == "sermo":
+                        clsColl = CollectionSerm
+                        field = "sermon"
+                    elif self.colltype == "gold":
+                        clsColl = CollectionGold
+                        field = "gold"
+                    elif self.colltype == "manu":
+                        clsColl = CollectionMan
+                        field = "manuscript"
+                    elif self.colltype == "super":
+                        clsColl = CollectionSuper
+                        field = "super"
+                    with transaction.atomic():
+                        for item in qs:
+                            kwargs[field] = getattr( item, self.s_field)
+                            # Check if it doesn't exist yet
+                            obj = clsColl.objects.filter(**kwargs).first()
+                            if obj == None:
+                                clsColl.objects.create(**kwargs)
+                                # Note that some changes have been made
+                                bChanged = True
+                    # Make sure to redirect to this instance -- but only for COLLCREATE
+                    if operation == "collcreate":
+                        self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+                    else:
+                        # We are adding
+                        collurl = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+                        collname = coll.name
+                        context['data'] = dict(collurl=collurl, collname=collname)
+                        # Have changes been made?
+                        if bChanged:
+                            # Add the current basket history to the collection's path
+                            lst_history_basket = json.loads(history)
+                            lst_history_coll = json.loads(coll.path)
+                            for item in lst_history_basket:
+                                lst_history_coll.append(item)
+                            coll.path = json.dumps(lst_history_coll)
+                            coll.save()
 
             # Adapt the basket size
             context['basketsize'] = self.get_basketsize(profile)
@@ -9757,6 +9757,7 @@ class BasketUpdateManu(BasketUpdate):
     s_form = SearchManuForm
     s_field = "manu"
     colltype = "manu"
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -9776,6 +9777,7 @@ class BasketUpdateGold(BasketUpdate):
     s_form = SermonGoldForm
     s_field = "gold"
     colltype = "gold"
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -9795,6 +9797,7 @@ class BasketUpdateSuper(BasketUpdate):
     s_form = SuperSermonGoldForm
     s_field = "super"
     colltype = "super"
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
