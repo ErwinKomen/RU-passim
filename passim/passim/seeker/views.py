@@ -9926,7 +9926,7 @@ class BasketUpdateManu(BasicPart):
     MainModel = Manuscript
     template_name = "seeker/basket_buttons.html"
     entrycount = 0
-   # filters = MANU_SEARCH_FILTERS # TH: aan te passen, eerst dit voor MANUSCRIPT_SEARCH_FILTERS bepalen
+   # filters = MANU_SEARCH_FILTERS # TH: aan  te passen, eerst dit voor MANUSCRIPT_SEARCH_FILTERS bepalen
     bFilter = False
 
     def add_to_context(self, context):
