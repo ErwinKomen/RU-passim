@@ -41,7 +41,7 @@
                            aria-haspopup="true" aria-expanded="false">Tools<span class="caret"></span></a>
                         
                        <ul class="dropdown-menu">
-                          {% if is_passim_editor %}
+                          {% if is_app_editor %}
                             <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'collsermo_list' %}" title="Collections of Sermons">Collections of Sermons</a></li>
@@ -57,22 +57,19 @@
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                             <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>
                           {% endif %}
-                          {% if is_passim_uploader %}
+                          {% if is_app_uploader %}
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'project_list' %}" title="Projects">Projects</a></li> 
                           {% endif %}
                         </ul>
                       </li>
 
-                      {% if is_passim_uploader %}
+                      {% if is_app_uploader %}
                         <li class="dropdown">
                           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                              aria-haspopup="true" aria-expanded="false">Developers<span class="caret"></span></a>
                         
                          <ul class="dropdown-menu">
-                            <li><a href="" title="Upload XML files from e-codices (ch)">Import e-codices XML</a></li>
-                            
-                            <li role="separator" class="divider"></li>
                             <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
                             
                             <li role="separator" class="divider"></li>

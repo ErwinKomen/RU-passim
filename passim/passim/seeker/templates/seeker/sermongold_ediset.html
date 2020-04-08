@@ -9,7 +9,7 @@
       {{ gedi_formset.management_form }}
 
       <div class="col-md-12">
-        {% if not is_passim_editor and gedi_formset|length == 0 %}
+        {% if not is_app_editor and gedi_formset|length == 0 %}
           <p>No critical editions defined for this gold sermon</p>
         {% else %}
           <!-- Table of critical editions for the current gold sermon -->
@@ -28,7 +28,7 @@
 
                     <!-- A button to edit or save this edition -->
                     <td valign="top" class="clickable"  style="min-width: 20px;">
-                      {% if is_passim_editor %}
+                      {% if is_app_editor %}
                         <div class="view-mode">
                           <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this edition">
                             <span class="glyphicon glyphicon-pencil"></span>
@@ -56,7 +56,7 @@
                       <div class="litref-key hidden">{{litrform.litref}}</div>
                       <div class="edit-mode hidden">{{litrform.litref_ta}}</div>                    
                       <!-- Confirmation of delete -->
-                      {% if is_passim_editor %}
+                      {% if is_app_editor %}
                         <div class="delete-confirm hidden">
                           <span>Do you really want to delete this edition?</span>
                           <span>
@@ -81,7 +81,7 @@
                   
                   <!-- A delete button -->
                   <td title="Delete this edition" style="vertical-align: middle; width: 20px; " class="clickable">
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
                     {% endif %}
                   </td>
@@ -89,7 +89,7 @@
                
               {% endfor %}
 
-              {% if is_passim_editor %}
+              {% if is_app_editor %}
                 <!-- Empty row with specifications -->
                 <tr class="form-row empty-form">
                   <!-- A 1-based counter for the forms in this set-->

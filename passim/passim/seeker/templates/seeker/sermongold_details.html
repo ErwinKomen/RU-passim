@@ -53,7 +53,7 @@
             </div>
               
             <!-- Room for viewing (and adding) links to existing other SermonGold instances: FORMSET?? -->
-            {% if goldForm.instance.id and is_passim_editor %}
+            {% if goldForm.instance.id and is_app_editor %}
               <div id="sermongold-links-{{goldForm.instance.id}}">
 
                 <!-- Modal attempt -->
@@ -74,7 +74,7 @@
 
                       <!-- Footer with the save button -->
                       <div class="modal-footer">
-                        {% if is_passim_editor %}
+                        {% if is_app_editor %}
                           <a class="btn jumbo-1" data-dismiss="modal"
                              onclick="ru.passim.seeker.gold_select_save(this);">
                             <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>

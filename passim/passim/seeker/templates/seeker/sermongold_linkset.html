@@ -7,7 +7,7 @@
     {{ glink_formset.management_form }}
 
     <div class="col-md-12">
-      {% if not is_passim_editor and glink_formset|length == 0 %}
+      {% if not is_app_editor and glink_formset|length == 0 %}
         <p>No links to other gold sermons defined for this gold sermon</p>
       {% else %}
         <table class="func-view" style="width: 100%;">
@@ -25,7 +25,7 @@
 
                 <!-- A button to edit or save this link -->
                 <td valign="top" class="clickable"  style="min-width: 20px;">
-                  {% if is_passim_editor %}
+                  {% if is_app_editor %}
                     <div class="view-mode">
                       <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this link">
                         <span class="glyphicon glyphicon-pencil"></span>
@@ -71,7 +71,7 @@
                   </div>
 
                   <!-- Confirmation of delete -->
-                  {% if is_passim_editor %}
+                  {% if is_app_editor %}
                     <div class="delete-confirm hidden">
                       <span>Do you really want to delete this link?</span>
                       <span>
@@ -90,7 +90,7 @@
 
                 <!-- A delete button -->
                 <td title="Delete this link" style="vertical-align: middle; width: 20px; " class="clickable">
-                  {% if is_passim_editor %}
+                  {% if is_app_editor %}
                     <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
                   {% endif %}
                 </td>
@@ -98,7 +98,7 @@
 
             {% endfor %}
 
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <!-- Empty row with specifications -->
               <tr class="form-row empty-form">
                 <!-- A 1-based counter for the forms in this set-->

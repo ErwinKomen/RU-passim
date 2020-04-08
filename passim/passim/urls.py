@@ -10,7 +10,9 @@ import django.contrib.auth.views
 
 import passim.seeker.forms
 import passim.seeker.views
+import passim.reader.views
 from passim.seeker.views import *
+from passim.reader.views import *
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -59,7 +61,7 @@ urlpatterns = [
 
     url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
-    url(r'^search/collection', passim.seeker.views.search_collection, name='search_collection'),
+    url(r'^search/collection',  CollectionListView.as_view(prefix="any"), name='search_collection'),
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
 
@@ -106,16 +108,19 @@ urlpatterns = [
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
     url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
 
+    url(r'^collection/any/list', CollectionListView.as_view(prefix="any"), name='collany_list'),
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
     url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
     url(r'^collection/gold/list', CollectionListView.as_view(prefix="gold"), name='collgold_list'),
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
 
+    url(r'^collection/any/details(?:/(?P<pk>\d+))?/$', CollAnyDetails.as_view(), name='collany_details'),
     url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
     url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
     url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
     url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
 
+    url(r'^collection/any/edit(?:/(?P<pk>\d+))?/$', CollAnyEdit.as_view(), name='collany_edit'),
     url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),
     url(r'^collection/manu/edit(?:/(?P<pk>\d+))?/$', CollManuEdit.as_view(), name='collmanu_edit'),
     url(r'^collection/gold/edit(?:/(?P<pk>\d+))?/$', CollGoldEdit.as_view(), name='collgold_edit'),
@@ -197,10 +202,9 @@ urlpatterns = [
     url(r'^api/manuidnos/$', passim.seeker.views.get_manuidnos, name='api_manuidnos'),
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
-    url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
-    url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    # url(r'^api/import/editions/$', passim.seeker.views.do_import_editions, name='import_editions'),
+    #url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
+    #url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 
@@ -208,6 +212,12 @@ urlpatterns = [
     
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
+
+    # ================ Any READER APP URLs should come here =======================================
+    url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
+    url(r'^reader/import/ecodex2/$', ReaderEcodex.as_view(), name='import_ecodex2'),
+    url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
+    # =============================================================================================
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),

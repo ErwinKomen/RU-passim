@@ -1728,6 +1728,7 @@ var ru = (function ($, ru) {
       do_basket: function (elStart) {
         var frm = null,
             targeturl = "",
+            redirecturl = "",
             operation = "",
             targetid = "",
             target = null,
@@ -1765,6 +1766,11 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
+                  // Should we do redirection?
+                  if ("redirecturl" in response) {
+                    redirecturl = response.redirecturl;
+                    window.location.href = redirecturl;
+                  }
                   // Show the HTML target
                   $(target).html(response['html']);
                   // Possibly do some initialisations again??

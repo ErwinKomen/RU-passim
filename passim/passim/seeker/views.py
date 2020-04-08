@@ -72,6 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT
+from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails
@@ -86,41 +87,6 @@ paginateValues = (100, 50, 20, 10, 5, 2, 1, )
 bDebug = False
 
 cnrs_url = "http://medium-avance.irht.cnrs.fr"
-
-# FILTER SPECIFICATIONS
-SERMON_SEARCH_FILTERS = [
-        {"name": "Author",          "id": "filter_author",      "enabled": False},
-        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
-        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-        {"name": "Title",           "id": "filter_title",       "enabled": False},
-        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
-        {"name": "Feast",           "id": "filter_feast",       "enabled": False},
-        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
-        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection",      "id": "filter_collection",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_manuscript"},
-        {"name": "Collection super","id": "filter_collection_super",  "enabled": False, "head_id": "filter_manuscript"},
-        ]
-GOLD_SEARCH_FILTERS = [
-        {"name": "Gryson or Clavis", "id": "filter_signature",  "enabled": False},
-        {"name": "Author",          "id": "filter_author",      "enabled": False},
-        {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
-        {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
-        {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-        {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-        {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-        {"name": "Collection super","id": "filter_collection_super", "enabled": False},
-        ]   
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -428,12 +394,15 @@ def make_search_list(filters, oFields, search_list, qd):
                 infield = get_value(search_item, "infield")
                 dbfield = get_value(search_item, "dbfield")
                 fkfield = get_value(search_item, "fkfield")
+                keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
                 s_q = ""
+                arFkField = []
+                if fkfield != None:
+                    arFkField = fkfield.split("|")
                
                 # Main differentiation: fkfield or dbfield
                 if fkfield:
-                    # We are dealing with a foreign key
                     # Check for keyS
                     if has_string_value(keyS, oFields):
                         # Check for ID field
@@ -453,12 +422,21 @@ def make_search_list(filters, oFields, search_list, qd):
                         else:
                             val = oFields[keyS]
                             enable_filter(filter_type, head_id)
+                            # We are dealing with a foreign key (or multiple)
+                            if len(arFkField) > 1:
+                                iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
-                            if "*" in val:
-                                val = adapt_search(val)
-                                s_q = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
-                            else:
-                                s_q = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                            s_q = None
+                            for fkfield in arFkField:
+                                if "*" in val:
+                                    val = adapt_search(val)
+                                    s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+                                else:
+                                    s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+                                if s_q == None:
+                                    s_q = s_q_add
+                                else:
+                                    s_q |= s_q_add
                     elif has_obj_value(fkfield, oFields):
                         val = oFields[fkfield]
                         enable_filter(filter_type, head_id)
@@ -490,14 +468,34 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
+                    elif keyType == "has":
+                        # Check the count for the db field
+                        val = oFields[filter_type]
+                        if val == "yes" or val == "no":
+                            enable_filter(filter_type, head_id)
+                            if val == "yes":
+                                s_q = Q(**{"{}__gt".format(dbfield): 0})
+                            else:
+                                s_q = Q(**{"{}".format(dbfield): 0})
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):
+                    s_q_lst = ""
                     enable_filter(filter_type, head_id)
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
-                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        if len(arFkField) > 1:
+                            # THere are more foreign keys: combine in logical or
+                            s_q_lst = ""
+                            for fkfield in arFkField:
+                                if s_q_lst == "":
+                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                                else:
+                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        else:
+                            # Just one foreign key
+                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
                     elif dbfield:
                         s_q_lst = Q(**{"{}__in".format(infield): code_list})
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
@@ -511,7 +509,6 @@ def make_search_list(filters, oFields, search_list, qd):
 
     # Return what we have created
     return filters, lstQ, qd
-
 def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     oErr = ErrHandle()
@@ -658,8 +655,8 @@ def home(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-    context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -688,7 +685,7 @@ def contact(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Contact", True)
@@ -702,7 +699,7 @@ def more(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "More", True)
@@ -716,7 +713,7 @@ def technical(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
@@ -730,7 +727,7 @@ def bibliography(request):
                 'year':datetime.now().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Add the edition references (abreviated and full)
 
@@ -792,7 +789,7 @@ def about(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "About", True)
@@ -807,7 +804,7 @@ def short(request):
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
                'year': get_current_datetime().year}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request, template, context)
 
 def nlogin(request):
@@ -816,7 +813,7 @@ def nlogin(request):
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
                     'year':get_current_datetime().year,}
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
 
 def sync_entry(request):
@@ -932,45 +929,29 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-def search_sermon(filters, qd):
-    """Create a queryset to search for a sermon"""
-    # Wijkt af van dat wat bij SermonListView te zien is. Dat aanpassen? Eerst maar def search_manu doen?
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'title',     'dbfield': 'title',             'keyS': 'title'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature', 'fkfield': 'sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }
-            ]},
-        {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',    'fkfield': 'manu',                      'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'country',   'fkfield': 'manu__library__lcountry',   'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',      'fkfield': 'manu__library__lcity',      'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',   'fkfield': 'manu__library',             'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'daterange', 'dbfield': 'manu__yearstart__gte',      'keyS': 'date_from'},
-            {'filter': 'daterange', 'dbfield': 'manu__yearfinish__lte',     'keyS': 'date_until'},
-            ]}
-         ]
+def search_generic(s_view, cls, form, qd):
+    """Generic queryset generation for searching"""
 
     qs = None
     oErr = ErrHandle()
     bFilter = False
-    sermoForm = None
+    genForm = None
     try:
         bHasFormset = (len(qd) > 0)
 
         if bHasFormset:
             # Get the formset from the input
             lstQ = []
+            prefix = s_view.prefix
+            filters = s_view.filters
+            searches = s_view.searches
 
-            sermoForm = SermonForm(qd, prefix='sermo')
+            genForm = form(qd, prefix=prefix)
 
-            if sermoForm.is_valid():
+            if genForm.is_valid():
 
                 # Process the criteria from this form 
-                oFields = sermoForm.cleaned_data
+                oFields = genForm.cleaned_data
 
                 # Create the search based on the specification in searches
                 filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
@@ -978,225 +959,27 @@ def search_sermon(filters, qd):
                 # Calculate the final qs
                 if len(lstQ) == 0:
                     # No filter: Just show everything
-                    qs = SermonDescr.objects.all()
+                    qs = cls.objects.all()
                 else:
                     # There is a filter: apply it
-                    qs = SermonDescr.objects.filter(*lstQ).distinct()
+                    qs = cls.objects.filter(*lstQ).distinct()
                     bFilter = True
             else:
                 # TODO: communicate the error to the user???
 
                 # Just show everything
-                qs = SermonDescr.objects.all().distinct()
+                qs = cls.objects.all().distinct()
 
         else:
             # Just show everything
-            qs = SermonDescr.objects.all().distinct()
+            qs = cls.objects.all().distinct()
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("search_sermon")
+        oErr.DoError("search_generic")
         qs = None
         bFilter = False
     # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-
-def search_manu(filters, qd):
-    """Create a queryset to search for a manuscript"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'manuid',           'dbfield': 'idno',                                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',          'fkfield': 'library__lcountry',                      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',             'fkfield': 'library__lcity',                         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',          'fkfield': 'library',                                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',          'fkfield': 'keywords',                               'keyS': 'keyword',       'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
-            {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
-            ]},
-        {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            ]},
-        {'section': 'other', 'filterlist': [
-            {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
-            ]}
-         ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            manuForm = ManuscriptForm(qd, prefix='manu')
-
-            if manuForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = manuForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = Manuscript.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = Manuscript.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = Manuscript.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = Manuscript.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_manu")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-def search_gold(filters, qd):
-    """Create a queryset to search for a gold sermon"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            goldForm = SermonGoldForm(qd, prefix='gold')
-
-            if goldForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = goldForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = SermonGold.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = SermonGold.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = SermonGold.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = SermonGold.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_gold")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-def search_super(filters, qd):
-    """Create a queryset to search for a sermon"""
-    searches = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
-            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'collection_manu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    qs = None
-    oErr = ErrHandle()
-    bFilter = False
-    sermoForm = None
-    try:
-        bHasFormset = (len(qd) > 0)
-
-        if bHasFormset:
-            # Get the formset from the input
-            lstQ = []
-
-            superForm = SuperSermonGoldForm(qd, prefix='sermo')
-
-            if sermoForm.is_valid():
-
-                # Process the criteria from this form 
-                oFields = superForm.cleaned_data
-
-                # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # No filter: Just show everything
-                    qs = EqualGold.objects.all()
-                else:
-                    # There is a filter: apply it
-                    qs = EqualGold.objects.filter(*lstQ).distinct()
-                    bFilter = True
-            else:
-                # TODO: communicate the error to the user???
-
-                # Just show everything
-                qs = EqualGold.objects.all().distinct()
-
-        else:
-            # Just show everything
-            qs = EqualGold.objects.all().distinct()
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("search_super")
-        qs = None
-        bFilter = False
-    # Return the resulting filtered and sorted queryset
-    return filters, bFilter, qs, qd
-
-
+    return filters, bFilter, qs, qd, oFields
 
 def search_collection(request):
     """Search for a collection"""
@@ -1215,7 +998,7 @@ def search_collection(request):
     context = dict(title="Search collection",
                    authenticated=authenticated,
                    searchForm=searchForm)
-    context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Create and show the result
     return render(request, template_name, context)
@@ -1329,11 +1112,11 @@ def do_stype(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair Stype definitions"
@@ -1396,11 +1179,11 @@ def do_locations(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Establish location definitions"
@@ -1521,11 +1304,11 @@ def do_provenance(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Tweak Manuscript-Provenance connections"
@@ -1578,11 +1361,11 @@ def do_daterange(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Update from Manuscript to Daterange table"
@@ -1630,11 +1413,11 @@ def do_mext(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Copy Manuscript links to externals"
@@ -1684,11 +1467,11 @@ def do_goldsearch(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Re-create Gold sermon searching (incipit/explicit)"
@@ -1736,11 +1519,11 @@ def do_sermons(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair manuscript-sermons"
@@ -1829,11 +1612,11 @@ def do_goldtogold(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Repair gold-to-gold links"
@@ -1976,11 +1759,11 @@ def do_ssgmigrate(request):
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
-        context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
         # Only passim uploaders can do this
-        if not context['is_passim_uploader']: return reverse('home')
+        if not context['is_app_uploader']: return reverse('home')
 
         # Indicate the necessary tools sub-part
         context['tools_part'] = "Migrate SSG"
@@ -2045,73 +1828,6 @@ def do_ssgmigrate(request):
         msg = oErr.get_error_message()
         oErr.DoError("ssgmigrate")
         return reverse('home')
-
-
-#def do_import_editions(request):
-#    """"This definition imports the old editions and the pages (from Edition) into EdirefSG"""
-
-#    # Use double for-loop:
-#    last_old_edi = ""
-#    last_litref = None
-#    count = 0
-#    oErr = ErrHandle()
-#    template_name = 'tools.html'
-#    result_list = []
-#    context = {'status': 'ok', 'tools_part': 'import_edition'}
-#    try:
-#        for edi in Edition.objects.all().order_by('name'):
-#            edi.update = "NIETGEDAAN"
-#            edi.save()
-
-#            # DEBUG
-#            if edi.id == 1253:
-#                iStop = 1
-
-#            # Split the old editions into old_edi and pages
-#            old_edi, pages, status = get_old_edi(edi) # Gaat dit zo goed met old_edi en pages??
-#            if old_edi != None and old_edi != "":
-#                litref = None
-#                if old_edi != last_old_edi:
-#                    # Compare the old editions with the new editions ("short"), using short without the year
-#                    for litreftmp in Litref.objects.all().order_by('short'): # Moet dit naar boven?
-#                        if old_edi == get_short_edit(litreftmp.short):
-#                            litref = litreftmp
-#                            last_litref = litreftmp
-#                            break
-#                else:
-#                    litref = last_litref
-#                # Continue...
-#                if litref != None:
-#                    # We can process him!
-#                    gold_obj = edi.gold
-#                    esg = EdirefSG.objects.filter(sermon_gold=gold_obj, reference=litref).first()
-#                    if esg == None:
-#                        # Create EdirefSG record
-#                        esg = EdirefSG.objects.create(sermon_gold=gold_obj, reference=litref)
-#                    # Double check pages and add to new EdirefSG record
-#                    if pages != None:
-#                        esg.pages = pages
-#                        esg.save()
-#                    # Keep track of activity in Edition TH: hier worden de records waarbij er geen pages zijn eruit gegooid
-#                    count += 1
-#                    if status == "ok":
-#                        edi.update = "Repaired number {} at {}".format(count, get_now_time())
-#                    else:
-#                        edi.update = "PAGES: " + status
-#                    edi.save()
-#                    # Show it in the result list
-#                    result_list.append({'part': count, 'result': edi.name})
-#            #else: # Hier moet het nog anders. 
-#        # All edition objects have been reviewed
-#        context['result_list'] = result_list
-#    except:
-#        sMsg = oErr.get_error_message()
-#        oErr.DoError("do_import_editions")
-#        context['status'] = "error"
-#        context['message'] = sMsg
-
-#    # Render and return the page
-#    return render(request, template_name, context)
 
 def get_old_edi(edi):
     """Split pages and year from edition, keep stripped edition and the pages
@@ -2373,6 +2089,7 @@ def do_create_pdf_manu(request):
     # And return the pdf
     return response
 
+# ============== NOTE: superseded by the READER app ===================
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
 
@@ -2396,7 +2113,7 @@ def import_ead(request):
     username = request.user.username
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
     
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -2496,7 +2213,7 @@ def import_ecodex(request):
     username = request.user.username
 
     # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
 
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -2676,6 +2393,87 @@ def import_ecodex(request):
     # Return the information
     return JsonResponse(data)
 
+def search_ecodex(request):
+    arErr = []
+    error_list = []
+    data = {'status': 'ok', 'html': ''}
+    username = request.user.username
+    errHandle = ErrHandle()
+
+    # Check if the user is authenticated and if it is POST
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_editor):
+        # Create a regular expression
+        r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
+        # Get the parameters
+        if request.POST:
+            qd = request.POST
+        else:
+            qd = request.GET
+        if 'search_url' in qd:
+            # Get the parameter
+            s_url = qd['search_url']
+            # Make a search request and get the result into a string
+            try:
+                r = requests.get(s_url)
+            except:
+                sMsg = errHandle.get_error_message()
+                errHandle.DoError("Request problem")
+                return False
+            if r.status_code == 200:
+                # Get the text into a list
+                l_text = r.text.split('\n')
+                lHtml = []
+                iMatches = 0
+                lHtml.append("<table><thead><tr><th>#</th><th>Part</th><th>Text</th><th>Version</th><th>XML</th></tr></thead>")
+                lHtml.append("<tbody>")
+                # Walk the text
+                for line in l_text:
+                    # Check if this line contains information
+                    if ">Description<" in line:
+                        # Extract the information from this line
+                        match = r_href.search(line)
+                        if match:
+                            iMatches += 1
+                            # Get the HREF 
+                            href = match.group(2)
+                            # Split into parts
+                            parts = href.split("/")
+                            # Find the 'description' part
+                            for idx,part in enumerate(parts):
+                                if part == "description":
+                                    # Take array from one further
+                                    idx += 1
+                                    mparts = parts[idx:]
+                                    break
+                            # Reconstruct:
+                            xml_name = "{}-{}".format(mparts[0], mparts[1])
+                            version = ""
+                            if len(mparts) > 2 and mparts[2] != "":
+                                xml_name = "{}_{}".format(xml_name, mparts[2])
+                                version = mparts[2]
+                            xml_url = "{}/{}.xml".format("https://www.e-codices.unifr.ch/xml/tei_published", xml_name)
+
+                            # Add to the HTML table
+                            lHtml.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(iMatches,mparts[0], mparts[1],version,xml_url))
+                # We had all lines, now we need to return it in a good way
+                lHtml.append("</tbody></table>")
+                data['html'] = "\n".join(lHtml)
+                data['status'] = "ok"
+            else:
+                data['html'] = "Website returns status code {}".format(r.status_code)
+                data['status'] = "error"
+        else:
+            data['html'] = "Did not receive parameter search_url"
+            data['status'] = "error"
+    else:
+        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
+        data['status'] = "error"
+ 
+    # Return the information
+    return JsonResponse(data)
+
+# ============== NOTE: end of READER app superseded material ==========
+
 def import_gold(request):
     """Import one or more Excel files that each contain one Gold-Sermon definition in Excel"""
 
@@ -2691,7 +2489,7 @@ def import_gold(request):
     bClean = False
     username = request.user.username
 
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
+    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, app_uploader):
 
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
@@ -2843,85 +2641,6 @@ def download_file(url):
         sResult = "download_file received status {} for {}".format(r.status_code, url)
     # Return the result
     return bResult, sResult
-
-def search_ecodex(request):
-    arErr = []
-    error_list = []
-    data = {'status': 'ok', 'html': ''}
-    username = request.user.username
-    errHandle = ErrHandle()
-
-    # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_editor'):
-        # Create a regular expression
-        r_href = re.compile(r'(href=[\'"]?)([^\'" >]+)')
-        # Get the parameters
-        if request.POST:
-            qd = request.POST
-        else:
-            qd = request.GET
-        if 'search_url' in qd:
-            # Get the parameter
-            s_url = qd['search_url']
-            # Make a search request and get the result into a string
-            try:
-                r = requests.get(s_url)
-            except:
-                sMsg = errHandle.get_error_message()
-                errHandle.DoError("Request problem")
-                return False
-            if r.status_code == 200:
-                # Get the text into a list
-                l_text = r.text.split('\n')
-                lHtml = []
-                iMatches = 0
-                lHtml.append("<table><thead><tr><th>#</th><th>Part</th><th>Text</th><th>Version</th><th>XML</th></tr></thead>")
-                lHtml.append("<tbody>")
-                # Walk the text
-                for line in l_text:
-                    # Check if this line contains information
-                    if ">Description<" in line:
-                        # Extract the information from this line
-                        match = r_href.search(line)
-                        if match:
-                            iMatches += 1
-                            # Get the HREF 
-                            href = match.group(2)
-                            # Split into parts
-                            parts = href.split("/")
-                            # Find the 'description' part
-                            for idx,part in enumerate(parts):
-                                if part == "description":
-                                    # Take array from one further
-                                    idx += 1
-                                    mparts = parts[idx:]
-                                    break
-                            # Reconstruct:
-                            xml_name = "{}-{}".format(mparts[0], mparts[1])
-                            version = ""
-                            if len(mparts) > 2 and mparts[2] != "":
-                                xml_name = "{}_{}".format(xml_name, mparts[2])
-                                version = mparts[2]
-                            xml_url = "{}/{}.xml".format("https://www.e-codices.unifr.ch/xml/tei_published", xml_name)
-
-                            # Add to the HTML table
-                            lHtml.append("<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(iMatches,mparts[0], mparts[1],version,xml_url))
-                # We had all lines, now we need to return it in a good way
-                lHtml.append("</tbody></table>")
-                data['html'] = "\n".join(lHtml)
-                data['status'] = "ok"
-            else:
-                data['html'] = "Website returns status code {}".format(r.status_code)
-                data['status'] = "error"
-        else:
-            data['html'] = "Did not receive parameter search_url"
-            data['status'] = "error"
-    else:
-        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
-        data['status'] = "error"
- 
-    # Return the information
-    return JsonResponse(data)
 
 @csrf_exempt
 def get_countries(request):
@@ -3754,6 +3473,7 @@ class BasicPart(View):
     formset_objects = []    # List of formsets to be processed
     previous = None         # Return to this
     bDebug = False          # Debugging information
+    redirectpage = ""       # Where to redirect to
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
     def post(self, request, pk=None):
@@ -3769,8 +3489,9 @@ class BasicPart(View):
             # Build the context
             context = dict(object_id = pk, savedate=None)
             context['authenticated'] = user_is_authenticated(request)
-            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+            context['is_app_editor'] = user_is_ingroup(request, app_editor)
+
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -4012,6 +3733,9 @@ class BasicPart(View):
             # Allow user to add to the context
             context = self.add_to_context(context)
 
+            # First look at redirect page
+            if self.redirectpage != "":
+                self.data['redirecturl'] = self.redirectpage
             # Check if 'afternewurl' needs adding
             # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
             if 'afternewurl' in context and self.add:
@@ -4076,8 +3800,8 @@ class BasicPart(View):
             context = dict(object_id = pk, savedate=None)
             context['prevpage'] = self.previous
             context['authenticated'] = user_is_authenticated(request)
-            context['is_passim_uploader'] = user_is_ingroup(request, 'passim_uploader')
-            context['is_passim_editor'] = user_is_ingroup(request, 'passim_editor')
+            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+            context['is_app_editor'] = user_is_ingroup(request, app_editor)
             # Walk all the form objects
             for formObj in self.form_objects:        
                 # Used to populate a NEW research project
@@ -4430,8 +4154,8 @@ class PassimDetails(DetailView):
 
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
@@ -4962,8 +4686,8 @@ class BasicListView(ListView):
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['authenticated'] = context['is_authenticated'] 
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -5170,8 +4894,8 @@ class LocationListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -5240,7 +4964,7 @@ class LocationDetailsView(PassimDetails):
         context['contained_locations'] = contained_locations
 
         # The standard information
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('location_list')
         crumbs = []
@@ -5427,7 +5151,7 @@ class OriginDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('origin_list')
         crumbs = []
@@ -6053,10 +5777,10 @@ class SermonListView(BasicList):
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
-                {"name": "Collection sermo", "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection gold",  "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection super", "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Collection manu",  "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
@@ -6156,66 +5880,6 @@ class SermonListView(BasicList):
         return sBack, sTitle
 
 
-class BasketView(SermonListView):
-    """Like SermonListView, but then with the basket set true"""
-    basketview = True
-
-
-class BasketUpdate(BasicPart):
-    """Update contents of the sermondescr basket"""
-
-    MainModel = SermonDescr
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
-
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini =  search_sermon(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
- 
-
 class KeywordEdit(BasicDetails):
     """The details of one keyword"""
 
@@ -6307,7 +5971,7 @@ class ProjectEdit(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('project_list')
         context['prevpage'] = prevpage
@@ -6380,6 +6044,48 @@ class ProjectListView(BasicList):
         return sBack, sTitle
 
 
+class CollAnyEdit(BasicDetails):
+    """Manu: Manuscript collections"""
+
+    model = Collection
+    mForm = CollectionForm
+    prefix = "any"
+    basic_name_prefix = "coll"
+    rtype = "json"
+    title = "Any collection"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+          """Add to the existing context"""
+
+          # Define the main items to show and edit
+          context['mainitems'] = [
+             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
+             ]
+          # Return the context we have made
+          return context    
+    
+    def before_save(self, form, instance):
+        if form != None:
+            # Search the user profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.owner = profile
+            # The collection type is now a parameter
+            # form.instance.type = self.prefix
+        return True, ""
+
+
+class CollAnyDetails(CollAnyEdit):
+    """Like CollAnyEdit, but then with html"""
+    rtype = "html"
+
+
 class CollManuEdit(BasicDetails):
     """Manu: Manuscript collections"""
 
@@ -6396,10 +6102,13 @@ class CollManuEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6438,7 +6147,10 @@ class CollSermoEdit(BasicDetails):
              {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Type:", 'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:", 'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6474,10 +6186,13 @@ class CollGoldEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
+             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
+             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6513,10 +6228,13 @@ class CollSuperEdit(BasicDetails):
 
           # Define the main items to show and edit
           context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'},
+             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:", 'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Readonly:", 'value': instance.readonly, 'field_key': 'readonly'}
+             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
+             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
+             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
              ]
           # Return the context we have made
           return context    
@@ -6541,17 +6259,18 @@ class CollectionListView(BasicList):
 
     model = Collection
     listform = CollectionForm
-    prefix = "col"
+    prefix = "any"
     paginate_by = 20
     bUseFilter = True
+    has_select2 = True
     basic_name_prefix = "coll"
     plural_name = ""
-    page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', '']
+    order_cols = ['scope', 'name', 'created', '']
     order_default = order_cols
-    order_heads = [{'name': 'Collection', 'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}
-                   #{'name': 'Sermon', 'order': '', 'type': 'str', 'main': True }
+    order_heads = [{'name': 'Scope',        'order': 'o=1', 'type': 'str', 'custom': 'scope'},
+                   {'name': 'Collection',   'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                   {'name': 'Created',      'order': 'o=3', 'type': 'str', 'custom': 'created'},
+                   {'name': 'Frequency',    'order': '',    'type': 'str', 'custom': 'links'}
                    ]
     filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
     searches = [
@@ -6565,16 +6284,29 @@ class CollectionListView(BasicList):
     def initializations(self):
         if self.prefix == "sermo":
             self.plural_name = "Sermon collections"
-            self.sg_name = "Sermon"
+            self.sg_name = "Sermon collection"
         elif self.prefix == "manu":
             self.plural_name = "Manuscript Collections"
-            self.sg_name = "Manuscript"
+            self.sg_name = "Manuscript collection"
         elif self.prefix == "gold":
             self.plural_name = "Gold sermons Collections"
-            self.sg_name = "Sermon gold"
+            self.sg_name = "Sermon gold collection"
         elif self.prefix == "super":
             self.plural_name = "Super sermons gold Collections"
-            self.sg_name = "Super sermon gold"        
+            self.sg_name = "Super sermon gold collection"        
+        elif self.prefix == "any":
+            self.new_button = False
+            self.plural_name = "All types Collections"
+            self.sg_name = "Collection"  
+            self.order_cols = ['type', 'scope', 'name', 'created', '']
+            self.order_default = self.order_cols
+            self.order_heads  = [
+                {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
+                {'name': 'Scope',       'order': 'o=2', 'type': 'str', 'custom': 'scope'},
+                {'name': 'Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
+                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+            ]  
         return None
 
     def adapt_search(self, fields):
@@ -6587,7 +6319,8 @@ class CollectionListView(BasicList):
             fields['ownlist'] = qs
 
             # Also make sure that we add the collection type, which is specified in "prefix"
-            fields['type'] = self.prefix
+            if self.prefix != "any":
+                fields['type'] = self.prefix
         return fields
 
     def get_field_value(self, instance, custom):
@@ -6614,11 +6347,17 @@ class CollectionListView(BasicList):
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?super-collist_ssg={}'>".format(url, instance.id))
+                html.append("<a href='{}?ssg-collist_ssg={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
-            return sBack, sTitle
+        elif custom == "type":
+            sBack = instance.get_type_display()
+        elif custom == "scope":
+            sBack = instance.get_scope_display()
+        elif custom == "created":
+            sBack = get_crpp_date(instance.created)
+        return sBack, sTitle
 
 
 class CollectionEdit(PassimDetails):
@@ -6640,7 +6379,7 @@ class CollectionEdit(PassimDetails):
         return True, "" 
         
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('collection_list')
         context['prevpage'] = prevpage
@@ -7184,9 +6923,6 @@ class ManuscriptListView(BasicList):
     has_select2 = True
     paginate_by = 20
     bUseFilter = True
-    # template_name = 'seeker/manuscript_list.html'
-    basketview = False
-    page_function = "ru.passim.seeker.search_paged_start"
     prefix = "manu"
     order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
@@ -7207,12 +6943,13 @@ class ManuscriptListView(BasicList):
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
-        {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-        {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-        {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-        {"name": "Collection super","id": "filter_collection_super", "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
+        {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Manuscript",      "id": "filter_collection_manu",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collection_sermo", "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collection_super","enabled": False, "head_id": "filter_collection"},
         {"name": "Project",         "id": "filter_project",          "enabled": False, "head_id": "filter_other"},
       ]
 
@@ -7225,12 +6962,14 @@ class ManuscriptListView(BasicList):
             {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',          'fkfield': 'keywords',                               'keyS': 'keyword',       'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
+            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
+            ]},
+        {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
             {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
             {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -7239,8 +6978,9 @@ class ManuscriptListView(BasicList):
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
-    uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
-               {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    #uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
+    #           {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
+    uploads = reader_uploads
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def add_to_context(self, context, initial):
@@ -7261,7 +7001,7 @@ class ManuscriptListView(BasicList):
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            qs = profile.basketitems_manu.all()
         else:
             qs = Manuscript.objects.all()
         return qs
@@ -7533,11 +7273,8 @@ class SermonGoldListView(BasicList):
     sg_name = "Gold sermon"
     new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
-    # template_name = 'seeker/sermongold.html'
-    basketview = False
     has_select2 = True
     paginate_by = 20
-    page_function = "ru.passim.seeker.search_paged_start"
     order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
@@ -7547,20 +7284,6 @@ class SermonGoldListView(BasicList):
                    {'name': 'Editions', 'order': '', 'type': 'str', 'custom': 'edition'},
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
                    {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
-
-    # ORIGINAL
-    filters = SERMON_SEARCH_FILTERS
-    # TH replacement
-    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",       "enabled": False},
-                {"name": "Author",          "id": "filter_author",           "enabled": False},
-                {"name": "Incipit",         "id": "filter_incipit",          "enabled": False},
-                {"name": "Explicit",        "id": "filter_explicit",         "enabled": False},
-                {"name": "Keyword",         "id": "filter_keyword",          "enabled": False}, 
-                {"name": "Collection manu", "id": "filter_collection_manu",  "enabled": False},
-                {"name": "Collection sermo","id": "filter_collection_sermo", "enabled": False},
-                {"name": "Collection gold", "id": "filter_collection_gold",  "enabled": False},
-                {"name": "Collection super","id": "filter_collection_super", "enabled": False},]
-    # EK new
     filters = [
         {"name": "Gryson or Clavis","id": "filter_signature",   "enabled": False},
         {"name": "Passim code",     "id": "filter_code",        "enabled": False},
@@ -7574,23 +7297,6 @@ class SermonGoldListView(BasicList):
         {"name": "Sermon Gold",     "id": "filter_collgold",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Super sermon gold","id": "filter_collsuper",  "enabled": False, "head_id": "filter_collection"},
         ]       
-    
-    # EK: This one is superseded by the next one
-    searches_ACHTERHAALD = [
-        {'section': '', 'filterlist': [
-            {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
-            {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
-            {'filter': 'collection_manu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
-        ]
-
-    # EK: This is the most up to date version of [searches] for SermonGoldListview
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
@@ -7606,22 +7312,21 @@ class SermonGoldListView(BasicList):
             {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' } 
             ]}
         ]
-
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
     def add_to_context(self, context, initial):
         # Find out who the user is
         profile = Profile.get_user_profile(self.request.user.username)
-        context['basketsize'] = 0 if profile == None else profile.basketsize
+        context['basketsize'] = 0 if profile == None else profile.basketsize_gold
         context['basket_show'] = reverse('basket_show_gold')
         context['basket_update'] = reverse('basket_update_gold')
         return context
 
-
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            # TODO: chck the below -- is that SG??
+            qs = profile.basketitems_gold.all()
         else:
             qs = SermonGold.objects.all()
         return qs
@@ -7730,8 +7435,8 @@ class SermonGoldSelect(BasicPart):
         # Add the result to the context
         context['results'] = self.qs
         context['authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Return the updated context
         return context
@@ -8796,8 +8501,6 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    basketview = False
-    page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['code', 'author', 'number', '', 'srchincipit', '' ]
     order_default= order_cols
     order_heads = [
@@ -8811,16 +8514,18 @@ class EqualGoldListView(BasicList):
         {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"}
         ]
-    filters = [{"name": "Author",          "id": "filter_author",            "enabled": False},
-               {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
-               {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
-               {"name": "Passim code",     "id": "filter_code",              "enabled": False},
-               {"name": "Number",          "id": "filter_number",            "enabled": False},
-               {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
-               {"name": "Collection manu", "id": "filter_collection_manu",   "enabled": False},
-               {"name": "Collection sermo","id": "filter_collection_sermo",  "enabled": False},
-               {"name": "Collection gold", "id": "filter_collection_gold",   "enabled": False},
-               {"name": "Collection super","id": "filter_collection_super",  "enabled": False},
+    filters = [
+        {"name": "Author",          "id": "filter_author",            "enabled": False},
+        {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
+        {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
+        {"name": "Passim code",     "id": "filter_code",              "enabled": False},
+        {"name": "Number",          "id": "filter_number",            "enabled": False},
+        {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
+        {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
+        {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
+        {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
+        {"name": "Super sermon gold","id": "filter_collsuper",        "enabled": False, "head_id": "filter_collection"},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -8829,11 +8534,14 @@ class EqualGoldListView(BasicList):
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'collection_manu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collection_sermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collection_gold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collection_super', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }]}
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
+            ]},
+        {'section': 'collection', 'filterlist': [
+            {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collsuper', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }
+            ]}
         ]
     
     def add_to_context(self, context, initial):
@@ -8847,7 +8555,7 @@ class EqualGoldListView(BasicList):
     def get_basketqueryset(self):
         if self.basketview:
             profile = Profile.get_user_profile(self.request.user.username)
-            qs = profile.basketitems.all()
+            qs = profile.basketitems_super.all()
         else:
             qs = EqualGold.objects.all()
         return qs
@@ -9093,7 +8801,7 @@ class AuthorEdit(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         context['breadcrumbs'] = get_breadcrumbs(self.request, "Author edit", False)
 
@@ -9119,7 +8827,7 @@ class AuthorDetails(AuthorEdit):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         context['afterdelurl'] = ""
         # Process this visit and get the new breadcrumbs object
@@ -9220,8 +8928,8 @@ class LibraryListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
          # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9406,7 +9114,7 @@ class LibraryDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('library_list')
         context['prevpage'] = prevpage
@@ -9575,8 +9283,8 @@ class ReportListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9617,7 +9325,7 @@ class ReportDetailsView(PassimDetails):
     rtype = "html"
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('report_list')
         context['prevpage'] = prevpage
@@ -9747,7 +9455,7 @@ class SourceDetailsView(PassimDetails):
         return True, "" 
 
     def add_to_context(self, context, instance):
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('source_list')
         context['prevpage'] = prevpage
@@ -9846,8 +9554,8 @@ class LitRefListView(ListView):
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_passim_uploader'] = user_is_ingroup(self.request, 'passim_uploader')
-        context['is_passim_editor'] = user_is_ingroup(self.request, 'passim_editor')
+        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -9905,6 +9613,11 @@ class LitRefListView(ListView):
         return qs
 
 
+class BasketView(SermonListView):
+    """Like SermonListView, but then with the basket set true"""
+    basketview = True
+
+
 class BasketViewManu(ManuscriptListView):
     """Like ManuscriptListView, but then with the basket set true"""
     basketview = True
@@ -9920,167 +9633,175 @@ class BasketViewSuper(EqualGoldListView):
     basketview = True
 
 
-class BasketUpdateManu(BasicPart):
+class BasketUpdate(BasicPart):
+    """Update contents of the sermondescr basket"""
+
+    MainModel = SermonDescr
+    clsBasket = Basket
+    template_name = "seeker/basket_buttons.html"
+    entrycount = 0
+    bFilter = False
+    s_view = SermonListView
+    s_form = SermonForm
+    s_field = "sermon"
+    colltype = "sermo"
+
+    def add_to_context(self, context):
+        # Get the operation
+        if 'operation' in self.qd:
+            operation = self.qd['operation']
+        else:
+            return context
+
+        # Get our profile
+        profile = Profile.get_user_profile(self.request.user.username)
+        if profile != None:
+
+            # Get the queryset
+            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd)
+
+            kwargs = {'profile': profile}
+
+            # Action depends on the operation specified
+            if qs and operation == "create":
+                # Remove anything there
+                self.clsBasket.objects.filter(profile=profile).delete()
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.create(**kwargs)
+                # Process history
+                profile.history(operation, self.colltype, oFields)
+            elif qs and operation == "add":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.create(**kwargs)
+                # Process history
+                profile.history(operation, self.colltype, oFields)
+            elif qs and operation == "remove":
+                # Add
+                with transaction.atomic():
+                    for item in qs:
+                        kwargs[self.s_field] = item
+                        self.clsBasket.objects.filter(**kwargs).delete()
+                # Process history
+                profile.history(operation, self.colltype, oFields)
+            elif operation == "reset":
+                # Remove everything from our basket
+                self.clsBasket.objects.filter(profile=profile).delete()
+                # Reset the history for this one
+                profile.history(operation, self.colltype)
+            elif qs and operation == "collcreate":
+                # Queryset: the basket contents
+                qs = self.clsBasket.objects.filter(profile=profile)
+
+                # Get the history string
+                history = getattr(profile, "history{}".format(self.colltype))
+                # Save the current basket as a collection that needs to receive a name
+                coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, 
+                                                 descrip="Created from a {} listview basket".format(self.colltype), 
+                                                 owner=profile, type=self.colltype)
+                # Link the collection with the correct model
+                kwargs = {'collection': coll}
+                if self.colltype == "sermo":
+                    clsColl = CollectionSerm
+                    field = "sermon"
+                elif self.colltype == "gold":
+                    clsColl = CollectionGold
+                    field = "gold"
+                elif self.colltype == "manu":
+                    clsColl = CollectionMan
+                    field = "manuscript"
+                elif self.colltype == "super":
+                    clsColl = CollectionSuper
+                    field = "super"
+                with transaction.atomic():
+                    for item in qs:
+                        kwargs[field] = getattr( item, self.s_field)
+                        clsColl.objects.create(**kwargs)
+                # Make sure to redirect to this instance
+                self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+
+            # Adapt the basket size
+            context['basketsize'] = self.get_basketsize(profile)
+
+            # Set the other context parameters
+            if self.colltype == "sermo":
+                context['basket_show'] = reverse('basket_show' )
+                context['basket_update'] = reverse('basket_update')
+            else:
+                context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
+                context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
+
+        # Return the updated context
+        return context
+
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems.count()
+        profile.basketsize = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
+
+ 
+class BasketUpdateManu(BasketUpdate):
     """Update contents of the manuscript basket"""
 
     MainModel = Manuscript
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-   # filters = MANU_SEARCH_FILTERS # TH: aan  te passen, eerst dit voor MANUSCRIPT_SEARCH_FILTERS bepalen
-    bFilter = False
+    clsBasket = BasketMan 
+    s_view = ManuscriptListView
+    s_form = SearchManuForm
+    s_field = "manu"
+    colltype = "manu"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset # TH: serach_sermon aanpassen
-            self.filters, self.bFilter, qs, ini =  search_manu(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                BasketMan.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.create(profile=profile, manu=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.create(profile=profile, manu=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        BasketMan.objects.filter(profile=profile, manu=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                BasketMan.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_manu.count()
+        profile.basketsize_manu = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
 
 
-class BasketUpdateGold(BasicPart):
+class BasketUpdateGold(BasketUpdate):
     """Update contents of the sermondescr basket"""
 
     MainModel = SermonGold
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
+    clsBasket = BasketGold
+    s_view = SermonGoldListView
+    s_form = SermonGoldForm
+    s_field = "gold"
+    colltype = "gold"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini = search_gold(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_gold.count()
+        profile.basketsize_gold = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
     
 
-class BasketUpdateSuper(BasicPart):
+class BasketUpdateSuper(BasketUpdate):
     """Update contents of the sermondescr basket"""
 
     MainModel = EqualGold
-    template_name = "seeker/basket_buttons.html"
-    entrycount = 0
-    filters = SERMON_SEARCH_FILTERS
-    bFilter = False
+    clsBasket = BasketSuper
+    s_view = EqualGoldListView
+    s_form = SuperSermonGoldForm
+    s_field = "super"
+    colltype = "super"
 
-    def add_to_context(self, context):
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
+    def get_basketsize(self, profile):
+        # Adapt the basket size
+        basketsize = profile.basketitems_super.count()
+        profile.basketsize_super = basketsize
+        profile.save()
+        # Return the basketsize
+        return basketsize
 
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini = search_super(self.filters, self.qd)
-
-            # Action depends on the operation specified
-            if operation == "create":
-                # Remove anything there
-                Basket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.create(profile=profile, sermon=item)
-            elif operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        Basket.objects.filter(profile=profile,sermon=item).delete()
-            elif operation == "reset":
-                # Remove everything from our basket
-                Basket.objects.filter(profile=profile).delete()
-
-            # Adapt the basket size
-            basketsize = profile.basketitems.count()
-            profile.basketsize = basketsize
-            profile.save()
-            context['basketsize'] = basketsize
-
-        # Return the updated context
-        return context
 

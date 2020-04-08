@@ -33,6 +33,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="manage.py" />
+    <Compile Include="passim\basic\admin.py" />
+    <Compile Include="passim\basic\apps.py" />
+    <Compile Include="passim\basic\models.py" />
+    <Compile Include="passim\basic\tests.py" />
+    <Compile Include="passim\basic\utils.py" />
+    <Compile Include="passim\basic\views.py" />
+    <Compile Include="passim\basic\__init__.py" />
     <Compile Include="passim\seeker\admin.py" />
     <Compile Include="passim\seeker\apps.py" />
     <Compile Include="passim\seeker\excel.py">
@@ -55,7 +62,16 @@
     <Compile Include="passim\wsgi.py" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="doc\" />
+    <Folder Include="doc\source\" />
     <Folder Include="passim\" />
+    <Folder Include="passim\basic\" />
+    <Folder Include="passim\basic\static\" />
+    <Folder Include="passim\basic\static\basic\" />
+    <Folder Include="passim\basic\static\basic\content\" />
+    <Folder Include="passim\basic\static\basic\scripts\" />
+    <Folder Include="passim\basic\templates\" />
+    <Folder Include="passim\basic\templates\basic\" />
     <Folder Include="passim\seeker\static\" />
     <Folder Include="passim\seeker\static\seeker\" />
     <Folder Include="passim\seeker\static\seeker\content\" />
@@ -73,6 +89,17 @@
       <SubType>Code</SubType>
     </Content>
     <None Include="passim\seeker\static\seeker\scripts\_references.js" />
+    <Content Include="doc\source\assumptions.rst" />
+    <Content Include="doc\source\basic.rst" />
+    <Content Include="doc\source\basiclistview.rst" />
+    <Content Include="doc\source\detailsview.rst" />
+    <Content Include="doc\source\index.rst" />
+    <Content Include="doc\source\tagtext.rst" />
+    <Content Include="passim\basic\static\basic\content\basic.css" />
+    <Content Include="passim\basic\static\basic\scripts\basic.js" />
+    <Content Include="passim\basic\templates\basic\basic_details.html" />
+    <Content Include="passim\basic\templates\basic\basic_edit.html" />
+    <Content Include="passim\basic\templates\basic\basic_list.html" />
     <Content Include="passim\seeker\static\seeker\content\bootstrap.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-base.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-form.css" />
@@ -106,18 +133,37 @@
     <Content Include="passim\seeker\static\seeker\scripts\xhr2.js" />
     <Content Include="passim\seeker\templates\seeker\author_details.html" />
     <Content Include="passim\seeker\templates\seeker\author_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\basic_list.html" />
+    <Content Include="passim\seeker\templates\seeker\basket_buttons.html" />
     <Content Include="passim\seeker\templates\seeker\collection.html" />
     <Content Include="passim\seeker\templates\seeker\author_list.html" />
+    <Content Include="passim\seeker\templates\seeker\collection_details.html" />
+    <Content Include="passim\seeker\templates\seeker\collection_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\collection_list.html" />
+    <Content Include="passim\seeker\templates\seeker\collection_sermset.html" />
+    <Content Include="passim\seeker\templates\seeker\formset_new.html" />
+    <Content Include="passim\seeker\templates\seeker\generic_details.html" />
+    <Content Include="passim\seeker\templates\seeker\generic_edit.html" />
     <Content Include="passim\seeker\templates\seeker\import_gold.html" />
     <Content Include="passim\seeker\templates\seeker\import_manuscripts.html" />
     <Content Include="passim\seeker\templates\seeker\import_authors.html" />
+    <Content Include="passim\seeker\templates\seeker\item_new.html" />
+    <Content Include="passim\seeker\templates\seeker\keyword_details.html" />
+    <Content Include="passim\seeker\templates\seeker\keyword_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\keyword_list.html" />
+    <Content Include="passim\seeker\templates\seeker\keyword_new.html" />
+    <Content Include="passim\seeker\templates\seeker\library_details.html" />
+    <Content Include="passim\seeker\templates\seeker\library_edit.html" />
     <Content Include="passim\seeker\templates\seeker\report_list.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\sermongold_litset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_colset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_ediset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_litset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_signset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_list.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongoldlink_info.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
@@ -128,12 +174,13 @@
     <Content Include="passim\seeker\templates\seeker\sermongold_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_select.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_details.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_info.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_view.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_edit.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_view.html" />
+    <Content Include="passim\seeker\templates\seeker\super_eqset.html" />
+    <Content Include="passim\seeker\templates\seeker\super_linkset.html" />
+    <Content Include="passim\seeker\templates\seeker\super_select.html" />
     <Content Include="passim\seeker\templates\seeker\syncentry.html" />
     <Content Include="passim\templates\about.html" />
     <Content Include="passim\templates\admin\base.html" />
@@ -149,7 +196,6 @@
     <Content Include="passim\templates\nlogin.html" />
     <Content Include="passim\templates\pagination.html" />
     <Content Include="passim\templates\paginationpost.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon.html" />
     <Content Include="passim\templates\signup.html" />
     <Content Include="passim\templates\submit_row.html" />
     <Content Include="passim\templates\topnav.html" />

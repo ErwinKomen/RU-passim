@@ -31,6 +31,8 @@ Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "passimproject", "passimproj
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "gallica", "gallica\gallica.pyproj", "{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}"
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "ru-basic", "ru-basic\ru-basic.pyproj", "{31DA21B7-7FE4-4FBD-B762-C33297642943}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,8 @@ Global
 		{BB4FCF56-3EE7-437E-8C0E-EE147ACA6855}.Release|Any CPU.Build.0 = Debug|Any CPU
 		{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C95AE658-A129-4A90-8DA8-2B30DA5EDE87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31DA21B7-7FE4-4FBD-B762-C33297642943}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31DA21B7-7FE4-4FBD-B762-C33297642943}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
