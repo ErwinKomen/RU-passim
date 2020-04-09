@@ -513,6 +513,8 @@ class SearchManuForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False, 
+                widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -550,6 +552,10 @@ class SearchManuForm(forms.ModelForm):
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+
+        # The CollOne information is needed for the basket (add basket to collection)
+        prefix = "manu"
+        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -620,6 +626,8 @@ class SermonForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False, 
+                widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -688,6 +696,10 @@ class SermonForm(forms.ModelForm):
         # The available Sermondescr-Gold list
         # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
         self.fields['goldlist'].queryset = SermonDescrGold.objects.all()
+
+        # The CollOne information is needed for the basket (add basket to collection)
+        prefix = "sermo"
+        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -1085,6 +1097,8 @@ class SuperSermonGoldForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False, 
+                widget=CollOneSuperWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
 
     class Meta:
@@ -1109,7 +1123,12 @@ class SuperSermonGoldForm(forms.ModelForm):
         self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
         self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
         self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
-        # Get the instance
+
+        # The CollOne information is needed for the basket (add basket to collection)
+        prefix = "super"
+        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+        
+       # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
             # If there is an instance, then check the author specification
@@ -1803,7 +1822,7 @@ class ManuscriptForm(forms.ModelForm):
             self.fields['name'].required = False
             self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
-
+        
             # Get the instance
             if 'instance' in kwargs:
                 instance = kwargs['instance']

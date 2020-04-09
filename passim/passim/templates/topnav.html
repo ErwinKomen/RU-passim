@@ -41,8 +41,8 @@
                            aria-haspopup="true" aria-expanded="false">Tools<span class="caret"></span></a>
                         
                        <ul class="dropdown-menu">
+                          <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
                           {% if is_app_editor %}
-                            <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'collsermo_list' %}" title="Collections of Sermons">Collections of Sermons</a></li>
                             <li><a href="{% url 'collmanu_list' %}" title="Collections of Manuscripts">Collections of Manuscripts</a></li>
@@ -50,9 +50,11 @@
                             <li><a href="{% url 'collsuper_list' %}" title="Collections of Super Sermon Gold">Collections of Super Sermon Gold</a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'sync_zotero' %}" title="Force Zotero Sync">Synchronize Zotero (force)</a></li>
-                            <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'keyword_list' %}" title="Keywords">Keywords</a></li> 
-                            <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
+                          {% endif %}
+                          <li role="separator" class="divider"></li>
+                          <li><a href="{% url 'keyword_list' %}" title="Keywords">Keywords</a></li> 
+                          <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
+                          {% if is_app_editor %}
                             <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                             <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>
