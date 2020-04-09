@@ -6073,10 +6073,10 @@ class CollAnyEdit(BasicDetails):
              {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
              {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
              {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
+             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
              {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
              {'type': 'plain', 'label': "Created:",     'value': instance.get_created},
-             {'type': 'plain', 'label': "Size:",        'value': instance.get_size}
+             {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown}
              ]
           
           # Return the context we have made
@@ -6088,7 +6088,7 @@ class CollAnyEdit(BasicDetails):
             profile = Profile.get_user_profile(self.request.user.username)
             form.instance.owner = profile
             # The collection type is now a parameter
-            # form.instance.type = self.prefix
+            form.instance.type = self.prefix
         return True, ""
 
 
@@ -6626,9 +6626,14 @@ class ManuscriptEdit(PassimDetails):
     McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
                                        form=ManuscriptCollectionForm, min_num=0,
                                        fk_name="manuscript", extra=0)
+    MlitFormSet = inlineformset_factory(Manuscript, LitrefMan,
+                                         form = ManuscriptLitrefForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
 
     formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False},
-                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'}]
+                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'},
+                       {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
 
     def add_to_context(self, context, instance):
 
@@ -6660,6 +6665,20 @@ class ManuscriptEdit(PassimDetails):
                         # Make sure we set the keyword
                         form.instance.collection = obj
                         # Note: it will get saved with formset.save()
+                elif prefix == "mlit":
+                    # Literature reference processing
+                    newpages = ""
+                    if 'newpages' in cleaned and cleaned['newpages'] != "":
+                        newpages = cleaned['newpages']
+                    # Also get the litref
+                    if 'oneref' in cleaned:
+                        litref = cleaned['oneref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.reference = litref
+                            if newpages:
+                                form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
                 
             else:
                 errors.append(form.errors)
@@ -6692,6 +6711,8 @@ class ManuscriptEdit(PassimDetails):
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             collist = form.cleaned_data['collist']
             adapt_m2m(CollectionMan, instance, "manuscript", collist, "collection")
+            litlist = form.cleaned_data['litlist']
+            adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
                     
         except:
             msg = oErr.get_error_message()

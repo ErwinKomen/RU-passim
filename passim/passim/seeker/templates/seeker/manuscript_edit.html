@@ -72,7 +72,7 @@
 
       <!-- Country -->
       <tr class="form-row">
-        <td valign="top" style="width: 100px;"><b>Country</b></td>
+        <td class="tdnowrap" valign="top" style="width: 100px;"><b>Country</b></td>
         <td class="manuscript-country" align="left">
           <div class="view-mode">{% if manuForm.country_ta and manuForm.country_ta.value %}{{manuForm.country_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
@@ -84,7 +84,7 @@
 
       <!-- City -->
       <tr class="form-row">
-        <td valign="top"><b>City</b></td>
+        <td class="tdnowrap" valign="top"><b>City</b></td>
         <td class="manuscript-city" align="left">
           <div class="view-mode">{% if manuForm.city_ta and manuForm.city_ta.value %}{{manuForm.city_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
@@ -96,7 +96,7 @@
 
       <!-- Library -->
       <tr class="form-row">
-        <td valign="top"><b>Library</b></td>
+        <td class="tdnowrap" valign="top"><b>Library</b></td>
         <td class="manuscript-library" align="left">
           <div class="view-mode">{% if manuForm.libname_ta and manuForm.libname_ta.value %}{{manuForm.libname_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
@@ -108,7 +108,7 @@
 
       <!-- Identifier -->
       <tr class="form-row">
-        <td valign="top"><b>Identifier</b></td>
+        <td class="tdnowrap" valign="top"><b>Identifier</b></td>
         <td class="manuscript-name" align="left">
           <div class="view-mode">{% if manuForm.idno.value %}{{manuForm.idno.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}<div class="edit-mode hidden">{{manuForm.idno}}</div>{% endif %}
@@ -117,7 +117,7 @@
 
       <!-- Title -->
       <tr class="form-row">
-        <td valign="top"><b>Title</b></td>
+        <td class="tdnowrap" valign="top"><b>Title</b></td>
         <td class="manuscript-name" align="left">
           <div class="view-mode">{{manuForm.name.value}}</div>
           {% if is_app_editor %}<div class="edit-mode hidden">{{manuForm.name}}</div>{% endif %}
@@ -126,7 +126,7 @@
 
       <!-- Origin -->
       <tr class="form-row">
-        <td valign="top"><b>Origin</b></td>
+        <td class="tdnowrap" valign="top"><b>Origin</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">
             {% if manuForm.instance.origin %}
@@ -143,7 +143,7 @@
       <!-- Dateranges -->
       <!-- Dates for this manuscript -->
       <tr class="form-row">
-        <td valign="top"><b>Date</b></td>
+        <td class="tdnowrap" valign="top"><b>Date</b></td>
         <td class="manuscript-date" align="left">
           <div class="view-mode">
             {% for range in manuForm.instance.manuscript_dateranges.all %}
@@ -260,21 +260,23 @@
 
       <!-- Physical appearance -->
       <tr class="form-row">
-        <td valign="top"><b>Support</b></td>
+        <td class="tdnowrap" valign="top"><b>Support</b></td>
         <td class="manuscript-support" align="left">
           <div class="view-mode">{% if manuForm.instance.support %}{{manuForm.support.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}<div class="edit-mode hidden">{{manuForm.support}}</div>{% endif %}
         </td>
       </tr>
+
       <tr class="form-row">
-        <td valign="top"><b>Extent</b></td>
+        <td class="tdnowrap" valign="top"><b>Extent</b></td>
         <td class="manuscript-extent" align="left">
           <div class="view-mode">{% if manuForm.instance.extent %}{{manuForm.extent.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}<div class="edit-mode hidden">{{manuForm.extent}}</div>{% endif %}
         </td>
       </tr>
+
       <tr class="form-row">
-        <td valign="top"><b>Format</b></td>
+        <td class="tdnowrap" valign="top"><b>Format</b></td>
         <td class="manuscript-format" align="left">
           <div class="view-mode">{% if manuForm.instance.format %}{{manuForm.format.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}<div class="edit-mode hidden">{{manuForm.format}}</div>{% endif %}
@@ -283,7 +285,7 @@
 
       <!-- Project this manuscript belongs to -->
       <tr class="form-row">
-        <td valign="top"><b>Project</b></td>
+        <td class="tdnowrap" valign="top"><b>Project</b></td>
         <td class="manuscript-project" align="left">
           <div class="view-mode">
             {% if manuForm.instance.project %}
@@ -298,7 +300,7 @@
 
       <!-- VIEW only: keywords -->
       <tr class="form-row">
-        <td valign="top"><b>Keywords</b></td>
+        <td class="tdnowrap" valign="top"><b>Keywords</b></td>
         <td class="manuscript-format" align="left">
           <div class="any-mode">
             {% if manuForm.instance.keywords.count > 0 %}
@@ -312,12 +314,15 @@
       
       <!-- Collections (using select2) TH aanpassen vanaf de naam vd collectie direct naar de lijst met manuscripts in man list view -->
       <tr class="form-row">
-        <td valign="top"> <b>Collections</b></td>
-          <span>
-            <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
-              <span class="glyphicon glyphicon-plus"></span>
-            </a>
-          </span>
+        <td class="tdnowrap" valign="top"> 
+          <b>Collections</b>
+          {% if is_app_editor %}
+            <span >
+              <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+                <span class="glyphicon glyphicon-plus"></span>
+              </a>
+            </span>
+          {% endif %}
         </td>
         <td class="manuscript-format" align="left"> 
           <div class="view-mode">
@@ -332,6 +337,38 @@
           {% if is_app_editor %}
             <div class="new-mode hidden" id="mcol_formset">
               {% include 'seeker/formset_new.html' with this_formset=mcol_formset prefix='mcol' linkfield=mcol_linkfield unique=1 %}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+
+      <!-- Literature references (using select2) -->
+      <tr class="form-row">
+        <td class="tdnowrap" valign="top"> 
+          <b>Literature</b>
+          {% if is_app_editor %}
+            <span >
+              <a class="edit-mode hidden btn" onclick="ru.passim.seeker.add_new_select2(this);">
+                <span class="glyphicon glyphicon-plus"></span>
+              </a>
+            </span>
+          {% endif %}
+        </td>
+        <td class="manuscript-format" align="left"> 
+          <div class="view-mode">
+            <!-- Litref -->
+            {% if manuForm.instance.litrefs.count > 0 %}
+              {% for mlref in manuForm.instance.manuscript_litrefs.all %}
+                <span class="badge signature cl">
+                  <a href="{% url 'literature_list' %}#lit_{{mlref.reference.id}}">{{mlref.get_short_markdown|safe}}</a>
+                </span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div class="edit-mode hidden">{{manuForm.litlist}}</div>
+          {% if is_app_editor %}
+            <div class="new-mode hidden" id="mlit_formset">
+              {% include 'seeker/formset_new.html' with this_formset=mlit_formset prefix='mlit' linkfield=mlit_linkfield unique=1 %}
             </div>
           {% endif %}
         </td>

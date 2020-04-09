@@ -2413,7 +2413,7 @@ class Manuscript(models.Model):
 
     # PHYSICAL features of the manuscript (OPTIONAL)
     # [0-1] Support: the general type of manuscript
-    support = models.CharField("Support", max_length=LONG_STRING, null=True, blank=True)
+    support = models.TextField("Support", null=True, blank=True)
     # [0-1] Extent: the total number of pages
     extent = models.TextField("Extent", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Format: the size
@@ -2433,15 +2433,13 @@ class Manuscript(models.Model):
     # [0-1] Each manuscript should belong to a particular project
     project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
 
+    # ============== MANYTOMANY connections
     # [m] Many-to-many: one manuscript can have a series of provenances
-    provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")
-       
+    provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")       
     # [m] Many-to-many: one manuscript can have a series of literature references
     litrefs = models.ManyToManyField("Litref", through="LitrefMan")
-
      # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
-
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
 
@@ -4361,19 +4359,35 @@ class Collection(models.Model):
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
 
-    def get_size(self):
-        """Count the items that belong to me, depending on my type"""
+    def get_size_markdown(self):
+        """Count the items that belong to me, depending on my type
+        
+        Create a HTML output
+        """
 
         size = 0
+        lHtml = []
         if self.type == "sermo":
             size = self.freqsermo()
+            # Determine where clicking should lead to
+            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
         elif self.type == "manu":
             size = self.freqmanu()
+            # Determine where clicking should lead to
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
         elif self.type == "gold":
             size = self.freqgold()
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
         elif self.type == "super":
             size = self.freqsuper()
-        return size
+            # Determine where clicking should lead to
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
+        sBack = ", ".join(lHtml)
+        return sBack
 
 
 class SermonDescr(models.Model):

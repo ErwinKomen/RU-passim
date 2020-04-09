@@ -203,6 +203,18 @@ class LitrefSgWidget(ModelSelect2MultipleWidget):
         return LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class LitrefManWidget(ModelSelect2MultipleWidget):
+    model = LitrefMan
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
+
+
 class LocationWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains']
@@ -781,7 +793,7 @@ class CollectionForm(forms.ModelForm):
         fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type', 'scope']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}), 
                  'owner':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'descrip':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'descrip':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'readonly':    forms.CheckboxInput(),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'scope':       forms.Select(attrs={'style': 'width: 100%;'})
@@ -1553,6 +1565,12 @@ class ManuscriptProvForm(forms.ModelForm):
 
 
 class ManuscriptLitrefForm(forms.ModelForm):
+    # EK: Added for Sermon Gold new approach 
+    oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
+    # ORIGINAL:
     litref = forms.CharField(required=False)
     litref_ta = forms.CharField(label=_("Reference"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
@@ -1572,6 +1590,10 @@ class ManuscriptLitrefForm(forms.ModelForm):
         self.fields['reference'].required = False
         self.fields['litref'].required = False
         self.fields['litref_ta'].required = False
+        # EK: Added for Sermon Gold new approach 
+        self.fields['newpages'].required = False
+        self.fields['oneref'].required = False
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1582,8 +1604,9 @@ class ManuscriptLitrefForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super(ManuscriptLitrefForm, self).clean()
         litref = cleaned_data.get("litref")
+        oneref = cleaned_data.get("oneref")
         reference = cleaned_data.get("reference")
-        if reference == None and (litref == None or litref == ""):
+        if reference == None and (litref == None or litref == "") and (oneref == None or oneref == ""):
             #litref_ta = cleaned_data.get("litref_ta")
             #obj = Litref.objects.filter(full=litref_ta).first()
             #if obj == None:
@@ -1744,6 +1767,8 @@ class ManuscriptForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
 
     class Meta:
@@ -1769,40 +1794,47 @@ class ManuscriptForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ManuscriptForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['stype'].required = False
-        self.fields['yearstart'].required = False
-        self.fields['yearfinish'].required = False
-        self.fields['name'].required = False
-        self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['stype'].required = False
+            self.fields['yearstart'].required = False
+            self.fields['yearfinish'].required = False
+            self.fields['name'].required = False
+            self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
 
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # If there is an instance, then check if a library is specified
-            library = instance.library
-            if library != None:
-                # In this case: get the city and the country
-                city = library.get_city_name()
-                country = library.get_country_name()
-                if (country == None or country == "") and city != None and city != "":
-                    # We have a city, but the country is not specified...
-                    lstQ = []
-                    lstQ.append(Q(loctype__name="country"))
-                    lstQ.append(Q(relations_location=library.lcity))
-                    obj = Location.objects.filter(*lstQ).first()
-                    if obj != None:
-                        country = obj.name
-                # Put them in the fields
-                self.fields['city_ta'].initial = city
-                self.fields['country_ta'].initial = country
-                # Also: make sure we put the library NAME in the initial
-                self.fields['libname_ta'].initial = library.name
-            # Look after origin
-            origin = instance.origin
-            self.fields['origname_ta'].initial = "" if origin == None else origin.name
-            self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
-            
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # If there is an instance, then check if a library is specified
+                library = instance.library
+                if library != None:
+                    # In this case: get the city and the country
+                    city = library.get_city_name()
+                    country = library.get_country_name()
+                    if (country == None or country == "") and city != None and city != "":
+                        # We have a city, but the country is not specified...
+                        lstQ = []
+                        lstQ.append(Q(loctype__name="country"))
+                        lstQ.append(Q(relations_location=library.lcity))
+                        obj = Location.objects.filter(*lstQ).first()
+                        if obj != None:
+                            country = obj.name
+                    # Put them in the fields
+                    self.fields['city_ta'].initial = city
+                    self.fields['country_ta'].initial = country
+                    # Also: make sure we put the library NAME in the initial
+                    self.fields['libname_ta'].initial = library.name
+                # Look after origin
+                origin = instance.origin
+                self.fields['origname_ta'].initial = "" if origin == None else origin.name
+                self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+                self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError()
+        return None
 
 class LocationForm(forms.ModelForm):
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
