@@ -684,7 +684,7 @@ class BasicList(ListView):
         return None
 
     def adapt_search(self, fields):
-        return fields
+        return fields, None, None
   
     def get_queryset(self):
         # Get the parameters passed on with the GET or the POST request
@@ -732,17 +732,32 @@ class BasicList(ListView):
                 oFields = thisForm.cleaned_data
 
                 # Allow user to adapt the list of search fields
-                oFields = self.adapt_search(oFields)
+                oFields, lstExclude, qAlternative = self.adapt_search(oFields)
                 
                 self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
                 
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
-                    # Just show everything
-                    qs = self.model.objects.all()
+                    if lstExclude:
+                        qs = self.model.exclude(*lstExclude)
+                    else:
+                        # Just show everything
+                        qs = self.model.objects.all()
                 else:
-                    # There is a filter, so apply it
-                    qs = self.model.objects.filter(*lstQ).distinct()
+                    # There is a filter, so build it up
+                    filter = lstQ[0]
+                    for item in lstQ[1:]:
+                        filter = filter & item
+                    if qAlternative:
+                        filter = ( filter ) | qAlternative
+
+                    # Check if excluding is needed
+                    if lstExclude:
+                        # qs = self.model.objects.filter(*lstQ).exclude(*lstExclude).distinct()
+                        qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
+                    else:
+                        # qs = self.model.objects.filter(*lstQ).distinct()
+                        qs = self.model.objects.filter(filter).distinct()
                     # Only set the [bFilter] value if there is an overt specified filter
                     for filter in self.filters:
                         if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
@@ -752,6 +767,8 @@ class BasicList(ListView):
             elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
+
+
 
             # Do the ordering of the results
             order = self.order_default
@@ -793,6 +810,7 @@ class BasicDetails(DetailView):
     basic_name_prefix = ""
     basic_add = ""
     add_text = "Add a new"
+    permission = "write"    # Permission can be: (nothing), "read" and "write"
     new_button = False
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
@@ -978,6 +996,12 @@ class BasicDetails(DetailView):
         context['afternewurl'] = ""
 
         context['topleftbuttons'] = ""
+
+        if context['authenticated']:
+            self.permission = "read"
+            if context['is_app_editor']:
+                self.permission = "write"
+        context['permission'] = self.permission
 
         # Possibly define where a listview is
         classname = self.model._meta.model_name

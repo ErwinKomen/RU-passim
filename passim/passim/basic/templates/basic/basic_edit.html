@@ -14,7 +14,7 @@
         <td colspan="2"  class="ms editable table">
           <!-- Provide the necessary buttons: edit, cancel and save -->
           <div>
-            {% if is_app_editor %}
+            {% if is_app_editor and permission == "write" %}
               <!-- Edit button -->
               <a mode="edit" class="view-mode btn btn-xs jumbo-1"><span class="glyphicon glyphicon-pencil" title="Edit these data"></span></a>
             {% endif %}
@@ -24,7 +24,7 @@
               <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
             </a>
 
-            {% if is_app_editor %}
+            {% if is_app_editor and permission == "write"  %}
               <!-- Save button -->
               <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
                  targeturl="{% if basic_form.instance.id %}{{editview}}{% else %}{{addview}}{% endif %}" >
@@ -38,7 +38,7 @@
             <!-- Little error message room -->
             <span id="gold_err_msg" class="err-msg"></span>
 
-            {% if is_app_editor %}
+            {% if is_app_editor  and permission == "write" %}
               <!-- Put the delete button completely to the right-->
               <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
                  onclick="ru.basic.delete_confirm(this);">
@@ -48,7 +48,7 @@
           </div>
 
           <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-          {% if is_app_editor %}
+          {% if is_app_editor and permission == "write"  %}
             <div class="delete-confirm hidden selected">
               <span>Are you sure you would like to delete this item?</span>
               <span>
@@ -83,7 +83,7 @@
             <!-- Cell with the name of the field-->
             <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
               <span>{{mainitem.label}}</span>
-              {% if is_app_editor and mainitem.multiple %}
+              {% if is_app_editor and mainitem.multiple and permission == "write"  %}
                 <!-- Multiple value field, i.e. select2 -->
                 <span>
                   <a class="edit-mode hidden btn" 
@@ -101,16 +101,16 @@
 
               {% if mainitem.multiple and not 'field_list' in mainitem %}
                 <!-- Multiple instances choosing using Select2 -->
-                <div class="{% if 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
+                <div class="{% if 'field_list' in mainitem and permission == "write" %}view-mode{% else %}any-mode{% endif %} ">
                   {% if mainitem.value|length > 0 %}
                     {% for subitem in mainitem.value %}
                       <span class="keyword"><a href="{{mainitem.link}}?{{mainitem.qlist}}={{subitem.id}}">{{subitem.get_label}}</a></span>
                     {% endfor %}
                   {% else %}-{% endif %}
                 </div>
-                {% if 'field_list' in mainitem %}
+                {% if 'field_list' in mainitem and permission == "write" %}
                   <div class="edit-mode hidden">{{mainitem.field_list}}</div>
-                  {% if is_app_editor %}
+                  {% if is_app_editor and permission == "write"  %}
                     <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
                       {% if mainitem.unique %}
                         {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
@@ -139,33 +139,35 @@
                 </div>
 
                 <!-- This is where the editable input comes -->
-                <div class="edit-overal">
-                  {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
-                    <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
-                    <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
-                  {% elif 'field_key' in mainitem %}
-                    <div class="edit-mode hidden">{{mainitem.field_key}}</div>
-                  {% elif 'field_list' in mainitem %}
-                    <div class="edit-mode hidden" 
-                          {% if 'inline_selection' in mainitem %}select2init="{{mainitem.inline_selection}}"{% endif %}>
-                      <div class="inner">
-                        {{mainitem.field_list}}
+                {% if permission == "write"  %}
+                  <div class="edit-overal">
+                    {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
+                      <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
+                      <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
+                    {% elif 'field_key' in mainitem %}
+                      <div class="edit-mode hidden">{{mainitem.field_key}}</div>
+                    {% elif 'field_list' in mainitem %}
+                      <div class="edit-mode hidden" 
+                            {% if 'inline_selection' in mainitem %}select2init="{{mainitem.inline_selection}}"{% endif %}>
+                        <div class="inner">
+                          {{mainitem.field_list}}
+                        </div>
                       </div>
-                    </div>
-                    {% if is_app_editor and 'fso' in mainitem %}
-                      <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset" 
-                           {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
-                        {% if mainitem.unique %}
-                          {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
-                        {% else %}
-                          {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
-                        {% endif %}
-                      </div>
+                      {% if is_app_editor and 'fso' in mainitem and permission == "write"  %}
+                        <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset" 
+                             {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
+                          {% if mainitem.unique %}
+                            {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
+                          {% else %}
+                            {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    {% elif 'field_view' in mainitem %}
+                      <div class="hidden">{{mainitem.field_view}}</div>
                     {% endif %}
-                  {% elif 'field_view' in mainitem %}
-                    <div class="hidden">{{mainitem.field_view}}</div>
-                  {% endif %}
-                </div>
+                  </div>
+                {% endif %}
               {% endif %}
             </td>
           </tr>

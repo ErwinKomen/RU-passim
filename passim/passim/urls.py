@@ -225,6 +225,8 @@ urlpatterns = [
     url(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     url(r'^signup/$', passim.seeker.views.signup, name='signup'),
 
+    url(r'^login/user/(?P<user_id>\w[\w\d_]+)$', passim.seeker.views.login_as_user, name='login_as'),
+
     url(r'^login/$',
         django.contrib.auth.views.login,
         {

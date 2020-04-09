@@ -15,7 +15,7 @@
 
 {% block content %}
   <div>
-    {% if authenticated %}
+    {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
       <div class="panel panel-default gold-head subform">
         <div class="row">&nbsp;</div>
@@ -236,6 +236,10 @@
 
       </div>
 
+    {% elif authenticated and not permission %}
+      <div class="explanation">
+        <p>Dear user, you do not have permission to view this item.</p>
+      </div>
     {% else %}
       <div class="explanation">
         <p>Dear user, you are <b>not</b> logged in.</p>

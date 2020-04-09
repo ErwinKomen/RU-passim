@@ -1004,6 +1004,25 @@ def search_collection(request):
     # Create and show the result
     return render(request, template_name, context)
 
+def login_as_user(request, user_id):
+    assert isinstance(request, HttpRequest)
+
+    # Find out who I am
+    supername = request.user.username
+    super = User.objects.filter(username__iexact=supername).first()
+    if super == None:
+        return nlogin(request)
+
+    # Make sure that I am superuser
+    if super.is_staff and super.is_superuser:
+        user = User.objects.filter(username__iexact=user_id).first()
+        if user != None:
+            # Perform the login
+            login(request, user)
+            return HttpResponseRedirect(reverse("home"))
+
+    return home(request)
+
 def signup(request):
     """Provide basic sign up and validation of it """
 
@@ -4780,7 +4799,7 @@ class BasicListView(ListView):
         return None
 
     def adapt_search(self, fields):
-        return fields
+        return fields, None, None
   
     def get_queryset(self):
         # Get the parameters passed on with the GET or the POST request
@@ -6065,22 +6084,49 @@ class CollAnyEdit(BasicDetails):
     mainitems = []
 
     def add_to_context(self, context, instance):
-          """Add to the existing context"""
+        """Add to the existing context"""
 
-          # Define the main items to show and edit
-          context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
-             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Created:",     'value': instance.get_created},
-             {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown}
-             ]
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+            {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+            {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
+            {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
+            {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
+            {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
+            {'type': 'plain', 'label': "Created:",     'value': instance.get_created},
+            {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown}
+            ]
+
+        # Determine what the permission level is of this collection for the current user
+        # (1) Is this user a different one than the one who created the collection?
+        profile_owner = instance.owner
+        profile_user = Profile.get_user_profile(self.request.user.username)
+        # (2) Set default permission
+        permission = ""
+        if profile_owner.id == profile_user.id:
+            # (3) Any creator of the collection may write it
+            permission = "write"
+        else:
+            # (4) permission for different users
+            if context['is_app_editor']:
+                # (5) what if the user is an app_editor?
+                if instance.scope == "publ":
+                    # Editors may read/write collections with 'public' scope
+                    permission = "write"
+                elif instance.scope == "team":
+                    # Editors may read collections with 'team' scope
+                    permission = "read"
+            else:
+                # (5) any other users
+                if instance.scope == "publ":
+                    # All users may read collections with 'public' scope
+                    permission = "read"
+
+        context['permission'] = permission
           
-          # Return the context we have made
-          return context    
+        # Return the context we have made
+        return context    
     
     def before_save(self, form, instance):
         if form != None:
@@ -6230,20 +6276,23 @@ class CollectionListView(BasicList):
     has_select2 = True
     basic_name_prefix = "coll"
     plural_name = ""
-    order_cols = ['scope', 'name', 'created', '']
+    order_cols = ['scope', 'name', 'created', 'owner__user__username', '']
     order_default = order_cols
     order_heads = [{'name': 'Scope',        'order': 'o=1', 'type': 'str', 'custom': 'scope'},
                    {'name': 'Collection',   'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                    {'name': 'Created',      'order': 'o=3', 'type': 'str', 'custom': 'created'},
+                   {'name': 'Owner',        'order': 'o=4', 'type': 'str', 'custom': 'owner'},
                    {'name': 'Frequency',    'order': '',    'type': 'str', 'custom': 'links'}
                    ]
-    filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+    filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False},
+                {"name": "Owner",      "id": "filter_owner",      "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'collection', 'dbfield': 'name', 'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+            {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+            {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'owner',   'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
-            {'filter': 'coltype', 'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' }]}
+            {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
+            {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
         ]
 
     def initializations(self):
@@ -6263,30 +6312,44 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "All types Collections"
             self.sg_name = "Collection"  
-            self.order_cols = ['type', 'scope', 'name', 'created', '']
+            self.order_cols = ['type', 'scope', 'name', 'created', 'owner__user__username', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Scope',       'order': 'o=2', 'type': 'str', 'custom': 'scope'},
                 {'name': 'Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
+                {'name': 'Owner',       'order': 'o=5', 'type': 'str', 'custom': 'owner'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
         return None
 
     def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
         # Check if the collist is identified
         if fields['ownlist'] == None or len(fields['ownlist']) == 0:
             # Get the user
-            user = User.objects.filter(username=self.request.user.username).first()
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
             # Get to the profile of this user
             qs = Profile.objects.filter(user=user)
+            profile = qs[0]
             fields['ownlist'] = qs
+
+            # Check on what kind of user I am
+            if user_is_ingroup(self.request, app_editor):
+                # This is an editor: may see collections in the team
+                qAlternative = Q(scope="team") | Q(scope="publ")
+            else:
+                # Common user: may only see those with public scope
+                # fields['scope'] = "publ"
+                qAlternative = Q(scope="publ")
 
             # Also make sure that we add the collection type, which is specified in "prefix"
             if self.prefix != "any":
                 fields['type'] = self.prefix
-        return fields
+        return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -6322,6 +6385,8 @@ class CollectionListView(BasicList):
             sBack = instance.get_scope_display()
         elif custom == "created":
             sBack = get_crpp_date(instance.created)
+        elif custom == "owner":
+            sBack = instance.owner.user.username
         return sBack, sTitle
 
 
@@ -7001,7 +7066,7 @@ class ManuscriptListView(BasicList):
                 prj_default = qs.first()
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
-        return fields
+        return fields, None, None
 
     def get_field_value(self, instance, custom):
         sBack = ""
