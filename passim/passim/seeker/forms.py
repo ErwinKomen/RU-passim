@@ -995,6 +995,8 @@ class SermonGoldForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        username = kwargs.pop('username', "")
+        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SermonGoldForm, self).__init__(*args, **kwargs)
         oErr = ErrHandle()
@@ -1007,11 +1009,17 @@ class SermonGoldForm(forms.ModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
-            self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-            self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-            self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-            self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
             self.fields['ftxtlist'].queryset = Ftextlink.objects.all().order_by('url')
+
+            # Note: the collection filters must use the SCOPE of the collection
+            self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
+            self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
+            self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
+            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            #self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            #self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+            #self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+            #self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "gold"

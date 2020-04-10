@@ -443,7 +443,7 @@ class BasicList(ListView):
 
         # Need to load the correct form
         if self.listform:
-            frm = self.listform(initial, prefix=self.prefix)
+            frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor)
             if frm.is_valid():
                 context['{}Form'.format(self.prefix)] = frm
                 # Get any possible typeahead parameters

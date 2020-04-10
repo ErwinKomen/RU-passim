@@ -286,8 +286,7 @@ def user_is_authenticated(request):
 
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
-    username = request.user.username
-    user = User.objects.filter(username=username).first()
+    user = User.objects.filter(username=request.user.username).first()
     # glist = user.groups.values_list('name', flat=True)
 
     # Only look at group if the user is known
