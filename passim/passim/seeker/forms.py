@@ -536,6 +536,8 @@ class SearchManuForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        username = kwargs.pop('username', "")
+        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SearchManuForm, self).__init__(*args, **kwargs)
         
@@ -677,6 +679,8 @@ class SermonForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        username = kwargs.pop('username', "")
+        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SermonForm, self).__init__(*args, **kwargs)
         # Some fields are not required
@@ -1041,7 +1045,7 @@ class SermonGoldForm(forms.ModelForm):
                 self.fields['ftxtlist'].initial = [x.pk for x in instance.goldftxtlinks.all().order_by('url')]
         except:
             msg = oErr.get_error_message()
-            oErr.DoError()
+            oErr.DoError("SermonGoldForm-init")
         return None
 
 
@@ -1122,6 +1126,8 @@ class SuperSermonGoldForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        username = kwargs.pop('username', "")
+        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SuperSermonGoldForm, self).__init__(*args, **kwargs)
         # Some fields are not required

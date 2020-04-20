@@ -420,6 +420,7 @@ class BasicList(ListView):
     uploads = []
     delete_line = False
     none_on_empty = False
+    use_team_group = False
     lst_typeaheads = []
     sort_order = ""
     page_function = "ru.basic.search_paged_start"
@@ -443,7 +444,10 @@ class BasicList(ListView):
 
         # Need to load the correct form
         if self.listform:
-            frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor)
+            if self.use_team_group:
+                frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor)
+            else:
+                frm = self.listform(initial, prefix=self.prefix)
             if frm.is_valid():
                 context['{}Form'.format(self.prefix)] = frm
                 # Get any possible typeahead parameters

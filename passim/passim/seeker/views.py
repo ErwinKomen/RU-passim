@@ -5785,6 +5785,7 @@ class SermonListView(BasicList):
     plural_name = "Sermons"
     basic_name = "sermon"
     has_select2 = True
+    use_team_group = True
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
     order_default = order_cols
@@ -6971,6 +6972,7 @@ class ManuscriptListView(BasicList):
     model = Manuscript
     listform = SearchManuForm
     has_select2 = True
+    use_team_group = True
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
@@ -7324,6 +7326,7 @@ class SermonGoldListView(BasicList):
     new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
     has_select2 = True
+    use_team_group = True
     paginate_by = 20
     order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
     order_cols = order_default
@@ -8548,6 +8551,7 @@ class EqualGoldListView(BasicList):
     model = EqualGold
     listform = SuperSermonGoldForm
     has_select2 = True  # Check
+    use_team_group = True
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
