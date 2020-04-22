@@ -584,8 +584,38 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
     # Return the object that has been created
     return oBack
 
+def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
+    """Import an XML from EAD with manuscript data and add it to the DB
+        
+    This approach makes use of MINIDOM (which is part of the standard xml.dom)
+    TODO: Thijs Hermsen will add code here
+    """
+        
+    order = 0   # Number to order all the items we read
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+    errHandle = ErrHandle()
+    iSermCount = 0
+    # ================= INITIALISATIONS =============================
 
-# =============== The functions available in [urls.py] ===========
+
+    # ===============================================================
+
+    try:
+        # ================= PUT YOUR CODE HERE ==========================
+        code_of_thijs = "here"
+
+        # ===============================================================
+    except:
+        sError = errHandle.get_error_message()
+        oBack['filename'] = filename
+        oBack['status'] = 'error'
+        oBack['msg'] = sError
+
+    # Return the object that has been created
+    return oBack
+
+
+# =============== The OLD functions that WERE available in [urls.py] ===========
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
 
@@ -888,6 +918,8 @@ def import_ecodex(request):
     # Return the information
     return JsonResponse(data)
 
+# ============== End of OLD functions ==========================================
+
 
 class ReaderImport(View):
     # Initialisations
@@ -1079,13 +1111,13 @@ class ReaderEcodex(ReaderImport):
 
                             if oResult == None or oResult['status'] == "error":
                                 # Process results
-                                add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
                                                 filename=oResult['filename'])
                             else:
                                 # Get the results from oResult
                                 obj = oResult['obj']
                                 # Process results
-                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
                                                 name=oResult['name'], yearstart=obj.yearstart,
                                                 yearfinish=obj.yearfinish,library=obj.library.name,
                                                 idno=obj.idno,filename=oResult['filename'])
@@ -1127,13 +1159,13 @@ class ReaderEcodex(ReaderImport):
                                                 msg = oResult['status']
                                             arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
                                             # Process results
-                                            add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                            self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
                                                             filename=oResult['filename'])
                                         else:
                                             # Get the results from oResult
                                             obj = oResult['obj']
                                             # Process results
-                                            add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                            self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
                                                             name=oResult['name'], yearstart=obj.yearstart,
                                                             yearfinish=obj.yearfinish,library=obj.library.name,
                                                             idno=obj.idno,filename=oResult['filename'])
@@ -1200,13 +1232,13 @@ class ReaderEad(ReaderImport):
 
                             if oResult == None or oResult['status'] == "error":
                                 # Process results
-                                add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
                                                 filename=oResult['filename'])
                             else:
                                 # Get the results from oResult
                                 obj = oResult['obj']
                                 # Process results
-                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
                                                 name=oResult['name'], yearstart=obj.yearstart,
                                                 yearfinish=obj.yearfinish,library=obj.library.name,
                                                 idno=obj.idno,filename=oResult['filename'])
@@ -1248,13 +1280,13 @@ class ReaderEad(ReaderImport):
                                                 msg = oResult['status']
                                             arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
                                             # Process results
-                                            add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                            self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
                                                             filename=oResult['filename'])
                                         else:
                                             # Get the results from oResult
                                             obj = oResult['obj']
                                             # Process results
-                                            add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                            self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
                                                             name=oResult['name'], yearstart=obj.yearstart,
                                                             yearfinish=obj.yearfinish,library=obj.library.name,
                                                             idno=obj.idno,filename=oResult['filename'])
