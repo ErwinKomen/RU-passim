@@ -4396,18 +4396,28 @@ class Collection(models.Model):
         non_private = ['publ', 'team']
         oErr = ErrHandle()
         try:
-            # First filter on owner
-            owner = Profile.get_user_profile(username)
-            filter = Q(owner=owner)
-            # Now check for permissions
-            is_team = (owner.user.groups.filter(name=team_group).first() != None)
-            # Adapt the filter accordingly
-            if is_team:
-                # User is part of the team: may not see 'private' from others
-                filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
+            # Validate
+            if username and team_group and username != "" and team_group != "":
+                # First filter on owner
+                owner = Profile.get_user_profile(username)
+                filter = Q(owner=owner)
+                # Now check for permissions
+                is_team = (owner.user.groups.filter(name=team_group).first() != None)
+                # Adapt the filter accordingly
+                if is_team:
+                    # User is part of the team: may not see 'private' from others
+                    if type:
+                        filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
+                    else:
+                        filter = ( filter ) | ( Q(scope__in=non_private)  )
+                else:
+                    # THis is a general user: may only see the public ones
+                    if type:
+                        filter = ( filter & Q(type=type)) | ( Q(scope="publ") & Q(type=type) )
+                    else:
+                        filter = ( filter ) | ( Q(scope="publ")  )
             else:
-                # THis is a general user: may only see the public ones
-                filter = ( filter & Q(type=type)) | ( Q(scope="publ") & Q(type=type) )
+                filter = Q(type=type)
             # Apply the filter
             qs = Collection.objects.filter(filter)
         except:

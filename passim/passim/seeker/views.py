@@ -6276,6 +6276,7 @@ class CollectionListView(BasicList):
     bUseFilter = True
     has_select2 = True
     basic_name_prefix = "coll"
+    use_team_group = True
     plural_name = ""
     order_cols = ['scope', 'name', 'created', 'owner__user__username', '']
     order_default = order_cols
@@ -6300,15 +6301,19 @@ class CollectionListView(BasicList):
         if self.prefix == "sermo":
             self.plural_name = "Sermon collections"
             self.sg_name = "Sermon collection"
+            self.searches[0]['filterlist'][1]['keyList'] = "collist_s"
         elif self.prefix == "manu":
             self.plural_name = "Manuscript Collections"
             self.sg_name = "Manuscript collection"
+            self.searches[0]['filterlist'][1]['keyList'] = "collist_m"
         elif self.prefix == "gold":
             self.plural_name = "Gold sermons Collections"
             self.sg_name = "Sermon gold collection"
+            self.searches[0]['filterlist'][1]['keyList'] = "collist_sg"
         elif self.prefix == "super":
             self.plural_name = "Super sermons gold Collections"
             self.sg_name = "Super sermon gold collection"        
+            self.searches[0]['filterlist'][1]['keyList'] = "collist_ssg"
         elif self.prefix == "any":
             self.new_button = False
             self.plural_name = "All types Collections"
@@ -6347,9 +6352,9 @@ class CollectionListView(BasicList):
                 # fields['scope'] = "publ"
                 qAlternative = Q(scope="publ")
 
-            # Also make sure that we add the collection type, which is specified in "prefix"
-            if self.prefix != "any":
-                fields['type'] = self.prefix
+        # Also make sure that we add the collection type, which is specified in "prefix"
+        if self.prefix != "any":
+            fields['type'] = self.prefix
         return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):

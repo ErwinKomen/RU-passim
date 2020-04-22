@@ -753,7 +753,7 @@ class BasicList(ListView):
                     for item in lstQ[1:]:
                         filter = filter & item
                     if qAlternative:
-                        filter = ( filter ) | qAlternative
+                        filter = ( filter ) | ( ( qAlternative ) & filter )
 
                     # Check if excluding is needed
                     if lstExclude:
