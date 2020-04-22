@@ -4552,7 +4552,7 @@ class SermonDescr(models.Model):
         # Visit all collections
         for col in self.collections.all().order_by('name'):
             # Determine where clicking should lead to
-            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
+            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
             # Create a display for this topic
             lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 

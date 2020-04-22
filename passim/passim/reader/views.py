@@ -54,10 +54,15 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
 from passim.basic.views import BasicList, BasicDetails
 
 # =================== This is imported by seeker/views.py ===============
+# OLD METHODS
+#reader_uploads = [
+#    {"title": "ecodex",  "label": "e-codices",     "url": "import_ecodex",  "type": "multiple", "msg": "Upload e-codices XML files"},
+#    {"title": "ead",     "label": "EAD",           "url": "import_ead",     "type": "multiple","msg": "Upload 'archives et manuscripts' XML files"}
+#    ]
+# NEW METHODS
 reader_uploads = [
-    {"title": "ecodex",  "label": "e-codices",     "url": "import_ecodex",  "type": "multiple", "msg": "Upload e-codices XML files"},
-    {"title": "ecodex2", "label": "e-codices (n)", "url": "import_ecodex2", "type": "multiple","msg": "Upload e-codices XML files (n)"},
-    {"title": "ead",     "label": "EAD",           "url": "import_ead",     "type": "multiple","msg": "Upload 'archives et manuscripts' XML files"}
+    {"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "type": "multiple","msg": "Upload e-codices XML files (n)"},
+    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "type": "multiple","msg": "Upload 'archives et manuscripts' XML files"}
     ]
 # Global debugging 
 bDebug = False
@@ -892,6 +897,7 @@ class ReaderImport(View):
     data = {'status': 'ok', 'html': ''}
     template_name = 'reader/import_manuscripts.html'
     obj = None
+    oStatus = None
     data_file = ""
     bClean = False
     import_type = "undefined"
@@ -913,6 +919,8 @@ class ReaderImport(View):
             # Create a status object
             oStatus = Status(user=username, type=self.import_type, status="preparing")
             oStatus.save()
+            # Make sure the status is available
+            self.oStatus = oStatus
 
             form = self.mForm(request.POST, request.FILES)
             lResults = []
@@ -1040,6 +1048,7 @@ class ReaderEcodex(ReaderImport):
         oErr = ErrHandle()
         bOkay = True
         code = ""
+        oStatus = self.oStatus
         try:
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
@@ -1143,6 +1152,127 @@ class ReaderEcodex(ReaderImport):
                         else:
                             lResults.append(oResult)
             code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+        return bOkay, code
+
+
+class ReaderEad(ReaderImport):
+    """Specific parameters for importing EAD"""
+
+    import_type = "ead"
+    sourceinfo_url = "https://ccfr.bnf.fr/"
+
+    def process_files(self, request, lResults):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        try:
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = read_ead(username, data_file, filename, arErr, source=source)
+
+                            if oResult == None or oResult['status'] == "error":
+                                # Process results
+                                add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                                filename=oResult['filename'])
+                            else:
+                                # Get the results from oResult
+                                obj = oResult['obj']
+                                # Process results
+                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                name=oResult['name'], yearstart=obj.yearstart,
+                                                yearfinish=obj.yearfinish,library=obj.library.name,
+                                                idno=obj.idno,filename=oResult['filename'])
+
+                        elif extension == "txt":
+                            # Set the status
+                            oStatus.set("reading list", msg="file={}".format(filename))
+                            # (1) Read the TXT file
+                            lines = []
+                            bFirst = True
+                            for line in data_file:
+                                # Get a good view of the line
+                                sLine = line.decode("utf-8").strip()
+                                if bFirst:
+                                    if "\ufeff" in sLine:
+                                        sLine = sLine.replace("\ufeff", "")
+                                    bFirst = False
+                                lines.append(sLine)
+                            # (2) Walk through the list of XML file names
+                            for idx, xml_url in enumerate(lines):
+                                xml_url = xml_url.strip()
+                                if xml_url != "" and ".xml" in xml_url:
+                                    # Set the status
+                                    oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
+                                    # (3) Download the file from the internet and save it 
+                                    bOkay, sResult = download_file(xml_url)
+                                    if bOkay:
+                                        # We have the filename
+                                        xml_file = sResult
+                                        name = xml_url.split("/")[-1]
+                                        # (4) Read the e-codex manuscript
+                                        oResult = read_ead(username, xml_file, name, arErr, source=source)
+                                        # (5) Check before continuing
+                                        if oResult == None or oResult['status'] == "error":
+                                            msg = "unknown"  
+                                            if 'msg' in oResult: 
+                                                msg = oResult['msg']
+                                            elif 'status' in oResult:
+                                                msg = oResult['status']
+                                            arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
+                                            # Process results
+                                            add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                                            filename=oResult['filename'])
+                                        else:
+                                            # Get the results from oResult
+                                            obj = oResult['obj']
+                                            # Process results
+                                            add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                            name=oResult['name'], yearstart=obj.yearstart,
+                                                            yearfinish=obj.yearfinish,library=obj.library.name,
+                                                            idno=obj.idno,filename=oResult['filename'])
+
+                                    else:
+                                        aErr.append("Import-ead: failed to download file {}".format(xml_url))
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "iead", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+            code = "Imported using the [import_ead] function on these XML files: {}".format(", ".join(file_list))
         except:
             bOkay = False
             code = oErr.get_error_message()

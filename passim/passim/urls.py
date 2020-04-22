@@ -214,9 +214,11 @@ urlpatterns = [
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
 
     # ================ Any READER APP URLs should come here =======================================
-    url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
-    url(r'^reader/import/ecodex2/$', ReaderEcodex.as_view(), name='import_ecodex2'),
-    url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
+    #url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
+    #url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
+    # ========== NEW method =======================================================================
+    url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
+    url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     # =============================================================================================
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io

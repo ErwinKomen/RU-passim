@@ -5431,7 +5431,7 @@ class SermonEdit(BasicDetails):
 
             # (4) 'collections'
             collist_s = form.cleaned_data['collist_s']
-            adapt_m2m(CollectionSerm, instance, "sermo", collist_s, "collection")
+            adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
 
         except:
             msg = oErr.get_error_message()
@@ -5837,7 +5837,7 @@ class SermonListView(BasicList):
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'name' }, 
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'name' }, 
             {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collsuper',     'fkfield': 'equal_goldsermons__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'name' }
+            {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},

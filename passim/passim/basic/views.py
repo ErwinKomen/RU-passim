@@ -773,7 +773,6 @@ class BasicList(ListView):
                 qs = self.model.objects.all().distinct()
 
 
-
             # Do the ordering of the results
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
