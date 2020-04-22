@@ -5236,6 +5236,7 @@ class SermonEdit(BasicDetails):
     rtype = "json"
     mainitems = []
     basic_name = "sermon"
+    use_team_group = True
 
     StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
                                          form=SermonDescrGoldForm, min_num=0,
@@ -6684,6 +6685,7 @@ class ManuscriptEdit(PassimDetails):
     title = "Manuscript" 
     afternewurl = ""
     prefix = "manu"
+    use_team_group = True
     MdrFormSet = inlineformset_factory(Manuscript, Daterange,
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
@@ -7822,6 +7824,7 @@ class SermonGoldEdit(BasicDetails):
     rtype = "json"
     mainitems = []
     basic_name = "gold"
+    use_team_group = True
 
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,
@@ -8362,6 +8365,7 @@ class EqualGoldEdit(BasicDetails):
     rtype = "json"
     new_button = True
     mainitems = []
+    use_team_group = True
     
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,

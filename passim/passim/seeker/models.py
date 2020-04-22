@@ -4394,20 +4394,26 @@ class Collection(models.Model):
 
         # Initialisations
         non_private = ['publ', 'team']
-        # First filter on owner
-        owner = Profile.get_user_profile(username)
-        filter = Q(owner=owner)
-        # Now check for permissions
-        is_team = (owner.user.groups.filter(name=team_group).first() != None)
-        # Adapt the filter accordingly
-        if is_team:
-            # User is part of the team: may not see 'private' from others
-            filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
-        else:
-            # THis is a general user: may only see the public ones
-            filter = ( filter & Q(type=type)) | ( Q(scope="publ") & Q(type=type) )
-        # Apply the filter
-        qs = Collection.objects.filter(filter)
+        oErr = ErrHandle()
+        try:
+            # First filter on owner
+            owner = Profile.get_user_profile(username)
+            filter = Q(owner=owner)
+            # Now check for permissions
+            is_team = (owner.user.groups.filter(name=team_group).first() != None)
+            # Adapt the filter accordingly
+            if is_team:
+                # User is part of the team: may not see 'private' from others
+                filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
+            else:
+                # THis is a general user: may only see the public ones
+                filter = ( filter & Q(type=type)) | ( Q(scope="publ") & Q(type=type) )
+            # Apply the filter
+            qs = Collection.objects.filter(filter)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_scoped_queryset")
+            qs = Collection.objects.all()
         # REturn the result
         return qs
 

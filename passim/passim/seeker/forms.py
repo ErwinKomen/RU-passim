@@ -369,6 +369,13 @@ class SuperOneWidget(ModelSelect2Widget):
 
 # ================= FORMS =======================================
 
+class PassimModelForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        # Start by executing the standard handling
+        super(PassimModelForm, self).__init__(*args, **kwargs)
+
 
 class BootstrapAuthenticationForm(AuthenticationForm):
     """Authentication form which uses boostrap CSS."""
@@ -463,7 +470,7 @@ class SearchManuscriptForm(forms.Form):
     typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
-class SearchManuForm(forms.ModelForm):
+class SearchManuForm(PassimModelForm):
     """Manuscript search form"""
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -536,57 +543,64 @@ class SearchManuForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        username = kwargs.pop('username', "")
-        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SearchManuForm, self).__init__(*args, **kwargs)
         
-        # NONE of the fields are required in the SEARCH form!
-        self.fields['stype'].required = False
-        self.fields['name'].required = False
-        self.fields['yearstart'].required = False
-        self.fields['yearfinish'].required = False
-        self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
-        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
-        self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-        self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-        self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-        self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+        try:
+            #username = kwargs.pop('username', "")
+            #team_group = kwargs.pop('team_group', "")
+            username = self.username
+            team_group = self.team_group
+            # NONE of the fields are required in the SEARCH form!
+            self.fields['stype'].required = False
+            self.fields['name'].required = False
+            self.fields['yearstart'].required = False
+            self.fields['yearfinish'].required = False
+            self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+            self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+            self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+            self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
-        # The CollOne information is needed for the basket (add basket to collection)
-        prefix = "manu"
-        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # The CollOne information is needed for the basket (add basket to collection)
+            prefix = "manu"
+            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
 
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # If there is an instance, then check if a library is specified
-            library = instance.library
-            if library != None:
-                # In this case: get the city and the country
-                city = library.get_city_name()
-                country = library.get_country_name()
-                if (country == None or country == "") and city != None and city != "":
-                    # We have a city, but the country is not specified...
-                    lstQ = []
-                    lstQ.append(Q(loctype__name="country"))
-                    lstQ.append(Q(relations_location=library.lcity))
-                    obj = Location.objects.filter(*lstQ).first()
-                    if obj != None:
-                        country = obj.name
-                # Put them in the fields
-                self.fields['city_ta'].initial = city
-                self.fields['country_ta'].initial = country
-                # Also: make sure we put the library NAME in the initial
-                self.fields['libname_ta'].initial = library.name
-            # Look after origin
-            origin = instance.origin
-            self.fields['origname_ta'].initial = "" if origin == None else origin.name
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # If there is an instance, then check if a library is specified
+                library = instance.library
+                if library != None:
+                    # In this case: get the city and the country
+                    city = library.get_city_name()
+                    country = library.get_country_name()
+                    if (country == None or country == "") and city != None and city != "":
+                        # We have a city, but the country is not specified...
+                        lstQ = []
+                        lstQ.append(Q(loctype__name="country"))
+                        lstQ.append(Q(relations_location=library.lcity))
+                        obj = Location.objects.filter(*lstQ).first()
+                        if obj != None:
+                            country = obj.name
+                    # Put them in the fields
+                    self.fields['city_ta'].initial = city
+                    self.fields['country_ta'].initial = country
+                    # Also: make sure we put the library NAME in the initial
+                    self.fields['libname_ta'].initial = library.name
+                # Look after origin
+                origin = instance.origin
+                self.fields['origname_ta'].initial = "" if origin == None else origin.name
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SearchManuForm-init")
+        return None
 
 
-class SermonForm(forms.ModelForm):
+class SermonForm(PassimModelForm):
     # Helper fields for SermonDescr fields
     authorname  = forms.CharField(label=_("Author"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
@@ -679,57 +693,64 @@ class SermonForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        username = kwargs.pop('username', "")
-        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SermonForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['stype'].required = False
-        self.fields['manu'].required = False
-        self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
-        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-        self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-        self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-        self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
-        # Note: what we show the user is the set of GOLD-signatures
-        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
-        self.fields['siglist_m'].queryset = SermonSignature.objects.all().order_by('code')
-        # The available Sermondescr-Gold list
-        # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
-        self.fields['goldlist'].queryset = SermonDescrGold.objects.all()
+        oErr = ErrHandle()
+        try:
+            #username = kwargs.pop('username', "")
+            #team_group = kwargs.pop('team_group', "")
+            username = self.username
+            team_group = self.team_group
+            # Some fields are not required
+            self.fields['stype'].required = False
+            self.fields['manu'].required = False
+            self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+            self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+            self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+            self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+            # Note: what we show the user is the set of GOLD-signatures
+            self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
+            self.fields['siglist_m'].queryset = SermonSignature.objects.all().order_by('code')
+            # The available Sermondescr-Gold list
+            # self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
+            self.fields['goldlist'].queryset = SermonDescrGold.objects.all()
 
-        # The CollOne information is needed for the basket (add basket to collection)
-        prefix = "sermo"
-        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # The CollOne information is needed for the basket (add basket to collection)
+            prefix = "sermo"
+            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
 
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # If there is an instance, then check the author specification
-            sAuthor = "" if not instance.author else instance.author.name
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # If there is an instance, then check the author specification
+                sAuthor = "" if not instance.author else instance.author.name
 
-            ## Make sure I myself do not occur in the goldlist
-            #self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
+                ## Make sure I myself do not occur in the goldlist
+                #self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
 
-            ## If there is an instance, then check the nickname specification
-            #sNickName = "" if not instance.nickname else instance.nickname.name
-            self.fields['authorname'].initial = sAuthor
-            self.fields['authorname'].required = False
-            # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
-            self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
-            self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
-            self.fields['collist_s'].initial = [x.pk for x in instance.collections.filter(type='sermo').order_by('name')]
-            self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
-            self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
-            # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
-            # self.fields['siglist'].initial = instance.signatures_ordered()
-            self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
-            # Note: this is the list of links between SermonDesrc-Gold
-            self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
-            iStop = 1
+                ## If there is an instance, then check the nickname specification
+                #sNickName = "" if not instance.nickname else instance.nickname.name
+                self.fields['authorname'].initial = sAuthor
+                self.fields['authorname'].required = False
+                # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
+                self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
+                self.fields['collist_s'].initial = [x.pk for x in instance.collections.filter(type='sermo').order_by('name')]
+                self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
+                self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
+                # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
+                # self.fields['siglist'].initial = instance.signatures_ordered()
+                self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
+                # Note: this is the list of links between SermonDesrc-Gold
+                self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
+                iStop = 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonForm-init")
         return None
 
 
@@ -940,8 +961,8 @@ class SermonDescrKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
-                
-class SermonGoldForm(forms.ModelForm):
+
+class SermonGoldForm(PassimModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
@@ -999,12 +1020,12 @@ class SermonGoldForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        username = kwargs.pop('username', "")
-        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SermonGoldForm, self).__init__(*args, **kwargs)
         oErr = ErrHandle()
         try:
+            username = self.username        # kwargs.pop('username', "")
+            team_group = self.team_group    # kwargs.pop('team_group', "")
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
@@ -1083,7 +1104,7 @@ class EqualGoldForm(forms.ModelForm):
         fields = [ ]
     
 
-class SuperSermonGoldForm(forms.ModelForm):
+class SuperSermonGoldForm(PassimModelForm):
     authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1126,31 +1147,37 @@ class SuperSermonGoldForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        username = kwargs.pop('username', "")
-        team_group = kwargs.pop('team_group', "")
         # Start by executing the standard handling
         super(SuperSermonGoldForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-        self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-        self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-        self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
+        try:
+            #username = kwargs.pop('username', "")
+            #team_group = kwargs.pop('team_group', "")
+            username = self.username
+            team_group = self.team_group
+            # Some fields are not required
+            self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
+            self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
+            self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
+            self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
-        # The CollOne information is needed for the basket (add basket to collection)
-        prefix = "super"
-        self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # The CollOne information is needed for the basket (add basket to collection)
+            prefix = "super"
+            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
         
-       # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            # If there is an instance, then check the author specification
-            sAuthor = "" if not instance.author else instance.author.name
-            self.fields['authorname'].initial = sAuthor
-            self.fields['authorname'].required = False
-            self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+           # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # If there is an instance, then check the author specification
+                sAuthor = "" if not instance.author else instance.author.name
+                self.fields['authorname'].initial = sAuthor
+                self.fields['authorname'].required = False
+                self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
 
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SuperSermonGoldForm-init")
         # We are okay
         return None
 
@@ -1787,7 +1814,7 @@ class SermonGoldFtextlinkForm(forms.ModelForm):
         self.fields['gold'].required = False
 
 
-class ManuscriptForm(forms.ModelForm):
+class ManuscriptForm(PassimModelForm):
     country_ta = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city_ta = forms.CharField(label=_("City"), required=False, 
@@ -1829,6 +1856,8 @@ class ManuscriptForm(forms.ModelForm):
         super(ManuscriptForm, self).__init__(*args, **kwargs)
         oErr = ErrHandle()
         try:
+            username = self.username
+            team_group = self.team_group
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['yearstart'].required = False
@@ -1868,6 +1897,7 @@ class ManuscriptForm(forms.ModelForm):
             msg = oErr.get_error_message()
             oErr.DoError()
         return None
+
 
 class LocationForm(forms.ModelForm):
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,

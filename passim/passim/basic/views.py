@@ -818,6 +818,7 @@ class BasicDetails(DetailView):
     new_button = False
     do_not_save = False
     newRedirect = False     # Redirect the page name to a correct one after creating
+    use_team_group = False
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
     is_basic = True         # Is this a basic details/edit view?
@@ -1204,6 +1205,9 @@ class BasicDetails(DetailView):
         bNew = False
         mForm = self.mForm
         oErr = ErrHandle()
+        username=self.request.user.username
+        team_group=app_editor
+
 
         # Determine the prefix
         if self.prefix_type == "":
@@ -1257,15 +1261,24 @@ class BasicDetails(DetailView):
             # Do we have an existing object or are we creating?
             if instance == None:
                 # Saving a new item
-                frm = mForm(initial, prefix=prefix)
+                if self.use_team_group:
+                    frm = mForm(initial, prefix=prefix, username=username, team_group=team_group)
+                else:
+                    frm = mForm(initial, prefix=prefix)
                 bNew = True
                 self.add = True
             elif len(initial) == 0:
                 # Create a completely new form, on the basis of the [instance] only
-                frm = mForm(prefix=prefix, instance=instance)
+                if self.use_team_group:
+                    frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group)
+                else:
+                    frm = mForm(prefix=prefix, instance=instance)
             else:
                 # Editing an existing one
-                frm = mForm(initial, prefix=prefix, instance=instance)
+                if self.use_team_group:
+                    frm = mForm(initial, prefix=prefix, instance=instance, username=username, team_group=team_group)
+                else:
+                    frm = mForm(initial, prefix=prefix, instance=instance)
             # Both cases: validation and saving
             if frm.is_valid():
                 # The form is valid - do a preliminary saving
@@ -1315,10 +1328,16 @@ class BasicDetails(DetailView):
             # Check if this is asking for a new form
             if instance == None:
                 # Get the form for the sermon
-                frm = mForm(prefix=prefix)
+                if self.use_team_group:
+                    frm = mForm(prefix=prefix, username=username, team_group=team_group)
+                else:
+                    frm = mForm(prefix=prefix)
             else:
                 # Get the form for the sermon
-                frm = mForm(instance=instance, prefix=prefix)
+                if self.use_team_group:
+                    frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group)
+                else:
+                    frm = mForm(instance=instance, prefix=prefix)
             if frm.is_valid():
                 iOkay = 1
             # Walk all the form objects
