@@ -329,7 +329,7 @@
             <!-- Collection -->
             {% if manuForm.instance.collections.count > 0 %}
               {% for col in manuForm.instance.collections.all|dictsort:"name" %}
-                <span class="collection"><a href="{% url 'search_manuscript' %}?manu-collection={{col.name}}">{{col.name}}</a></span>
+                <span class="collection"><a href="{% url 'search_manuscript' %}?manu-collist_m={{col.id}}">{{col.name}}</a></span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
