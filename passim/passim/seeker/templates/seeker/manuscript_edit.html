@@ -76,8 +76,7 @@
         <td class="manuscript-country" align="left">
           <div class="view-mode">{% if manuForm.country_ta and manuForm.country_ta.value %}{{manuForm.country_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
-            <div class="country-key hidden">{{manuForm.country}}</div>
-            <div class="edit-mode hidden">{{manuForm.country_ta}}</div>
+            <div class="edit-mode hidden">{{manuForm.lcountry}}</div>
           {% endif %}
         </td>
       </tr>
@@ -88,8 +87,7 @@
         <td class="manuscript-city" align="left">
           <div class="view-mode">{% if manuForm.city_ta and manuForm.city_ta.value %}{{manuForm.city_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
-            <div class="city-key hidden">{{manuForm.city}}</div>
-            <div class="edit-mode hidden">{{manuForm.city_ta}}</div>
+            <div class="edit-mode hidden">{{manuForm.lcity}}</div>
           {% endif %}
         </td>
       </tr>
@@ -100,8 +98,7 @@
         <td class="manuscript-library" align="left">
           <div class="view-mode">{% if manuForm.libname_ta and manuForm.libname_ta.value %}{{manuForm.libname_ta.value}}{% else %}-{% endif %}</div>
           {% if is_app_editor %}
-            <div class="library-key hidden">{{manuForm.library}}</div>
-            <div class="edit-mode hidden">{{manuForm.libname_ta}}</div>
+            <div class="edit-mode hidden">{{manuForm.library}}</div>
           {% endif %}
         </td>
       </tr>

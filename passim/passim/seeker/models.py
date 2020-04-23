@@ -2411,6 +2411,12 @@ class Manuscript(models.Model):
     # [0-1] Optional link to a website with (more) information on this manuscript
     url = models.URLField("Web info", null=True, blank=True)
 
+    # Temporary support for the LIBRARY, when that field is not completely known:
+    # [0-1] City - ideally determined by field [library]
+    lcity = models.ForeignKey(Location, null=True, related_name="lcity_manuscripts")
+    # [0-1] Library - ideally determined by field [library]
+    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_manuscripts")
+
     # PHYSICAL features of the manuscript (OPTIONAL)
     # [0-1] Support: the general type of manuscript
     support = models.TextField("Support", null=True, blank=True)

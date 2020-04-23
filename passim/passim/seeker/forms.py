@@ -45,6 +45,19 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
+class CityOneWidget(ModelSelect2Widget):
+    model = Location
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {'lcity': 'lcity_manuscripts'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loc_city = LocationType.objects.filter(name="city").first()
+        return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
+
+
 class CodeWidget(ModelSelect2MultipleWidget):
     # NOTE: only use the [Signature] table - don't use [SermonSignature]
     model = EqualGold
@@ -130,6 +143,19 @@ class CollOneSuperWidget(CollOneWidget):
     type = "super"
 
 
+class CountryOneWidget(ModelSelect2Widget):
+    model = Location
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {'lcountry': 'lcountry_manuscripts'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loc_country = LocationType.objects.filter(name="country").first()
+        return Location.objects.filter(loctype=loc_country).order_by('name').distinct()
+
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -192,6 +218,22 @@ class LitrefWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return Litref.objects.exclude(full="").order_by('full').distinct()
+
+
+class LibraryOneWidget(ModelSelect2Widget):
+    model = Library
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {'lcity': 'lcity', 'lcountry': 'lcountry'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Library.objects.all().order_by('name').distinct()
+
+    def filter_queryset(self, term, queryset = None, **dependent_fields):
+        response = super(LibraryOneWidget, self).filter_queryset(term, queryset, **dependent_fields)
+        return response
 
 
 class LitrefSgWidget(ModelSelect2MultipleWidget):
@@ -986,7 +1028,6 @@ class SermonDescrGoldForm(forms.ModelForm):
 
                 # Make sure we exclude the instance from the queryset
                 self.fields['newgold'].queryset = self.fields['newgold'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
-
 
 
 class SermonDescrKeywordForm(forms.ModelForm):
@@ -1887,13 +1928,13 @@ class SermonGoldFtextlinkForm(forms.ModelForm):
 
 class ManuscriptForm(PassimModelForm):
     country_ta = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city_ta = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     libname_ta = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
     collection = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1906,8 +1947,10 @@ class ManuscriptForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
-        widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;'}),
+        fields = ['name', 'yearstart', 'yearfinish', 'library', 'lcity', 'lcountry', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
+        widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'lcity':       CityOneWidget(attrs={'data-placeholder': 'Select a city...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
@@ -1934,6 +1977,8 @@ class ManuscriptForm(PassimModelForm):
             self.fields['yearstart'].required = False
             self.fields['yearfinish'].required = False
             self.fields['name'].required = False
+            self.fields['lcity'].required = False
+            self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
 
             # Note: the collection filters must use the SCOPE of the collection
@@ -1962,6 +2007,9 @@ class ManuscriptForm(PassimModelForm):
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
+
+                    # New method
+                    # self.fields['library'].initial = 
                 # Look after origin
                 origin = instance.origin
                 self.fields['origname_ta'].initial = "" if origin == None else origin.name
