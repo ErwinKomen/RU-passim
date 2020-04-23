@@ -72,12 +72,18 @@
       <!-- Walk all the fields in mainitems -->
       {% for mainitem in mainitems %}
         <!-- Check if this may be shown or not -->
-        {% if 'empty' in mainitem and mainitem.empty == "idonly" %}
-        <tr class="hidden">
-          <td colspan="2">
-            <input id="id_{{mainitem.field_key}}_id" name="{{mainitem.field_key}}_id" type="text" value="{{mainitem.value}}" />
-          </td>
-        </tr>
+        {% if 'empty' in mainitem %}
+          {% if mainitem.empty == "idonly" %}
+            <tr class="hidden">
+              <td colspan="2">
+                <input id="id_{{mainitem.field_abbr}}_id" name="{{mainitem.field_abbr}}_id" type="text" value="{{mainitem.value}}" />
+              </td>
+            </tr>
+          {% elif mainitem.empty == "hide" %}
+            <tr class="hidden">
+              <td colspan="2">{{mainitem.field_key}}</td>
+            </tr>
+          {% endif %}
         {% elif mainitem.empty != "hide" or mainitem.value != "" %}
           <tr class="view-row">
             <!-- Cell with the name of the field-->

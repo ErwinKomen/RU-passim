@@ -5237,6 +5237,7 @@ class SermonEdit(BasicDetails):
     mainitems = []
     basic_name = "sermon"
     use_team_group = True
+    prefix_type = "simple"
 
     StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
                                          form=SermonDescrGoldForm, min_num=0,
@@ -5263,9 +5264,11 @@ class SermonEdit(BasicDetails):
 
         # Define the main items to show and edit
         iStop = 1
+        manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display,'field_key': 'stype'},
-            {'type': 'plain', 'label': "Manuscript id",         'value': instance.manu.id,          'field_key': "manu", 'empty': 'idonly'},
+            # {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author,       'field_key': 'author'},
             {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
@@ -5322,6 +5325,11 @@ class SermonEdit(BasicDetails):
 
         ## Set the 'afternew' URL
         #self.afternewurl = reverse('sermon_list')
+        if instance.manu and instance.order < 0:
+            # Calculate how many sermons there are
+            sermon_count = instance.manu.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            form.instance.order = sermon_count
 
         # Return positively
         return True, "" 
@@ -5462,6 +5470,14 @@ class SermonDetails(SermonEdit):
         return context
 
     def before_save(self, form, instance):
+        # Double check for the presence of manu and order
+        if instance.manu and instance.order < 0:
+            # Calculate how many sermons there are
+            sermon_count = instance.manu.manusermons.all().count()
+            # Make sure the new sermon gets changed
+            form.instance.order = sermon_count
+            #instance.save()
+
         return True, ""
 
     def process_formset(self, prefix, request, formset):

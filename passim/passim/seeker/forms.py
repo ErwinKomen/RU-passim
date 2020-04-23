@@ -751,6 +751,9 @@ class SermonForm(PassimModelForm):
                 # If there is an instance, then check the author specification
                 sAuthor = "" if not instance.author else instance.author.name
 
+                if instance.manu:
+                    self.fields['manu'].queryset = Manuscript.objects.filter(id=instance.manu.id)
+
                 ## Make sure I myself do not occur in the goldlist
                 #self.fields['goldlist'].queryset = SermonDescrGold.unique_list()
 
