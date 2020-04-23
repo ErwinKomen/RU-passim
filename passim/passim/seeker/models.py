@@ -4437,6 +4437,9 @@ class SermonDescr(models.Model):
     # [0-1] Some (e.g. e-codices) may have a subtitle (field <rubric>)
     subtitle = models.CharField("Sub title", null=True, blank=True, max_length=LONG_STRING)
 
+    # [0-1] Section title 
+    sectiontitle = models.CharField("Section title", null=True, blank=True, max_length=LONG_STRING)
+
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
@@ -4451,6 +4454,8 @@ class SermonDescr(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+    # [0-1] Postscriptim
+    postscriptum = models.TextField("Postscriptum", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
     quote = models.TextField("Quote", null=True, blank=True)
     # [0-1] The FEAST??
@@ -4587,6 +4592,10 @@ class SermonDescr(models.Model):
     def get_explicit_markdown(self):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
+
+    def get_postscriptum_markdown(self):
+        """Get the contents of the postscriptum field using markdown"""
+        return adapt_markdown(self.postscriptum)
 
     def get_eqsetsignatures_markdown(self, type="all"):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
