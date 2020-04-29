@@ -259,3 +259,7 @@ thead th {
     background: #f6f6f6;
 }
 
+/* Select 2 tweaks */
+.select2-container input {
+    width: 400px !important;
+}

@@ -1056,6 +1056,15 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * ssglink_template
+       *    Construct the template for a *link* to a Super Sermon Gold
+       *
+       */
+      ssglink_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/ssglink/");
+      },
+
+      /**
        * ssg_template
        *    Construct the template for a Super Sermon Gold
        *

@@ -59,7 +59,7 @@ from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
                                 AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
                                 SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
-                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SearchUrlForm, \
+                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
                                 SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
@@ -68,7 +68,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SuperSermonGoldCollectionForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, Nickname, NewsItem, SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
+    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
+    SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT
@@ -2970,6 +2971,31 @@ def get_sglink(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_ssglink(request):
+    """Get ONE particular short representation of a *link* to a SSG"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            ssg = SermonDescrEqual.objects.filter(Q(id=sId)).first()
+            if ssg:
+                short = ssg.get_label()
+                co_json['name'] = short
+            data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_ssglink")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_ssg(request):
     """Get ONE particular short representation of a SSG"""
     
@@ -5239,8 +5265,12 @@ class SermonEdit(BasicDetails):
     use_team_group = True
     prefix_type = "simple"
 
-    StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
-                                         form=SermonDescrGoldForm, min_num=0,
+    #StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
+    #                                     form=SermonDescrGoldForm, min_num=0,
+    #                                     fk_name = "sermon",
+    #                                     extra=0, can_delete=True, can_order=False)
+    StossgFormSet = inlineformset_factory(SermonDescr, SermonDescrEqual,
+                                         form=SermonDescrSuperForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
     SDkwFormSet = inlineformset_factory(SermonDescr, SermonDescrKeyword,
@@ -5254,7 +5284,8 @@ class SermonEdit(BasicDetails):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+    formset_objects = [ #{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+                       {'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
@@ -5297,9 +5328,9 @@ class SermonEdit(BasicDetails):
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
             {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
-            {'type': 'line',    'label': "Gold Sermon links:",  'value': instance.get_goldlinks_markdown(), 
-             'multiple': True,  'field_list': 'goldlist',       'fso': self.formset_objects[0], 
-             'inline_selection': 'ru.passim.sglink_template',   'template_selection': 'ru.passim.sg_template'}
+            {'type': 'line',    'label': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
+             'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
+             'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
             ]
         # Notes:
         # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
@@ -5311,11 +5342,14 @@ class SermonEdit(BasicDetails):
                  'title': "Go to manuscript {}".format(instance.manu.idno), 
                  'url': reverse('manuscript_details', kwargs={'pk': instance.manu.id})}
             topleftlist.append(buttonspecs)
+            idno = instance.manu.idno
+        else:
+            idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
         # Add something right to the SermonDetails title
         context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
         # Add the manuscript's IDNO completely right
-        context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(instance.manu.idno)
+        context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(idno)
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -5398,21 +5432,37 @@ class SermonEdit(BasicDetails):
                         # Make sure we set the keyword
                         form.instance.collection = obj
                         # Note: it will get saved with formset.save()
-                elif prefix == "stog":
-                    # SermonDescr-To-SermonGold processing
-                    if 'newgold' in cleaned and cleaned['newgold'] != "":
-                        newgold = cleaned['newgold']
+                #elif prefix == "stog":
+                #    # SermonDescr-To-SermonGold processing
+                #    if 'newgold' in cleaned and cleaned['newgold'] != "":
+                #        newgold = cleaned['newgold']
+                #        # There also must be a linktype
+                #        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                #            linktype = cleaned['newlinktype']
+                #            # Check existence
+                #            obj = SermonDescrGold.objects.filter(sermon=instance, gold=newgold, linktype=linktype).first()
+                #            if obj == None:
+                #                gold = SermonGold.objects.filter(id=newgold).first()
+                #                if gold != None:
+                #                    # Set the right parameters for creation later on
+                #                    form.instance.linktype = linktype
+                #                    form.instance.gold = gold
+                #    # Note: it will get saved with form.save()
+                elif prefix == "stossg":
+                    # SermonDescr-To-EqualGold processing
+                    if 'newsuper' in cleaned and cleaned['newsuper'] != "":
+                        newsuper = cleaned['newsuper']
                         # There also must be a linktype
                         if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
                             linktype = cleaned['newlinktype']
                             # Check existence
-                            obj = SermonDescrGold.objects.filter(sermon=instance, gold=newgold, linktype=linktype).first()
+                            obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
                             if obj == None:
-                                gold = SermonGold.objects.filter(id=newgold).first()
-                                if gold != None:
+                                super = EqualGold.objects.filter(id=newsuper).first()
+                                if super != None:
                                     # Set the right parameters for creation later on
                                     form.instance.linktype = linktype
-                                    form.instance.gold = gold
+                                    form.instance.super = super
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -5436,9 +5486,12 @@ class SermonEdit(BasicDetails):
             siglist = form.cleaned_data['siglist']
             adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
 
+            ## (3) 'Links to Gold Sermons'
+            #goldlist = form.cleaned_data['goldlist']
+            #adapt_m2m(SermonDescrGold, instance, "sermon", goldlist, "gold", extra = ['linktype'], related_is_through=True)
             # (3) 'Links to Gold Sermons'
-            goldlist = form.cleaned_data['goldlist']
-            adapt_m2m(SermonDescrGold, instance, "sermon", goldlist, "gold", extra = ['linktype'], related_is_through=True)
+            superlist = form.cleaned_data['superlist']
+            adapt_m2m(SermonDescrEqual, instance, "sermon", superlist, "super", extra = ['linktype'], related_is_through=True)
 
             # (4) 'collections'
             collist_s = form.cleaned_data['collist_s']

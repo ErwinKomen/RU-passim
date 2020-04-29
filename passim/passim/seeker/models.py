@@ -3331,6 +3331,14 @@ class EqualGold(models.Model):
             oErr.DoError("Equalgold.save")
             return None
 
+    def create_empty():
+        """Create an empty new one"""
+
+        org = EqualGold()
+        org.author = Author.get_undecided()
+        org.save()
+        return org
+
     def create_moved(self):
         """Create a copy of [self], and indicate in that copy that it moved to [self]"""
 
@@ -3359,24 +3367,98 @@ class EqualGold(models.Model):
         org.save()
         return org
 
-    def create_empty():
-        """Create an empty new one"""
+    def get_collections_markdown(self):
 
-        org = EqualGold()
-        org.author = Author.get_undecided()
-        org.save()
-        return org
+        lHtml = []
+        for obj in self.collections.all().order_by('name'):
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        sBack = ", ".join(lHtml)
+        return sBack
 
-    def sermon_number(author):
-        """Determine what the sermon number *would be* for the indicated author"""
+    def get_explicit_markdown(self):
+        """Get the contents of the explicit field using markdown"""
+        return adapt_markdown(self.explicit)
 
-        # Check the highest sermon number for this author
-        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
-        if qs_ssg.count() == 0:
-            iNumber = 1
+    def get_incipit_markdown(self):
+        """Get the contents of the incipit field using markdown"""
+        # Perform
+        return adapt_markdown(self.incipit)
+
+    def get_label(self, do_incexpl=False):
+        """Get a string view of myself to be put on a label"""
+
+        lHtml = []
+
+        # Treat passim code
+        sLabel = self.code
+        if sLabel == None: sLabel = "(Undecided {})".format(self.id)
+        lHtml.append("{} ".format(sLabel))
+
+        # Treat signatures
+        #srch = "CPPM"
+        #qs = EqualGold.objects.filter(Q(equal_goldsermons__goldsignatures__code__icontains=srch))
+        equal_set = self.equal_goldsermons.all()
+        siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()]
+        lHtml.append(" | ".join(siglist))
+
+        # Treat the author
+        if self.author:
+            lHtml.append("(by {}) ".format(self.author.name))
         else:
-            iNumber = qs_ssg.first().number + 1
-        return iNumber
+            lHtml.append("(by Unknwon Author) ")
+
+        if do_incexpl:
+            # Treat incipit
+            if self.incipit: lHtml.append("{}".format(self.srchincipit))
+            # Treat intermediate dots
+            if self.incipit and self.explicit: lHtml.append("...-...")
+            # Treat explicit
+            if self.explicit: lHtml.append("{}".format(self.srchexplicit))
+
+        # Return the results
+        return "".join(lHtml)
+
+    def get_moved_code(self):
+        """Get the passim code of the one this is replaced by"""
+
+        sBack = ""
+        if self.moved:
+            sBack = self.moved.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
+        return sBack
+
+    def get_moved_url(self):
+        """Get the URL of the SSG to which I have been moved"""
+
+        url = ""
+        if self.moved:
+            url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
+        return url
+
+    def get_previous_code(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: 
+            sBack = origin.code
+            if sBack == None or sBack == "None":
+                sBack = "(no Passim code)"
+        # REturn the information
+        return sBack
+
+    def get_previous_url(self):
+        """Get information on the SSG from which I derive"""
+
+        sBack = ""
+        # Find out if I have moved from anywhere or not
+        origin = EqualGold.objects.filter(moved=self).first()
+        if origin != None: sBack = reverse('equalgold_details', kwargs={'pk': origin.id})
+        # REturn the information
+        return sBack
 
     def get_short(self):
         """Get a very short textual summary"""
@@ -3463,64 +3545,16 @@ class EqualGold(models.Model):
             sCode = "PASSIM {:03d}.{:04d}".format(auth_num, iNumber)
         return sCode
 
-    def get_moved_code(self):
-        """Get the passim code of the one this is replaced by"""
+    def sermon_number(author):
+        """Determine what the sermon number *would be* for the indicated author"""
 
-        sBack = ""
-        if self.moved:
-            sBack = self.moved.code
-            if sBack == None or sBack == "None":
-                sBack = "(no Passim code)"
-        return sBack
-
-    def get_moved_url(self):
-        """Get the URL of the SSG to which I have been moved"""
-
-        url = ""
-        if self.moved:
-            url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
-        return url
-
-    def get_previous_code(self):
-        """Get information on the SSG from which I derive"""
-
-        sBack = ""
-        # Find out if I have moved from anywhere or not
-        origin = EqualGold.objects.filter(moved=self).first()
-        if origin != None: 
-            sBack = origin.code
-            if sBack == None or sBack == "None":
-                sBack = "(no Passim code)"
-        # REturn the information
-        return sBack
-
-    def get_previous_url(self):
-        """Get information on the SSG from which I derive"""
-
-        sBack = ""
-        # Find out if I have moved from anywhere or not
-        origin = EqualGold.objects.filter(moved=self).first()
-        if origin != None: sBack = reverse('equalgold_details', kwargs={'pk': origin.id})
-        # REturn the information
-        return sBack
-
-    def get_incipit_markdown(self):
-        """Get the contents of the incipit field using markdown"""
-        # Perform
-        return adapt_markdown(self.incipit)
-
-    def get_explicit_markdown(self):
-        """Get the contents of the explicit field using markdown"""
-        return adapt_markdown(self.explicit)
-
-    def get_collections_markdown(self):
-
-        lHtml = []
-        for obj in self.collections.all().order_by('name'):
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
-        sBack = ", ".join(lHtml)
-        return sBack
+        # Check the highest sermon number for this author
+        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+        if qs_ssg.count() == 0:
+            iNumber = 1
+        else:
+            iNumber = qs_ssg.first().number + 1
+        return iNumber
 
 
 class SermonGold(models.Model):
@@ -4803,6 +4837,21 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_superlinks_markdown(self):
+        """Return all the SSG links = type + super"""
+
+        lHtml = []
+        sBack = ""
+        for superlink in self.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist'):
+            lHtml.append("<tr class='view-row'>")
+            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
+            url = reverse('equalgold_details', kwargs={'pk': superlink.super.id})
+            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.super.get_view()))
+            lHtml.append("</tr>")
+        if len(lHtml) > 0:
+            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        return sBack
+
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
         lst_author = []
@@ -4908,6 +4957,35 @@ class ManuscriptKeyword(models.Model):
     keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+
+class SermonDescrEqual(models.Model):
+    """Link from sermon description (S) to super sermon gold (SSG)"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_super")
+    # [1] The gold sermon
+    super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
+    # [1] Each sermon-to-gold link must have a linktype, with default "equal"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="eq")
+
+    def __str__(self):
+        # Temporary fix: sermon.id
+        # Should be changed to something more significant in the future
+        # E.G: manuscript+locus?? (assuming each sermon has a locus)
+        combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.super.__str__())
+        return combi
+
+    def get_label(self, do_incexpl=False):
+        sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))
+        return sBack
+
+    def unique_list():
+        """Get a list of links that are unique in terms of combination [ssg] [linktype]"""
+
+        # We're not really giving unique ones
+        uniques = SermonDescrEqual.objects.order_by('linktype', 'sermon__author__name', 'sermon__siglist')
+        return uniques
 
 
 class SermonDescrGold(models.Model):

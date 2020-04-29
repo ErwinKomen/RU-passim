@@ -828,6 +828,15 @@ var ru = (function ($, ru) {
           // Set handling of unique-field
           $("td.unique-field input").unbind("change").change(ru.basic.unique_change);
 
+          // Look for <select> or <input> with [tdstyle]
+          $("select[tdstyle], input[tdstyle]").each(function (idx, el) {
+            var td = $(el).closest("td");
+
+            if (! $(td)[0].hasAttribute("style")) {
+              $(td).attr("style", $(el).attr("tdstyle"));
+            }
+          });
+
           // First destroy them
           $(".typeahead.keywords").typeahead('destroy');
           $(".typeahead.languages").typeahead('destroy');

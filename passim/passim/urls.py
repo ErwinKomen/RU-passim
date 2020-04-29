@@ -185,6 +185,7 @@ urlpatterns = [
     url(r'^api/litref/$', passim.seeker.views.get_litref, name='api_litref'),
     url(r'^api/sg/$', passim.seeker.views.get_sg, name='api_sg'),
     url(r'^api/sglink/$', passim.seeker.views.get_sglink, name='api_sglink'),
+    url(r'^api/ssglink/$', passim.seeker.views.get_ssglink, name='api_ssglink'),
     url(r'^api/ssg/$', passim.seeker.views.get_ssg, name='api_ssg'),
     url(r'^api/sermosig/$', passim.seeker.views.get_sermosig, name='api_sermosig'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
