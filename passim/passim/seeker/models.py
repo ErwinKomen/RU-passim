@@ -3380,6 +3380,21 @@ class EqualGold(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
+    def get_goldset_markdown(self):
+
+        context = []
+        template_name = 'seeker/super_goldset.html'
+
+
+        lHtml = []
+        for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
+            sigs = json.loads(item.siglist)
+            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+            url = reverse('gold_details', kwargs={'pk': item.id})
+            lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+        sBack = " ".join(lHtml)
+        return sBack
+
     def get_incipit_markdown(self):
         """Get the contents of the incipit field using markdown"""
         # Perform
@@ -3396,8 +3411,6 @@ class EqualGold(models.Model):
         lHtml.append("{} ".format(sLabel))
 
         # Treat signatures
-        #srch = "CPPM"
-        #qs = EqualGold.objects.filter(Q(equal_goldsermons__goldsignatures__code__icontains=srch))
         equal_set = self.equal_goldsermons.all()
         siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()]
         lHtml.append(" | ".join(siglist))

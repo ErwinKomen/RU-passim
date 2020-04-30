@@ -33,9 +33,10 @@ var ru = (function ($, ru) {
           },
           // super
           { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead },
-          {
-            "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
+          { "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead,
+            "select2_options": { "templateSelection": ru.passim.sg_template }
+          },
+          { "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
             "select2_options": { "templateSelection": ru.passim.ssg_template }
           },
 

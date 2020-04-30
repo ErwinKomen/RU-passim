@@ -61,6 +61,7 @@
                   <div class="view-mode">
                     <a href="{% url 'equalgold_details' linkform.instance.dst.id %}">{{linkform.instance.dst.get_view|safe}}</a>
                   </div>
+                  <!-- THe edit-mode shows the Select2 list -->
                   <div class="edit-mode hidden">
                     {{linkform.target_list}}
                   </div>

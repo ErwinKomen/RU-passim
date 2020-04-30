@@ -804,12 +804,10 @@ var ru = (function ($, ru) {
               }
               // Create the option to be passed on
               options["templateSelection"] = template_fn;
-              options["templateResult"] = template_fn;
-              // options["templateSelection"] = template_sel;
               // Remove previous .select2
-              $(el).find(".select2").remove();
+              $(el).parent().find(".select2").remove();
               // Now make it happen
-              $(el).find(".django-select2").djangoSelect2(options);
+              $(el).parent().find(".django-select2").djangoSelect2(options);
             }
           });
 

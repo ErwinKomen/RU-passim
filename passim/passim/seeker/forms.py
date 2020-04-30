@@ -375,7 +375,21 @@ class SermonGoldOneWidget(ModelSelect2Widget):
         return full
 
     def get_queryset(self):
-        return SermonGold.objects.all().order_by('author__name', 'siglist').distinct()
+        return SermonGold.objects.all().order_by('siglist').distinct()
+
+
+class SermonGoldWidget(ModelSelect2MultipleWidget):
+    model = SermonGold
+    search_fields = [ 'siglist__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Determine the full text
+        full = obj.get_label(do_incexpl=True)
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return SermonGold.objects.all().order_by('siglist').distinct()
 
 
 class ManualSignatureWidget(ModelSelect2MultipleWidget):
@@ -1276,6 +1290,8 @@ class SermonGoldSameForm(forms.ModelForm):
 
 
 class EqualGoldForm(forms.ModelForm):
+    newgold = ModelChoiceField(queryset=None, required=False,
+                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     gold = forms.CharField(label=_("Destination gold sermon"), required=True)
     
     class Meta:
@@ -1283,6 +1299,40 @@ class EqualGoldForm(forms.ModelForm):
 
         model = EqualGold
         fields = [ ]
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(EqualGoldForm, self).__init__(*args, **kwargs)
+
+        # Set the keyword to optional for best processing
+        self.fields['newgold'].required = False
+        self.fields['gold'].required = False
+
+        # Initialize queryset
+        self.fields['newgold'].queryset = SermonGold.objects.order_by('author__name', 'siglist')
+    
+
+class SuperToGoldForm(forms.ModelForm):
+    newgold = ModelChoiceField(queryset=None, required=False,
+                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    gold = forms.CharField(label=_("Destination gold sermon"), required=True)
+    
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescr
+        fields = [ ]
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(SuperToGoldForm, self).__init__(*args, **kwargs)
+
+        # Set the keyword to optional for best processing
+        self.fields['newgold'].required = False
+        self.fields['gold'].required = False
+
+        # Initialize queryset
+        self.fields['newgold'].queryset = SermonGold.objects.order_by('author__name', 'siglist')
     
 
 class SuperSermonGoldForm(PassimModelForm):
@@ -1295,10 +1345,13 @@ class SuperSermonGoldForm(PassimModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
-    collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False)
+    goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
+    collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
+    collist_sg  = ModelMultipleChoiceField(queryset=None, required=False)
+    collist_ssg = ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_s = forms.CharField(label=_("Collection s"), required=False,
@@ -1330,8 +1383,12 @@ class SuperSermonGoldForm(PassimModelForm):
             username = self.username
             team_group = self.team_group
             # Some fields are not required
+            self.fields['authorname'].required = False
+
+            # Initialize querysets
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1348,10 +1405,6 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
-            #self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-            #self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-            #self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-            #self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
@@ -1363,8 +1416,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 # If there is an instance, then check the author specification
                 sAuthor = "" if not instance.author else instance.author.name
                 self.fields['authorname'].initial = sAuthor
-                self.fields['authorname'].required = False
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+                self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
 
         except:
             msg = oErr.get_error_message()
