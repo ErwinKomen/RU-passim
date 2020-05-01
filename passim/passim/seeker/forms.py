@@ -168,9 +168,44 @@ class EdirefSgWidget(ModelSelect2MultipleWidget):
         return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
+    model = EqualGold
+    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
+    addonly = False
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label(do_incexpl = True)
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = EqualGold.objects.none()
+        else:
+            qs = EqualGold.objects.all().order_by('code').distinct()
+        return qs
+
+
+class EqualGoldLinkAddOnlyWidget(EqualGoldMultiWidget):
+    model = EqualGoldLink
+    search_fields = ['dst__code__icontains', 'dst__id__icontains', 'dst__author__name__icontains', 'dst__equal_goldsermons__siglist__icontains']
+    addonly = True
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label(do_incexpl = True)
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = EqualGoldLink.objects.none()
+        else:
+            qs = EqualGoldLink.objects.all().order_by('dst__code').distinct()
+        return qs
+
+
 class EqualGoldWidget(ModelSelect2Widget):
     model = EqualGold
     search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+    addonly = False
 
     def label_from_instance(self, obj):
         # Determine the full text
@@ -179,7 +214,11 @@ class EqualGoldWidget(ModelSelect2Widget):
         return full
 
     def get_queryset(self):
-        return EqualGold.objects.all().order_by('code').distinct()
+        if self.addonly:
+            qs = EqualGold.objects.none()
+        else:
+            qs = EqualGold.objects.all().order_by('code').distinct()
+        return qs
 
 
 class FtextlinkWidget(ModelSelect2MultipleWidget):
@@ -1347,6 +1386,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1379,6 +1420,7 @@ class SuperSermonGoldForm(PassimModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SuperSermonGoldForm, self).__init__(*args, **kwargs)
+        oErr = ErrHandle()
         try:
             username = self.username
             team_group = self.team_group
@@ -1389,6 +1431,8 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
+            self.fields['superlist'].queryset = EqualGoldLink.objects.none()
+            # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1418,7 +1462,9 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['authorname'].initial = sAuthor
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
-
+                self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
+                self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
+                qs = instance.equalgold_dst.all()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SuperSermonGoldForm-init")
@@ -1443,7 +1489,9 @@ class SuperSermonGoldForm(PassimModelForm):
 
 
 class EqualGoldLinkForm(forms.ModelForm):
-    target_list = ModelChoiceField(queryset=None, required=False,
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     gold = forms.CharField(label=_("Destination gold sermon"), required=False)
 
@@ -1460,10 +1508,14 @@ class EqualGoldLinkForm(forms.ModelForm):
         super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
         init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
+        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
         # Make sure to set required and optional fields
+        self.fields['linktype'].required = False
+        self.fields['newlinktype'].required = False
         self.fields['dst'].required = False
-        self.fields['target_list'].required = False
-        self.fields['target_list'].queryset = EqualGold.objects.all().order_by('code')
+        self.fields['newsuper'].required = False
+        self.fields['newsuper'].queryset = EqualGold.objects.all().order_by('code')
+        # self.fields['target_list'].queryset = EqualGold.objects.none()
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1471,8 +1523,11 @@ class EqualGoldLinkForm(forms.ModelForm):
                 #  NOTE: the following has no effect because we use bound fields
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
-                self.fields['target_list'].queryset = EqualGold.objects.exclude(id=instance.id).order_by('code')
-                pass
+
+                self.fields['newsuper'].queryset = EqualGold.objects.exclude(id=instance.id).order_by('code')
+
+        # REturn nothing
+        return None
 
     def clean(self):
         # Run any super class cleaning
@@ -1482,7 +1537,7 @@ class EqualGoldLinkForm(forms.ModelForm):
         src = cleaned_data.get("src")
         if src != None:
             # Any new destination is added in target_list
-            dst = cleaned_data.get("target_list")
+            dst = cleaned_data.get("newsuper")
             if dst != None:
                 # WE have a DST, now check how many links there are with this one
                 existing = src.relations.filter(id=dst.id)

@@ -1057,11 +1057,20 @@ var ru = (function ($, ru) {
 
       /**
        * ssglink_template
-       *    Construct the template for a *link* to a Super Sermon Gold
+       *    Construct the template for a *link* from SermonDescr to a Super Sermon Gold
        *
        */
       ssglink_template: function (sel_item) {
         return private_methods.get_template(sel_item, "api/ssglink/");
+      },
+
+      /**
+       * ssg2ssg_template
+       *    Construct the template for a *link* from SSG to a Super Sermon Gold
+       *
+       */
+      ssg2ssg_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/ssg2ssg/");
       },
 
       /**

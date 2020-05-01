@@ -3493,6 +3493,21 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_superlinks_markdown(self):
+        """Return all the SSG links = type + dst"""
+
+        lHtml = []
+        sBack = ""
+        for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+            lHtml.append("<tr class='view-row'>")
+            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
+            url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
+            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.dst.get_view()))
+            lHtml.append("</tr>")
+        if len(lHtml) > 0:
+            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        return sBack
+
     def get_text(self):
         """Get a short textual representation"""
 
@@ -4275,12 +4290,15 @@ class EqualGoldLink(models.Model):
     # [1] It equals equalgoldgroup [dst]
     dst = models.ForeignKey(EqualGold, related_name="equalgold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
-                            max_length=5, default=LINK_EQUAL)
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_EQUAL)
 
     def __str__(self):
-        combi = "{} is {} of {}".format(self.src.signature, self.linktype, self.dst.signature)
+        combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)
         return combi
+
+    def get_label(self, do_incexpl=False):
+        sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))
+        return sBack
 
 
 class SermonGoldSame(models.Model):
