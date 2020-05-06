@@ -3289,6 +3289,9 @@ class EqualGold(models.Model):
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
 
+    # [0-n] Many-to-many: keywords per SermonGold
+    keywords = models.ManyToManyField(Keyword, through="EqualGoldKeyword", related_name="keywords_super")
+
     # [m] Many-to-many: one sermon can be a part of a series of collections
     collections = models.ManyToManyField("Collection", through="CollectionSuper", related_name="collections_super")
     
@@ -3399,6 +3402,18 @@ class EqualGold(models.Model):
         """Get the contents of the incipit field using markdown"""
         # Perform
         return adapt_markdown(self.incipit)
+
+    def get_keywords_markdown(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_label(self, do_incexpl=False):
         """Get a string view of myself to be put on a label"""
@@ -4299,6 +4314,17 @@ class EqualGoldLink(models.Model):
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))
         return sBack
+
+
+class EqualGoldKeyword(models.Model):
+    """Relation between an EqualGold and a Keyword"""
+
+    # [1] The link is between a SermonGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equal_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="equal_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
 
 
 class SermonGoldSame(models.Model):

@@ -1388,6 +1388,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1433,6 +1435,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1462,6 +1465,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['authorname'].initial = sAuthor
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
+                self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 qs = instance.equalgold_dst.all()

@@ -69,7 +69,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
-    SourceInfo, SermonGoldSame, SermonGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
+    SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_PARTIAL
@@ -7980,6 +7980,7 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
             {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide', 'link': instance.get_moved_url},
             {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code, 'empty': 'hide', 'link': instance.get_previous_url},
             {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
@@ -8085,6 +8086,10 @@ class EqualGoldEdit(BasicDetails):
             # (2) links from one SSG to another SSG
             superlist = form.cleaned_data['superlist']
             adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True)
+
+            # (3) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(EqualGoldKeyword, instance, "equal", kwlist, "keyword")
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -8212,6 +8217,7 @@ class EqualGoldListView(BasicList):
         {"name": "Passim code",     "id": "filter_code",              "enabled": False},
         {"name": "Number",          "id": "filter_number",            "enabled": False},
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -8224,6 +8230,7 @@ class EqualGoldListView(BasicList):
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
             ]},
