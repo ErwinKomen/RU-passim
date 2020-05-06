@@ -36,14 +36,15 @@ LONG_STRING=255
 MAX_TEXT_LEN = 200
 PASSIM_CODE_LENGTH = 20
 
-VIEW_STATUS = "view.status"
-LIBRARY_TYPE = "seeker.libtype"
-REPORT_TYPE = "seeker.reptype"
-LINK_TYPE = "seeker.linktype"
-EDI_TYPE = "seeker.editype"
-STATUS_TYPE = "seeker.stype"
-COLLECTION_TYPE = "seeker.coltype" 
 COLLECTION_SCOPE = "seeker.colscope"
+COLLECTION_TYPE = "seeker.coltype" 
+EDI_TYPE = "seeker.editype"
+LIBRARY_TYPE = "seeker.libtype"
+LINK_TYPE = "seeker.linktype"
+REPORT_TYPE = "seeker.reptype"
+STATUS_TYPE = "seeker.stype"
+VIEW_STATUS = "view.status"
+VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
@@ -2370,6 +2371,8 @@ class Keyword(models.Model):
 
     # [1] Obligatory text of a keyword
     name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Every manuscript has a visibility - default is 'all'
+    visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
 
     def __str__(self):
         return self.name
@@ -2388,6 +2391,41 @@ class Keyword(models.Model):
         """Frequency in Manuscripts"""
         freq = self.keywords_manu.all().count()
         return freq
+
+    def freqsuper(self):
+        """Frequency in Super sermons gold"""
+        freq = self.keywords_super.all().count()
+        return freq
+
+    def get_scoped_queryset(username, team_group):
+        """Get a filtered queryset, depending on type and username"""
+
+        # Initialisations
+        non_private = ['publ', 'team']
+        oErr = ErrHandle()
+        filter = None
+        try:
+            # Validate
+            if username and team_group and username != "" and team_group != "":
+                # First filter on owner
+                owner = Profile.get_user_profile(username)
+                # Now check for permissions
+                is_team = (owner.user.groups.filter(name=team_group).first() != None)
+                # Adapt the filter accordingly
+                if not is_team:
+                    # Non editors may only see keywords visible to all
+                    filter = Q(visibility="all")
+            if filter:
+                # Apply the filter
+                qs = Keyword.objects.filter(filter).order_by('name')
+            else:
+                qs = Keyword.objects.all().order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_scoped_queryset")
+            qs = Keyword.objects.all().order_by('name')
+        # REturn the result
+        return qs
 
 
 class Manuscript(models.Model):

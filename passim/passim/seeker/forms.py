@@ -19,6 +19,17 @@ def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bU
         if use_helptext:
             obj.fields[sFieldName].help_text = get_help(sSet)
 
+def user_is_in_team(username, team_group):
+    bResult = False
+    # Validate
+    if username and team_group and username != "" and team_group != "":
+        # First filter on owner
+        owner = Profile.get_user_profile(username)
+        # Now check for permissions
+        bResult = (owner.user.groups.filter(name=team_group).first() != None)
+    return bResult
+
+
 
 # ================= WIDGETS =====================================
 
@@ -236,12 +247,21 @@ class FtextlinkWidget(ModelSelect2MultipleWidget):
 class KeywordWidget(ModelSelect2MultipleWidget):
     model = Keyword
     search_fields = [ 'name__icontains' ]
+    is_team = True
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
-        return Keyword.objects.all().order_by('name').distinct()
+        if self.is_team:
+            qs = Keyword.objects.all().order_by('name').distinct()
+        else:
+            qs = Keyword.objects.exclude(visibility="edi").order_by('name').distinct()
+        return qs
+
+
+class KeywordAllWidget(KeywordWidget):
+    is_team = False
 
 
 class LitrefWidget(ModelSelect2Widget):
@@ -500,6 +520,7 @@ class SuperOneWidget(ModelSelect2Widget):
         return EqualGold.objects.all().order_by('code', 'id').distinct()
 
 
+
 # ================= FORMS =======================================
 
 class PassimModelForm(forms.ModelForm):
@@ -685,7 +706,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['yearfinish'].required = False
             self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
 
             # Set the widgets correctly
@@ -766,12 +787,10 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #goldlist = ModelMultipleChoiceField(queryset=None, required=False,
-    #            widget=SermonDescrGoldAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
-    #                                              'placeholder': 'Linked sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -843,12 +862,18 @@ class SermonForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            is_team = user_is_in_team(username, team_group)
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['manu'].required = False
             self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
-            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            if is_team:
+                self.fields['kwlist'].widget = KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'})
+            else:
+                self.fields['kwlist'].widget = KeywordAllWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'})
             # Note: what we show the user is the set of GOLD-signatures
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
@@ -861,11 +886,11 @@ class SermonForm(PassimModelForm):
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple sermon manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple super sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
@@ -892,19 +917,20 @@ class SermonForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+
+                # Determine the initial collections
                 self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
                 self.fields['collist_s'].initial = [x.pk for x in instance.collections.filter(type='sermo').order_by('name')]
                 self.fields['collist_sg'].initial = [x.pk for x in instance.collections.filter(type='gold').order_by('name')]
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
+
                 # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
-                # self.fields['siglist'].initial = instance.signatures_ordered()
                 self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
+
                 # Note: this is the list of links between SermonDesrc-Gold
-                # self.fields['goldlist'].initial = [x.pk for x in instance.sermondescr_gold.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
                 self.fields['superlist'].initial = [x.pk for x in instance.sermondescr_super.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
 
                 # Make sure the initial superlist captures exactly what we have
-                # self.fields['goldlist'].queryset = SermonDescrGold.objects.filter(Q(id__in = self.fields['goldlist'].initial))
                 self.fields['superlist'].queryset = SermonDescrEqual.objects.filter(Q(id__in = self.fields['superlist'].initial))
 
 
@@ -928,8 +954,9 @@ class KeywordForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Keyword
-        fields = ['name']
-        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+        fields = ['name', 'visibility']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'visibility':  forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Visibility type...',  'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -937,10 +964,14 @@ class KeywordForm(forms.ModelForm):
         super(KeywordForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['name'].required = False
+        self.fields['visibility'].required = False
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        # Initialize choices for linktype
+        init_choices(self, 'vistype', VISIBILITY_TYPE, bUseAbbr=True, use_helptext=False)
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+            self.fields['visibility'].initial = instance.visibility
 
 
 class ProjectForm(forms.ModelForm):
@@ -1254,7 +1285,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['stype'].required = False
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
-            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
@@ -1435,7 +1466,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
-            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -2176,7 +2207,7 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
-            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist'].queryset = Collection.get_scoped_queryset('manu', username, team_group)

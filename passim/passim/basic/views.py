@@ -435,7 +435,7 @@ class BasicList(ListView):
 
         oErr = ErrHandle()
 
-        self.initializations()
+        #self.initializations()
 
         # Get parameters for the search
         if self.initial == None:
@@ -692,10 +692,15 @@ class BasicList(ListView):
         return fields, None, None
   
     def get_queryset(self):
+        self.initializations()
+
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
         get = get.copy()
         self.qd = get
+
+        username=self.request.user.username
+        team_group=app_editor
 
         self.bFilter = False
         self.bHasParameters = (len(get) > 0)
@@ -730,7 +735,10 @@ class BasicList(ListView):
             self.bFilter = False
 
             # Read the form with the information
-            thisForm = self.listform(self.qd, prefix=self.prefix)
+            if self.use_team_group:
+                thisForm = self.listform(self.qd, prefix=self.prefix, username=username, team_group=team_group)
+            else:
+                thisForm = self.listform(self.qd, prefix=self.prefix)
 
             if thisForm.is_valid():
                 # Process the criteria for this form

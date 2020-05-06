@@ -2109,6 +2109,19 @@ def do_create_pdf_manu(request):
     # And return the pdf
     return response
 
+def user_is_in_team(request):
+    bResult = False
+    username = request.user.username
+    team_group = app_editor
+    # Validate
+    if username and team_group and username != "" and team_group != "":
+        # First filter on owner
+        owner = Profile.get_user_profile(username)
+        # Now check for permissions
+        bResult = (owner.user.groups.filter(name=team_group).first() != None)
+    return bResult
+
+
 # ============== NOTE: superseded by the READER app ===================
 def import_ead(request):
     """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
@@ -5458,22 +5471,6 @@ class SermonEdit(BasicDetails):
                         # Make sure we set the keyword
                         form.instance.collection = obj
                         # Note: it will get saved with formset.save()
-                #elif prefix == "stog":
-                #    # SermonDescr-To-SermonGold processing
-                #    if 'newgold' in cleaned and cleaned['newgold'] != "":
-                #        newgold = cleaned['newgold']
-                #        # There also must be a linktype
-                #        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
-                #            linktype = cleaned['newlinktype']
-                #            # Check existence
-                #            obj = SermonDescrGold.objects.filter(sermon=instance, gold=newgold, linktype=linktype).first()
-                #            if obj == None:
-                #                gold = SermonGold.objects.filter(id=newgold).first()
-                #                if gold != None:
-                #                    # Set the right parameters for creation later on
-                #                    form.instance.linktype = linktype
-                #                    form.instance.gold = gold
-                #    # Note: it will get saved with form.save()
                 elif prefix == "stossg":
                     # SermonDescr-To-EqualGold processing
                     if 'newsuper' in cleaned and cleaned['newsuper'] != "":
@@ -5622,8 +5619,9 @@ class SermonListView(BasicList):
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   
-                                        'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
+            #{'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   
+            #                            'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
@@ -5700,6 +5698,25 @@ class SermonListView(BasicList):
         sBack = "\n".join(html)
         return sBack, sTitle
 
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Check on what kind of user I am
+            if not user_is_ingroup(self.request, app_editor):
+                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                fields['kwlist'] = kwlist
+        return fields, lstExclude, qAlternative
+
 
 class KeywordEdit(BasicDetails):
     """The details of one keyword"""
@@ -5716,7 +5733,8 @@ class KeywordEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Name:",      'value': instance.name, 'field_key': 'name'}
+            {'type': 'plain', 'label': "Name:",      'value': instance.name,                    'field_key': 'name'},
+            {'type': 'plain', 'label': "Visibility:",'value': instance.get_visibility_display(), 'field_key': 'visibility'}
             ]
         # Return the context we have made
         return context
@@ -5736,16 +5754,56 @@ class KeywordListView(BasicList):
     paginate_by = 20
     # template_name = 'seeker/keyword_list.html'
     has_select2 = True
+    in_team = False
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', '']
+    order_cols = ['name', 'visibility', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword', 'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+    order_heads = [{'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                   {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
                    {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
-    filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+    filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+                {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'keyword',   'dbfield': 'name',          'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]}
+            {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }]}
         ]
+
+    def initializations(self):
+        # Check out who I am
+        in_team = user_is_in_team(self.request)
+        self.in_team = in_team
+        if in_team:
+            self.order_cols = ['name', 'visibility', '']
+            self.order_default = self.order_cols
+            self.order_heads = [
+                {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
+                {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
+            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+                             {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
+                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }]}
+                ]
+            self.bUseFilter = False
+        else:
+            self.order_cols = ['name', '']
+            self.order_default = self.order_cols
+            self.order_heads = [
+                {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
+            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
+                    ]}
+                ]
+            self.bUseFilter = True
+        return None
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -5756,21 +5814,37 @@ class KeywordListView(BasicList):
             number = instance.freqsermo()
             if number > 0:
                 url = reverse('sermon_list')
-                html.append("<a href='{}?sermo-keyword={}'>".format(url, instance.name))
+                html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
             number = instance.freqgold()
             if number > 0:
                 url = reverse('search_gold')
-                html.append("<a href='{}?gold-keyword={}'>".format(url, instance.name))
+                html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
             number = instance.freqmanu()
             if number > 0:
                 url = reverse('search_manuscript')
                 html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            number = instance.freqsuper()
+            if number > 0:
+                url = reverse('equalgold_list')
+                html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-4 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
+        elif custom == "visibility":
+            sBack = instance.get_visibility_display()
         return sBack, sTitle
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+        if not self.in_team:
+            # restrict access to "all" marked ons
+            fields['visibility'] = "all"
+
+        return fields, lstExclude, qAlternative
 
 
 class ProjectEdit(PassimDetails):
@@ -6846,8 +6920,6 @@ class ManuscriptListView(BasicList):
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
-    #uploads = [{"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "msg": "Upload e-codices XML files"},
-    #           {"title": "ead",    "label": "EAD",       "url": "import_ead",    "msg": "Upload 'archives et manuscripts' XML files"}]
     uploads = reader_uploads
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
@@ -6924,6 +6996,25 @@ class ManuscriptListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Check on what kind of user I am
+            if not user_is_ingroup(self.request, app_editor):
+                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                fields['kwlist'] = kwlist
+        return fields, lstExclude, qAlternative
   
 
 class ManuscriptProvset(BasicPart):
@@ -7259,6 +7350,25 @@ class SermonGoldListView(BasicList):
 
         return None
 
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Check on what kind of user I am
+            if not user_is_ingroup(self.request, app_editor):
+                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                fields['kwlist'] = kwlist
+        return fields, lstExclude, qAlternative
+
 
 class SermonGoldSelect(BasicPart):
     """Facilitate searching and selecting one gold sermon"""
@@ -7384,183 +7494,6 @@ class SermonGoldSelect(BasicPart):
             self.qs = qs
         # Return the resulting filtered and sorted queryset
         return qs
-
-
-#class SermonGoldEqualset(BasicPart):
-#    """The set of equality links from one gold sermon"""
-
-#    MainModel = SermonGold
-#    template_name = 'seeker/sermongold_eqset.html'
-#    title = "SermonGoldLinkset"
-#    GeqFormSet = inlineformset_factory(EqualGold, SermonGold, 
-#                                         form=EqualGoldForm, min_num=0,
-#                                         fk_name = "equal",
-#                                         extra=0, can_delete=True, can_order=False)
-#    formset_objects = [{'formsetClass': GeqFormSet, 'prefix': 'geq', 'readonly': False}]
-
-#    def get_queryset(self, prefix):
-#        qs = None
-#        if prefix == "geq":
-#            # Get all SermonGold instances with the same EqualGold
-#            equal = self.obj.equal
-#            qs = SermonGold.objects.filter(equal=equal).exclude(id=self.obj.id)
-#        return qs
-
-#    def get_instance(self, prefix):
-#        if prefix == "geq" or "geq" in prefix:
-#            return self.obj.equal
-#        else:
-#            return self.obj
-
-#    def process_formset(self, prefix, request, formset):
-#        if prefix == "geq":
-#            for form in formset:
-#                # Check if this has an instance
-#                if form.instance == None or form.instance.id == None:
-#                    # This has no SermonGold instance: retrieve it from the 'gold' value
-#                    if 'gold' in form.fields:
-#                        gold_id = form['gold'].data
-#                        if gold_id != "":
-#                            gold = SermonGold.objects.filter(id=gold_id).first()
-#                            form.instance = gold
-#        # No return value needed
-#        return True
-
-#    def remove_from_eqset(self, instance):
-#        # In fact, a new 'EqualGold' instance must be created
-#        geq = EqualGold()
-#        geq.save()
-#        # Set the SermonGold instance to this new equality set
-#        instance.equal = geq
-#        instance.save()
-#        # Check if we need to retain any partial or other links
-#        gdkeep = [x for x in self.qd if "gdkeep-" in x]
-#        for keep in gdkeep:
-#            eqgl = EqualGoldLink.objects.filter(id=self.qd[keep]).first()
-#            # Create a new link
-#            lnk = EqualGoldLink(src=geq, dst=eqgl.dst, linktype=eqgl.linktype)
-#            lnk.save()
-#        # Return positively
-#        return True
-
-#    def before_delete(self, prefix = None, instance = None):
-#        """Check if moving of non-equal links should take place"""
-
-#        # NOTE: this is already part of a transaction.atomic() area!!!
-#        bDoDelete = True
-#        if prefix != None and prefix == "geq" and instance != None:
-#            # No actual deletion of anything should take place...
-#            bDoDelete = False
-#            # Perform the operation
-#            self.remove_from_eqset(instance)
-#        return bDoDelete
-
-#    def before_save(self, prefix, request, instance = None, form = None):
-#        bNeedSaving = False
-#        if prefix == "geq":
-#            self.gold = None
-#            if 'gold' in form.cleaned_data:
-#                # Get the form's 'gold' value
-#                gold_id = form.cleaned_data['gold']
-#                if gold_id != "":
-#                    # Find the gold to attach to
-#                    gold = SermonGold.objects.filter(id=gold_id).first()
-#                    if gold != None and gold.id != instance.id:
-#                        self.gold = gold
-#        return bNeedSaving
-
-#    def after_save(self, prefix, instance = None, form = None):
-#        # The instance here is the geq-instance, so an instance of SermonGold
-#        # Now make sure all related material is updated
-
-#        if self.gold == None:
-#            # Add this gold sermon to the equality group of the target
-#            added, lst_res = add_gold2equal(instance, self.obj.equal)
-#        else:
-#            # The user wants to change the gold-sermon inside the equality set: 
-#            # (1) Keep track of the current equality set
-#            eqset = self.obj.equal
-#            # (2) Remove [instance] from the equality set
-#            self.remove_from_eqset(instance)
-#            # (3) Add [gold] to the current equality set
-#            added, lst_res = add_gold2equal(self.gold, eqset)
-#            # (4) Save changes to the instance
-#            self.obj.save()
-#            # bNeedSaving = True
-#        return True
-
-#    def add_to_context(self, context):
-#        # Get the EqualGold instances to which I am associated
-#        context['associations'] = self.obj.equal.equalgold_src.all()
-
-#        return context
-
-    
-#class SermonGoldLinkset(BasicPart):
-#    """The set of other links from one SermonEqual item"""
-
-#    MainModel = SermonGold
-#    template_name = 'seeker/sermongold_linkset.html'
-#    title = "SermonGoldLinkset"
-#    GlinkFormSet = inlineformset_factory(EqualGold, EqualGoldLink,
-#                                         form=EqualGoldLinkForm, min_num=0,
-#                                         fk_name = "src",
-#                                         extra=0, can_delete=True, can_order=False)
-#    formset_objects = [{'formsetClass': GlinkFormSet, 'prefix': 'glink', 'readonly': False, 'initial': [{'linktype': LINK_EQUAL }]}]
-
-#    def custom_init(self):
-#        x = 1
-
-#    def get_instance(self, prefix):
-#        if prefix == "glink" or "glink" in prefix:
-#            return self.obj.equal
-#        else:
-#            return self.obj
-
-#    def process_formset(self, prefix, request, formset):
-#        if prefix == "glink":
-#            # Check the forms in the formset, and set the correct 'dst' values where possible
-#            for form in formset:
-#                if 'gold' in form.changed_data and 'dst' in form.fields and 'gold' in form.fields:
-#                    gold_id = form['gold'].data
-#                    dst_id = form['dst'].data
-#                    if gold_id != None and gold_id != "":
-#                        gold = SermonGold.objects.filter(id=gold_id).first()
-#                        if gold != None:
-#                            # Gaat niet: form['dst'].data = gold.equal
-#                            #            form['dst'].data = gold.equal.id
-#                            #            form.fields['dst'].initial = gold.equal.id
-#                            form.instance.dst = gold.equal
-#        # No need to return a value
-#        return True
-
-#    def before_delete(self, prefix = None, instance = None):
-#        id = instance.id
-#        return True
-
-#    def before_save(self, prefix, request, instance = None, form = None):
-#        bNeedSaving = False
-#        if prefix == "glink":
-#            if 'gold' in form.cleaned_data:
-#                # Get the form's 'gold' value
-#                gold_id = form.cleaned_data['gold']
-#                if gold_id != "":
-#                    # Find the gold to attach to
-#                    gold = SermonGold.objects.filter(id=gold_id).first()
-#                    if gold != None:
-#                        # The destination must be an EqualGold instance
-#                        instance.dst = gold.equal
-#                        bNeedSaving = True
-#        return bNeedSaving
-
-#    def after_save(self, prefix, instance = None, form = None):
-#        # The instance here is the glink-instance, so an instance of EqualGoldLink
-#        # Now make sure all related material is updated
-
-#        # WAS: added, lst_res = add_gold2gold(instance.src, instance.dst, instance.linktype)
-
-#        added, lst_res = add_equal2equal(self.obj, instance.dst, instance.linktype)
-#        return True
 
 
 class SermonGoldSignset(BasicPart):
@@ -8293,6 +8226,25 @@ class EqualGoldListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Check on what kind of user I am
+            if not user_is_ingroup(self.request, app_editor):
+                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                fields['kwlist'] = kwlist
+        return fields, lstExclude, qAlternative
 
 
 class EqualGoldEqualset(BasicPart):
