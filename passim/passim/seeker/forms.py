@@ -2207,6 +2207,7 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['origname_ta'].initial = "" if origin == None else origin.name
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
+                self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
         except:
             msg = oErr.get_error_message()
             oErr.DoError()
