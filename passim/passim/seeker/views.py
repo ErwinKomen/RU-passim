@@ -5343,7 +5343,8 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.note,             'field_key': 'note'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+             # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+             'field_list': 'kwlist',         'fso': self.formset_objects[1]},
             {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
              'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
@@ -6493,10 +6494,15 @@ class ManuscriptEdit(PassimDetails):
                                          form = ManuscriptLitrefForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
+    MkwFormSet = inlineformset_factory(Manuscript, ManuscriptKeyword,
+                                         form=ManuscriptKeywordForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': MdrFormSet, 'prefix': 'mdr', 'readonly': False},
-                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manu'},
-                       {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+    formset_objects = [{'formsetClass': MdrFormSet,  'prefix': 'mdr',  'readonly': False},
+                       {'formsetClass': McolFormSet, 'prefix': 'mcol', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': MkwFormSet,  'prefix': 'mkw',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
 
     def add_to_context(self, context, instance):
 
@@ -6527,6 +6533,16 @@ class ManuscriptEdit(PassimDetails):
                             obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
                         # Make sure we set the keyword
                         form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "mkw":
+                    # Keyword processing
+                    if 'newkw' in cleaned and cleaned['newkw'] != "":
+                        newkw = cleaned['newkw']
+                        # Is the COL already existing?
+                        obj = Keyword.objects.filter(name=newkw).first()
+                        if obj != None:
+                            # Make sure we set the keyword
+                            form.instance.keyword = obj
                         # Note: it will get saved with formset.save()
                 elif prefix == "mlit":
                     # Literature reference processing
@@ -6574,6 +6590,8 @@ class ManuscriptEdit(PassimDetails):
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             collist = form.cleaned_data['collist']
             adapt_m2m(CollectionMan, instance, "manuscript", collist, "collection")
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(ManuscriptKeyword, instance, "manuscript", kwlist, "keyword")
             litlist = form.cleaned_data['litlist']
             adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
                     
@@ -7669,7 +7687,8 @@ class SermonGoldEdit(BasicDetails):
              'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+             'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+             #'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
             {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 

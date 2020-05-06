@@ -1993,6 +1993,8 @@ class ManuscriptExtForm(forms.ModelForm):
 class ManuscriptKeywordForm(forms.ModelForm):
     name = forms.CharField(label=_("Keyword"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
+    newkw = forms.CharField(label=_("Keyword (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Keyword...',  'style': 'width: 100%;'}))
     typeaheads = ["keywords"]
 
     class Meta:
@@ -2006,6 +2008,7 @@ class ManuscriptKeywordForm(forms.ModelForm):
         super(ManuscriptKeywordForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
         self.fields['keyword'].required = False
+        self.fields['newkw'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -2126,6 +2129,8 @@ class ManuscriptForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
@@ -2167,10 +2172,10 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
-            # self.fields['collist'].queryset = Collection.objects.filter(type='manu').order_by('name')
         
             # Get the instance
             if 'instance' in kwargs:

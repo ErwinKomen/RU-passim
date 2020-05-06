@@ -40,7 +40,9 @@
                 <span><a role="button" class="btn btn-xs jumbo-1" targetid="manuscript_litset" title="Show/Hide literature references" onclick="ru.passim.seeker.toggle_click(this);">Literature</a></span>
 
                 <!-- A button to show/hide the keywords -->
+                <!--
                 <span><a role="button" class="btn btn-xs jumbo-1" targetid="manuscript_kwset" title="Show/Hide keywords" onclick="ru.passim.seeker.toggle_click(this);">Keywords</a></span>
+                  -->
               </div>
               {% if is_app_editor %}
                 <div class="col-md-6" align="right">
@@ -92,7 +94,7 @@
             <div class="row">
               <!-- Room for the keywords attached to this manuscript -->
               <div class="col-md-3">
-                <div id="manuscript_kwset" class="post-load hidden" targeturl="{% url 'manu_kwset' pk=manuForm.instance.id %}" >
+                <div id="manuscript_kwset" class="NIET_post-load hidden" targeturl="{% url 'manu_kwset' pk=manuForm.instance.id %}" >
                   <!-- The wait symbol will be overwritten -->
                   <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
                 </div>

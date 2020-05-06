@@ -299,13 +299,20 @@
       <tr class="form-row">
         <td class="tdnowrap" valign="top"><b>Keywords</b></td>
         <td class="manuscript-format" align="left">
-          <div class="any-mode">
+          <div class="view-mode">
             {% if manuForm.instance.keywords.count > 0 %}
               {% for kw in manuForm.instance.keywords.all %}
-                <span class="keyword">{{kw.name}}</span>
+                <span class="keyword">
+                  <a href="{% url 'search_manuscript' %}?manu-kwlist={{kw.id}}">
+                    {{kw.name}}
+                  </a>
+                </span>
               {% endfor %}
             {% else %}-{% endif %}
           </div>
+          {% if is_app_editor %}
+            <div class="edit-mode hidden">{{manuForm.kwlist}}</div>
+          {% endif %}
         </td>
       </tr>
       
