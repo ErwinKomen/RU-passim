@@ -2397,7 +2397,7 @@ class Keyword(models.Model):
         freq = self.keywords_super.all().count()
         return freq
 
-    def get_scoped_queryset(username, team_group):
+    def get_scoped_queryset(username, team_group, userplus=None):
         """Get a filtered queryset, depending on type and username"""
 
         # Initialisations
@@ -2406,11 +2406,13 @@ class Keyword(models.Model):
         filter = None
         try:
             # Validate
-            if username and team_group and username != "" and team_group != "":
+            if username and username != "" and team_group and team_group != "":
                 # First filter on owner
                 owner = Profile.get_user_profile(username)
                 # Now check for permissions
                 is_team = (owner.user.groups.filter(name=team_group).first() != None)
+                if not is_team and userplus != None and userplus != "":
+                    is_team = (owner.user.groups.filter(name=userplus).first() != None)
                 # Adapt the filter accordingly
                 if not is_team:
                     # Non editors may only see keywords visible to all
@@ -4386,9 +4388,9 @@ class SermonGoldKeyword(models.Model):
     """Relation between a SermonGold and a Keyword"""
 
     # [1] The link is between a SermonGold instance ...
-    gold = models.ForeignKey(SermonGold, related_name="sermongold_kw")
+    gold = models.ForeignKey(SermonGold, related_name="gold_sermongold_kw")
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="sermongold_kw")
+    keyword = models.ForeignKey(Keyword, related_name="keyword_sermongold_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -5425,7 +5427,7 @@ class NewsItem(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
       # Adapt the save date
-      self.saved = datetime.now()
+      self.saved = get_current_datetime()
       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
       return response
 

@@ -55,6 +55,7 @@ def get_application_name():
 PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
+app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -446,7 +447,7 @@ class BasicList(ListView):
         # Need to load the correct form
         if self.listform:
             if self.use_team_group:
-                frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor)
+                frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor, userplus=app_userplus)
             else:
                 frm = self.listform(initial, prefix=self.prefix)
             if frm.is_valid():
@@ -602,6 +603,7 @@ class BasicList(ListView):
         context['authenticated'] = context['is_authenticated'] 
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+        context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -1005,6 +1007,7 @@ class BasicDetails(DetailView):
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+        context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
@@ -1196,6 +1199,17 @@ class BasicDetails(DetailView):
                 if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
                 if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
+                # Calculate view-mode versus any-mode
+                #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
+                if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                    mobj['allowing'] = "edit"
+                else:
+                    mobj['allowing'] = "view"
+                if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                    mobj['allowing_key_list'] = "edit"
+                else:
+                    mobj['allowing_key_list'] = "view"
+
         # Define where to go to after deletion
         if 'afterdelurl' not in context or context['afterdelurl'] == "":
             context['afterdelurl'] = get_previous_page(self.request)
@@ -1217,6 +1231,7 @@ class BasicDetails(DetailView):
         oErr = ErrHandle()
         username=self.request.user.username
         team_group=app_editor
+        userplus = app_userplus
 
 
         # Determine the prefix
@@ -1272,7 +1287,7 @@ class BasicDetails(DetailView):
             if instance == None:
                 # Saving a new item
                 if self.use_team_group:
-                    frm = mForm(initial, prefix=prefix, username=username, team_group=team_group)
+                    frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(initial, prefix=prefix)
                 bNew = True
@@ -1280,13 +1295,13 @@ class BasicDetails(DetailView):
             elif len(initial) == 0:
                 # Create a completely new form, on the basis of the [instance] only
                 if self.use_team_group:
-                    frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group)
+                    frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(prefix=prefix, instance=instance)
             else:
                 # Editing an existing one
                 if self.use_team_group:
-                    frm = mForm(initial, prefix=prefix, instance=instance, username=username, team_group=team_group)
+                    frm = mForm(initial, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(initial, prefix=prefix, instance=instance)
             # Both cases: validation and saving
@@ -1339,13 +1354,13 @@ class BasicDetails(DetailView):
             if instance == None:
                 # Get the form for the sermon
                 if self.use_team_group:
-                    frm = mForm(prefix=prefix, username=username, team_group=team_group)
+                    frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(prefix=prefix)
             else:
                 # Get the form for the sermon
                 if self.use_team_group:
-                    frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group)
+                    frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(instance=instance, prefix=prefix)
             if frm.is_valid():

@@ -106,6 +106,7 @@ def get_application_name():
 PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
+app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 
 
 def treat_bom(sHtml):
@@ -118,7 +119,7 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False):
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None):
     """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
 
     errHandle = ErrHandle()
@@ -131,20 +132,23 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
         else:
             related_qs = [getattr(x, field2) for x in through_qs]
         # make sure all items in [qs] are associated
-        for obj in qs:
-            if obj not in related_qs:
-                # Add the association
-                args = {field1: instance}
-                if related_is_through:
-                    args[field2] = getattr(obj, field2)
-                else:
-                    args[field2] = obj
-                for item in extra:
-                    # Copy the field with this name from [obj] to 
-                    args[item] = getattr(obj, item)
-                # cls.objects.create(**{field1: instance, field2: obj})
-                cls.objects.create(**args)
+        if userplus == None or userplus:
+            for obj in qs:
+                if obj not in related_qs:
+                    # Add the association
+                    args = {field1: instance}
+                    if related_is_through:
+                        args[field2] = getattr(obj, field2)
+                    else:
+                        args[field2] = obj
+                    for item in extra:
+                        # Copy the field with this name from [obj] to 
+                        args[item] = getattr(obj, item)
+                    # cls.objects.create(**{field1: instance, field2: obj})
+                    cls.objects.create(**args)
+
         # Remove from [cls] all associations that are not in [qs]
+        # NOTE: do not allow userplus to delete
         for item in through_qs:
             if related_is_through:
                 obj = item
@@ -5303,10 +5307,6 @@ class SermonEdit(BasicDetails):
     use_team_group = True
     prefix_type = "simple"
 
-    #StogFormSet = inlineformset_factory(SermonDescr, SermonDescrGold,
-    #                                     form=SermonDescrGoldForm, min_num=0,
-    #                                     fk_name = "sermon",
-    #                                     extra=0, can_delete=True, can_order=False)
     StossgFormSet = inlineformset_factory(SermonDescr, SermonDescrEqual,
                                          form=SermonDescrSuperForm, min_num=0,
                                          fk_name = "sermon",
@@ -5322,8 +5322,7 @@ class SermonEdit(BasicDetails):
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [ #{'formsetClass': StogFormSet,   'prefix': 'stog',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
-                       {'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+    formset_objects = [{'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
@@ -6568,15 +6567,10 @@ class ManuscriptEdit(PassimDetails):
                                          form = ManuscriptLitrefForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
-    MkwFormSet = inlineformset_factory(Manuscript, ManuscriptKeyword,
-                                         form=ManuscriptKeywordForm, min_num=0,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
 
     formset_objects = [{'formsetClass': MdrFormSet,  'prefix': 'mdr',  'readonly': False},
                        {'formsetClass': McolFormSet, 'prefix': 'mcol', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MkwFormSet,  'prefix': 'mkw',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+                       {'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
 
     def add_to_context(self, context, instance):
 
@@ -6590,52 +6584,47 @@ class ManuscriptEdit(PassimDetails):
 
         errors = []
         bResult = True
-        instance = formset.instance
-        for form in formset:
-            if form.is_valid():
-                cleaned = form.cleaned_data
-                # Action depends on prefix
-                if prefix == "mcol":
-                    # Keyword processing
-                    if 'newcol' in cleaned and cleaned['newcol'] != "":
-                        newcol = cleaned['newcol']
-                        # Is the COL already existing?
-                        obj = Collection.objects.filter(name=newcol).first()
-                        if obj == None:
-                            # TODO: add profile here
-                            profile = Profile.get_user_profile(request.user.username)
-                            obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
-                        # Make sure we set the keyword
-                        form.instance.collection = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "mkw":
-                    # Keyword processing
-                    if 'newkw' in cleaned and cleaned['newkw'] != "":
-                        newkw = cleaned['newkw']
-                        # Is the COL already existing?
-                        obj = Keyword.objects.filter(name=newkw).first()
-                        if obj != None:
+        oErr = ErrHandle()
+        try:
+            instance = formset.instance
+            for form in formset:
+                if form.is_valid():
+                    cleaned = form.cleaned_data
+                    # Action depends on prefix
+                    if prefix == "mcol":
+                        # Keyword processing
+                        if 'newcol' in cleaned and cleaned['newcol'] != "":
+                            newcol = cleaned['newcol']
+                            # Is the COL already existing?
+                            obj = Collection.objects.filter(name=newcol).first()
+                            if obj == None:
+                                # TODO: add profile here
+                                profile = Profile.get_user_profile(request.user.username)
+                                obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
                             # Make sure we set the keyword
-                            form.instance.keyword = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "mlit":
-                    # Literature reference processing
-                    newpages = ""
-                    if 'newpages' in cleaned and cleaned['newpages'] != "":
-                        newpages = cleaned['newpages']
-                    # Also get the litref
-                    if 'oneref' in cleaned:
-                        litref = cleaned['oneref']
-                        # Check if all is in order
-                        if litref:
-                            form.instance.reference = litref
-                            if newpages:
-                                form.instance.pages = newpages
-                    # Note: it will get saved with form.save()
+                            form.instance.collection = obj
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "mlit":
+                        # Literature reference processing
+                        newpages = ""
+                        if 'newpages' in cleaned and cleaned['newpages'] != "":
+                            newpages = cleaned['newpages']
+                        # Also get the litref
+                        if 'oneref' in cleaned:
+                            litref = cleaned['oneref']
+                            # Check if all is in order
+                            if litref:
+                                form.instance.reference = litref
+                                if newpages:
+                                    form.instance.pages = newpages
+                        # Note: it will get saved with form.save()
                 
-            else:
-                errors.append(form.errors)
-                bResult = False
+                else:
+                    errors.append(form.errors)
+                    bResult = False
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptEdit - process_formset")
         return None
 
     def before_save(self, form, instance = None):
@@ -7622,7 +7611,7 @@ class SermonGoldEdit(BasicDetails):
              'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+             'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
              #'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
@@ -7760,11 +7749,15 @@ class SermonGoldEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            # Need to know if the user has special priviledges
+            userplus = None
+            if user_is_ingroup(self.request, app_userplus): userplus = True
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
-            adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword")
-
+            adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword", userplus=userplus)
+            
             # (2) 'editions'
             edilist = form.cleaned_data['edilist']
             adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)

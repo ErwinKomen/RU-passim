@@ -14,7 +14,7 @@
         <td colspan="2"  class="ms editable table">
           <!-- Provide the necessary buttons: edit, cancel and save -->
           <div>
-            {% if is_app_editor and permission == "write" %}
+            {% if is_app_userplus or is_app_editor and permission == "write" %}
               <!-- Edit button -->
               <a mode="edit" class="view-mode btn btn-xs jumbo-1"><span class="glyphicon glyphicon-pencil" title="Edit these data"></span></a>
             {% endif %}
@@ -24,7 +24,7 @@
               <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
             </a>
 
-            {% if is_app_editor and permission == "write"  %}
+            {% if is_app_userplus or is_app_editor and permission == "write"  %}
               <!-- Save button -->
               <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
                  targeturl="{% if basic_form.instance.id %}{{editview}}{% else %}{{addview}}{% endif %}" >
@@ -107,14 +107,14 @@
 
               {% if mainitem.multiple and not 'field_list' in mainitem %}
                 <!-- Multiple instances choosing using Select2 -->
-                <div class="{% if 'field_list' in mainitem and permission == "write" %}view-mode{% else %}any-mode{% endif %} ">
+                <div class="{% if 'field_list' in mainitem and mainitem.allowing == "edit"  %}view-mode{% else %}any-mode{% endif %} ">
                   {% if mainitem.value|length > 0 %}
                     {% for subitem in mainitem.value %}
                       <span class="keyword"><a href="{{mainitem.link}}?{{mainitem.qlist}}={{subitem.id}}">{{subitem.get_label}}</a></span>
                     {% endfor %}
                   {% else %}-{% endif %}
                 </div>
-                {% if 'field_list' in mainitem and permission == "write" %}
+                {% if 'field_list' in mainitem and  mainitem.allowing == "edit" %}
                   <div class="edit-mode hidden">{{mainitem.field_list}}</div>
                   {% if is_app_editor and permission == "write"  %}
                     <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
@@ -129,7 +129,7 @@
 
               {% else %}
                 <!-- Basic view mode -->
-                <div class="{% if 'field_key' in mainitem or 'field_list' in mainitem %}view-mode{% else %}any-mode{% endif %} ">
+                <div class="{% if mainitem.allowing_key_list == "edit" %}view-mode{% else %}any-mode{% endif %} ">
                   {% spaceless %}
                   {% if mainitem.type == "bold" %}
                     {% if mainitem.link == "" %}<b>{% if mainitem.value %}{{mainitem.value}}
@@ -145,7 +145,7 @@
                 </div>
 
                 <!-- This is where the editable input comes -->
-                {% if permission == "write"  %}
+                {% if mainitem.allowing == "edit" %}
                   <div class="edit-overal">
                     {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
                       <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
@@ -159,7 +159,7 @@
                           {{mainitem.field_list}}
                         </div>
                       </div>
-                      {% if is_app_editor and 'fso' in mainitem and permission == "write"  %}
+                      {% if is_app_editor and 'fso' in mainitem and permission == "write" %}
                         <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset" 
                              {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
                           {% if mainitem.unique %}
