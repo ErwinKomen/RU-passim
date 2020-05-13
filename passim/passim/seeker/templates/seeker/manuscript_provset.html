@@ -1,4 +1,4 @@
-﻿{% load i18n %}
+{% load i18n %}
 
 <div id="mprov_formset" >
 
@@ -9,7 +9,7 @@
       {{ mprov_formset.management_form }}
 
       <div class="col-md-12">
-        {% if not is_passim_editor and mprov_formset|length == 0 %}
+        {% if not is_app_editor and mprov_formset|length == 0 %}
           <p>No provenances defined for this manuscript</p>
         {% else %}
           <table class="func-view" style="width: 100%;">
@@ -27,7 +27,7 @@
 
                   <!-- A button to edit or save this provenance -->
                   <td valign="top" class="clickable"  style="min-width: 20px;">
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <div class="view-mode">
                         <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this provenance">
                           <span class="glyphicon glyphicon-pencil"></span>
@@ -66,7 +66,7 @@
                     <div class="view-mode">{{provform.instance.provenance.note}}</div>
                     <div class="edit-mode hidden">{{provform.note}}</div>
                     <!-- Confirmation of delete -->
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <div class="delete-confirm hidden">
                         <span>Do you really want to delete the link to this provenance?</span>
                         <span>
@@ -85,7 +85,7 @@
 
                   <!-- A delete button -->
                   <td title="Delete this provenance" style="vertical-align: middle; width: 20px; " class="clickable">
-                    {% if is_passim_editor %}
+                    {% if is_app_editor %}
                       <a onclick="ru.passim.seeker.delete_confirm(this);"><span class="glyphicon glyphicon-remove">&nbsp;</span></a>
                     {% endif %}
                   </td>
@@ -93,7 +93,7 @@
 
               {% endfor %}
 
-              {% if is_passim_editor %}
+              {% if is_app_editor %}
                 <!-- Empty row with specifications -->
                 <tr class="form-row empty-form">
                   <!-- A 1-based counter for the forms in this set-->

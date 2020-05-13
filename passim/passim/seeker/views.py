@@ -8063,41 +8063,32 @@ class EqualGoldDetails(EqualGoldEdit):
         else:
             context['sections'] = []
 
-            # List of post-load objects
-            postload_objects = []
-            ## (1) postload: gold equality
-            #geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
-            #postload_objects.append(geq_obj)
-
-            ## (2) postload: relation to other
-            #glink_obj = dict(prefix="ssglink", url=reverse('equalgold_linkset', kwargs={'pk': instance.id}))
-            #postload_objects.append(glink_obj)
-
-            context['postload_objects'] = postload_objects
-
             # Lists of related objects
             related_objects = []
 
             # List of manuscripts related to the SSG via sermon descriptions
             manuscripts = dict(title="Manuscripts", prefix="manu")
-            # Get all ID's of sermondescr instances linking to the correct eqg instance
-            # manu_ids = SermonDescr.goldsermons.filter(equal=instance).distinct().values('manu__id')
-            manu_ids = SermonDescr.objects.filter(goldsermons__equal=instance).distinct().values('manu__id')
-            qs = Manuscript.objects.filter(id__in=manu_ids).order_by('idno')
+
+            # Get all SermonDescr instances linking to the correct eqg instance
+            qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
             rel_list =[]
-            for item in qs:
-                manu_name = "<span class='signature'>{}</span> {}".format(item.idno, item.name)
+            for sermon in qs_s:
+                # Get the 'item': the manuscript
+                item = sermon.manu
                 rel_item = []
-                rel_item.append({'value': item.library.lcity.name})
-                rel_item.append({'value': item.library.name})
+                manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
                 rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                  'link': reverse('manuscript_details', kwargs={'pk': item.id})})
                 rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
                 rel_item.append({'value': item.yearstart, 'align': "right"})
                 rel_item.append({'value': item.yearfinish, 'align': "right"})
+
+                sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+                rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+                                 'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['City', 'Library', 'Name', 'Items', 'From', 'Until']
+            manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
