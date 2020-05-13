@@ -953,8 +953,14 @@ class Action(models.Model):
 
     # [1] The user
     user = models.ForeignKey(User)
-    # [1] The item (e.g: Manuscript, SermonDescr, SermonGold)
+    # [1] The item (e.g: Manuscript, SermonDescr, SermonGold = M/S/SG/SSG)
     itemtype = models.CharField("Item type", max_length=MAX_TEXT_LEN)
+    # [1] The ID value of the item (M/S/SG/SSG)
+    itemid = models.IntegerField("Item id", default=0)
+    # [0-1] possibly FK link to M/S/SG/SSG
+    linktype = models.CharField("Link type", max_length=MAX_TEXT_LEN, null=True, blank=True)
+    # [0-1] The ID value of the FK to M/S/SG/SSG
+    linkid = models.IntegerField("Link id", null=True, blank=True)
     # [1] The kind of action performed (e.g: create, edit, delete)
     actiontype = models.CharField("Action type", max_length=MAX_TEXT_LEN)
     # [0-1] Room for possible action-specific details
@@ -966,7 +972,7 @@ class Action(models.Model):
         action = "{}|{}".format(self.user.username, self.when)
         return action
 
-    def add(user, itemtype, actiontype, details=None):
+    def add(user, itemtype, itemid, actiontype, details=None):
         """Add an action"""
 
         # Check if we are getting a string user name or not
@@ -979,10 +985,32 @@ class Action(models.Model):
         if details != None and not isinstance(details, str):
             details = json.dumps(details)
         # Create the correct action
-        action = Action(user=oUser, itemtype=itemtype, actiontype=actiontype)
+        action = Action(user=oUser, itemtype=itemtype, itemid=itemid, actiontype=actiontype)
         if details != None: action.details = details
         action.save()
         return action
+
+    def get_object(self):
+        """Get an object representation of this particular Action item"""
+
+        actiontype = self.actiontype
+        oDetails = None
+        changes = {}
+        if actiontype == "save":
+            oDetails = json.loads(self.details)
+            if 'savetype' in oDetails:
+                actiontype = oDetails['savetype']
+            if 'changes' in oDetails:
+                changes = oDetails['changes']
+        oBack = dict(
+            actiontype = actiontype,
+            itemtype = self.itemtype,
+            itemid = self.itemid,
+            username = self.user.username,
+            when = get_crpp_date(self.when),
+            changes = changes
+            )
+        return oBack
 
 
 class Report(models.Model):
@@ -4656,6 +4684,40 @@ class SermonDescr(models.Model):
         sSignature = "{}/{}".format(sAuthor,self.locus)
         return sSignature
 
+    def adapt_nicknames():
+        """Copy all nicknames to the 'NOTE' field and remove the nickname"""
+
+        bOkay = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Get all the SermonDescr that *have* a nickname, but whose *author* field is empty
+            qs = SermonDescr.objects.exclude(nickname__isnull=True).filter(author__isnull=True)
+            with transaction.atomic():
+                for sermon in qs:
+                    # Get the nickname
+                    nickname = sermon.nickname.name
+                    # Add it to the NOTE field
+                    nicknote = "Possible author: **{}**".format(nickname)
+                    if sermon.note == None:
+                        sermon.note = nicknote
+                    else:
+                        sermon.note = "{} -- {}".format(sermon.note, nicknote)
+                    sermon.save()
+            # Now remove all nicknames
+            with transaction.atomic():
+                for sermon in SermonDescr.objects.all():
+                    if sermon.nickname != None:
+                        # Set the nickname link to 'None'
+                        sermon.nickname = None
+                        sermon.save()
+            # Now remove the whole nickname table
+            Nickname.objects.all().delete()
+        except:
+            msg = oErr.get_error_message()
+            bOkay = False
+        return bOkay, msg
+
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
@@ -4888,6 +4950,10 @@ class SermonDescr(models.Model):
         """Get the manuscript that links to this sermondescr"""
 
         return obj.manu
+
+    def get_note_markdown(self):
+        """Get the contents of the note field using markdown"""
+        return adapt_markdown(self.note)
 
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""

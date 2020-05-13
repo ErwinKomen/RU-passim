@@ -2125,6 +2125,15 @@ def user_is_in_team(request):
         bResult = (owner.user.groups.filter(name=team_group).first() != None)
     return bResult
 
+def passim_action_add(view, instance, details, actiontype):
+    """User can fill this in to his/her liking"""
+
+    # Get the username: 
+    username = view.request.user.username
+    # Process the action
+    Action.add(username, instance.__class__.__name__, instance.id, actiontype, json.dumps(details))
+
+
 
 # ============== NOTE: superseded by the READER app ===================
 def import_ead(request):
@@ -3625,7 +3634,7 @@ class BasicPart(View):
                                 if formObj['forminstance'].changed_data != None:
                                     details['changes'] = action_model_changes(formObj['forminstance'], instance)
                                 if 'action' in formObj: details['savetype'] = formObj['action']
-                                Action.add(request.user.username, self.MainModel.__name__, "save", json.dumps(details))
+                                Action.add(request.user.username, self.MainModel.__name__, instance.id, "save", json.dumps(details))
                                 # Set the context
                                 context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
@@ -3704,7 +3713,7 @@ class BasicPart(View):
                                                     if self.before_delete(prefix, form.instance):
                                                         # Log the delete action
                                                         details = {'id': form.instance.id}
-                                                        Action.add(request.user.username, itemtype, "delete", json.dumps(details))
+                                                        Action.add(request.user.username, itemtype, form.instance.id, "delete", json.dumps(details))
                                                         # Delete this one
                                                         form.instance.delete()
                                                         # NOTE: the template knows this one is deleted by looking at form.DELETE
@@ -3727,7 +3736,7 @@ class BasicPart(View):
                                                         details = {'id': sub_instance.id}
                                                         if form.changed_data != None:
                                                             details['changes'] = action_model_changes(form, sub_instance)
-                                                        Action.add(request.user.username, itemtype, "save", json.dumps(details))
+                                                        Action.add(request.user.username, itemtype,sub_instance.id, "save", json.dumps(details))
                                                         # Store the instance id in the data
                                                         self.data[prefix + '_instanceid'] = sub_instance.id
                                                         # Any action after saving this form
@@ -3812,7 +3821,7 @@ class BasicPart(View):
                 if self.before_delete():
                     # Log the delete action
                     details = {'id': self.obj.id}
-                    Action.add(request.user.username, self.MainModel.__name__, "delete", json.dumps(details))
+                    Action.add(request.user.username, self.MainModel.__name__, self.obj.id, "delete", json.dumps(details))
                     # We have permission to delete the instance
                     self.obj.delete()
                     context['deleted'] = True
@@ -4460,7 +4469,7 @@ class PassimDetails(DetailView):
                     if bResult:
                         # Log the DELETE action
                         details = {'id': instance.id}
-                        Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
+                        Action.add(self.request.user.username, instance.__class__.__name__, instance.id, "delete", json.dumps(details))
                         # Remove this sermongold instance
                         instance.delete()
                     else:
@@ -4514,7 +4523,7 @@ class PassimDetails(DetailView):
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, obj)
-                    Action.add(self.request.user.username, obj.__class__.__name__, "save", json.dumps(details))
+                    Action.add(self.request.user.username, obj.__class__.__name__, obj.id, "save", json.dumps(details))
 
                     # Make sure the form is actually saved completely
                     frm.save()
@@ -5353,7 +5362,7 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
             {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
-            {'type': 'plain', 'label': "Note:",                 'value': instance.note,             'field_key': 'note'},
+            {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
              'field_list': 'kwlist',         'fso': self.formset_objects[1]},
@@ -5380,7 +5389,9 @@ class SermonEdit(BasicDetails):
                  'title': "Go to manuscript {}".format(instance.manu.idno), 
                  'url': reverse('manuscript_details', kwargs={'pk': instance.manu.id})}
             topleftlist.append(buttonspecs)
-            idno = instance.manu.idno
+            lcity = "" if instance.manu.lcity == None else "{}, ".format(instance.manu.lcity.name)
+            lib = "" if instance.manu.library == None else "{}, ".format(instance.manu.library.name)
+            idno = "{}{}{}".format(lcity, lib, instance.manu.idno)
         else:
             idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
@@ -5521,6 +5532,10 @@ class SermonEdit(BasicDetails):
             bResult = False
         return bResult, msg
 
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
 
 class SermonDetails(SermonEdit):
     """The details of one sermon manifestation (SermonDescr)"""
@@ -5592,6 +5607,7 @@ class SermonListView(BasicList):
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
+                {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
@@ -5614,6 +5630,7 @@ class SermonListView(BasicList):
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
+            {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
@@ -5639,6 +5656,18 @@ class SermonListView(BasicList):
             {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
             ]}
          ]
+
+    def initializations(self):
+        # Check if signature adaptation is needed
+        nick_done = Information.get_kvalue("nicknames")
+        if nick_done == None or nick_done == "":
+            # Perform adaptations
+            bResult, msg = SermonDescr.adapt_nicknames()
+            if bResult:
+                # Success
+                Information.set_kvalue("nicknames", "done")
+
+        return None
 
     def add_to_context(self, context, initial):
         # Find out who the user is
@@ -5737,6 +5766,10 @@ class KeywordEdit(BasicDetails):
             ]
         # Return the context we have made
         return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class KeywordDetails(KeywordEdit):
@@ -6002,6 +6035,10 @@ class CollAnyEdit(BasicDetails):
             # The collection type is now a parameter
             form.instance.type = self.prefix
         return True, ""
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class CollManuEdit(CollAnyEdit):
@@ -7604,7 +7641,7 @@ class SermonGoldEdit(BasicDetails):
             {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
              'title': 'Other Sermons Gold members of the same equality set'},
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
-            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author, 'field_key': 'author'},
+            {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
@@ -7782,6 +7819,10 @@ class SermonGoldEdit(BasicDetails):
             msg = oErr.get_error_message()
             bResult = False
         return bResult, msg
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class SermonGoldDetails(SermonGoldEdit):
@@ -8028,6 +8069,10 @@ class EqualGoldEdit(BasicDetails):
             msg = oErr.get_error_message()
             bResult = False
         return bResult, msg
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class EqualGoldDetails(EqualGoldEdit):
