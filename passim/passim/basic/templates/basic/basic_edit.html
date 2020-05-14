@@ -191,6 +191,36 @@
   </table>
 </form>
 
+<!-- Modal form for history -->
+<div id="modal-history" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <!-- introduction header -->
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Revision history</h4>
+      </div>
+
+      <!-- Body of the modal-->
+      <div class="modal-body" id="view-history">
+        <!-- This is where the current gold-to-gold link shows up -->
+        {{history_contents|safe}}
+      </div>
+
+      <!-- Footer with the save button -->
+      <div class="modal-footer">
+        {% if is_app_editor %}
+          <a class="btn jumbo-1" data-dismiss="modal" >
+            <span class="glyphicon glyphicon-ok" title="Close history">&nbsp;Ok</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
 
 {% block endcontent %} 
   {% if has_select2 %}{{basic_form.media.js }}{% endif %}

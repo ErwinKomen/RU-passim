@@ -446,10 +446,11 @@ class BasicList(ListView):
 
         # Need to load the correct form
         if self.listform:
+            prefix = "" if self.prefix == "any" else self.prefix
             if self.use_team_group:
-                frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor, userplus=app_userplus)
+                frm = self.listform(initial, prefix=prefix, username=self.request.user.username, team_group=app_editor, userplus=app_userplus)
             else:
-                frm = self.listform(initial, prefix=self.prefix)
+                frm = self.listform(initial, prefix=prefix)
             if frm.is_valid():
                 context['{}Form'.format(self.prefix)] = frm
                 # Get any possible typeahead parameters
@@ -737,10 +738,12 @@ class BasicList(ListView):
             self.bFilter = False
 
             # Read the form with the information
+            prefix = self.prefix
+            if prefix == "any": prefix = ""
             if self.use_team_group:
-                thisForm = self.listform(self.qd, prefix=self.prefix, username=username, team_group=team_group)
+                thisForm = self.listform(self.qd, prefix=prefix, username=username, team_group=team_group)
             else:
-                thisForm = self.listform(self.qd, prefix=self.prefix)
+                thisForm = self.listform(self.qd, prefix=prefix)
 
             if thisForm.is_valid():
                 # Process the criteria for this form
@@ -832,6 +835,7 @@ class BasicDetails(DetailView):
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
     is_basic = True         # Is this a basic details/edit view?
+    history_button = False  # Show history button for this view
     lst_typeahead = []
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -999,6 +1003,10 @@ class BasicDetails(DetailView):
     def get_form_kwargs(self, prefix):
         return None
 
+    def get_history(self, instance):
+        """Get the history of this element"""
+        return ""
+
     def get_context_data(self, **kwargs):
         # Get the current context
         context = super(BasicDetails, self).get_context_data(**kwargs)
@@ -1012,6 +1020,7 @@ class BasicDetails(DetailView):
         context['afternewurl'] = ""
 
         context['topleftbuttons'] = ""
+        context['history_button'] = self.history_button
 
         if context['authenticated']:
             self.permission = "read"
@@ -1058,6 +1067,7 @@ class BasicDetails(DetailView):
         # Get the instance
         instance = self.object
 
+        # Prepare form
         frm = self.prepare_form(instance, context, initial)
 
         if frm:
@@ -1187,6 +1197,10 @@ class BasicDetails(DetailView):
         # Possibly add to context by the calling function
         if instance.id:
             context = self.add_to_context(context, instance)
+            if self.history_button:
+                # Retrieve history
+                context['history_contents'] = self.get_history(instance)
+
 
         # fill in the form values
         if frm and 'mainitems' in context:
@@ -1217,7 +1231,7 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
-    def action_add(self, details):
+    def action_add(self, instance, actiontype, details):
         """User can fill this in to his/her liking"""
 
         # Example: 
@@ -1253,7 +1267,7 @@ class BasicDetails(DetailView):
                     if bResult:
                         # Log the DELETE action
                         details = {'id': instance.id}
-                        self.action_add(details)
+                        self.action_add(instance, details, "delete")
                         
                         # Remove this sermongold instance
                         instance.delete()
@@ -1318,7 +1332,7 @@ class BasicDetails(DetailView):
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, obj)
-                    self.action_add(details)
+                    self.action_add(obj, details, "save")
 
                     # Make sure the form is actually saved completely
                     frm.save()

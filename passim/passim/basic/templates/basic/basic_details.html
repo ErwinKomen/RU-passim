@@ -143,9 +143,9 @@
                       <thead>
                         <tr>
                           {% if related.use_counter %}
-                            <th colspan="{% if related.editable %}2{% else %}1{% endif %}">#</th>
+                            <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                           {% endif %}
-                          {% for col in related.columns %}<th>{{col}}</th>{% endfor %}
+                          {% for col in related.columns %}<th class="tdnowrap">{{col}}</th>{% endfor %}
                         </tr>
                       </thead>
                       <tbody>
@@ -221,8 +221,17 @@
 
           </div>
 
-          <!-- Button for editing (if user has permission) -->
+          <!-- Button for History and for Editing (if user has permission) -->
           <div class="col-md-1">
+            {% if history_button %}
+              <!-- History button -->
+            <a class="view-mode btn jumbo-1"
+               data-toggle="modal" 
+               data-target="#modal-history">
+              <span class="glyphicon glyphicon-stats" title="Revision history"></span>
+            </a>
+            {% endif %}
+
             {% if is_app_editor and admindetails and show_admin %}
               <!-- Edit button -->
               <a mode="edit" class="view-mode btn jumbo-1"

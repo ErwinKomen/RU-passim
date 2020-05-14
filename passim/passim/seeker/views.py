@@ -2125,6 +2125,40 @@ def user_is_in_team(request):
         bResult = (owner.user.groups.filter(name=team_group).first() != None)
     return bResult
 
+def passim_action_add(view, instance, details, actiontype):
+    """User can fill this in to his/her liking"""
+
+    # Get the username: 
+    username = view.request.user.username
+    # Process the action
+    Action.add(username, instance.__class__.__name__, instance.id, actiontype, json.dumps(details))
+
+def passim_get_history(instance):
+    lhtml= []
+    lhtml.append("<table class='table'><thead><tr><td><b>User</b></td><td><b>Date</b></td><td><b>Description</b></td></tr></thead><tbody>")
+    # Get the history for this item
+    lHistory = Action.get_history(instance.__class__.__name__, instance.id)
+    for obj in lHistory:
+        description = ""
+        if obj['actiontype'] == "new":
+            description = "Create New"
+        elif obj['actiontype'] == "delete":
+            description = "Delete"
+        elif obj['actiontype'] == "change":
+            description = "Changes"
+        if 'changes' in obj:
+            lchanges = []
+            for key, value in obj['changes'].items():
+                lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
+            changes = ", ".join(lchanges)
+            description = "{}: {}".format(description, changes)
+        lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
+    lhtml.append("</tbody></table>")
+
+    sBack = "\n".join(lhtml)
+    return sBack
+
+
 
 # ============== NOTE: superseded by the READER app ===================
 def import_ead(request):
@@ -3625,7 +3659,7 @@ class BasicPart(View):
                                 if formObj['forminstance'].changed_data != None:
                                     details['changes'] = action_model_changes(formObj['forminstance'], instance)
                                 if 'action' in formObj: details['savetype'] = formObj['action']
-                                Action.add(request.user.username, self.MainModel.__name__, "save", json.dumps(details))
+                                Action.add(request.user.username, self.MainModel.__name__, instance.id, "save", json.dumps(details))
                                 # Set the context
                                 context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
@@ -3704,7 +3738,7 @@ class BasicPart(View):
                                                     if self.before_delete(prefix, form.instance):
                                                         # Log the delete action
                                                         details = {'id': form.instance.id}
-                                                        Action.add(request.user.username, itemtype, "delete", json.dumps(details))
+                                                        Action.add(request.user.username, itemtype, form.instance.id, "delete", json.dumps(details))
                                                         # Delete this one
                                                         form.instance.delete()
                                                         # NOTE: the template knows this one is deleted by looking at form.DELETE
@@ -3727,7 +3761,7 @@ class BasicPart(View):
                                                         details = {'id': sub_instance.id}
                                                         if form.changed_data != None:
                                                             details['changes'] = action_model_changes(form, sub_instance)
-                                                        Action.add(request.user.username, itemtype, "save", json.dumps(details))
+                                                        Action.add(request.user.username, itemtype,sub_instance.id, "save", json.dumps(details))
                                                         # Store the instance id in the data
                                                         self.data[prefix + '_instanceid'] = sub_instance.id
                                                         # Any action after saving this form
@@ -3812,7 +3846,7 @@ class BasicPart(View):
                 if self.before_delete():
                     # Log the delete action
                     details = {'id': self.obj.id}
-                    Action.add(request.user.username, self.MainModel.__name__, "delete", json.dumps(details))
+                    Action.add(request.user.username, self.MainModel.__name__, self.obj.id, "delete", json.dumps(details))
                     # We have permission to delete the instance
                     self.obj.delete()
                     context['deleted'] = True
@@ -4460,7 +4494,7 @@ class PassimDetails(DetailView):
                     if bResult:
                         # Log the DELETE action
                         details = {'id': instance.id}
-                        Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
+                        Action.add(self.request.user.username, instance.__class__.__name__, instance.id, "delete", json.dumps(details))
                         # Remove this sermongold instance
                         instance.delete()
                     else:
@@ -4514,7 +4548,7 @@ class PassimDetails(DetailView):
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, obj)
-                    Action.add(self.request.user.username, obj.__class__.__name__, "save", json.dumps(details))
+                    Action.add(self.request.user.username, obj.__class__.__name__, obj.id, "save", json.dumps(details))
 
                     # Make sure the form is actually saved completely
                     frm.save()
@@ -5305,6 +5339,7 @@ class SermonEdit(BasicDetails):
     mainitems = []
     basic_name = "sermon"
     use_team_group = True
+    history_button = True
     prefix_type = "simple"
 
     StossgFormSet = inlineformset_factory(SermonDescr, SermonDescrEqual,
@@ -5353,7 +5388,7 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
             {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
-            {'type': 'plain', 'label': "Note:",                 'value': instance.note,             'field_key': 'note'},
+            {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
              'field_list': 'kwlist',         'fso': self.formset_objects[1]},
@@ -5380,7 +5415,9 @@ class SermonEdit(BasicDetails):
                  'title': "Go to manuscript {}".format(instance.manu.idno), 
                  'url': reverse('manuscript_details', kwargs={'pk': instance.manu.id})}
             topleftlist.append(buttonspecs)
-            idno = instance.manu.idno
+            lcity = "" if instance.manu.lcity == None else "{}, ".format(instance.manu.lcity.name)
+            lib = "" if instance.manu.library == None else "{}, ".format(instance.manu.library.name)
+            idno = "{}{}{}".format(lcity, lib, instance.manu.idno)
         else:
             idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
@@ -5521,6 +5558,13 @@ class SermonEdit(BasicDetails):
             bResult = False
         return bResult, msg
 
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
 
 class SermonDetails(SermonEdit):
     """The details of one sermon manifestation (SermonDescr)"""
@@ -5592,6 +5636,7 @@ class SermonListView(BasicList):
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
+                {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
@@ -5614,6 +5659,7 @@ class SermonListView(BasicList):
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
+            {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
@@ -5639,6 +5685,18 @@ class SermonListView(BasicList):
             {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
             ]}
          ]
+
+    def initializations(self):
+        # Check if signature adaptation is needed
+        nick_done = Information.get_kvalue("nicknames")
+        if nick_done == None or nick_done == "":
+            # Perform adaptations
+            bResult, msg = SermonDescr.adapt_nicknames()
+            if bResult:
+                # Success
+                Information.set_kvalue("nicknames", "done")
+
+        return None
 
     def add_to_context(self, context, initial):
         # Find out who the user is
@@ -5725,6 +5783,7 @@ class KeywordEdit(BasicDetails):
     prefix = 'kw'
     title = "KeywordEdit"
     rtype = "json"
+    history_button = True
     mainitems = []
     
     def add_to_context(self, context, instance):
@@ -5737,6 +5796,13 @@ class KeywordEdit(BasicDetails):
             ]
         # Return the context we have made
         return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
 
 class KeywordDetails(KeywordEdit):
@@ -5947,6 +6013,7 @@ class CollAnyEdit(BasicDetails):
     basic_name_prefix = "coll"
     rtype = "json"
     title = "Any collection"
+    history_button = True
     mainitems = []
 
     def add_to_context(self, context, instance):
@@ -6002,6 +6069,13 @@ class CollAnyEdit(BasicDetails):
             # The collection type is now a parameter
             form.instance.type = self.prefix
         return True, ""
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
 
 class CollManuEdit(CollAnyEdit):
@@ -6556,6 +6630,7 @@ class ManuscriptEdit(PassimDetails):
     afternewurl = ""
     prefix = "manu"
     use_team_group = True
+    history_button = True
     MdrFormSet = inlineformset_factory(Manuscript, Daterange,
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
@@ -6663,6 +6738,29 @@ class ManuscriptEdit(PassimDetails):
             bResult = False
         
         return bResult, msg
+
+    def get_history(self, instance):
+        lhtml= []
+        lhtml.append("<table><thead><tr><td>User</td><td>Date</td><td>Description</td></tr></thead><tbody>")
+        # Get the history for this item
+        lHistory = instance.get_history()
+        for obj in lHistory:
+            description = ""
+            if obj['actiontype'] == "new":
+                description = "Create New {}".format(obj['itemid'])
+            elif obj['actiontype'] == "delete":
+                description = "Delete {}".format(obj['itemid'])
+            elif obj['actiontype'] == "change":
+                lchanges = []
+                for key, value in obj['changes'].items():
+                    lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
+                changes = ", ".join(lchanges)
+                description = "Changes in {}: {}".format(obj['itemid'], changes)
+            lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
+        lhtml.append("</tbody></table>")
+
+        sBack = "\n".join(lhtml)
+        return sBack
 
 
 class ManuscriptDetails(ManuscriptEdit):
@@ -7563,6 +7661,7 @@ class SermonGoldEdit(BasicDetails):
     mainitems = []
     basic_name = "gold"
     use_team_group = True
+    history_button = True
 
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,
@@ -7604,7 +7703,7 @@ class SermonGoldEdit(BasicDetails):
             {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
              'title': 'Other Sermons Gold members of the same equality set'},
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
-            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author, 'field_key': 'author'},
+            {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
@@ -7783,6 +7882,13 @@ class SermonGoldEdit(BasicDetails):
             bResult = False
         return bResult, msg
 
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
 
 class SermonGoldDetails(SermonGoldEdit):
     """The details of one sermon"""
@@ -7875,6 +7981,7 @@ class EqualGoldEdit(BasicDetails):
     new_button = True
     mainitems = []
     use_team_group = True
+    history_button = True
     
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
@@ -8029,6 +8136,13 @@ class EqualGoldEdit(BasicDetails):
             bResult = False
         return bResult, msg
 
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
 
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
@@ -8063,41 +8177,32 @@ class EqualGoldDetails(EqualGoldEdit):
         else:
             context['sections'] = []
 
-            # List of post-load objects
-            postload_objects = []
-            ## (1) postload: gold equality
-            #geq_obj = dict(prefix="ssgeq", url=reverse('equalgold_eqset', kwargs={'pk': instance.id}))
-            #postload_objects.append(geq_obj)
-
-            ## (2) postload: relation to other
-            #glink_obj = dict(prefix="ssglink", url=reverse('equalgold_linkset', kwargs={'pk': instance.id}))
-            #postload_objects.append(glink_obj)
-
-            context['postload_objects'] = postload_objects
-
             # Lists of related objects
             related_objects = []
 
             # List of manuscripts related to the SSG via sermon descriptions
             manuscripts = dict(title="Manuscripts", prefix="manu")
-            # Get all ID's of sermondescr instances linking to the correct eqg instance
-            # manu_ids = SermonDescr.goldsermons.filter(equal=instance).distinct().values('manu__id')
-            manu_ids = SermonDescr.objects.filter(goldsermons__equal=instance).distinct().values('manu__id')
-            qs = Manuscript.objects.filter(id__in=manu_ids).order_by('idno')
+
+            # Get all SermonDescr instances linking to the correct eqg instance
+            qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
             rel_list =[]
-            for item in qs:
-                manu_name = "<span class='signature'>{}</span> {}".format(item.idno, item.name)
+            for sermon in qs_s:
+                # Get the 'item': the manuscript
+                item = sermon.manu
                 rel_item = []
-                rel_item.append({'value': item.library.lcity.name})
-                rel_item.append({'value': item.library.name})
+                manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
                 rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                  'link': reverse('manuscript_details', kwargs={'pk': item.id})})
                 rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
                 rel_item.append({'value': item.yearstart, 'align': "right"})
                 rel_item.append({'value': item.yearfinish, 'align': "right"})
+
+                sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+                rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+                                 'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['City', 'Library', 'Name', 'Items', 'From', 'Until']
+            manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
