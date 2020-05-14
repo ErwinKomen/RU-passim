@@ -2133,6 +2133,31 @@ def passim_action_add(view, instance, details, actiontype):
     # Process the action
     Action.add(username, instance.__class__.__name__, instance.id, actiontype, json.dumps(details))
 
+def passim_get_history(instance):
+    lhtml= []
+    lhtml.append("<table class='table'><thead><tr><td><b>User</b></td><td><b>Date</b></td><td><b>Description</b></td></tr></thead><tbody>")
+    # Get the history for this item
+    lHistory = Action.get_history(instance.__class__.__name__, instance.id)
+    for obj in lHistory:
+        description = ""
+        if obj['actiontype'] == "new":
+            description = "Create New"
+        elif obj['actiontype'] == "delete":
+            description = "Delete"
+        elif obj['actiontype'] == "change":
+            description = "Changes"
+        if 'changes' in obj:
+            lchanges = []
+            for key, value in obj['changes'].items():
+                lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
+            changes = ", ".join(lchanges)
+            description = "{}: {}".format(description, changes)
+        lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
+    lhtml.append("</tbody></table>")
+
+    sBack = "\n".join(lhtml)
+    return sBack
+
 
 
 # ============== NOTE: superseded by the READER app ===================
@@ -5314,6 +5339,7 @@ class SermonEdit(BasicDetails):
     mainitems = []
     basic_name = "sermon"
     use_team_group = True
+    history_button = True
     prefix_type = "simple"
 
     StossgFormSet = inlineformset_factory(SermonDescr, SermonDescrEqual,
@@ -5536,6 +5562,9 @@ class SermonEdit(BasicDetails):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
 
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
 
 class SermonDetails(SermonEdit):
     """The details of one sermon manifestation (SermonDescr)"""
@@ -5754,6 +5783,7 @@ class KeywordEdit(BasicDetails):
     prefix = 'kw'
     title = "KeywordEdit"
     rtype = "json"
+    history_button = True
     mainitems = []
     
     def add_to_context(self, context, instance):
@@ -5770,6 +5800,9 @@ class KeywordEdit(BasicDetails):
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
 
 class KeywordDetails(KeywordEdit):
@@ -5980,6 +6013,7 @@ class CollAnyEdit(BasicDetails):
     basic_name_prefix = "coll"
     rtype = "json"
     title = "Any collection"
+    history_button = True
     mainitems = []
 
     def add_to_context(self, context, instance):
@@ -6039,6 +6073,9 @@ class CollAnyEdit(BasicDetails):
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
 
 class CollManuEdit(CollAnyEdit):
@@ -6593,6 +6630,7 @@ class ManuscriptEdit(PassimDetails):
     afternewurl = ""
     prefix = "manu"
     use_team_group = True
+    history_button = True
     MdrFormSet = inlineformset_factory(Manuscript, Daterange,
                                          form=DaterangeForm, min_num=1,
                                          fk_name = "manuscript",
@@ -6700,6 +6738,29 @@ class ManuscriptEdit(PassimDetails):
             bResult = False
         
         return bResult, msg
+
+    def get_history(self, instance):
+        lhtml= []
+        lhtml.append("<table><thead><tr><td>User</td><td>Date</td><td>Description</td></tr></thead><tbody>")
+        # Get the history for this item
+        lHistory = instance.get_history()
+        for obj in lHistory:
+            description = ""
+            if obj['actiontype'] == "new":
+                description = "Create New {}".format(obj['itemid'])
+            elif obj['actiontype'] == "delete":
+                description = "Delete {}".format(obj['itemid'])
+            elif obj['actiontype'] == "change":
+                lchanges = []
+                for key, value in obj['changes'].items():
+                    lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
+                changes = ", ".join(lchanges)
+                description = "Changes in {}: {}".format(obj['itemid'], changes)
+            lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
+        lhtml.append("</tbody></table>")
+
+        sBack = "\n".join(lhtml)
+        return sBack
 
 
 class ManuscriptDetails(ManuscriptEdit):
@@ -7600,6 +7661,7 @@ class SermonGoldEdit(BasicDetails):
     mainitems = []
     basic_name = "gold"
     use_team_group = True
+    history_button = True
 
     GkwFormSet = inlineformset_factory(SermonGold, SermonGoldKeyword,
                                        form=SermonGoldKeywordForm, min_num=0,
@@ -7824,6 +7886,9 @@ class SermonGoldEdit(BasicDetails):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
 
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
 
 class SermonGoldDetails(SermonGoldEdit):
     """The details of one sermon"""
@@ -7916,6 +7981,7 @@ class EqualGoldEdit(BasicDetails):
     new_button = True
     mainitems = []
     use_team_group = True
+    history_button = True
     
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
@@ -8073,6 +8139,9 @@ class EqualGoldEdit(BasicDetails):
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
 
 class EqualGoldDetails(EqualGoldEdit):

@@ -1002,15 +1002,31 @@ class Action(models.Model):
                 actiontype = oDetails['savetype']
             if 'changes' in oDetails:
                 changes = oDetails['changes']
+        when = self.when.strftime("%d/%B/%Y %H:%M:%S")
         oBack = dict(
             actiontype = actiontype,
             itemtype = self.itemtype,
             itemid = self.itemid,
             username = self.user.username,
-            when = get_crpp_date(self.when),
+            when = when,
             changes = changes
             )
         return oBack
+
+    def get_history(itemtype, itemid):
+        """Get a list of <Action> items"""
+
+        lHistory = []
+        # Get the history for this object
+        qs = Action.objects.filter(itemtype=itemtype, itemid=itemid).order_by('when')
+        for item in qs:
+            bAdd = True
+            oChanges = item.get_object()
+            if oChanges['actiontype'] == "change":
+                if 'changes' not in oChanges or len(oChanges['changes']) == 0: 
+                    bAdd = False
+            if bAdd: lHistory.append(item.get_object())
+        return lHistory
 
 
 class Report(models.Model):
