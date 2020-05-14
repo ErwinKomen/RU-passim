@@ -2607,6 +2607,127 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
+    def get_city(self):
+        if self.lcity:
+            city = self.lcity.name
+            if self.library and self.library.lcity.id != self.lcity.id:
+                city = self.library.lcity.name
+        elif self.library:
+            city = self.library.lcity.name
+        else:
+            city = "-"
+        return city
+
+    def get_collections_markdown(self):
+
+        lHtml = []
+        for obj in self.collections.all().order_by('name'):
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), obj.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_country(self):
+        if self.lcountry:
+            country = self.lcountry.name
+            if self.library and self.library.lcountry.id != self.lcountry.id:
+                country = self.library.lcountry.name
+        elif self.library:
+            country = self.library.lcountry.name
+        else:
+            country = "-"
+        return country
+
+    def get_date_markdown(self):
+        """Get the date ranges as a HTML string"""
+
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " ({}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " ({})".format(obj.reference.get_full_markdown())
+
+            item = "{}-{}{}".format(obj.yearstart, obj.yearfinish, ref)
+            lhtml.append(item)
+
+        return "\n".join(lhtml)
+
+    def get_external_markdown(self):
+        lHtml = []
+        for obj in self.manuscriptexternals.all().order_by('url'):
+            url = obj.url
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_markdown(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_library(self):
+        if self.library:
+            lib = self.library.name
+        else:
+            lib = "-"
+        return lib
+
+    def get_litrefs_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for litref in self.manuscript_litrefs.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_origin(self):
+        sBack = "-"
+        if self.origin:
+            # Just take the bare name of the origin
+            sBack = self.origin.name
+            if self.origin.location:
+                # Add the actual location if it is known
+                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+        return sBack
+
+    def get_project(self):
+        sBack = "-" if self.project == None else self.project.name
+        return sBack
+
+    def get_provenance_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for prov in self.provenances.all().order_by('name'):
+            if prov.location == None:
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl'>{}</span>".format(prov.name))
+            else:
+                # Determine where clicking should lead to
+                url = reverse('location_details', kwargs={'pk': prov.location.id})
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
         
@@ -3088,7 +3209,7 @@ class Manuscript(models.Model):
 
         # Return the object that has been created
         return oBack
-    
+        
 
 class Daterange(models.Model):
     """Each manuscript can have a number of date ranges attached to it"""

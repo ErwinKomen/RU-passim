@@ -170,6 +170,22 @@ class CountryOneWidget(ModelSelect2Widget):
         return Location.objects.filter(loctype=loc_country).order_by('name').distinct()
 
 
+class DaterangeWidget(ModelSelect2MultipleWidget):
+    model = Daterange
+    search_fields = [ 'yearstart__icontains', 'yearfinish__icontains' ]
+    addonly = False
+
+    def label_from_instance(self, obj):
+        return "{}-{}".format(obj.yearstart, obj.yearfinish)
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = Daterange.objects.none()
+        else:
+            qs = Daterange.objects.all().order_by('yearstart').distinct()
+        return qs
+
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -332,6 +348,19 @@ class LocationWidget(ModelSelect2MultipleWidget):
         return sLabel
 
 
+class LocationOneWidget(ModelSelect2Widget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.loctype)
+        # sLabel = obj.name
+        return sLabel
+
+    def get_queryset(self):
+        return Location.objects.all().order_by('name').distinct()
+
+
 class ManuidWidget(ModelSelect2MultipleWidget):
     model = Manuscript
     search_fields = [ 'idno__icontains']
@@ -341,6 +370,22 @@ class ManuidWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Manuscript.objects.all().order_by('idno').distinct()
+
+
+class ManuscriptExtWidget(ModelSelect2MultipleWidget):
+    model = ManuscriptExt
+    search_fields = [ 'url__icontains' ]
+    addonly = False
+
+    def label_from_instance(self, obj):
+        return obj.url
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = ManuscriptExt.objects.none()
+        else:
+            qs = ManuscriptExt.objects.all().order_by('url').distinct()
+        return qs        
 
 
 class ProjectOneWidget(ModelSelect2Widget):
@@ -374,6 +419,22 @@ class ProfileWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Profile.objects.all().order_by('user__username').distinct()
+
+
+class ProvenanceWidget(ModelSelect2MultipleWidget):
+    model = Provenance
+    search_fields = [ 'name__icontains' ]
+    addonly = False
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = Provenance.objects.none()
+        else:
+            qs = Provenance.objects.all().order_by('name').distinct()
+        return qs        
 
 
 class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
@@ -1937,11 +1998,12 @@ class SermonGoldLitrefForm(forms.ModelForm):
 
 
 class ManuscriptProvForm(forms.ModelForm):
-    name = forms.CharField(label=_("Name"), required=False, 
+    name = forms.CharField(label=_("Name"), required=False, help_text="editable",
                            widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
-    note = forms.CharField(label=_("Note"), required=False,
-                           widget = forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
-    location = forms.CharField(required=False)
+    note = forms.CharField(label=_("Note"), required=False, help_text="editable",
+                           widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
+    location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+                           widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     typeaheads = ["locations"]
@@ -1961,6 +2023,7 @@ class ManuscriptProvForm(forms.ModelForm):
         self.fields['provenance'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
+        self.fields['location'].queryset = Location.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -2025,6 +2088,9 @@ class ManuscriptLitrefForm(forms.ModelForm):
 
 
 class ManuscriptExtForm(forms.ModelForm):
+    newurl = forms.CharField(label=_("URL (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'URL...',  'style': 'width: 100%;'}))
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -2037,6 +2103,8 @@ class ManuscriptExtForm(forms.ModelForm):
         # Start by executing the standard handling
         super(ManuscriptExtForm, self).__init__(*args, **kwargs)
 
+        self.fields['url'].required = False
+        self.fields['newurl'].required = False
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -2170,22 +2238,28 @@ class SermonGoldFtextlinkForm(forms.ModelForm):
 
 
 class ManuscriptForm(PassimModelForm):
-    country_ta = forms.CharField(label=_("Country"), required=False, 
+    country_ta  = forms.CharField(label=_("Country"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city_ta = forms.CharField(label=_("City"), required=False, 
+    city_ta     = forms.CharField(label=_("City"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    libname_ta = forms.CharField(label=_("Library"), required=False, 
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
-    collection = forms.CharField(label=_("Collection"), required=False,
+    collection  = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProvenanceWidget(attrs={'data-placeholder': 'Select multiple provenances...', 'style': 'width: 100%;', 'class': 'searching'}))
+    extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
+    datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
 
     class Meta:
@@ -2234,6 +2308,15 @@ class ManuscriptForm(PassimModelForm):
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
+
+            # Some lists need to be initialized to NONE:
+            self.fields['provlist'].queryset = Provenance.objects.none()
+            self.fields['extlist'].queryset = ManuscriptExt.objects.none()
+            self.fields['datelist'].queryset = Daterange.objects.none()
+
+            self.fields['provlist'].widget.addonly = True
+            self.fields['extlist'].widget.addonly = True
+            self.fields['datelist'].widget.addonly = True
         
             # Get the instance
             if 'instance' in kwargs:
@@ -2266,9 +2349,19 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+
+                self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
+                self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
+                self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
+
+                # The manuscriptext and the provenance should *just* contain what they have (no extension here)
+                self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
+                self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
+                self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
+
         except:
             msg = oErr.get_error_message()
-            oErr.DoError()
+            oErr.DoError("manuscriptForm")
         return None
 
 
@@ -2333,6 +2426,14 @@ class LocationRelForm(forms.ModelForm):
 
 
 class DaterangeForm(forms.ModelForm):
+    newstart    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Start...',  'style': 'width: 100%;'}))
+    newfinish   = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Finish...',  'style': 'width: 100%;'}))
+    oneref      = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+                widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newpages    = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2350,10 +2451,13 @@ class DaterangeForm(forms.ModelForm):
         super(DaterangeForm, self).__init__(*args, **kwargs)
 
         # Set other parameters
-        self.fields['yearstart'].required = True
-        self.fields['yearfinish'].required = True
+        self.fields['yearstart'].required = False
+        self.fields['yearfinish'].required = False
         self.fields['reference'].required = False
         self.fields['pages'].required = False
+        self.fields['newpages'].required = False
+        self.fields['oneref'].required = False
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
