@@ -40,6 +40,13 @@
     <Compile Include="passim\basic\utils.py" />
     <Compile Include="passim\basic\views.py" />
     <Compile Include="passim\basic\__init__.py" />
+    <Compile Include="passim\reader\admin.py" />
+    <Compile Include="passim\reader\apps.py" />
+    <Compile Include="passim\reader\forms.py" />
+    <Compile Include="passim\reader\models.py" />
+    <Compile Include="passim\reader\tests.py" />
+    <Compile Include="passim\reader\views.py" />
+    <Compile Include="passim\reader\__init__.py" />
     <Compile Include="passim\seeker\admin.py" />
     <Compile Include="passim\seeker\apps.py" />
     <Compile Include="passim\seeker\excel.py">
@@ -72,6 +79,9 @@
     <Folder Include="passim\basic\static\basic\scripts\" />
     <Folder Include="passim\basic\templates\" />
     <Folder Include="passim\basic\templates\basic\" />
+    <Folder Include="passim\reader\" />
+    <Folder Include="passim\reader\templates\" />
+    <Folder Include="passim\reader\templates\reader\" />
     <Folder Include="passim\seeker\static\" />
     <Folder Include="passim\seeker\static\seeker\" />
     <Folder Include="passim\seeker\static\seeker\content\" />
@@ -100,6 +110,7 @@
     <Content Include="passim\basic\templates\basic\basic_details.html" />
     <Content Include="passim\basic\templates\basic\basic_edit.html" />
     <Content Include="passim\basic\templates\basic\basic_list.html" />
+    <Content Include="passim\reader\templates\reader\import_manuscripts.html" />
     <Content Include="passim\seeker\static\seeker\content\bootstrap.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-base.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-form.css" />
