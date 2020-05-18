@@ -255,7 +255,7 @@ a.navbar-img > img.mini-mini-logo {
 
 /* BASE.css */
 p { 
-  padding: 0;
+ 
   line-height: 140%;
 	font-family: 'Calibri Light', sans-serif !important;
 	font-size: 25px;
@@ -672,7 +672,7 @@ body p {
 }
 
 .page-content {
-  margin-bottom: 30px;
+  margin-bottom: 70px;
 }
 
 ol, ul {
