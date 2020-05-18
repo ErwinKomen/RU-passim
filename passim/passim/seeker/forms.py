@@ -2261,18 +2261,23 @@ class ManuscriptForm(PassimModelForm):
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
+    action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
+                  'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
+                  'kwlist', 'listlist', 'collist', 'provlist', 'extlist', 'datelist']
+    exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'lcity', 'lcountry', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
+        fields = ['name', 'library', 'lcity', 'lcountry', 'idno', # 'yearstart', 'yearfinish', 
+                  'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityOneWidget(attrs={'data-placeholder': 'Select a city...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
-                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
+                 #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}),
                  'origin':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
@@ -2293,8 +2298,8 @@ class ManuscriptForm(PassimModelForm):
             team_group = self.team_group
             # Some fields are not required
             self.fields['stype'].required = False
-            self.fields['yearstart'].required = False
-            self.fields['yearfinish'].required = False
+            #self.fields['yearstart'].required = False
+            #self.fields['yearfinish'].required = False
             self.fields['name'].required = False
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
@@ -2434,6 +2439,8 @@ class DaterangeForm(forms.ModelForm):
                 widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages    = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
+    action_log = ['yearstart', 'yearfinish', 'pages', 'reference']
+    exclude = []    # ['newstart', 'newfinish', 'oneref', 'newpages']
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

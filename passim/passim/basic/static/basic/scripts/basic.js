@@ -678,6 +678,28 @@ var ru = (function ($, ru) {
               }
             }
           });*/
+
+          // Make modal draggable
+          $(".modal-header, modal-dragpoint").on("mousedown", function (mousedownEvt) {
+            var $draggable = $(this),
+                x = mousedownEvt.pageX - $draggable.offset().left,
+                y = mousedownEvt.pageY - $draggable.offset().top;
+
+            $("body").on("mousemove.draggable", function (mousemoveEvt) {
+              $draggable.closest(".modal-dialog").offset({
+                "left": mousemoveEvt.pageX - x,
+                "top": mousemoveEvt.pageY - y
+              });
+            });
+            $("body").one("mouseup", function () {
+              $("body").off("mousemove.draggable");
+            });
+            $draggable.closest(".modal").one("bs.modal.hide", function () {
+              $("body").off("mousemove.draggable");
+            });
+          });
+
+
           $(".nocloseonclick").each(function (idx, value) {
             var targetid = $(this);
             $(targetid).data("closable", false);

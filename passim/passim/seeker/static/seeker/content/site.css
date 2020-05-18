@@ -1383,3 +1383,20 @@ input:checked + .slider:before {
 .slider.round {   border-radius: 34px; }
 
 .slider.round:before {   border-radius: 50%; }
+
+/* Sermon tree */
+.tree[level='1'] {
+    margin-left: 10px;
+}
+.tree[level='2'] {
+    margin-left: 30px;
+}
+.tree[level='3'] {
+    margin-left: 70px;
+}
+.tree[level='4'] {
+    margin-left: 100px;
+}
+.tree[level='5'] {
+    margin-left: 130px;
+}

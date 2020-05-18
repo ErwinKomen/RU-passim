@@ -994,19 +994,21 @@ class Action(models.Model):
         """Get an object representation of this particular Action item"""
 
         actiontype = self.actiontype
+        model = ""
         oDetails = None
         changes = {}
-        if actiontype == "save":
+        if actiontype == "save" or actiontype == "add" or actiontype == "new":
             oDetails = json.loads(self.details)
-            if 'savetype' in oDetails:
-                actiontype = oDetails['savetype']
-            if 'changes' in oDetails:
-                changes = oDetails['changes']
+            actiontype = oDetails.get('savetype', '')
+            changes = oDetails.get('changes', {})
+            model = oDetails.get('model', None)
+
         when = self.when.strftime("%d/%B/%Y %H:%M:%S")
         oBack = dict(
             actiontype = actiontype,
             itemtype = self.itemtype,
             itemid = self.itemid,
+            model = model,
             username = self.user.username,
             when = when,
             changes = changes
@@ -1018,7 +1020,7 @@ class Action(models.Model):
 
         lHistory = []
         # Get the history for this object
-        qs = Action.objects.filter(itemtype=itemtype, itemid=itemid).order_by('when')
+        qs = Action.objects.filter(itemtype=itemtype, itemid=itemid).order_by('-when')
         for item in qs:
             bAdd = True
             oChanges = item.get_object()
@@ -1884,7 +1886,10 @@ class Litref(models.Model):
     short = models.TextField("Short reference", blank=True, default="")
 
     def __str__(self):
-        return self.itemid
+        sBack = str(self.itemid)
+        if self.short != None and self.short != "":
+            sBack = self.short
+        return sBack
 
     def sync_zotero(force=False):
         """Read all stuff from Zotero"""
@@ -2326,6 +2331,8 @@ class Litref(models.Model):
                 else:
                     if number == 1:
                         result = authors[0]
+                    elif number == 0:
+                        result = "(no author)"
                     else:
                         preamble = authors[:-1]
                         last = authors[-1]
@@ -2607,6 +2614,21 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
+    def get_full_name(self):
+        lhtml = []
+        # (1) City
+        if self.lcity != None:
+            lhtml.append(self.lcity.name)
+        elif self.library != None:
+            lhtml.append(self.library.lcity.name)
+        # (2) Library
+        if self.library != None:
+            lhtml.append(self.library.name)
+        # (3) Idno
+        lhtml.append(self.idno)
+
+        return ", ".join(lhtml)
+
     def get_city(self):
         if self.lcity:
             city = self.lcity.name
@@ -2650,11 +2672,11 @@ class Manuscript(models.Model):
             ref = ""
             if obj.reference: 
                 if obj.pages: 
-                    ref = " ({}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                    ref = " <span style='font-size: x-small;'>(see {}, {})</span>".format(obj.reference.get_full_markdown(), obj.pages)
                 else:
-                    ref = " ({})".format(obj.reference.get_full_markdown())
+                    ref = " <span style='font-size: x-small;'>(see {})</span>".format(obj.reference.get_full_markdown())
 
-            item = "{}-{}{}".format(obj.yearstart, obj.yearfinish, ref)
+            item = "<div><span class='badge signature ot'>{}-{}</span>{}</div>".format(obj.yearstart, obj.yearfinish, ref)
             lhtml.append(item)
 
         return "\n".join(lhtml)
@@ -2710,6 +2732,12 @@ class Manuscript(models.Model):
 
     def get_project(self):
         sBack = "-" if self.project == None else self.project.name
+        return sBack
+
+    def get_project_markdown(self):
+        sBack = "-"
+        if self.project:
+            sBack = '<span class="project">{}</span>'.format(self.project.name)
         return sBack
 
     def get_provenance_markdown(self):
