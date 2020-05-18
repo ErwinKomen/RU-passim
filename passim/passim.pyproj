@@ -4,10 +4,11 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <Name>passim</Name>
     <RootNamespace>passim</RootNamespace>
-    <InterpreterId>MSBuild|{3505382d-cd29-4811-a618-c985c9459a18}|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>{3505382d-cd29-4811-a618-c985c9459a18}</InterpreterId>
     <WebBrowserPort>6405</WebBrowserPort>
     <WebBrowserUrl>
     </WebBrowserUrl>
+    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -21,7 +22,6 @@
     <WorkingDirectory>.</WorkingDirectory>
     <LaunchProvider>Web launcher</LaunchProvider>
     <OutputPath>.</OutputPath>
-    <WebBrowserUrl>http://localhost</WebBrowserUrl>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -42,7 +42,10 @@
     <Compile Include="passim\basic\__init__.py" />
     <Compile Include="passim\reader\admin.py" />
     <Compile Include="passim\reader\apps.py" />
-    <Compile Include="passim\reader\forms.py" />
+    <Compile Include="passim\reader\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\reader\migrations\__init__.py" />
     <Compile Include="passim\reader\models.py" />
     <Compile Include="passim\reader\tests.py" />
     <Compile Include="passim\reader\views.py" />
@@ -80,6 +83,7 @@
     <Folder Include="passim\basic\templates\" />
     <Folder Include="passim\basic\templates\basic\" />
     <Folder Include="passim\reader\" />
+    <Folder Include="passim\reader\migrations\" />
     <Folder Include="passim\reader\templates\" />
     <Folder Include="passim\reader\templates\reader\" />
     <Folder Include="passim\seeker\static\" />
@@ -145,6 +149,7 @@
     <Content Include="passim\seeker\templates\seeker\author_details.html" />
     <Content Include="passim\seeker\templates\seeker\author_edit.html" />
     <Content Include="passim\seeker\templates\seeker\basic_list.html" />
+    <Content Include="passim\seeker\templates\seeker\basket_choices.html" />
     <Content Include="passim\seeker\templates\seeker\basket_buttons.html" />
     <Content Include="passim\seeker\templates\seeker\collection.html" />
     <Content Include="passim\seeker\templates\seeker\author_list.html" />
@@ -165,6 +170,9 @@
     <Content Include="passim\seeker\templates\seeker\keyword_new.html" />
     <Content Include="passim\seeker\templates\seeker\library_details.html" />
     <Content Include="passim\seeker\templates\seeker\library_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_extset.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_litset.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_provset.html" />
     <Content Include="passim\seeker\templates\seeker\report_list.html" />
     <Content Include="passim\seeker\templates\seeker\library_list.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_edit.html" />
@@ -172,11 +180,11 @@
     <Content Include="passim\seeker\templates\seeker\sermon_colset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_ediset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_litset.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_one.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_signset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_list.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_linkset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_ftxtset.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_edit.html" />
@@ -187,8 +195,8 @@
     <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
     <Content Include="passim\seeker\templates\seeker\manuscript_details.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_view.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_edit.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_view.html" />
+    <Content Include="passim\seeker\templates\seeker\super_goldset.html" />
     <Content Include="passim\seeker\templates\seeker\super_eqset.html" />
     <Content Include="passim\seeker\templates\seeker\super_linkset.html" />
     <Content Include="passim\seeker\templates\seeker\super_select.html" />
@@ -220,6 +228,7 @@
   <ItemGroup>
     <Interpreter Include="D:\env\passim\">
       <Id>{3505382d-cd29-4811-a618-c985c9459a18}</Id>
+      <BaseInterpreter>{2af0f10d-7135-4994-9156-5d01c9c11b7e}</BaseInterpreter>
       <Version>3.5</Version>
       <Description>passim (Python 3.5)</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
@@ -269,5 +278,4 @@
       </FlavorProperties>
     </VisualStudio>
   </ProjectExtensions>
-  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>

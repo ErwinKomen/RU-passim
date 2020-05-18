@@ -205,7 +205,9 @@
       <!-- Body of the modal-->
       <div class="modal-body" id="view-history">
         <!-- This is where the current gold-to-gold link shows up -->
-        {{history_contents|safe}}
+        <div  style='height: 300px; overflow-y: scroll;'>
+          {{history_contents|safe}}
+        </div>
       </div>
 
       <!-- Footer with the save button -->

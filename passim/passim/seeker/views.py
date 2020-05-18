@@ -6620,7 +6620,268 @@ class SermonLitset(BasicPart):
         return context
 
 
-class ManuscriptEdit(PassimDetails):
+class ManuscriptEdit(BasicDetails):
+    """The details of one manuscript"""
+
+    model = Manuscript  
+    mForm = ManuscriptForm
+    prefix = 'manu'
+    title = "Manuscript"
+    rtype = "json"
+    new_button = True
+    mainitems = []
+    use_team_group = True
+    history_button = True
+    
+    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+                                         form=DaterangeForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
+                                       form=ManuscriptCollectionForm, min_num=0,
+                                       fk_name="manuscript", extra=0)
+    MlitFormSet = inlineformset_factory(Manuscript, LitrefMan,
+                                         form = ManuscriptLitrefForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    MprovFormSet = inlineformset_factory(Manuscript, ProvenanceMan,
+                                         form=ManuscriptProvForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+    MextFormSet = inlineformset_factory(Manuscript, ManuscriptExt,
+                                         form=ManuscriptExtForm, min_num=0,
+                                         fk_name = "manuscript",
+                                         extra=0, can_delete=True, can_order=False)
+
+    formset_objects = [{'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+                       {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        y = instance
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_display(),  'field_key': 'stype'},
+            {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
+            {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity'},
+            {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
+            {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
+            {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
+            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
+            {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
+             'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0] },
+            {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
+            {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
+            {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
+            {'type': 'plain', 'label': "Project:",      'value': instance.get_project(),        'field_key': 'project'},
+            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+            {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
+                'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
+            {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
+                'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2] },
+            {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
+                'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
+            {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
+                'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # SPecification of the new button
+        context['new_button_title'] = "Manuscript"
+        context['new_button_name'] = "manu"
+        context['new_button_url'] = reverse("manuscript_details")
+        context['new_button_params'] = [
+            # {'name': 'gold-n-equal', 'value': instance.id}
+            ]
+
+        # Return the context we have made
+        return context
+
+    def process_formset(self, prefix, request, formset):
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+
+                if prefix == "mdr":
+                    # Processing one daterange
+                    newstart = cleaned.get('newstart', None)
+                    newfinish = cleaned.get('newfinish', None)
+                    oneref = cleaned.get('oneref', None)
+                    newpages = cleaned.get('newpages', None)
+
+                    if newstart and newfinish:
+                        # Double check if this one already exists for the current instance
+                        obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
+                        if obj != None:
+                            form.instance.yearstart = int(newstart)
+                            form.instance.yearfinish = int(newfinish)
+                        # Do we have a reference?
+                        if oneref != None:
+                            form.instance.reference = oneref
+                            if newpages != None:
+                                form.instance.pages = newpages
+                        # Note: it will get saved with formset.save()
+                elif prefix == "mcol":
+                    # Collection processing
+                    newcol = cleaned.get('newcol', None)
+                    if newcol != None:
+                        # Is the COL already existing?
+                        obj = Collection.objects.filter(name=newcol).first()
+                        if obj == None:
+                            # TODO: add profile here
+                            profile = Profile.get_user_profile(request.user.username)
+                            obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
+                        # Make sure we set the keyword
+                        form.instance.collection = obj
+                        # Note: it will get saved with formset.save()
+                elif prefix == "mlit":
+                    # Literature reference processing
+                    newpages = cleaned.get("newpages")
+                    # Also get the litref
+                    oneref = cleaned.get("oneref")
+                    if oneref:
+                        litref = cleaned['oneref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.reference = litref
+                            if newpages:
+                                form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
+                elif prefix == "mprov":
+                    name = cleaned.get("name")
+                    note = cleaned.get("note")
+                    location = cleaned.get("location")
+                    if name:
+                        obj = Provenance.objects.filter(name=name, note=note, location=location).first()
+                        if obj == None:
+                            obj = Provenance.objects.create(name=name)
+                            if note: obj.note = note
+                            if location: obj.location = location
+                        if obj:
+                            form.instance.provenance = obj
+                    # Note: it will get saved with form.save()
+                elif prefix == "mext":
+                    newurl = cleaned.get('newurl')
+                    if newurl:
+                        form.instance.url = newurl
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'collections'
+            collist_m = form.cleaned_data['collist']
+            adapt_m2m(CollectionMan, instance, "manuscript", collist_m, "collection")
+
+            # (2) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(ManuscriptKeyword, instance, "manuscript", kwlist, "keyword")
+
+            # (3) 'literature'
+            litlist = form.cleaned_data['litlist']
+            adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
+
+            # (4) 'provenances'
+            provlist = form.cleaned_data['provlist']
+            adapt_m2m(ProvenanceMan, instance, "manuscript", provlist, "provenance")
+
+            # Process many-to-ONE changes
+            # (1) links from SG to SSG
+            datelist = form.cleaned_data['datelist']
+            adapt_m2o(Daterange, instance, "manuscript", datelist)
+
+            # (2) external URLs
+            extlist = form.cleaned_data['extlist']
+            adapt_m2o(ManuscriptExt, instance, "manuscript", extlist)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class ManuscriptDetails(ManuscriptEdit):
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(ManuscriptDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        # Lists of related objects
+        related_objects = []
+
+        ## List of manuscripts related to the SSG via sermon descriptions
+        #manuscripts = dict(title="Manuscripts", prefix="manu")
+
+        ## Get all SermonDescr instances linking to the correct eqg instance
+        #qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+        #rel_list =[]
+        #for sermon in qs_s:
+        #    # Get the 'item': the manuscript
+        #    item = sermon.manu
+        #    rel_item = []
+        #    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+        #    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+        #                        'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+        #    rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
+        #    rel_item.append({'value': item.yearstart, 'align': "right"})
+        #    rel_item.append({'value': item.yearfinish, 'align': "right"})
+
+        #    sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+        #    rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+        #                        'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+        #    rel_list.append(rel_item)
+        #manuscripts['rel_list'] = rel_list
+        #manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
+        #related_objects.append(manuscripts)
+
+        context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
+
+
+class ManuscriptEdit_ORG(PassimDetails):
     """The details of one manuscript"""
 
     model = Manuscript  
@@ -6763,7 +7024,7 @@ class ManuscriptEdit(PassimDetails):
         return sBack
 
 
-class ManuscriptDetails(ManuscriptEdit):
+class ManuscriptDetails_ORG(ManuscriptEdit):
     """Editable manuscript details"""
 
     template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
