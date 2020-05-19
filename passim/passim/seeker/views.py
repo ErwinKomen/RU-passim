@@ -6883,7 +6883,7 @@ class ManuscriptDetails(ManuscriptEdit):
             # Create a well sorted list of sermons
             qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
-            for sermon in qs:
+            for idx, sermon in enumerate(qs):
                 # Need this first, because it also REPAIRS possible parent errors
                 level = sermon.getdepth()
 
@@ -6891,6 +6891,7 @@ class ManuscriptDetails(ManuscriptEdit):
                 oSermon = {}
                 oSermon['obj'] = sermon
                 oSermon['nodeid'] = sermon.order + 1
+                oSermon['number'] = idx + 1
                 oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
                 oSermon['level'] = level
                 oSermon['pre'] = (level-1) * 20

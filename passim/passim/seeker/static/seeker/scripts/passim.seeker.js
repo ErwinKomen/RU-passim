@@ -1338,14 +1338,109 @@ var ru = (function ($, ru) {
             });
           });
 
-          /*          $(".modal-dialog").draggable({
-                      "handle": ".modal-header"
-                    })*/
+          //// Any other draggables
+          //$(".draggable").draggable({
+          //  cursor: "move",
+          //  snap: ".draggable",
+          //  snapMode: "inner",
+          //  snapTolerance: 20
+          //});
+
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
       },
+
+      sermon_drag: function (ev) {
+        var elTree = null,
+            divId = "",
+            sermonid = "";
+        try {
+          elTree = $(ev.target).closest(".tree");
+          sermonid = $(elTree).attr("sermonid");
+          divId = $(elTree).attr("id");
+
+          ev.dataTransfer.setData("text", divId);
+        } catch (ex) {
+          private_methods.errMsg("sermon_drag", ex);
+        }
+      },
+
+      sermon_dragenter: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          ev.preventDefault();
+          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
+            //$(ev.target).addClass("dragover");
+            $(ev.target).addClass("ruler_black");
+            $(ev.target).removeClass("ruler_white");
+          } else {
+            $(ev.target).closest("td").addClass("dragover");
+            $(ev.target).addClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("sermon_dragenter", ex);
+        }
+      },
+
+      sermon_dragleave: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          $("#sermon_tree .dragover").removeClass("dragover");
+          $("#sermon_tree .ruler").removeClass("ruler_black");
+          $("#sermon_tree .ruler").addClass("ruler_white");
+        } catch (ex) {
+          private_methods.errMsg("sermon_dragleave", ex);
+        }
+      },
+
+      sermon_drop: function (ev) {
+        var elTree = null,
+            divSrcId = "",
+            divDstId = "",
+            divSrc = null,
+            divDst = null,
+            target_under_source = false,
+            sermonid = "";
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          // Figure out what the source and destination is
+          elTree = $(ev.target).closest(".tree");
+          divSrcId = ev.dataTransfer.getData("text");
+          divDstId = $(elTree).attr("id");
+
+          // Reset the class of the drop element
+          $("#sermon_tree .dragover").removeClass("dragover");
+          //$(ev.target).closest("td").removeClass("dragover");
+
+          // Find the actual source div
+          divSrc = $("#sermon_tree").find("#" + divSrcId);
+          // The destination - that is me myself
+          divDst = elTree;
+
+          // check for target under source -- that is not allowed
+          target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
+
+          // Check if the target is okay to go to
+          if (divSrcId !== divDstId && !target_under_source) {
+
+            // Show source and destination
+            console.log("Move from " + divSrcId + " to UNDER " + divDstId);
+            $("#sermonlog").html("Move from " + divSrcId + " to UNDER " + divDstId);
+
+            // Move source *UNDER* the destination
+          } else {
+            $("#sermonlog").html("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+          }
+        } catch (ex) {
+          private_methods.errMsg("sermon_drop", ex);
+        }
+      },
+
+
 
       /**
        * unique_change
@@ -1675,6 +1770,35 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("sermon_drawtree", ex);
+        }
+      },
+
+      /**
+       *  sermon_level
+       *      Open or close the current level in the sermon tree
+       *
+       */
+      sermon_level: function (elThis) {
+        var elChild = null,
+            elTree = null,
+            elTable = null;
+
+        try {
+          // Get my tree part
+          elTree = $(elThis).closest(".tree");
+          // Get my first child
+          elChild = $(elTree).children(".tree").first();
+          // Action depends on hidden or not
+          if ($(elChild).hasClass("hidden")) {
+            // Show
+            $(elTree).children(".tree").removeClass("hidden");
+          } else {
+            // Hide
+            $(elTree).children(".tree").addClass("hidden");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_level", ex);
         }
       },
 

@@ -1389,14 +1389,62 @@ input:checked + .slider:before {
     margin-left: 10px;
 }
 .tree[level='2'] {
-    margin-left: 30px;
+    margin-left: 20px;
 }
 .tree[level='3'] {
-    margin-left: 70px;
+    margin-left: 30px;
 }
 .tree[level='4'] {
-    margin-left: 100px;
+    margin-left: 40px;
 }
 .tree[level='5'] {
-    margin-left: 130px;
+    margin-left: 50px;
+}
+
+/* Drag and drop stuff */
+.draggable:hover {
+    /* border: 1px solid yellow; */
+    background-color: lightsalmon;
+    color: white;
+    cursor: move;
+}
+
+.td {
+    font-size: small;
+    /* background-color: lightgray;
+    border: 1px solid white;
+    /* line-height: 0/8; */
+    /* display: block; */
+}
+.tdhead {
+  border: 1px solid white;
+  font-size: 12px;
+  background-color: darkgreen;
+  color: white;
+  border-radius: 3px 3px;
+  margin-top: 0px;
+  vertical-align: top;
+  padding: 2px;
+}
+
+.sermonbutton {
+    white-space:nowrap !important;
+    background-color: white; 
+    min-width: 20px;
+}
+.sermonbutton:hover {
+    background-color: antiquewhite;
+    cursor: pointer;
+}
+
+.dragover {
+    background-color: yellow !important;
+    border: 1px dotted red;
+}
+
+.ruler_white {
+    background-color: white;
+}
+.ruler_black {
+    background-color: black;
 }

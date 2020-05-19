@@ -20,56 +20,31 @@
 
     <!-- Room to have the form-link to create a new sermon for this manuscript -->
     <div class="hidden" >
-      <form action="{% url 'sermon_details' %}" method="post" id="create_new_sermon">
+      <form id="create_new_sermon" action="{% url 'sermon_details' %}" method="post" >
         {% csrf_token %}
         <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
       </form>
     </div>
-
-    <!-- Hidden hierarchy submit form -->
-    <div class="hidden">
-      <form id="save_new_hierarchy" method="post" action="{% url 'manuscript_hierarchy' pk=manuForm.instance.id %}">
-        {% csrf_token %}
-        <input type="text" id="id_manu-hlist" name="manu-hlist" value="" />
-      </form>
-    </div>
-
-      <!-- This is where the sermon that is currently being edited shows up -->
-      {% if is_app_editor %}
-        <div class="row edit-sermon hidden">
-          <div class="col-md-10 col-md-offset-1">
-            <div class="panel panel-default" 
-                  parent="{{manuForm.instance.id}}"
-                  manusurl="{% if  manuForm.instance.id %}{% url 'manuscript_edit' manuForm.instance.id %}{% else %}{% url 'manuscript_edit' %}{% endif %}"
-                  id="sermon_edit">
-            </div>
-          </div>
-        </div>
-      {% endif %}
-
-      <!-- This is where a NEW sermon definition can be edited -->
-      {% if is_app_editor %}
-        <div class="row subform">
-          <div class="col-md-10 col-md-offset-1">
-            <div id="sermon_new">
-              <!-- Room to create a new sermon instance that should be added to this manuscript -->
-            </div>
-          </div>
-        </div>
-      {% endif %}
 
 
     {% if object.manusermons.count == 0 %}
       <p><i>This manuscript does not contain a definition of its contents</i></p>
     {% else %}
 
-      <!-- A table to show all the sermons of this manuscript -->
-      <table id="sermon_list" class="func-view" >
-        <!-- There is the place where the tree actually comes as it is drawn-->
-      </table>
+    <div id="sermonlog"></div>
 
       <!-- A place where the Sermons are put in hierarchically organized <div> elements -->
       <div id="sermon_tree" class="not_hidden">
+        <div class="" level="1">
+          <table class="func-view" style="width: 100%;">
+            <thead>
+              <tr>
+                <th class="draggable" style="width: 100%;">Details of this manuscript's {{object.manusermons.count}} items</th>
+                <th class="tdnowrap"><a role="button" class="btn btn-xs jumbo-1">Expand</a></th>
+              </tr>
+            </thead>
+          </table>
+        </div>
         <!-- This is where the sermon hierarchy is put-->
         {% for sermon in sermon_list %}
           {% if sermon.childof == 1 %}
@@ -84,47 +59,5 @@
   </div>
 </div>
 
-  <!-- Modal form that shows the manipulation buttons to move something around -->
-  <div id="sermon_hierarchy" class="modal fade" role="dialog">
-    <div class="modal-dialog modal-sm" style="width: 100px;">
-      <!-- Modal content -->
-      <div class="modal-content">
-        <div class="modal-header" style="background-color: goldenrod;">
-          <a class="btn btn-xs jumbo-2" role="button"
-              title="Save the new hierarchy"
-              onclick="ru.passim.seeker.sermon_move('save');"
-              ><span class="glyphicon glyphicon-ok"></span>&nbsp;Save
-          </a>
-        </div>
-        <div class="modal-body modal-dragpoint">
-          <table>
-            <tbody>
-              <tr>
-                <td>&nbsp;</td>
-                <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('up');"><span class="glyphicon glyphicon-arrow-up"></span></a></td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('left');"><span class="glyphicon glyphicon-arrow-left"></span></a></td>
-                <td><a class="close btn btn-xs jumbo-1" title="Close" role="button" data-dismiss="modal" style="padding-left: 1px;padding-right: 1px;" onclick="ru.passim.seeker.sermon_move('close', this);"><span class="glyphicon glyphicon-remove"></span></a></td>
-                <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('right');"><span class="glyphicon glyphicon-arrow-right"></span></a></td>
-              </tr>
-              <tr>
-                <td>&nbsp;</td>
-                <td><a class="btn btn-xs jumbo-3" role="button" onclick="ru.passim.seeker.sermon_move('down');"><span class="glyphicon glyphicon-arrow-down"></span></a></td>
-                <td>&nbsp;</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 
-
-<script>
-  ru.passim.seeker.sermon_drawtree();
-  ru.passim.init_event_listeners([]);
-  ru.passim.seeker.init_events();
-</script>
 
