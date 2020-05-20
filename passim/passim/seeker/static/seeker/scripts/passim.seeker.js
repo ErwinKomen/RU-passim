@@ -1375,6 +1375,8 @@ var ru = (function ($, ru) {
             //$(ev.target).addClass("dragover");
             $(ev.target).addClass("ruler_black");
             $(ev.target).removeClass("ruler_white");
+            // make row larger
+            $(ev.target).parent().addClass("ruler_show");
           } else {
             $(ev.target).closest("td").addClass("dragover");
             $(ev.target).addClass("dragover");
@@ -1390,6 +1392,7 @@ var ru = (function ($, ru) {
           $("#sermon_tree .dragover").removeClass("dragover");
           $("#sermon_tree .ruler").removeClass("ruler_black");
           $("#sermon_tree .ruler").addClass("ruler_white");
+          $("#sermon_tree .ruler_show").removeClass("ruler_show");
         } catch (ex) {
           private_methods.errMsg("sermon_dragleave", ex);
         }
@@ -1401,7 +1404,9 @@ var ru = (function ($, ru) {
             divDstId = "",
             divSrc = null,
             divDst = null,
+            level = 0,
             target_under_source = false,
+            type = "under",
             sermonid = "";
         try {
           // Prevent default handling
@@ -1414,26 +1419,56 @@ var ru = (function ($, ru) {
 
           // Reset the class of the drop element
           $("#sermon_tree .dragover").removeClass("dragover");
-          //$(ev.target).closest("td").removeClass("dragover");
+          $("#sermon_tree .ruler").removeClass("ruler_black");
+          $("#sermon_tree .ruler").addClass("ruler_white");
+          $("#sermon_tree .ruler_show").removeClass("ruler_show");
 
           // Find the actual source div
           divSrc = $("#sermon_tree").find("#" + divSrcId);
           // The destination - that is me myself
           divDst = elTree;
 
-          // check for target under source -- that is not allowed
-          target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
+          // Do we need to put the source "under" the destination or "before" it?
+          if ($(ev.target).hasClass("ruler")) {
+            type = "before";
+          }
 
-          // Check if the target is okay to go to
-          if (divSrcId !== divDstId && !target_under_source) {
+          // Action now depends on the type
+          switch (type) {
+            case "under":   // Put src under div dst
+              // check for target under source -- that is not allowed
+              target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
 
-            // Show source and destination
-            console.log("Move from " + divSrcId + " to UNDER " + divDstId);
-            $("#sermonlog").html("Move from " + divSrcId + " to UNDER " + divDstId);
+              // Check if the target is okay to go to
+              if (divSrcId !== divDstId && !target_under_source) {
 
-            // Move source *UNDER* the destination
-          } else {
-            $("#sermonlog").html("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+                // Show source and destination
+                console.log("Move from " + divSrcId + " to UNDER " + divDstId);
+                $("#sermonlog").html("Move from " + divSrcId + " to UNDER " + divDstId);
+
+                // Move source *UNDER* the destination
+                divDst.append(divSrc);
+                // Get my dst level
+                level = parseInt($(divDst).attr("level"), 10);
+                level += 1;
+                $(divSrc).attr("level", level.toString());
+              } else {
+                $("#sermonlog").html("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+              }
+              break;
+            case "before":  // Put src before div dst
+              // Validate
+              if (divSrcId === divDstId) {
+                $("#sermonlog").html("Cannot move me " + divSrcId + " before myself " + divDstId);
+              } else {
+                // Move source *BEFORE* the destination
+                divSrc.insertBefore(divDst);
+                // Adapt my level to the one before me
+                $(divSrc).attr("level", $(divDst).attr("level"));
+                // Show what has been done
+                $("#sermonlog").html("Move " + divSrcId + " to BEFORE " + divDstId);
+              }
+              break;
           }
         } catch (ex) {
           private_methods.errMsg("sermon_drop", ex);

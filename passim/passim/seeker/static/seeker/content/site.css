@@ -1446,5 +1446,10 @@ input:checked + .slider:before {
     background-color: white;
 }
 .ruler_black {
-    background-color: black;
+    /* background-color: black; */
+    border: 1px solid black !important;
+}
+.ruler_show {
+    height: 12px;
+    border: 1px dashed black !important;
 }
