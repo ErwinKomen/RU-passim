@@ -2,10 +2,11 @@
 
     <!-- Information on one sermon-->
     <div sermonid="{{sermon.obj.id}}" level="{{level}}" id="sermon_{{sermon.number}}"
-         class="tree {% if level > 1 %} hidden{% endif %}">
-      <table class="func-view" style="width: 100%;">
+         class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
+      <table class="func-view sermons" style="width: 100%;">
         <tbody>
-          <tr style="font-size: 2px;" class="">
+          <!-- Horizontal ruler that can be expanded -->
+          <tr style="font-size: 1px;" class="">
             <td colspan="2" class="ruler ruler_white" 
                 ondragover="ru.passim.seeker.sermon_dragenter(event);" 
                 ondragenter="ru.passim.seeker.sermon_dragenter(event);"
@@ -16,18 +17,24 @@
             </td>
             <td colspan="2" style="background-color: white;"></td>
           </tr>
+          <!-- Actual line-->
           <tr>
+            <!-- Either '+' sign or empty space -->
             <td valign="top" class="sermonbutton"
-                {% if sermon.group %}onclick="ru.passim.seeker.sermon_level(this);"{% endif %}>
-              {% if sermon.group %}
+                {% if sermon.isparent %}onclick="ru.passim.seeker.sermon_level(this);"{% endif %}>
+              {% if sermon.isparent %}
                 <span class="glyphicon glyphicon-plus"></span>
               {% else %}
                 <span>&nbsp;</span>
               {% endif %}
             </td>
+
+            <!-- The number of the sermon in our current hierarchy -->
             <td valign="top" class="tdnowrap"   style="background-color: white;">
               <span>{{sermon.number}}</span>
             </td>
+
+            <!-- The *LOCUS* of the sermon that serves as drag point -->
             <td valign="top" class="tdnowrap"  style="background-color: white;"
                 ondragover="ru.passim.seeker.sermon_dragenter(event);" 
                 ondragenter="ru.passim.seeker.sermon_dragenter(event);"
@@ -38,7 +45,9 @@
                       ondragstart="ru.passim.seeker.sermon_drag(event);"
                       >{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
             </td>
-            <td valign="top" class="td" style="width: 100%;" >
+
+            <!-- The sermon itself -->
+            <td valign="top" class="td clickable" style="width: 100%;" >
               <span draggable="false" targeturl="{{sermon.obj.target}}">
                 {% if sermon.obj.goldsermons.count > 0 %}
                   <span class="badge signature ot" title="This links to {{sermon.obj.goldsermons.count}} Sermons Gold">G</span>

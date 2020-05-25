@@ -934,6 +934,7 @@ var ru = (function ($, ru) {
             manutype = "",
             err = "#little_err_msg",
             elTr = null,
+            elUserDetails = "#add_to_details",
             elView = null,
             elEdit = null;
 
@@ -1011,6 +1012,8 @@ var ru = (function ($, ru) {
               // Go to edit mode
               $(elTr).find(".view-mode").addClass("hidden");
               $(elTr).find(".edit-mode").removeClass("hidden");
+              // Hide afterdetails
+              $(elUserDetails).addClass("hidden");
               // Make sure typeahead works here
               ru.basic.init_typeahead();
               break;
@@ -1297,6 +1300,8 @@ var ru = (function ($, ru) {
               // Go to view mode without saving
               $(elTr).find(".view-mode").removeClass("hidden");
               $(elTr).find(".edit-mode").addClass("hidden");
+              // If we get here, switch on afterdetails again
+              $(elUserDetails).removeClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?
@@ -1404,6 +1409,7 @@ var ru = (function ($, ru) {
 
               break;
           }
+
         } catch (ex) {
           private_methods.errMsg("manu_edit", ex);
         }

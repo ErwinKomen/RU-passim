@@ -966,11 +966,45 @@ var ru = (function ($, ru) {
         try {
           $(elRoot).find("div.tree").each(function (idx, el) {
             var sermonid = "",
-                nodeid = "",
-                childof = "",
+                previd = "",
+                nextid = "",
+                firstchild = "",
+                parent = "",
+                elTreeNext = null,
+                elTreePrev = null,
+                elTreeChild = null,
+                elTreeParent = null,
                 oNew = {};
 
+            // Get my own sermonid
             sermonid = $(el).attr("sermonid");
+
+            // Get the sermonid of any preceding <div.tree>
+            elTreePrev = $(el).prev(".tree").first();
+            if (elTreePrev !== null && $(elTreePrev).length > 0) {
+              previd = $(elTreePrev).attr("sermonid");
+            }
+
+            // Get the sermonid of a following <div.tree>
+            elTreeNext = $(el).next(".tree").first();
+            if (elTreeNext !== null && $(elTreeNext).length > 0) {
+              nextid = $(elTreeNext).attr("sermonid");
+            }
+
+            // Get the parent if exists
+            elTreeParent = $(el).parent(".tree").first();
+            if (elTreeParent !== null && $(elTreeParent).length > 0) {
+              parent = $(elTreeParent).attr("sermonid");
+            }
+
+            // Get the sermonid of a first-child <div.tree>
+            elTreeChild = $(el).children(".tree").first();
+            if (elTreeChild !== null && $(elTreeChild).length > 0) {
+              firstchild = $(elTreeChild).attr("sermonid");
+            }
+
+            oNew = { id: sermonid, previd: previd, nextid: nextid, parent: parent, firstchild: firstchild };
+            hList.push(oNew);
           });
 
           return hList;
@@ -1404,6 +1438,7 @@ var ru = (function ($, ru) {
             divDstId = "",
             divSrc = null,
             divDst = null,
+            bChanged = false,
             level = 0,
             target_under_source = false,
             type = "under",
@@ -1442,33 +1477,42 @@ var ru = (function ($, ru) {
               // Check if the target is okay to go to
               if (divSrcId !== divDstId && !target_under_source) {
 
-                // Show source and destination
-                console.log("Move from " + divSrcId + " to UNDER " + divDstId);
-                $("#sermonlog").html("Move from " + divSrcId + " to UNDER " + divDstId);
-
                 // Move source *UNDER* the destination
                 divDst.append(divSrc);
                 // Get my dst level
                 level = parseInt($(divDst).attr("level"), 10);
                 level += 1;
                 $(divSrc).attr("level", level.toString());
+
+                // Check if my parent already has a plus sign showing
+                $(divDst).children("table").find(".sermonbutton").html('<span class="glyphicon glyphicon-plus"></span>');
+                $(divDst).children("table").find(".sermonbutton").attr("onclick", "ru.passim.seeker.sermon_level(this);");
+
+                // Signal we have changed
+                bChanged = true;
               } else {
-                $("#sermonlog").html("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+                console.log("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
               }
               break;
             case "before":  // Put src before div dst
               // Validate
               if (divSrcId === divDstId) {
-                $("#sermonlog").html("Cannot move me " + divSrcId + " before myself " + divDstId);
+                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
               } else {
                 // Move source *BEFORE* the destination
                 divSrc.insertBefore(divDst);
                 // Adapt my level to the one before me
                 $(divSrc).attr("level", $(divDst).attr("level"));
-                // Show what has been done
-                $("#sermonlog").html("Move " + divSrcId + " to BEFORE " + divDstId);
+                // SIgnal change
+                bChanged = true;
               }
               break;
+          }
+
+          // What if change happened?
+          if (bChanged) {
+            // Show the SAVE and RESTORE buttons
+            $("#sermon_tree").find(".edit-mode").removeClass("hidden");
           }
         } catch (ex) {
           private_methods.errMsg("sermon_drop", ex);
@@ -1663,6 +1707,67 @@ var ru = (function ($, ru) {
             // document.getElementById('sermon_manipulate').submit();
             $(elHier).addClass("in");
             $(elHier).show();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("form_row_select", ex);
+        }
+      },
+
+      /**
+       *  manuscript
+       *      Save the current constellation of sermons in the manuscript
+       *
+       */
+      manuscript: function (operation, elStart) {
+        var targeturl = "",
+            elCopy = $("#sermon_tree_copy"),
+            elMain = $("#sermon_tree_main"),
+            elTree = $("#sermon_tree"),
+            hList = null,
+            data = null;
+
+        try {
+          // Get the 'targeturl' attribute 
+          targeturl = $(elStart).attr("targeturl");
+
+          switch (operation) {
+            case "save":    // Save the current constellation of sermons 
+              if (targeturl !== undefined && targeturl !== null) {
+                // 'Read' the current hierarchy...
+                hList = private_methods.sermon_hlisttree(elMain);
+                // Set the <input> value to return the contents of [hList]
+                $("#id_manu-hlist").val(JSON.stringify(hList));
+
+                // Indicate we are waiting
+                $(elTree).find(".waiting").removeClass("hidden");
+                // Hide the buttons
+                $(elTree).find(".edit-mode").addClass("hidden");
+
+                // Pass this on as parameter??
+                $("#save_new_hierarchy").submit();
+              }
+              break;
+            case "restore": // Resture the sermon hierarchy to what it was
+              // REmove what is under [elTree]
+              $(elMain).empty();
+              // Copy everything from #sermon_tree_copy to after the first child of #sermon_tree
+              $(elMain).append($(elCopy).html());
+              // Hide the SAVE and RESTORE buttons
+              $(elTree).find(".edit-mode").addClass("hidden");
+              break;
+            case 'expand':
+              // Remove all hidden stuff
+              $(elMain).find(".tree").removeClass("hidden");
+              break;
+            case 'collapse':
+              // Hide everything that is under the main level
+              $(elMain).find(".tree[level!='1']").addClass("hidden");
+              break;
+            case 'init':
+              // Make a copy of the tree as it is
+              $(elCopy).html($(elMain).html());
+              break;
           }
 
         } catch (ex) {

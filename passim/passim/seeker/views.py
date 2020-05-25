@@ -6887,6 +6887,12 @@ class ManuscriptDetails(ManuscriptEdit):
                 # Need this first, because it also REPAIRS possible parent errors
                 level = sermon.getdepth()
 
+                parent = sermon.parent
+                firstchild = False
+                if parent:
+                    if sermon.id == instance.manusermons.filter(parent=parent).order_by('order').first().id:
+                        firstchild = True
+
                 # Only then continue!
                 oSermon = {}
                 oSermon['obj'] = sermon
@@ -6896,7 +6902,9 @@ class ManuscriptDetails(ManuscriptEdit):
                 oSermon['level'] = level
                 oSermon['pre'] = (level-1) * 20
                 # If this is a new level, indicate it
-                oSermon['group'] = (sermon.firstchild != None)
+                oSermon['group'] = firstchild   # (sermon.firstchild != None)
+                # Is this one a parent of others?
+                oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
                 sermon_list.append(oSermon)
                 # Bookkeeping
                 if level > maxdepth: maxdepth = level
@@ -7232,6 +7240,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
     def custom_init(self, instance):
         errHandle = ErrHandle()
+        method = "may2020"
 
         try:
             # Make sure to set the correct redirect page
@@ -7243,27 +7252,101 @@ class ManuscriptHierarchy(ManuscriptDetails):
             if 'manu-hlist' in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
-                with transaction.atomic():
-                    for item in hlist:
-                        bNeedSaving = False
-                        # Get the sermon of this item
-                        sermon = SermonDescr.objects.filter(id=item['id']).first()
-                        order = int(item['nodeid']) -1
-                        parent_order = int(item['childof']) - 1
-                        parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
-                        # Check if anytyhing changed
-                        if sermon.order != order:
-                            sermon.order = order
-                            bNeedSaving =True
-                        if sermon.parent is not parent:
-                            sermon.parent = parent
-                            # Sanity check...
-                            if sermon.parent.id == parent.id:
-                                sermon.parent = None
-                            bNeedSaving = True
-                        # Do we need to save this one?
-                        if bNeedSaving:
-                            sermon.save()
+
+                if method == "may2020":
+                    # The new May2020 method that uses different parameters
+                    changes = {}
+                    hierarchy = []
+                    with transaction.atomic():
+                        for idx, item in enumerate(hlist):
+                            bNeedSaving = False
+                            # Get the sermon of this item
+                            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                            # Get the next if any
+                            next = None if item['nextid'] == "" else SermonDescr.objects.filter(id=item['nextid']).first()
+                            # Get the first child
+                            firstchild = None if item['firstchild'] == "" else SermonDescr.objects.filter(id=item['firstchild']).first()
+                            # Get the parent
+                            parent = None if item['parent'] == "" else SermonDescr.objects.filter(id=item['parent']).first()
+
+                            order = idx + 1
+
+                            sermon_change = {}  # {'sermon': sermon.id}
+
+                            # Check if anytyhing changed
+                            if sermon.order != order:
+                                # Track the change
+                                sermon_change['horder'] = "{} to {}".format(sermon.order, order)
+                                # Implement the change
+                                sermon.order = order
+                                bNeedSaving =True
+                            if sermon.parent is not parent:
+                                # Track the change
+                                old_parent_id = "none" if sermon.parent == None else sermon.parent.id
+                                new_parent_id = "none" if parent == None else parent.id
+                                if old_parent_id != new_parent_id:
+                                    sermon_change['hparent'] = "{} to {}".format(old_parent_id, new_parent_id)
+
+                                    # Alternative tracking
+                                    hierarchy.append("s{} parent s{} becomes s{}".format(sermon.id, old_parent_id, new_parent_id))
+
+                                    # Implement the change
+                                    sermon.parent = parent
+                                    bNeedSaving = True
+                                else:
+                                    no_change = 1
+
+                            if sermon.firstchild != firstchild:
+                                # Track the change
+                                old_child_id = "none" if sermon.firstchild == None else sermon.firstchild.id
+                                new_child_id = "none" if firstchild == None else firstchild.id
+                                sermon_change['hfirstchild'] = "{} to {}".format(old_child_id, new_child_id)
+                                # Implement the change
+                                sermon.firstchild = firstchild
+                                bNeedSaving =True
+                            if sermon.next != next:
+                                # Track the change
+                                old_next_id = "none" if sermon.next == None else sermon.next.id
+                                new_next_id = "none" if next == None else next.id
+                                sermon_change['hnext'] = "{} to {}".format(old_next_id, new_next_id)
+
+                                # Alternative tracking
+                                hierarchy.append("s{} next s{} becomes s{}".format(sermon.id, old_next_id, new_next_id))
+
+                                # Implement the change
+                                sermon.next = next
+                                bNeedSaving =True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                sermon.save()
+                                # Store the changes
+                                changes[str(sermon.id)] = sermon_change
+
+                    details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
+                    passim_action_add(self, instance, details, "save")
+                else:
+
+                    with transaction.atomic():
+                        for item in hlist:
+                            bNeedSaving = False
+                            # Get the sermon of this item
+                            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                            order = int(item['nodeid']) -1
+                            parent_order = int(item['childof']) - 1
+                            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
+                            # Check if anytyhing changed
+                            if sermon.order != order:
+                                sermon.order = order
+                                bNeedSaving =True
+                            if sermon.parent is not parent:
+                                sermon.parent = parent
+                                # Sanity check...
+                                if sermon.parent.id == parent.id:
+                                    sermon.parent = None
+                                bNeedSaving = True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                sermon.save()
 
             return True
         except:

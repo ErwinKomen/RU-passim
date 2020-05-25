@@ -26,6 +26,13 @@
       </form>
     </div>
 
+    <!-- Hidden hierarchy submit form -->
+    <div class="hidden">
+      <form id="save_new_hierarchy" method="post" action="{% url 'manuscript_hierarchy' pk=manuForm.instance.id %}">
+        {% csrf_token %}
+        <input type="text" id="id_manu-hlist" name="manu-hlist" value="" />
+      </form>
+    </div>
 
     {% if object.manusermons.count == 0 %}
       <p><i>This manuscript does not contain a definition of its contents</i></p>
@@ -36,21 +43,56 @@
       <!-- A place where the Sermons are put in hierarchically organized <div> elements -->
       <div id="sermon_tree" class="not_hidden">
         <div class="" level="1">
-          <table class="func-view" style="width: 100%;">
+          <table class="func-view sermons" style="width: 100%;">
             <thead>
               <tr>
                 <th class="draggable" style="width: 100%;">Details of this manuscript's {{object.manusermons.count}} items</th>
-                <th class="tdnowrap"><a role="button" class="btn btn-xs jumbo-1">Expand</a></th>
+                <th class="tdnowrap">
+                  {% if is_app_editor %}
+                    <span>
+                      <a mode="restore" class="edit-mode btn btn-xs jumbo-1 hidden" 
+                         onclick="ru.passim.seeker.manuscript('restore');">
+                        <span class="glyphicon glyphicon-arrow-left" title="Restore to the original sermon hierarchy"></span>
+                      </a>
+                    </span>
+                    <span>
+                      <a mode="save" class="edit-mode btn btn-xs jumbo-2 hidden" 
+                         onclick="ru.passim.seeker.manuscript('save', this);"
+                         targetid=""
+                         targeturl="{% if manuForm.instance.id %}{% url 'manuscript_details' manuForm.instance.id %}{% endif %}" >
+                        <span class="glyphicon glyphicon-ok" title="Save this sermon hierarchy"></span>
+                        Save
+                      </a>
+                    </span>
+                    <span class="hidden waiting">
+                      <span>Processing changes...</span><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+                    </span>
+                  {% endif %}
+                  <span>
+                    <a mode="expand" role="button" class="btn btn-xs jumbo-1" 
+                         onclick="ru.passim.seeker.manuscript('expand');">
+                        <span class="glyphicon glyphicon-collapse-down" title="Expand the whole hierarchy"></span>
+                    </a>
+                  </span>
+                  <span>
+                    <a mode="collapse" role="button" class="btn btn-xs jumbo-1" 
+                         onclick="ru.passim.seeker.manuscript('collapse');">
+                        <span class="glyphicon glyphicon-collapse-up" title="Collapse the whole hierarchy"></span>
+                    </a>
+                  </span>
+                </th>
               </tr>
             </thead>
           </table>
         </div>
         <!-- This is where the sermon hierarchy is put-->
-        {% for sermon in sermon_list %}
-          {% if sermon.childof == 1 %}
-            {% include 'seeker/sermon_one.html' with sermon=sermon sermon_list=sermon_list level=1 %}
-          {% endif %}
-        {% endfor %}
+        <div id="sermon_tree_main">
+          {% for sermon in sermon_list %}
+            {% if sermon.childof == 1 %}
+              {% include 'seeker/sermon_one.html' with sermon=sermon sermon_list=sermon_list level=1 %}
+            {% endif %}
+          {% endfor %}
+        </div>
       </div>
       <!-- Copy of the tree -->
       <div id="sermon_tree_copy" class="hidden"></div>
@@ -59,5 +101,7 @@
   </div>
 </div>
 
-
+<script>
+  ru.passim.seeker.manuscript('init');
+</script>
 

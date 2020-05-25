@@ -1095,7 +1095,7 @@ class BasicDetails(DetailView):
                 form_kwargs = self.get_form_kwargs(prefix)
                 if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                     # Only process actual changes!!
-                    if self.request.method == "POST" and self.request.POST:
+                    if self.request.method == "POST" and self.request.POST and not self.do_not_save:
 
                         #if self.add:
                         #    # Saving a NEW item
