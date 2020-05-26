@@ -7271,12 +7271,11 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
                             order = idx + 1
 
-                            sermon_change = {}  # {'sermon': sermon.id}
+                            sermonlog = dict(sermon=sermon.id)
+                            bAddSermonLog = False
 
                             # Check if anytyhing changed
                             if sermon.order != order:
-                                # Track the change
-                                sermon_change['horder'] = "{} to {}".format(sermon.order, order)
                                 # Implement the change
                                 sermon.order = order
                                 bNeedSaving =True
@@ -7285,10 +7284,10 @@ class ManuscriptHierarchy(ManuscriptDetails):
                                 old_parent_id = "none" if sermon.parent == None else sermon.parent.id
                                 new_parent_id = "none" if parent == None else parent.id
                                 if old_parent_id != new_parent_id:
-                                    sermon_change['hparent'] = "{} to {}".format(old_parent_id, new_parent_id)
-
-                                    # Alternative tracking
-                                    hierarchy.append("s{} parent s{} becomes s{}".format(sermon.id, old_parent_id, new_parent_id))
+                                    # Track the change
+                                    sermonlog['parent_new'] = new_parent_id
+                                    sermonlog['parent_old'] = old_parent_id
+                                    bAddSermonLog = True
 
                                     # Implement the change
                                     sermon.parent = parent
@@ -7297,10 +7296,6 @@ class ManuscriptHierarchy(ManuscriptDetails):
                                     no_change = 1
 
                             if sermon.firstchild != firstchild:
-                                # Track the change
-                                old_child_id = "none" if sermon.firstchild == None else sermon.firstchild.id
-                                new_child_id = "none" if firstchild == None else firstchild.id
-                                sermon_change['hfirstchild'] = "{} to {}".format(old_child_id, new_child_id)
                                 # Implement the change
                                 sermon.firstchild = firstchild
                                 bNeedSaving =True
@@ -7308,10 +7303,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
                                 # Track the change
                                 old_next_id = "none" if sermon.next == None else sermon.next.id
                                 new_next_id = "none" if next == None else next.id
-                                sermon_change['hnext'] = "{} to {}".format(old_next_id, new_next_id)
-
-                                # Alternative tracking
-                                hierarchy.append("s{} next s{} becomes s{}".format(sermon.id, old_next_id, new_next_id))
+                                sermonlog['next_new'] = new_next_id
+                                sermonlog['next_old'] = old_next_id
+                                bAddSermonLog = True
 
                                 # Implement the change
                                 sermon.next = next
@@ -7319,8 +7313,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             # Do we need to save this one?
                             if bNeedSaving:
                                 sermon.save()
-                                # Store the changes
-                                changes[str(sermon.id)] = sermon_change
+                                if bAddSermonLog:
+                                    # Store the changes
+                                    hierarchy.append(sermonlog)
 
                     details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
                     passim_action_add(self, instance, details, "save")
@@ -7421,6 +7416,18 @@ class ManuscriptListView(BasicList):
          ]
     uploads = reader_uploads
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+
+    def initializations(self):
+        # Check if signature adaptation is needed
+        sh_done = Information.get_kvalue("sermonhierarchy")
+        if sh_done == None or sh_done == "":
+            # Perform adaptations
+            bResult, msg = Manuscript.adapt_hierarchy()
+            if bResult:
+                # Success
+                Information.set_kvalue("sermonhierarchy", "done")
+
+        return None
 
     def add_to_context(self, context, initial):
         # Add a files upload form

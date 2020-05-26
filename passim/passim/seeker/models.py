@@ -2543,6 +2543,39 @@ class Manuscript(models.Model):
     def __str__(self):
         return self.name
 
+    def adapt_hierarchy():
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            count = Manuscript.objects.all().count()
+            with transaction.atomic():
+                # Walk all manuscripts
+                for idx, manu in enumerate(Manuscript.objects.all()):
+                    oErr.Status("Sermon # {}/{}".format(idx, count))
+                    # Walk all sermons in this manuscript, in order
+                    qs = manu.manusermons.all().order_by('order')
+                    for sermo in qs:
+                        # Reset saving
+                        bNeedSaving = False
+                        # Check presence of 'firstchild' and 'next'
+                        firstchild = manu.manusermons.filter(parent=sermo).order_by('order').first()
+                        if sermo.firstchild != firstchild:
+                            sermo.firstchild = firstchild
+                            bNeedSaving = True
+                        # Check for the 'next' one
+                        next = manu.manusermons.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
+                        if sermo.next != next:
+                            sermo.next = next
+                            bNeedSaving = True
+                        # If this needs saving, so do it
+                        if bNeedSaving:
+                            sermo.save()
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
     def find_sermon(self, oDescr):
         """Find a sermon within a manuscript"""
 
