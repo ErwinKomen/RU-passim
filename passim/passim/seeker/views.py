@@ -317,11 +317,14 @@ def add_visit(request, name, is_menu):
 def action_model_changes(form, instance):
     field_values = model_to_dict(instance)
     changed_fields = form.changed_data
+    exclude = []
+    if hasattr(form, 'exclude'):
+        exclude = form.exclude
     changes = {}
     for item in changed_fields: 
         if item in field_values:
             changes[item] = field_values[item]
-        else:
+        elif item not in exclude:
             # It is a form field
             try:
                 representation = form.cleaned_data[item]
@@ -332,8 +335,10 @@ def action_model_changes(form, instance):
                         rep_str = str(rep)
                         rep_list.append(rep_str)
                     representation = json.dumps(rep_list)
+                elif isinstance(representation, str) or isinstance(representation, int):
+                    representation = representation
                 elif isinstance(representation, object):
-                    representation = [ representation.id ]
+                    representation = str(representation)
                 changes[item] = representation
             except:
                 changes[item] = "(unavailable)"
@@ -2142,6 +2147,8 @@ def passim_get_history(instance):
         description = ""
         if obj['actiontype'] == "new":
             description = "Create New"
+        elif obj['actiontype'] == "add":
+            description = "Add"
         elif obj['actiontype'] == "delete":
             description = "Delete"
         elif obj['actiontype'] == "change":
@@ -2151,6 +2158,8 @@ def passim_get_history(instance):
             for key, value in obj['changes'].items():
                 lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
             changes = ", ".join(lchanges)
+            if 'model' in obj and obj['model'] != None and obj['model'] != "":
+                description = "{} {}".format(description, obj['model'])
             description = "{}: {}".format(description, changes)
         lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
     lhtml.append("</tbody></table>")
@@ -6673,16 +6682,16 @@ class ManuscriptEdit(BasicDetails):
             {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
             {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
             {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-             'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0] },
+             'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
             {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
             {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-            {'type': 'plain', 'label': "Project:",      'value': instance.get_project(),        'field_key': 'project'},
-            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),   'field_key': 'project'},
+            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),  'field_list': 'kwlist'},
             {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
                 'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
             {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
-                'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2] },
+                'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
             {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
                 'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
             {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
@@ -6692,13 +6701,20 @@ class ManuscriptEdit(BasicDetails):
         # Signal that we have select2
         context['has_select2'] = True
 
-        # SPecification of the new button
-        context['new_button_title'] = "Manuscript"
-        context['new_button_name'] = "manu"
-        context['new_button_url'] = reverse("manuscript_details")
-        context['new_button_params'] = [
-            # {'name': 'gold-n-equal', 'value': instance.id}
-            ]
+        # Specify that the manuscript info should appear at the right
+        title_right = '<span style="font-size: xx-small">{}</span>'.format(instance.get_full_name())
+        context['title_right'] = title_right
+
+        if context['is_app_editor']:
+            lhtml = []
+            lbuttons = [dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."), 
+                        dict(title="Open a list of locations", href=reverse('location_list'), label="Locations...")]
+            lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+            for item in lbuttons:
+                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' href='{}'>".format(item['title'], item['href']))
+                lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
+            lhtml.append("</div></div>")
+            context['after_details'] = "\n".join(lhtml)
 
         # Return the context we have made
         return context
@@ -6722,7 +6738,7 @@ class ManuscriptEdit(BasicDetails):
                     if newstart and newfinish:
                         # Double check if this one already exists for the current instance
                         obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
-                        if obj != None:
+                        if obj == None:
                             form.instance.yearstart = int(newstart)
                             form.instance.yearfinish = int(newfinish)
                         # Do we have a reference?
@@ -6767,6 +6783,7 @@ class ManuscriptEdit(BasicDetails):
                             obj = Provenance.objects.create(name=name)
                             if note: obj.note = note
                             if location: obj.location = location
+                            obj.save()
                         if obj:
                             form.instance.provenance = obj
                     # Note: it will get saved with form.save()
@@ -6833,40 +6850,99 @@ class ManuscriptDetails(ManuscriptEdit):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        template_sermon = 'seeker/sermon_view.html'
+
+        def sermon_object(obj ):
+            # Calculate the HTML for this sermon
+            context = dict(msitem=obj)
+            html = treat_bom( render_to_string(template_sermon, context))
+            # Determine what the label is going to be
+            label = obj.locus
+            # Determine the parent, if any
+            parent = 1 if obj.parent == None else obj.parent.order + 1
+            id = obj.order + 1
+            # Create a sermon representation
+            oSermon = dict(id=id, parent=parent, pos=label, child=[], f = dict(order=obj.order, html=html))
+            return oSermon
+
         # Start by executing the standard handling
         super(ManuscriptDetails, self).add_to_context(context, instance)
 
+        # Additional sections
         context['sections'] = []
 
         # Lists of related objects
-        related_objects = []
+        context['related_objects'] = []
 
-        ## List of manuscripts related to the SSG via sermon descriptions
-        #manuscripts = dict(title="Manuscripts", prefix="manu")
+        # Construct the hierarchical list
+        sermon_list = []
+        maxdepth = 0
+        build_htable = False
 
-        ## Get all SermonDescr instances linking to the correct eqg instance
-        #qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
-        #rel_list =[]
-        #for sermon in qs_s:
-        #    # Get the 'item': the manuscript
-        #    item = sermon.manu
-        #    rel_item = []
-        #    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
-        #    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-        #                        'link': reverse('manuscript_details', kwargs={'pk': item.id})})
-        #    rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
-        #    rel_item.append({'value': item.yearstart, 'align': "right"})
-        #    rel_item.append({'value': item.yearfinish, 'align': "right"})
+        if instance != None:
+            # Create a well sorted list of sermons
+            qs = instance.manusermons.filter(order__gte=0).order_by('order')
+            prev_level = 0
+            for idx, sermon in enumerate(qs):
+                # Need this first, because it also REPAIRS possible parent errors
+                level = sermon.getdepth()
 
-        #    sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
-        #    rel_item.append({'value': sermon.locus, 'title': sermo_name, 
-        #                        'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
-        #    rel_list.append(rel_item)
-        #manuscripts['rel_list'] = rel_list
-        #manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
-        #related_objects.append(manuscripts)
+                parent = sermon.parent
+                firstchild = False
+                if parent:
+                    if sermon.id == instance.manusermons.filter(parent=parent).order_by('order').first().id:
+                        firstchild = True
 
-        context['related_objects'] = related_objects
+                # Only then continue!
+                oSermon = {}
+                oSermon['obj'] = sermon
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['number'] = idx + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = firstchild   # (sermon.firstchild != None)
+                # Is this one a parent of others?
+                oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
+
+            # Alternative method: create a hierarchical object of sermons
+            if build_htable:
+                lSermon = []
+                for sermon in qs:
+                    # Create sermon object
+                    oSermon = sermon_object(sermon)
+                    # Add it to the list
+                    lSermon.append(oSermon)
+                    # Immediately attach it to the correct parent
+                    parent_id = oSermon['parent']
+                    if parent_id:
+                        oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
+                        if oParent:
+                            oParent['child'].append(oSermon)
+                # Retain the top sermon
+                oSermon = lSermon[0]
+                # Remove the list
+                lSermon = []
+
+                # DEBUGGING: show what we have
+                sSermon = json.dumps(oSermon)
+                context['sermon_htable'] = sSermon
+
+        # Add instances to the list, noting their childof and order
+        context['sermon_list'] = sermon_list
+        context['sermon_count'] = len(sermon_list)
+
+        # Add the list of sermons
+        context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
 
         # Return the context we have made
         return context
@@ -7164,6 +7240,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
     def custom_init(self, instance):
         errHandle = ErrHandle()
+        method = "may2020"
 
         try:
             # Make sure to set the correct redirect page
@@ -7175,27 +7252,96 @@ class ManuscriptHierarchy(ManuscriptDetails):
             if 'manu-hlist' in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
-                with transaction.atomic():
-                    for item in hlist:
-                        bNeedSaving = False
-                        # Get the sermon of this item
-                        sermon = SermonDescr.objects.filter(id=item['id']).first()
-                        order = int(item['nodeid']) -1
-                        parent_order = int(item['childof']) - 1
-                        parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
-                        # Check if anytyhing changed
-                        if sermon.order != order:
-                            sermon.order = order
-                            bNeedSaving =True
-                        if sermon.parent is not parent:
-                            sermon.parent = parent
-                            # Sanity check...
-                            if sermon.parent.id == parent.id:
-                                sermon.parent = None
-                            bNeedSaving = True
-                        # Do we need to save this one?
-                        if bNeedSaving:
-                            sermon.save()
+
+                if method == "may2020":
+                    # The new May2020 method that uses different parameters
+                    changes = {}
+                    hierarchy = []
+                    with transaction.atomic():
+                        for idx, item in enumerate(hlist):
+                            bNeedSaving = False
+                            # Get the sermon of this item
+                            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                            # Get the next if any
+                            next = None if item['nextid'] == "" else SermonDescr.objects.filter(id=item['nextid']).first()
+                            # Get the first child
+                            firstchild = None if item['firstchild'] == "" else SermonDescr.objects.filter(id=item['firstchild']).first()
+                            # Get the parent
+                            parent = None if item['parent'] == "" else SermonDescr.objects.filter(id=item['parent']).first()
+
+                            order = idx + 1
+
+                            sermonlog = dict(sermon=sermon.id)
+                            bAddSermonLog = False
+
+                            # Check if anytyhing changed
+                            if sermon.order != order:
+                                # Implement the change
+                                sermon.order = order
+                                bNeedSaving =True
+                            if sermon.parent is not parent:
+                                # Track the change
+                                old_parent_id = "none" if sermon.parent == None else sermon.parent.id
+                                new_parent_id = "none" if parent == None else parent.id
+                                if old_parent_id != new_parent_id:
+                                    # Track the change
+                                    sermonlog['parent_new'] = new_parent_id
+                                    sermonlog['parent_old'] = old_parent_id
+                                    bAddSermonLog = True
+
+                                    # Implement the change
+                                    sermon.parent = parent
+                                    bNeedSaving = True
+                                else:
+                                    no_change = 1
+
+                            if sermon.firstchild != firstchild:
+                                # Implement the change
+                                sermon.firstchild = firstchild
+                                bNeedSaving =True
+                            if sermon.next != next:
+                                # Track the change
+                                old_next_id = "none" if sermon.next == None else sermon.next.id
+                                new_next_id = "none" if next == None else next.id
+                                sermonlog['next_new'] = new_next_id
+                                sermonlog['next_old'] = old_next_id
+                                bAddSermonLog = True
+
+                                # Implement the change
+                                sermon.next = next
+                                bNeedSaving =True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                sermon.save()
+                                if bAddSermonLog:
+                                    # Store the changes
+                                    hierarchy.append(sermonlog)
+
+                    details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
+                    passim_action_add(self, instance, details, "save")
+                else:
+
+                    with transaction.atomic():
+                        for item in hlist:
+                            bNeedSaving = False
+                            # Get the sermon of this item
+                            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                            order = int(item['nodeid']) -1
+                            parent_order = int(item['childof']) - 1
+                            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
+                            # Check if anytyhing changed
+                            if sermon.order != order:
+                                sermon.order = order
+                                bNeedSaving =True
+                            if sermon.parent is not parent:
+                                sermon.parent = parent
+                                # Sanity check...
+                                if sermon.parent.id == parent.id:
+                                    sermon.parent = None
+                                bNeedSaving = True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                sermon.save()
 
             return True
         except:
@@ -7270,6 +7416,18 @@ class ManuscriptListView(BasicList):
          ]
     uploads = reader_uploads
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+
+    def initializations(self):
+        # Check if signature adaptation is needed
+        sh_done = Information.get_kvalue("sermonhierarchy")
+        if sh_done == None or sh_done == "":
+            # Perform adaptations
+            bResult, msg = Manuscript.adapt_hierarchy()
+            if bResult:
+                # Success
+                Information.set_kvalue("sermonhierarchy", "done")
+
+        return None
 
     def add_to_context(self, context, initial):
         # Add a files upload form

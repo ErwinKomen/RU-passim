@@ -110,10 +110,13 @@ def action_model_changes(form, instance):
     field_values = model_to_dict(instance)
     changed_fields = form.changed_data
     changes = {}
+    exclude = []
+    if hasattr(form, 'exclude'):
+        exclude = form.exclude
     for item in changed_fields: 
         if item in field_values:
             changes[item] = field_values[item]
-        else:
+        elif item not in exclude:
             # It is a form field
             try:
                 representation = form.cleaned_data[item]
@@ -124,6 +127,13 @@ def action_model_changes(form, instance):
                         rep_str = str(rep)
                         rep_list.append(rep_str)
                     representation = json.dumps(rep_list)
+                elif isinstance(representation, str) or isinstance(representation, int):
+                    representation = representation
+                elif isinstance(representation, object):
+                    try:
+                        representation = representation.__str__()
+                    except:
+                        representation = str(representation)
                 changes[item] = representation
             except:
                 changes[item] = "(unavailable)"
@@ -1085,7 +1095,7 @@ class BasicDetails(DetailView):
                 form_kwargs = self.get_form_kwargs(prefix)
                 if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                     # Only process actual changes!!
-                    if self.request.method == "POST" and self.request.POST:
+                    if self.request.method == "POST" and self.request.POST and not self.do_not_save:
 
                         #if self.add:
                         #    # Saving a NEW item
@@ -1105,7 +1115,17 @@ class BasicDetails(DetailView):
                         # Process all the correct forms in the formset
                         for subform in formset:
                             if subform.is_valid():
+                                # DO the actual saving
                                 subform.save()
+
+                                # Log the SAVE action
+                                details = {'id': instance.id}
+                                details["savetype"] = "add" # if bNew else "change"
+                                details['model'] = subform.instance.__class__.__name__
+                                if subform.changed_data != None and len(subform.changed_data) > 0:
+                                    details['changes'] = action_model_changes(subform, subform.instance)
+                                self.action_add(instance, details, "add")
+
                                 # Signal that the *FORM* needs refreshing, because the formset changed
                                 bFormsetChanged = True
 

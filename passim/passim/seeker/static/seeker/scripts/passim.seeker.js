@@ -966,11 +966,45 @@ var ru = (function ($, ru) {
         try {
           $(elRoot).find("div.tree").each(function (idx, el) {
             var sermonid = "",
-                nodeid = "",
-                childof = "",
+                previd = "",
+                nextid = "",
+                firstchild = "",
+                parent = "",
+                elTreeNext = null,
+                elTreePrev = null,
+                elTreeChild = null,
+                elTreeParent = null,
                 oNew = {};
 
+            // Get my own sermonid
             sermonid = $(el).attr("sermonid");
+
+            // Get the sermonid of any preceding <div.tree>
+            elTreePrev = $(el).prev(".tree").first();
+            if (elTreePrev !== null && $(elTreePrev).length > 0) {
+              previd = $(elTreePrev).attr("sermonid");
+            }
+
+            // Get the sermonid of a following <div.tree>
+            elTreeNext = $(el).next(".tree").first();
+            if (elTreeNext !== null && $(elTreeNext).length > 0) {
+              nextid = $(elTreeNext).attr("sermonid");
+            }
+
+            // Get the parent if exists
+            elTreeParent = $(el).parent(".tree").first();
+            if (elTreeParent !== null && $(elTreeParent).length > 0) {
+              parent = $(elTreeParent).attr("sermonid");
+            }
+
+            // Get the sermonid of a first-child <div.tree>
+            elTreeChild = $(el).children(".tree").first();
+            if (elTreeChild !== null && $(elTreeChild).length > 0) {
+              firstchild = $(elTreeChild).attr("sermonid");
+            }
+
+            oNew = { id: sermonid, previd: previd, nextid: nextid, parent: parent, firstchild: firstchild };
+            hList.push(oNew);
           });
 
           return hList;
@@ -1338,14 +1372,154 @@ var ru = (function ($, ru) {
             });
           });
 
-          /*          $(".modal-dialog").draggable({
-                      "handle": ".modal-header"
-                    })*/
+          //// Any other draggables
+          //$(".draggable").draggable({
+          //  cursor: "move",
+          //  snap: ".draggable",
+          //  snapMode: "inner",
+          //  snapTolerance: 20
+          //});
+
 
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
       },
+
+      sermon_drag: function (ev) {
+        var elTree = null,
+            divId = "",
+            sermonid = "";
+        try {
+          elTree = $(ev.target).closest(".tree");
+          sermonid = $(elTree).attr("sermonid");
+          divId = $(elTree).attr("id");
+
+          ev.dataTransfer.setData("text", divId);
+        } catch (ex) {
+          private_methods.errMsg("sermon_drag", ex);
+        }
+      },
+
+      sermon_dragenter: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          ev.preventDefault();
+          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
+            //$(ev.target).addClass("dragover");
+            $(ev.target).addClass("ruler_black");
+            $(ev.target).removeClass("ruler_white");
+            // make row larger
+            $(ev.target).parent().addClass("ruler_show");
+          } else {
+            $(ev.target).closest("td").addClass("dragover");
+            $(ev.target).addClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("sermon_dragenter", ex);
+        }
+      },
+
+      sermon_dragleave: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          $("#sermon_tree .dragover").removeClass("dragover");
+          $("#sermon_tree .ruler").removeClass("ruler_black");
+          $("#sermon_tree .ruler").addClass("ruler_white");
+          $("#sermon_tree .ruler_show").removeClass("ruler_show");
+        } catch (ex) {
+          private_methods.errMsg("sermon_dragleave", ex);
+        }
+      },
+
+      sermon_drop: function (ev) {
+        var elTree = null,
+            divSrcId = "",
+            divDstId = "",
+            divSrc = null,
+            divDst = null,
+            bChanged = false,
+            level = 0,
+            target_under_source = false,
+            type = "under",
+            sermonid = "";
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          // Figure out what the source and destination is
+          elTree = $(ev.target).closest(".tree");
+          divSrcId = ev.dataTransfer.getData("text");
+          divDstId = $(elTree).attr("id");
+
+          // Reset the class of the drop element
+          $("#sermon_tree .dragover").removeClass("dragover");
+          $("#sermon_tree .ruler").removeClass("ruler_black");
+          $("#sermon_tree .ruler").addClass("ruler_white");
+          $("#sermon_tree .ruler_show").removeClass("ruler_show");
+
+          // Find the actual source div
+          divSrc = $("#sermon_tree").find("#" + divSrcId);
+          // The destination - that is me myself
+          divDst = elTree;
+
+          // Do we need to put the source "under" the destination or "before" it?
+          if ($(ev.target).hasClass("ruler")) {
+            type = "before";
+          }
+
+          // Action now depends on the type
+          switch (type) {
+            case "under":   // Put src under div dst
+              // check for target under source -- that is not allowed
+              target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
+
+              // Check if the target is okay to go to
+              if (divSrcId !== divDstId && !target_under_source) {
+
+                // Move source *UNDER* the destination
+                divDst.append(divSrc);
+                // Get my dst level
+                level = parseInt($(divDst).attr("level"), 10);
+                level += 1;
+                $(divSrc).attr("level", level.toString());
+
+                // Check if my parent already has a plus sign showing
+                $(divDst).children("table").find(".sermonbutton").html('<span class="glyphicon glyphicon-plus"></span>');
+                $(divDst).children("table").find(".sermonbutton").attr("onclick", "ru.passim.seeker.sermon_level(this);");
+
+                // Signal we have changed
+                bChanged = true;
+              } else {
+                console.log("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+              }
+              break;
+            case "before":  // Put src before div dst
+              // Validate
+              if (divSrcId === divDstId) {
+                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
+              } else {
+                // Move source *BEFORE* the destination
+                divSrc.insertBefore(divDst);
+                // Adapt my level to the one before me
+                $(divSrc).attr("level", $(divDst).attr("level"));
+                // SIgnal change
+                bChanged = true;
+              }
+              break;
+          }
+
+          // What if change happened?
+          if (bChanged) {
+            // Show the SAVE and RESTORE buttons
+            $("#sermon_tree").find(".edit-mode").removeClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("sermon_drop", ex);
+        }
+      },
+
+
 
       /**
        * unique_change
@@ -1541,6 +1715,67 @@ var ru = (function ($, ru) {
       },
 
       /**
+       *  manuscript
+       *      Save the current constellation of sermons in the manuscript
+       *
+       */
+      manuscript: function (operation, elStart) {
+        var targeturl = "",
+            elCopy = $("#sermon_tree_copy"),
+            elMain = $("#sermon_tree_main"),
+            elTree = $("#sermon_tree"),
+            hList = null,
+            data = null;
+
+        try {
+          // Get the 'targeturl' attribute 
+          targeturl = $(elStart).attr("targeturl");
+
+          switch (operation) {
+            case "save":    // Save the current constellation of sermons 
+              if (targeturl !== undefined && targeturl !== null) {
+                // 'Read' the current hierarchy...
+                hList = private_methods.sermon_hlisttree(elMain);
+                // Set the <input> value to return the contents of [hList]
+                $("#id_manu-hlist").val(JSON.stringify(hList));
+
+                // Indicate we are waiting
+                $(elTree).find(".waiting").removeClass("hidden");
+                // Hide the buttons
+                $(elTree).find(".edit-mode").addClass("hidden");
+
+                // Pass this on as parameter??
+                $("#save_new_hierarchy").submit();
+              }
+              break;
+            case "restore": // Resture the sermon hierarchy to what it was
+              // REmove what is under [elTree]
+              $(elMain).empty();
+              // Copy everything from #sermon_tree_copy to after the first child of #sermon_tree
+              $(elMain).append($(elCopy).html());
+              // Hide the SAVE and RESTORE buttons
+              $(elTree).find(".edit-mode").addClass("hidden");
+              break;
+            case 'expand':
+              // Remove all hidden stuff
+              $(elMain).find(".tree").removeClass("hidden");
+              break;
+            case 'collapse':
+              // Hide everything that is under the main level
+              $(elMain).find(".tree[level!='1']").addClass("hidden");
+              break;
+            case 'init':
+              // Make a copy of the tree as it is
+              $(elCopy).html($(elMain).html());
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("form_row_select", ex);
+        }
+      },
+
+      /**
        *  sermon_move
        *      Move the selected row
        *
@@ -1675,6 +1910,35 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("sermon_drawtree", ex);
+        }
+      },
+
+      /**
+       *  sermon_level
+       *      Open or close the current level in the sermon tree
+       *
+       */
+      sermon_level: function (elThis) {
+        var elChild = null,
+            elTree = null,
+            elTable = null;
+
+        try {
+          // Get my tree part
+          elTree = $(elThis).closest(".tree");
+          // Get my first child
+          elChild = $(elTree).children(".tree").first();
+          // Action depends on hidden or not
+          if ($(elChild).hasClass("hidden")) {
+            // Show
+            $(elTree).children(".tree").removeClass("hidden");
+          } else {
+            // Hide
+            $(elTree).children(".tree").addClass("hidden");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_level", ex);
         }
       },
 

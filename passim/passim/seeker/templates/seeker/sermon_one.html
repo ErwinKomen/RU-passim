@@ -1,16 +1,65 @@
 ﻿{% load i18n %}
 
     <!-- Information on one sermon-->
-    <div sermonid="{{sermon.obj.id}}" level="{{level}}" class="tree">
-      <span class="td" targeturl="{{sermon.obj.target}}">
-        <code>{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
-        {% if sermon.obj.goldsermons.count > 0 %}
-          <span class="badge signature ot" title="This links to {{sermon.obj.goldsermons.count}} Sermons Gold">G</span>
-        {% endif %}
-        <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
-          <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
-        </a>
-      </span>
+    <div sermonid="{{sermon.obj.id}}" level="{{level}}" id="sermon_{{sermon.number}}"
+         class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
+      <table class="func-view sermons" style="width: 100%;">
+        <tbody>
+          <!-- Horizontal ruler that can be expanded -->
+          <tr style="font-size: 1px;" class="">
+            <td colspan="2" class="ruler ruler_white" 
+                ondragover="ru.passim.seeker.sermon_dragenter(event);" 
+                ondragenter="ru.passim.seeker.sermon_dragenter(event);"
+                ondragleave="ru.passim.seeker.sermon_dragleave(event);"
+                ondrop="ru.passim.seeker.sermon_drop(event);"
+                >
+
+            </td>
+            <td colspan="2" style="background-color: white;"></td>
+          </tr>
+          <!-- Actual line-->
+          <tr>
+            <!-- Either '+' sign or empty space -->
+            <td valign="top" class="sermonbutton"
+                {% if sermon.isparent %}onclick="ru.passim.seeker.sermon_level(this);"{% endif %}>
+              {% if sermon.isparent %}
+                <span class="glyphicon glyphicon-plus"></span>
+              {% else %}
+                <span>&nbsp;</span>
+              {% endif %}
+            </td>
+
+            <!-- The number of the sermon in our current hierarchy -->
+            <td valign="top" class="tdnowrap"   style="background-color: white;">
+              <span>{{sermon.number}}</span>
+            </td>
+
+            <!-- The *LOCUS* of the sermon that serves as drag point -->
+            <td valign="top" class="tdnowrap"  style="background-color: white;"
+                ondragover="ru.passim.seeker.sermon_dragenter(event);" 
+                ondragenter="ru.passim.seeker.sermon_dragenter(event);"
+                ondragleave="ru.passim.seeker.sermon_dragleave(event);"
+                ondrop="ru.passim.seeker.sermon_drop(event);"
+                >
+                <code draggable="true" class="draggable" 
+                      ondragstart="ru.passim.seeker.sermon_drag(event);"
+                      >{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
+            </td>
+
+            <!-- The sermon itself -->
+            <td valign="top" class="td clickable" style="width: 100%;" >
+              <span draggable="false" targeturl="{{sermon.obj.target}}">
+                {% if sermon.obj.goldsermons.count > 0 %}
+                  <span class="badge signature ot" title="This links to {{sermon.obj.goldsermons.count}} Sermons Gold">G</span>
+                {% endif %}
+                <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
+                  <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
+                </a>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
       {% for child in sermon_list %}
         {% if child.obj.parent and child.obj.parent.id == sermon.obj.id %}
           {% include 'seeker/sermon_one.html' with sermon=child sermon_list=sermon_list level=level|add:1 %}
