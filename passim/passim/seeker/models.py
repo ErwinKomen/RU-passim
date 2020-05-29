@@ -51,6 +51,18 @@ LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 
+STYPE_IMPORTED = 'imp'
+STYPE_MANUAL = 'man'
+STYPE_EDITED = 'edi'
+STYPE_APPROVED = 'app'
+traffic_red = ['-', STYPE_IMPORTED]
+traffic_orange = [STYPE_MANUAL, STYPE_EDITED]
+traffic_green = [STYPE_APPROVED]
+traffic_light = '<span title="{}"><span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                                 '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                                 '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                '</span>'
+
 class FieldChoice(models.Model):
 
     field = models.CharField(max_length=50)
@@ -245,6 +257,34 @@ def get_searchable(sText):
         # Make sure to TRIM the text
         sText = sText.strip()
     return sText
+
+def get_stype_light(stype):
+    """HTML visualization of the different STYPE statuses"""
+
+    sBack = ""
+    if stype == "": stype = "-"
+    red = "gray"
+    orange = "gray"
+    green = "gray"
+    # Determine what the light is going to be
+    
+    if stype in traffic_orange:
+        orange = "orange"
+        htext = "This item has been edited and needs final approval"
+    elif stype in traffic_green:
+        green = "green"
+        htext = "This item has been completely revised and approved"
+    elif stype in traffic_red:
+        red = "red"
+        htext = "This item has been automatically received and needs editing and approval"
+
+    # We have the color of the light: visualize it
+    # sBack = "<span class=\"glyphicon glyphicon-record\" title=\"{}\" style=\"color: {};\"></span>".format(htext, light)
+    sBack = traffic_light.format(htext, red, orange, green)
+
+    # Return what we made
+    return sBack
+
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -2517,8 +2557,9 @@ class Manuscript(models.Model):
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
     # [1] Every manuscript has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
@@ -2602,7 +2643,7 @@ class Manuscript(models.Model):
             return None
 
     def find_or_create(name,yearstart, yearfinish, library, idno="", 
-                       filename=None, url="", support = "", extent = "", format = "", source=None, stype="imp"):
+                       filename=None, url="", support = "", extent = "", format = "", source=None, stype=STYPE_IMPORTED):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -2789,6 +2830,9 @@ class Manuscript(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
+
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
         
@@ -2912,7 +2956,7 @@ class Manuscript(models.Model):
                     if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
                     # Set the default status type
-                    sermon.stype = "imp"    # Imported
+                    sermon.stype = STYPE_IMPORTED    # Imported
 
                     # Set my parent manuscript
                     sermon.manu = manuscript
@@ -3552,6 +3596,11 @@ class EqualGold(models.Model):
     # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
+    # [1] Every SSG has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="-")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
 
@@ -3774,6 +3823,9 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
+
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
 
@@ -3888,8 +3940,9 @@ class SermonGold(models.Model):
     siglist = models.TextField("List of signatures", default="[]")
 
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default=STYPE_MANUAL)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # [0-1] Each SermonGold should belong to exactly one equality group
     equal = models.ForeignKey(EqualGold, null=True, blank=True, on_delete=models.SET_NULL, related_name="equal_goldsermons")
@@ -3942,7 +3995,7 @@ class SermonGold(models.Model):
             lEdition.append(item.reference.short)
         return " | ".join(lEdition)
 
-    def find_or_create(author, incipit, explicit, stype="imp"):
+    def find_or_create(author, incipit, explicit, stype=STYPE_IMPORTED):
         """Find or create a SermonGold"""
 
         lstQ = []
@@ -4207,6 +4260,9 @@ class SermonGold(models.Model):
         lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
         sBack = "".join(lHtml)
         return sBack
+
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
 
     def get_view(self):
         """Get a HTML valid view of myself similar to [sermongold_view.html]"""
@@ -4833,8 +4889,9 @@ class SermonDescr(models.Model):
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # ================ MANYTOMANY relations ============================
 
@@ -5197,6 +5254,9 @@ class SermonDescr(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
+
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
 
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + super"""

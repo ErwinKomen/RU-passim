@@ -388,6 +388,19 @@ class ManuscriptExtWidget(ModelSelect2MultipleWidget):
         return qs        
 
 
+class OriginOneWidget(ModelSelect2Widget):
+    model = Origin
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        # sLabel = "{} ({})".format(obj.name, obj.loctype)
+        sLabel = obj.name
+        return sLabel
+
+    def get_queryset(self):
+        return Location.objects.all().order_by('name').distinct()
+
+
 class ProjectOneWidget(ModelSelect2Widget):
     model = Project
     search_fields = [ 'name__icontains' ]
@@ -1406,7 +1419,6 @@ class SermonGoldForm(PassimModelForm):
         return None
     
 
-
 class SermonGoldSameForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1514,12 +1526,13 @@ class SuperSermonGoldForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGold
-        fields = ['author', 'incipit', 'explicit', 'code', 'number']
+        fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
         widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Passim code'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'})
+                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -2246,6 +2259,8 @@ class ManuscriptForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
+    origone     = ModelChoiceField(queryset=None, required=False,
+                widget=OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
     collection  = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -2314,6 +2329,8 @@ class ManuscriptForm(PassimModelForm):
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
 
+            self.fields['origone'].queryset = Origin.objects.all().order_by('name')
+
             # Some lists need to be initialized to NONE:
             self.fields['provlist'].queryset = Provenance.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
@@ -2351,6 +2368,7 @@ class ManuscriptForm(PassimModelForm):
                 # Look after origin
                 origin = instance.origin
                 self.fields['origname_ta'].initial = "" if origin == None else origin.name
+                self.fields['origone'].initial = None if origin == None else origin.id
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]

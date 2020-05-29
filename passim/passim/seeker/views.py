@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_PARTIAL
+    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -1161,7 +1161,7 @@ def do_stype(request):
             added = 0
             for item in Manuscript.objects.all():
                 if item.stype == "-":
-                    item.stype = "imp"
+                    item.stype = STYPE_IMPORTED
                     item.save()
                     added += 1
             result_list.append({'part': 'Manuscript changed stype', 'result': added})
@@ -1171,7 +1171,7 @@ def do_stype(request):
             added = 0
             for item in SermonDescr.objects.all():
                 if item.stype == "-":
-                    item.stype = "imp"
+                    item.stype = STYPE_IMPORTED
                     item.save()
                     added += 1
             result_list.append({'part': 'SermonDescr changed stype', 'result': added})
@@ -1181,10 +1181,20 @@ def do_stype(request):
             added = 0
             for item in SermonGold.objects.all():
                 if item.stype == "-":
-                    item.stype = "imp"
+                    item.stype = STYPE_IMPORTED
                     item.save()
                     added += 1
             result_list.append({'part': 'SermonGold changed stype', 'result': added})
+
+        # Phase 4: EqualGold
+        with transaction.atomic():
+            added = 0
+            for item in EqualGold.objects.all():
+                if item.stype == "-":
+                    item.stype = STYPE_IMPORTED
+                    item.save()
+                    added += 1
+            result_list.append({'part': 'EqualGold changed stype', 'result': added})
 
         context['result_list'] = result_list
     
@@ -2133,10 +2143,45 @@ def user_is_in_team(request):
 def passim_action_add(view, instance, details, actiontype):
     """User can fill this in to his/her liking"""
 
-    # Get the username: 
-    username = view.request.user.username
-    # Process the action
-    Action.add(username, instance.__class__.__name__, instance.id, actiontype, json.dumps(details))
+    # Check if this needs processing
+    stype_edi_fields = getattr(view, "stype_edi_fields", None)
+    if stype_edi_fields:
+        # Get the username: 
+        username = view.request.user.username
+        # Process the action
+        cls_name = instance.__class__.__name__
+        Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
+        # Check the details:
+        if 'changes' in details:
+            changes = details['changes']
+            if 'stype' not in changes or len(changes) > 1:
+                # Check if the current STYPE is *not* 'Edited*
+                stype = getattr(instance, "stype", "")
+                if stype != STYPE_EDITED:
+                    bNeedSaving = False
+                    key = ""
+                    if 'model' in details:
+                        bNeedSaving = details['model'] in stype_edi_fields
+                    if not bNeedSaving:
+                        # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
+                        for k,v in changes.items():
+                            if k in stype_edi_fields:
+                                bNeedSaving = True
+                                key = k
+                                break
+
+                    if bNeedSaving:
+                        # Need to set the stype to EDI
+                        instance.stype = STYPE_EDITED
+                        # Adapt status note
+                        snote = json.loads(instance.snote)
+                        snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
+                        instance.snote = json.dumps(snote)
+                        # Save it
+                        instance.save()
+    # Now we are ready
+    return None
+
 
 def passim_get_history(instance):
     lhtml= []
@@ -5229,11 +5274,11 @@ class OriginListView(BasicList):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', 'location', 'note', '']
     order_default = order_cols
-    order_heads = [{'name': 'Name', 'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
+    order_heads = [{'name': 'Name',     'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
                    {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
-                   {'name': 'Note', 'order': 'o=3', 'type': 'str', 'custom': 'note'},
-                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
-    filters = [ {"name": "Location",         "id": "filter_location",     "enabled": False},
+                   {'name': 'Note',     'order': 'o=3', 'type': 'str', 'custom': 'note'},
+                   {'name': '',         'order': '',    'type': 'str', 'custom': 'manulink' }]
+    filters = [ {"name": "Location",        "id": "filter_location",    "enabled": False},
                 {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
     searches = [
@@ -5250,7 +5295,7 @@ class OriginListView(BasicList):
             count = instance.origin_manuscripts.all().count()
             url = reverse('search_manuscript')
             if count > 0:
-                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
+                html.append("<a href='{}?manu-origin={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
                     url, instance.id, count, count))
         elif custom == "location":
             sLocation = ""
@@ -5370,6 +5415,14 @@ class SermonEdit(BasicDetails):
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
+
+    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'postscriptum', 'quote', 
+                                'bibnotes', 'feast', 'bibleref', 'additional', 'note',
+                        #'kwlist',
+                        'SermonSignature', 'siglist',
+                        #'CollectionSerm', 'collist_s',
+                        'SermonDescrEqual', 'superlist']
+    
        
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -5378,7 +5431,7 @@ class SermonEdit(BasicDetails):
         iStop = 1
         manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display,'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
             # {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'idonly'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
@@ -5759,7 +5812,9 @@ class SermonListView(BasicList):
                         html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
         elif custom == "status":
             # Provide that status badge
-            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+            # html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_light(), instance.stype[:1]))
+            html.append(instance.get_stype_light())
+            
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
@@ -6667,6 +6722,14 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+
+    stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
+                        'Daterange', 'datelist',
+                        #'kwlist',
+                        #'CollectionMan', 'collist',
+                        'LitrefMan', 'litlist',
+                        'ProvenanceMan', 'provlist'
+                        'ManuscriptExt', 'extlist']
     
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -6674,13 +6737,13 @@ class ManuscriptEdit(BasicDetails):
         # Define the main items to show and edit
         y = instance
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_display(),  'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
             {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
             {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity'},
             {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
             {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
             {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
+            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origone'},
             {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
              'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
@@ -7452,16 +7515,6 @@ class ManuscriptListView(BasicList):
             qs = Manuscript.objects.all()
         return qs
 
-    def adapt_search(self, fields):
-        # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-        return fields, None, None
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -7491,7 +7544,8 @@ class ManuscriptListView(BasicList):
             for item in instance.manuscript_dateranges.all():
                 html.append("<div>{}</div".format(item.yearfinish))
         elif custom == "status":
-            html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            # html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            html.append(instance.get_stype_light())
             sTitle = instance.get_stype_display()
         elif custom == "links":
             sLinks = ""
@@ -7520,6 +7574,14 @@ class ManuscriptListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+        # Check if the prjlist is identified
+        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+            # Get the default project
+            qs = Project.objects.all()
+            if qs.count() > 0:
+                prj_default = qs.first()
+                qs = Project.objects.filter(id=prj_default.id)
+                fields['prjlist'] = qs
         return fields, lstExclude, qAlternative
   
 
@@ -7842,7 +7904,9 @@ class SermonGoldListView(BasicList):
                     html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
         elif custom == "status":
             # Provide that status badge
-            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+            # html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_light(), instance.stype[:1]))
+            html.append(instance.get_stype_light())
+            sTitle = instance.get_stype_display()
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
@@ -8112,6 +8176,14 @@ class SermonGoldEdit(BasicDetails):
                        {'formsetClass': GlitFormSet,  'prefix': 'glit',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'},
                        {'formsetClass': GftxtFormSet, 'prefix': 'gftxt', 'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
+    stype_edi_fields = ['author', 'authorname', 'incipit', 'explicit', 'bibliography', 'equal',
+                        #'kwlist', 
+                        'Signature', 'siglist',
+                        #'CollectionGold', 'collist_sg',
+                        'EdirefSG', 'edilist',
+                        'LitrefSG', 'litlist',
+                        'Ftextlink', 'ftxtlist']
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -8121,7 +8193,7 @@ class SermonGoldEdit(BasicDetails):
              'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
             {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
              'title': 'Other Sermons Gold members of the same equality set'},
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
             {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
@@ -8423,11 +8495,19 @@ class EqualGoldEdit(BasicDetails):
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
         ]
 
+    stype_edi_fields = ['author', 'number', 'code', 'incipit', 'explicit',
+                        #'kwlist', 
+                        #'CollectionSuper', 'collist_ssg',
+                        'EqualGoldLink', 'superlist',
+                        'LitrefSG', 'litlist',
+                        'goldlist']
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
         # Define the main items to show and edit
         context['mainitems'] = [
+            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light,'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
             {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
              'title': 'This is the automatically assigned sermon number for this particular author' },
@@ -8660,7 +8740,8 @@ class EqualGoldListView(BasicList):
         {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
         {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
-         'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"}
+         'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
+        {'name': 'Status',                  'order': '',    'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -8742,6 +8823,9 @@ class EqualGoldListView(BasicList):
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "status":
+            # Provide the status traffic light
+            html.append(instance.get_stype_light())
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle

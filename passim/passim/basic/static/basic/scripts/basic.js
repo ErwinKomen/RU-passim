@@ -1279,6 +1279,8 @@ var ru = (function ($, ru) {
                     $(elTr).find(".edit-mode").addClass("hidden");
                     // Hide waiting symbol
                     $(elTr).find(".waiting").addClass("hidden");
+                    // If we get here, switch on afterdetails again
+                    $(elUserDetails).removeClass("hidden");
                     // Perform init again
                     ru.basic.init_events();
                   }
