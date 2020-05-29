@@ -6724,6 +6724,7 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
 
     stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
+                        'hierarchy',
                         'Daterange', 'datelist',
                         #'kwlist',
                         #'CollectionMan', 'collist',
