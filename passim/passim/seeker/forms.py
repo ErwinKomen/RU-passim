@@ -580,6 +580,17 @@ class SignatureOtherWidget(SignatureOneWidget):
     editype = "ot"
 
 
+class StypeWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+
+
 class SuperOneWidget(ModelSelect2Widget):
     model = EqualGold
     search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
@@ -708,6 +719,9 @@ class SearchManuForm(PassimModelForm):
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
+    stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+
     country     = forms.CharField(required=False)
     country_ta  = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -773,7 +787,7 @@ class SearchManuForm(PassimModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SearchManuForm, self).__init__(*args, **kwargs)
-        
+        oErr = ErrHandle()
         try:
             username = self.username
             team_group = self.team_group
@@ -786,6 +800,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,

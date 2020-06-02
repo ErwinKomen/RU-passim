@@ -1387,6 +1387,20 @@ class Visit(models.Model):
         return result
 
 
+class Stype(models.Model):
+    """Status of M/S/SG/SSG"""
+
+    # [1] THe abbreviation code of the status
+    abbr = models.CharField("Status abbreviation", max_length=50)
+    # [1] The English name
+    nameeng = models.CharField("Name (ENglish)", max_length=50)
+    # [1] The Dutch name
+    namenld = models.CharField("Name (Dutch)", max_length=50)
+
+    def __str__(self):
+        return self.abbr
+
+
 class LocationType(models.Model):
     """Kind of location and level on the location hierarchy"""
 

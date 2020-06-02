@@ -307,6 +307,8 @@ def make_search_list(filters, oFields, search_list, qd):
                         else:
                             # Just one foreign key
                             s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                    elif keyType == "fieldchoice":
+                        s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
                     elif dbfield:
                         s_q_lst = Q(**{"{}__in".format(infield): code_list})
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
