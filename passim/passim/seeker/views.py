@@ -8732,7 +8732,7 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    order_cols = ['code', 'author', 'number', '', 'srchincipit', '' ]
+    order_cols = ['code', 'author', 'number', '', 'srchincipit', '', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -8744,7 +8744,7 @@ class EqualGoldListView(BasicList):
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
         {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
-        {'name': 'Status',                  'order': '',    'type': 'str', 'custom': 'status'}
+        {'name': 'Status',                  'order': '7',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
