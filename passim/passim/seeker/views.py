@@ -5699,6 +5699,7 @@ class SermonListView(BasicList):
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
+                {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
@@ -5727,8 +5728,7 @@ class SermonListView(BasicList):
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
-            #{'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   
-            #                            'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
@@ -7517,8 +7517,7 @@ class ManuscriptListView(BasicList):
         else:
             qs = Manuscript.objects.all()
         return qs
-
-
+    
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
@@ -7822,6 +7821,7 @@ class SermonGoldListView(BasicList):
         {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
         {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Status",          "id": "filter_stype",       "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",  "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",   "enabled": False, "head_id": "filter_collection"},
@@ -7835,8 +7835,8 @@ class SermonGoldListView(BasicList):
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' } 
-            # {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' } 
+            {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' } 
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
@@ -8510,16 +8510,16 @@ class EqualGoldEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light,'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
             {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
              'title': 'This is the automatically assigned sermon number for this particular author' },
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown(True), 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown(True),'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide', 'link': instance.get_moved_url},
-            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code, 'empty': 'hide', 'link': instance.get_previous_url},
+            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
             {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
             {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
@@ -8754,6 +8754,7 @@ class EqualGoldListView(BasicList):
         {"name": "Number",          "id": "filter_number",            "enabled": False},
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
+        {"name": "Status",          "id": "filter_stype",             "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -8768,6 +8769,7 @@ class EqualGoldListView(BasicList):
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
             ]},
         {'section': 'collection', 'filterlist': [

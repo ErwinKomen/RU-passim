@@ -859,6 +859,8 @@ class SearchManuForm(PassimModelForm):
 
 class SermonForm(PassimModelForm):
     # Helper fields for SermonDescr fields
+    stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname  = forms.CharField(label=_("Author"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -959,6 +961,8 @@ class SermonForm(PassimModelForm):
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['manu'].required = False
+            self.fields['stype'].required = False
+            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
@@ -1315,6 +1319,8 @@ class SermonDescrKeywordForm(forms.ModelForm):
 
 
 class SermonGoldForm(PassimModelForm):
+    stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname  = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
@@ -1377,6 +1383,7 @@ class SermonGoldForm(PassimModelForm):
             userplus = self.userplus
             # Some fields are not required
             self.fields['stype'].required = False
+            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
@@ -1505,6 +1512,8 @@ class SuperToGoldForm(forms.ModelForm):
     
 
 class SuperSermonGoldForm(PassimModelForm):
+    stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1515,9 +1524,11 @@ class SuperSermonGoldForm(PassimModelForm):
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 
+                                                'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
+                                                         'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
@@ -1543,7 +1554,8 @@ class SuperSermonGoldForm(PassimModelForm):
         model = EqualGold
         fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
         widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Passim code'}),
+                 'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
+                                                       'data-placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1559,8 +1571,10 @@ class SuperSermonGoldForm(PassimModelForm):
             team_group = self.team_group
             # Some fields are not required
             self.fields['authorname'].required = False
+            self.fields['stype'].required = False
 
             # Initialize querysets
+            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
@@ -1569,13 +1583,13 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
             # Set the widgets correctly
-            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
@@ -1613,6 +1627,8 @@ class SuperSermonGoldForm(PassimModelForm):
 
     def clean_author(self):
         """Possibly determine the author if not known"""
+
+        do_remove = False
         
         author = self.cleaned_data.get("author", None)
         if not author:
@@ -1621,10 +1637,21 @@ class SuperSermonGoldForm(PassimModelForm):
                 # Figure out what the author is
                 author = Author.objects.filter(name=authorname).first()
         if self.instance and self.instance.author and author:
-            if self.instance.author.id != author.id and self.instance.author.name.lower() != "undecided":
-                # Create a copy of the object I used to be
-                moved = EqualGold.create_moved(self.instance)
-                # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
+            authornameLC = self.instance.author.name.lower()
+            if self.instance.author.id != author.id:
+                if do_remove:
+                    # Need to remove all SSG that have me as 'moved
+                    qs = EqualGold.objects.filter(moved=self.instance)
+                    qs.delete()
+                # Determine what to do in terms of 'moved'.
+                if authornameLC != "undecided" and authornameLC != "anonymus":
+                    # Create a copy of the object I used to be
+                    moved = EqualGold.create_moved(self.instance)
+                    # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
+                else:
+                    # We are moving from "undecided/anonymus" to another name
+                    # NOTE: not yet implemented. Is this needed??
+                    pass
         return author
 
 

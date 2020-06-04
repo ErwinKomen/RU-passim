@@ -3685,7 +3685,7 @@ class EqualGold(models.Model):
     def create_new(self):
         """Create a copy of [self]"""
 
-        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code']
+        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code', 'stype', 'moved']
         org = EqualGold()
         for field in fields:
             value = getattr(self, field)
@@ -3708,9 +3708,16 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_explicit_markdown(self):
+    def get_explicit_markdown(self, add_search = False):
         """Get the contents of the explicit field using markdown"""
-        return adapt_markdown(self.explicit)
+
+        if add_search:
+            parsed = adapt_markdown(self.explicit)
+            search = self.srchexplicit
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        else:
+            sBack = adapt_markdown(self.explicit)
+        return sBack
 
     def get_goldset_markdown(self):
 
@@ -3727,10 +3734,16 @@ class EqualGold(models.Model):
         sBack = " ".join(lHtml)
         return sBack
 
-    def get_incipit_markdown(self):
+    def get_incipit_markdown(self, add_search = False):
         """Get the contents of the incipit field using markdown"""
         # Perform
-        return adapt_markdown(self.incipit)
+        if add_search:
+            parsed = adapt_markdown(self.incipit)
+            search = self.srchincipit
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        else:
+            sBack = adapt_markdown(self.incipit)
+        return sBack
 
     def get_keywords_markdown(self):
         lHtml = []
@@ -4269,9 +4282,13 @@ class SermonGold(models.Model):
 
     def get_ssg_markdown(self):
         lHtml = []
-        url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
-        code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
-        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        if self.equal:
+            url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+            code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
+            lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        else:
+            # There is no EqualGold link...
+            lHtml.append("<span class='passimlink'>(not linked to a super-sermon-gold)</span>")
         sBack = "".join(lHtml)
         return sBack
 

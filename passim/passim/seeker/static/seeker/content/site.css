@@ -1459,3 +1459,8 @@ input:checked + .slider:before {
     height: 12px;
     border: 1px dashed black !important;
 }
+
+.searchincexp {
+    font-size: x-small;
+    color: darkblue;
+}
