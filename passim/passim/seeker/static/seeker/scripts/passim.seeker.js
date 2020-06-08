@@ -12,6 +12,7 @@ String.prototype.format = function () {
   return formatted;
 };
 
+
 var ru = (function ($, ru) {
   "use strict";
 
@@ -19,6 +20,7 @@ var ru = (function ($, ru) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
         loc_bManuSaved = false,
+        loc_vscrolling = 0,
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_goldlink_td = null, // Where the goldlink selection should go
@@ -1724,6 +1726,7 @@ var ru = (function ($, ru) {
             elCopy = $("#sermon_tree_copy"),
             elMain = $("#sermon_tree_main"),
             elTree = $("#sermon_tree"),
+            yoffset = 0,
             hList = null,
             data = null;
 
@@ -1767,11 +1770,40 @@ var ru = (function ($, ru) {
             case 'init':
               // Make a copy of the tree as it is
               $(elCopy).html($(elMain).html());
+              // If there is a location movement, select it
+              if (location.hash) {
+                location.href = location.hash;
+                $(location.hash).find(".sermonnumber").first().addClass("selected");
+                // $(location.hash)[0].scrollIntoView(true);
+                //$(location.hash)[0].scrollTop -= 100;
+                //yoffset = window.pageYoffset - 100;
+                //window.scrollTo(window.pageXoffset, yoffset);
+                loc_vscrolling = -100;
+              }
               break;
           }
 
         } catch (ex) {
-          private_methods.errMsg("form_row_select", ex);
+          private_methods.errMsg("manuscript", ex);
+        }
+      },
+
+      /**
+       *  sermon_move
+       *      Select or deselect a sermon
+       *
+       */
+      sermon_selection: function (elStart) {
+        try {
+          if ($(elStart).hasClass("selected")) {
+            // remove selection
+            $(elStart).removeClass("selected");
+          } else {
+            $(elStart).addClass("selected");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sermon_selection", ex);
         }
       },
 

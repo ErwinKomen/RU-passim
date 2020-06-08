@@ -1316,6 +1316,17 @@ a.sermon:link, a.sermon:visited {
     cursor: inherit;
 }
 
+.sermonnumber {
+    cursor: cell;
+    background-color: white;
+}
+.sermonnumber.selected {
+    background-color: yellow;
+}
+.sermonnumber.selected:visited {
+    background-color: white;
+}
+
 .signature {
   /* font-family: monospace; */
   font-size: smaller;

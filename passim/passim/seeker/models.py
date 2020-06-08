@@ -3811,6 +3811,22 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_litrefs_markdown(self):
+        """Get all the literature references associated with the SGs in this equality set"""
+
+        lHtml = []
+        # Visit all editions
+        qs = LitrefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        # Visit all literature references
+        for litref in qs:
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_moved_code(self):
         """Get the passim code of the one this is replaced by"""
 

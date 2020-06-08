@@ -8544,8 +8544,11 @@ class EqualGoldEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
-            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
-             'title': 'This is the automatically assigned sermon number for this particular author' },
+
+            # Issue #212: remove this sermon number
+            # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
+            # 'title': 'This is the automatically assigned sermon number for this particular author' },
+
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown(True), 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown(True),'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
@@ -8560,7 +8563,9 @@ class EqualGoldEdit(BasicDetails):
                 'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
                 'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
             {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-             'title': 'All the editions associated with the Gold Sermons in this equality set'}
+             'title': 'All the editions associated with the Gold Sermons in this equality set'},
+            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+             'title': 'All the literature references associated with the Gold Sermons in this equality set'}
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
@@ -8736,16 +8741,24 @@ class EqualGoldDetails(EqualGoldEdit):
                 manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
                 rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                  'link': reverse('manuscript_details', kwargs={'pk': item.id})})
-                rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
-                rel_item.append({'value': item.yearstart, 'align': "right"})
-                rel_item.append({'value': item.yearfinish, 'align': "right"})
+
+                # Location number and link to the correct point in the manuscript details view...
+                itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
+                                 'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+
+                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                rel_item.append({'value': daterange, 'align': "right"})
+                # Issue #214: combine start and end into daterange
+                # rel_item.append({'value': item.yearfinish, 'align': "right"})
+                # rel_item.append({'value': item.yearstart, 'align': "right"})
 
                 sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
                 rel_item.append({'value': sermon.locus, 'title': sermo_name, 
                                  'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
+            manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
@@ -8773,11 +8786,15 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
+    # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
-        {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+
+        # Issue #212: remove sermon number from listview
+        # {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+
         {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
         {'name': 'Gryson/Clavis',           'order': 'o=4', 'type': 'str', 'custom': 'sig',
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
@@ -8847,9 +8864,10 @@ class EqualGoldListView(BasicList):
                 html.append(instance.author.name)
             else:
                 html.append("<i>(not specified)</i>")
-        elif custom == "number":
-            sNumber = "-" if instance.number  == None else instance.number
-            html.append("{}".format(sNumber))
+        # Issue #212: remove sermon number
+        #elif custom == "number":
+        #    sNumber = "-" if instance.number  == None else instance.number
+        #    html.append("{}".format(sNumber))
         elif custom == "size":
             # iSize = instance.equal_goldsermons.all().count()
             iSize = instance.sgcount
