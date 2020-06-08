@@ -1205,6 +1205,10 @@ def do_stype(request):
                             item.stype = STYPE_EDITED
                             item.save()
                             added += 1
+                        elif item.equalgold_src.all().exists():
+                            item.stype = STYPE_EDITED
+                            item.save()
+                            added += 1
                 result_list.append({'part': 'EqualGold changed stype', 'result': added})
 
         context['result_list'] = result_list
@@ -8554,7 +8558,9 @@ class EqualGoldEdit(BasicDetails):
                 'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
             {'type': 'line',    'label': "Links:",  'title': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
                 'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'}
+                'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+             'title': 'All the editions associated with the Gold Sermons in this equality set'}
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection

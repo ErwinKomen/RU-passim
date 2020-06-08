@@ -3715,6 +3715,21 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_editions_markdown(self):
+        """Get all the editions associated with the SGs in this equality set"""
+
+        lHtml = []
+        # Visit all editions
+        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        for edi in qs:
+            # Determine where clicking should lead to
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_explicit_markdown(self, add_search = False):
         """Get the contents of the explicit field using markdown"""
 
