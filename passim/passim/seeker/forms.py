@@ -1426,7 +1426,7 @@ class SermonGoldForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
-                self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('editype', 'code')]
+                self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('-editype', 'code')]
                 self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
                 self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]

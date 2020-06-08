@@ -1132,6 +1132,7 @@ def do_stype(request):
     """Add stype on the appropriate places"""
 
     oErr = ErrHandle()
+    phases = []
     try:
         assert isinstance(request, HttpRequest)
         # Specify the template
@@ -1157,44 +1158,54 @@ def do_stype(request):
         result_list = []
 
         # Phase 1: Manuscript
-        with transaction.atomic():
-            added = 0
-            for item in Manuscript.objects.all():
-                if item.stype == "-":
-                    item.stype = STYPE_IMPORTED
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'Manuscript changed stype', 'result': added})
+        if '1' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in Manuscript.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'Manuscript changed stype', 'result': added})
 
         # Phase 2: SermonDescr
-        with transaction.atomic():
-            added = 0
-            for item in SermonDescr.objects.all():
-                if item.stype == "-":
-                    item.stype = STYPE_IMPORTED
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'SermonDescr changed stype', 'result': added})
+        if '2' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in SermonDescr.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'SermonDescr changed stype', 'result': added})
 
         # Phase 3: SermonGold
-        with transaction.atomic():
-            added = 0
-            for item in SermonGold.objects.all():
-                if item.stype == "-":
-                    item.stype = STYPE_IMPORTED
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'SermonGold changed stype', 'result': added})
+        if '3' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in SermonGold.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'SermonGold changed stype', 'result': added})
 
         # Phase 4: EqualGold
-        with transaction.atomic():
-            added = 0
-            for item in EqualGold.objects.all():
-                if item.stype == "-":
-                    item.stype = STYPE_IMPORTED
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'EqualGold changed stype', 'result': added})
+        if '4' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in EqualGold.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                    else:
+                        # Check i it is in Action
+                        if item.sgcount > 1 or Action.objects.filter(itemtype='EqualGold', itemid=item.id).exists():
+                            item.stype = STYPE_EDITED
+                            item.save()
+                            added += 1
+                result_list.append({'part': 'EqualGold changed stype', 'result': added})
 
         context['result_list'] = result_list
     
@@ -2181,7 +2192,6 @@ def passim_action_add(view, instance, details, actiontype):
                         instance.save()
     # Now we are ready
     return None
-
 
 def passim_get_history(instance):
     lhtml= []
@@ -3537,7 +3547,7 @@ def get_gold(request, pk=None):
                 info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
 
                 # Copy signatures
-                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
+                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().order_by('-editype').values('id')]
 
                 data['data'] = info
 
@@ -5682,7 +5692,7 @@ class SermonListView(BasicList):
     has_select2 = True
     use_team_group = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
     order_default = order_cols
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
@@ -5690,7 +5700,7 @@ class SermonListView(BasicList):
                    {'name': 'Manuscript', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
                    {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
-                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
+                   {'name': 'Status', 'order': 'o=7', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
@@ -7805,7 +7815,7 @@ class SermonGoldListView(BasicList):
     has_select2 = True
     use_team_group = True
     paginate_by = 20
-    order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
+    order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', 'stype']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
@@ -7875,7 +7885,7 @@ class SermonGoldListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-            for sig in instance.goldsignatures.all():
+            for sig in instance.goldsignatures.all().order_by('-editype'):
                 editype = sig.editype
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
@@ -8336,6 +8346,24 @@ class SermonGoldEdit(BasicDetails):
                 bResult = False
         return None
 
+    def before_save(self, form, instance):
+        # Get the old equal
+        equal_old = SermonGold.objects.filter(id=instance.id).first().equal
+        # Get the new equal
+        equal = instance.equal
+        # Normal behaviour
+        response = super(SermonGoldEdit, self).before_save(form, instance)
+        # If old differs from new
+        if equal_old != equal:
+            # Adapt the SG count value
+            if equal_old != None: equal_old.set_sgcount()
+            if equal != None: equal.set_sgcount()
+            # Adapt the 'firstsig' value
+            if equal_old != None: equal_old.set_firstsig()
+            if equal != None: equal.set_firstsig()
+        # Return result
+        return response
+
     def after_save(self, form, instance):
         msg = ""
         bResult = True
@@ -8631,7 +8659,14 @@ class EqualGoldEdit(BasicDetails):
             # Process many-to-ONE changes
             # (1) links from SG to SSG
             goldlist = form.cleaned_data['goldlist']
+            ssglist = [x.equal for x in goldlist]
             adapt_m2o(SermonGold, instance, "equal", goldlist)
+            # Adapt the SSGs needed
+            for ssg in ssglist:
+                # Adapt the SG count value
+                ssg.set_sgcount()
+                # Adapt the 'firstsig' value
+                ssg.set_firstsig()
 
         except:
             msg = oErr.get_error_message()
@@ -8732,19 +8767,19 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    order_cols = ['code', 'author', 'number', '', 'srchincipit', '', 'stype' ]
+    order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
         {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
         {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis',           'order': ''   , 'type': 'str', 'custom': 'sig',
+        {'name': 'Gryson/Clavis',           'order': 'o=4', 'type': 'str', 'custom': 'sig',
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
-        {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
+        {'name': 'Size',                    'order': 'o=6'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
-        {'name': 'Status',                  'order': '7',   'type': 'str', 'custom': 'status'}
+        {'name': 'Status',                  'order': 'o=7',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -8810,7 +8845,8 @@ class EqualGoldListView(BasicList):
             sNumber = "-" if instance.number  == None else instance.number
             html.append("{}".format(sNumber))
         elif custom == "size":
-            iSize = instance.equal_goldsermons.all().count()
+            # iSize = instance.equal_goldsermons.all().count()
+            iSize = instance.sgcount
             html.append("{}".format(iSize))
         elif custom == "code":
             sCode = "-" if instance.code  == None else instance.code
@@ -8822,7 +8858,7 @@ class EqualGoldListView(BasicList):
             html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "sig":
             # Get all the associated signatures
-            qs = Signature.objects.filter(gold__equal=instance).order_by('editype', 'code')
+            qs = Signature.objects.filter(gold__equal=instance).order_by('-editype', 'code')
             for sig in qs:
                 editype = sig.editype
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)

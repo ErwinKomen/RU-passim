@@ -3615,6 +3615,13 @@ class EqualGold(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # ============= CALCULATED FIELDS =============
+    # [1] We need to have the size of the equality set for sorting
+    sgcount = models.IntegerField("Equality set size", default=0)
+    # [1] The first signature
+    firstsig = models.CharField("Code", max_length=LONG_STRING, blank=True, null=True)
+
+    # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
 
@@ -3769,7 +3776,7 @@ class EqualGold(models.Model):
 
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()]
+        siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()]
         lHtml.append(" | ".join(siglist))
 
         # Treat the author
@@ -3838,7 +3845,7 @@ class EqualGold(models.Model):
         lHtml.append("{}".format(self.code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3876,7 +3883,7 @@ class EqualGold(models.Model):
         lHtml.append("{}".format(self.code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3903,7 +3910,7 @@ class EqualGold(models.Model):
         lHtml.append("<span class='passimcode'>{}</span> ".format(code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3943,6 +3950,24 @@ class EqualGold(models.Model):
         else:
             iNumber = qs_ssg.first().number + 1
         return iNumber
+
+    def set_firstsig(self):
+        # Calculate the first signature
+        first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
+        if first != None:
+            self.firstsig = first.code
+            # Save changes
+            self.save()
+        return True
+
+    def set_sgcount(self):
+        # Calculate and set the sgcount
+        sgcount = self.sgcount
+        iSize = self.equal_goldsermons.all().count()
+        if iSize != sgcount:
+            self.sgcount = iSize
+            self.save()
+        return True
 
 
 class SermonGold(models.Model):
@@ -4004,11 +4029,21 @@ class SermonGold(models.Model):
         """Ordered sample of gold collections"""
         return self.collections_gold.all().order_by("name")
 
+    def delete(self, using = None, keep_parents = False):
+        # Remember the equal set
+        equal = self.equal
+        # DO the removing
+        response = super(SermonGold, self).delete(using, keep_parents)
+        # Adjust the SGcount
+        equal.set_sgcount()
+        # REturn our response
+        return response
+
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         self.siglist = json.dumps(lSign)
         # And save myself
@@ -4264,14 +4299,14 @@ class SermonGold(models.Model):
     
     def get_signatures(self):
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         return lSign
 
     def get_signatures_markdown(self):
         lHtml = []
         # Visit all signatures
-        for sig in self.goldsignatures.all().order_by('editype', 'code'):
+        for sig in self.goldsignatures.all().order_by('-editype', 'code'):
             # Determine where clicking should lead to
             url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
             # Create a display for this topic
@@ -4629,18 +4664,19 @@ class SermonGold(models.Model):
         self.srchincipit = get_searchable(self.incipit)
         self.srchexplicit = get_searchable(self.explicit)
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         self.siglist = json.dumps(lSign)
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+
         return response
 
     def signatures(self):
         """Combine all signatures into one string"""
 
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         return " | ".join(lSign)
 
@@ -5104,7 +5140,7 @@ class SermonDescr(models.Model):
                     if sig.id not in lSig: lSig.append(sig.id)
 
         # Get an ordered set of signatures
-        for sig in Signature.objects.filter(id__in=lSig).order_by('editype', 'code'):
+        for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
             # Create a display for this topic
             if type == "first":
                 # Determine where clicking should lead to
@@ -5275,7 +5311,7 @@ class SermonDescr(models.Model):
     def get_sermonsignatures_markdown(self):
         lHtml = []
         # Visit all signatures
-        for sig in self.sermonsignatures.all().order_by('editype', 'code'):
+        for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
             # Determine where clicking should lead to
             url = ""
             if sig.gsig:
