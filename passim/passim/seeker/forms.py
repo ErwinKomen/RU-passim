@@ -7,6 +7,7 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
+from django.db.models import F
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
 
@@ -229,14 +230,15 @@ class EqualGoldLinkAddOnlyWidget(EqualGoldMultiWidget):
         if self.addonly:
             qs = EqualGoldLink.objects.none()
         else:
-            qs = EqualGoldLink.objects.all().order_by('dst__code').distinct()
+            qs = EqualGoldLink.objects.all().order_by('dst__code', 'dst__firstsig').distinct()
         return qs
 
 
 class EqualGoldWidget(ModelSelect2Widget):
     model = EqualGold
-    search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains' ]
+    search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains', 'equal_goldsermons__siglist__icontains' ]
     addonly = False
+    order = [F('code').asc(nulls_last=True), 'firstsig']
 
     def label_from_instance(self, obj):
         # Determine the full text
@@ -248,7 +250,8 @@ class EqualGoldWidget(ModelSelect2Widget):
         if self.addonly:
             qs = EqualGold.objects.none()
         else:
-            qs = EqualGold.objects.all().order_by('code').distinct()
+            # qs = EqualGold.objects.all().order_by('code', 'firstsig').distinct()
+            qs = EqualGold.objects.all().order_by(*self.order).distinct()
         return qs
 
 
@@ -477,10 +480,11 @@ class SermonDescrGoldAddOnlyWidget(SermonDescrGoldWidget):
 
 
 class SermonDescrSuperWidget(ModelSelect2MultipleWidget):
-    model = SermonDescrGold
+    model = SermonDescrEqual
     add_only = False
     search_fields = ['sermon__siglist__icontains',      'sermon__author__name__icontains', 
-                     'sermon__srchincipit__icontains',  'sermon__srchexplicit__icontains' ]
+                     'super__author__name__icontains', 'super__code__icontains',
+                     'super__srchincipit__icontains',  'super__srchexplicit__icontains' ]
 
     def label_from_instance(self, obj):
         # Determine the full text
@@ -489,11 +493,10 @@ class SermonDescrSuperWidget(ModelSelect2MultipleWidget):
         return full
 
     def get_queryset(self):
-        # return SermonDescrGold.objects.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist').distinct()
         if self.add_only:
-            qs = SermonDescrGold.objects.none()
+            qs = SermonDescrEqual.objects.none()
         else:
-            qs = SermonDescrGold.unique_list()
+            qs = SermonDescrEqual.unique_list()
         return qs
 
 
@@ -594,7 +597,9 @@ class StypeWidget(ModelSelect2MultipleWidget):
 
 class SuperOneWidget(ModelSelect2Widget):
     model = EqualGold
-    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
+    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 
+                     'srchincipit__icontains', 'srchexplicit__icontains',
+                     'equal_goldsermons__siglist__icontains']
 
     def label_from_instance(self, obj):
         sLabel = obj.get_label(do_incexpl = True)
