@@ -4202,12 +4202,15 @@ class SermonGold(models.Model):
 
         html = []
         # Make available the set of Gold Sermons that belongs to the same EqualGold
-        qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
-        for item in qs:
-            sigs = json.loads(item.siglist)
-            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
-            url = reverse('gold_details', kwargs={'pk': item.id})
-            html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+        if self.equal == None:
+            html.append("<i>This Sermon Gold is not part of a Super Sermon Gold</i>")
+        else:
+            qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
+            for item in qs:
+                sigs = json.loads(item.siglist)
+                first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+                url = reverse('gold_details', kwargs={'pk': item.id})
+                html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
         # Return the combination
         return " ".join(html)
 

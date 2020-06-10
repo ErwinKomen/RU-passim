@@ -7846,10 +7846,14 @@ class SermonGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
+             'keyFk': 'name',       'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 
+             'keyFk': 'code',       'keyList': 'siglist',   'keyId': 'signatureid', 'infield': 'code' },
+            {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',          
+             'keyFk': 'code',       'keyList': 'codelist',  'infield': 'code'},
+            {'filter': 'keyword',   'fkfield': 'keywords',          
+             'keyFk': 'name',       'keyList': 'kwlist',    'infield': 'name' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' } 
             ]},
         {'section': 'collection', 'filterlist': [
@@ -7956,6 +7960,20 @@ class SermonGoldListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
+        # Adapt the search for empty passim codes
+        if 'codetype' in fields:
+            codetype = fields['codetype']
+            if codetype == "non":
+                lstExclude = []
+                lstExclude.append(Q(equal__isnull=False))
+            elif codetype == "spe":
+                lstExclude = []
+                lstExclude.append(Q(equal__isnull=True))
+            # Reset the codetype
+            fields['codetype'] = ""
+
+        # Return the adapted stuff
         return fields, lstExclude, qAlternative
 
 

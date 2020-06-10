@@ -769,7 +769,7 @@ class BasicList(ListView):
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
-                        qs = self.model.exclude(*lstExclude)
+                        qs = self.model.objects.exclude(*lstExclude)
                     else:
                         # Just show everything
                         qs = self.model.objects.all()
@@ -797,7 +797,6 @@ class BasicList(ListView):
             elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
-
 
             # Do the ordering of the results
             order = self.order_default

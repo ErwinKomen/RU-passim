@@ -32,6 +32,7 @@ def user_is_in_team(username, team_group, userplus=None):
             bResult = (owner.user.groups.filter(name=userplus).first() != None)
     return bResult
 
+CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
 
 
 # ================= WIDGETS =====================================
@@ -1330,6 +1331,10 @@ class SermonGoldForm(PassimModelForm):
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     codelist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CodeWidget(attrs={'data-placeholder': 'Select multiple Passim Codes...', 'style': 'width: 100%;', 'class': 'searching'}))
+    codetype  = forms.ChoiceField(label=_("Passim code type"), required=False, 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Passim code...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    codename  = forms.CharField(label=_("Passim code"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Passim code...', 'style': 'width: 100%;'}))
     keyword    = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1383,6 +1388,13 @@ class SermonGoldForm(PassimModelForm):
             userplus = self.userplus
             # Some fields are not required
             self.fields['stype'].required = False
+            self.fields['codename'].required = False
+            self.fields['codetype'].required = False
+
+            # Choice field initialization
+            self.fields['codetype'].choices = CODE_TYPE
+
+            # Determine the querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
