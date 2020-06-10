@@ -3541,7 +3541,7 @@ class Author(models.Model):
 
         iNumber = -1
         # Validate this author
-        if self.name.lower() == "undecided" or self.name.lower() == "anonymus":
+        if self.name.lower() == "undecided":
             return -1
         # Check if this author already has a number
         if not self.number:
@@ -4733,6 +4733,12 @@ class EqualGoldLink(models.Model):
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)
         return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Perform the actual save() method on [self]
+        response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+        # Return the actual save() method response
+        return response
 
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))

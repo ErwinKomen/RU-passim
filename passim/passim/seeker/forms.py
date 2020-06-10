@@ -1656,12 +1656,12 @@ class SuperSermonGoldForm(PassimModelForm):
                     qs = EqualGold.objects.filter(moved=self.instance)
                     qs.delete()
                 # Determine what to do in terms of 'moved'.
-                if authornameLC != "undecided" and authornameLC != "anonymus":
+                if authornameLC != "undecided":
                     # Create a copy of the object I used to be
                     moved = EqualGold.create_moved(self.instance)
                     # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
                 else:
-                    # We are moving from "undecided/anonymus" to another name
+                    # We are moving from "undecided" to another name
                     # NOTE: not yet implemented. Is this needed??
                     pass
         return author

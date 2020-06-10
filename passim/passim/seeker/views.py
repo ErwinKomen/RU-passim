@@ -119,8 +119,13 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None):
-    """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None,
+              added=None, deleted=None):
+    """Adapt the 'field' of 'instance' to contain only the items in 'qs'
+    
+    The lists [added] and [deleted] (if specified) will contain links to the elements that have been added and deleted
+    If [deleted] is specified, then the items will not be deleted by adapt_m2m(). Caller needs to do this.
+    """
 
     errHandle = ErrHandle()
     try:
@@ -145,7 +150,9 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
                         # Copy the field with this name from [obj] to 
                         args[item] = getattr(obj, item)
                     # cls.objects.create(**{field1: instance, field2: obj})
-                    cls.objects.create(**args)
+                    new = cls.objects.create(**args)
+                    if added != None:
+                        added.append(new)
 
         # Remove from [cls] all associations that are not in [qs]
         # NOTE: do not allow userplus to delete
@@ -155,8 +162,11 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
             else:
                 obj = getattr(item, field2)
             if obj not in qs:
-                # Remove this item
-                item.delete()
+                if deleted == None:
+                    # Remove this item
+                    item.delete()
+                else:
+                    deleted.append(item)
         # Return okay
         return True
     except:
@@ -5436,8 +5446,7 @@ class SermonEdit(BasicDetails):
                         'SermonSignature', 'siglist',
                         #'CollectionSerm', 'collist_s',
                         'SermonDescrEqual', 'superlist']
-    
-       
+           
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -8652,6 +8661,18 @@ class EqualGoldEdit(BasicDetails):
                                     # Set the right parameters for creation later on
                                     form.instance.linktype = linktype
                                     form.instance.dst = super
+
+                                    # Double check reverse
+                                    lst_reverse = EqualGoldLink.objects.filter(src=super, dst=instance)
+                                    if lst_reverse.count() == 0:
+                                        # Add it
+                                        EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                    else:
+                                        # Double check the linktype
+                                        rev = lst_reverse.first()
+                                        if rev.linktype != linktype:
+                                            rev.linktype = linktype
+                                            rev.save()
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -8679,7 +8700,27 @@ class EqualGoldEdit(BasicDetails):
 
             # (2) links from one SSG to another SSG
             superlist = form.cleaned_data['superlist']
-            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True)
+            super_added = []
+            super_deleted = []
+            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True,
+                      added=super_added, deleted=super_deleted)
+            # Check for partial links in 'deleted'
+            for obj in super_deleted:
+                if obj.linktype in LINK_PRT:
+                    # First find and remove the other link
+                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse != None:
+                        reverse.delete()
+                    # Then remove myself
+                    obj.delete()
+            # Make sure to add the reverse link in the bidirectionals
+            for obj in super_added:
+                if obj.linktype in LINK_PRT:
+                    # Find the reversal
+                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse == None:
+                        # Create the reversal 
+                        reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
 
             # (3) 'keywords'
             kwlist = form.cleaned_data['kwlist']
@@ -8855,6 +8896,42 @@ class EqualGoldListView(BasicList):
             {'filter': 'collsuper', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }
             ]}
         ]
+
+    def initializations(self):
+        if Information.get_kvalue("author_anonymus") != "done":
+            # Get all SSGs with anyonymus
+            with transaction.atomic():
+                ano = "anonymus"
+                qs = EqualGold.objects.filter(Q(author__name__iexact=ano))
+                for ssg in qs:
+                    ssg.save()
+            Information.set_kvalue("author_anonymus", "done")
+
+        if Information.get_kvalue("ssg_bidirectional") != "done":
+            # Put all links in a list
+            lst_link = []
+            lst_remove = []
+            lst_reverse = []
+            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_PRT):
+                # Check for any other eqg-links with the same source
+                lst_src = EqualGoldLink.objects.filter(src=obj.src, dst=obj.dst).exclude(id=obj.id)
+                if lst_src.count() > 0:
+                    # Add them to the removal
+                    for item in lst_src:
+                        lst_remove.append(item)
+                else:
+                    # Add the obj to the list
+                    lst_link.append(obj)
+            for obj in lst_link:
+                # Find the reverse link
+                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src)
+                if reverse.count() == 0:
+                    # Create the reversal
+                    reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+
+            Information.set_kvalue("ssg_bidirectional", "done")
+
+        return None
     
     def add_to_context(self, context, initial):
         # Find out who the user is
