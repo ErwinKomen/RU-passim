@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
+    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -8663,16 +8663,17 @@ class EqualGoldEdit(BasicDetails):
                                     form.instance.dst = super
 
                                     # Double check reverse
-                                    lst_reverse = EqualGoldLink.objects.filter(src=super, dst=instance)
-                                    if lst_reverse.count() == 0:
-                                        # Add it
-                                        EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
-                                    else:
-                                        # Double check the linktype
-                                        rev = lst_reverse.first()
-                                        if rev.linktype != linktype:
-                                            rev.linktype = linktype
-                                            rev.save()
+                                    if linktype in LINK_BIDIR:
+                                        lst_reverse = EqualGoldLink.objects.filter(src=super, dst=instance)
+                                        if lst_reverse.count() == 0:
+                                            # Add it
+                                            EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                        else:
+                                            # Double check the linktype
+                                            rev = lst_reverse.first()
+                                            if rev.linktype != linktype:
+                                                rev.linktype = linktype
+                                                rev.save()
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -8706,7 +8707,7 @@ class EqualGoldEdit(BasicDetails):
                       added=super_added, deleted=super_deleted)
             # Check for partial links in 'deleted'
             for obj in super_deleted:
-                if obj.linktype in LINK_PRT:
+                if obj.linktype in LINK_BIDIR:
                     # First find and remove the other link
                     reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
                     if reverse != None:
@@ -8715,7 +8716,7 @@ class EqualGoldEdit(BasicDetails):
                     obj.delete()
             # Make sure to add the reverse link in the bidirectionals
             for obj in super_added:
-                if obj.linktype in LINK_PRT:
+                if obj.linktype in LINK_BIDIR:
                     # Find the reversal
                     reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
                     if reverse == None:
@@ -8912,7 +8913,7 @@ class EqualGoldListView(BasicList):
             lst_link = []
             lst_remove = []
             lst_reverse = []
-            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_PRT):
+            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_BIDIR):
                 # Check for any other eqg-links with the same source
                 lst_src = EqualGoldLink.objects.filter(src=obj.src, dst=obj.dst).exclude(id=obj.id)
                 if lst_src.count() > 0:
