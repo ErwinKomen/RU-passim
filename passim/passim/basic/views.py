@@ -307,6 +307,8 @@ def make_search_list(filters, oFields, search_list, qd):
                         else:
                             # Just one foreign key
                             s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                    elif keyType == "fieldchoice":
+                        s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
                     elif dbfield:
                         s_q_lst = Q(**{"{}__in".format(infield): code_list})
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
@@ -767,7 +769,7 @@ class BasicList(ListView):
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
-                        qs = self.model.exclude(*lstExclude)
+                        qs = self.model.objects.exclude(*lstExclude)
                     else:
                         # Just show everything
                         qs = self.model.objects.all()
@@ -795,7 +797,6 @@ class BasicList(ListView):
             elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
-
 
             # Do the ordering of the results
             order = self.order_default

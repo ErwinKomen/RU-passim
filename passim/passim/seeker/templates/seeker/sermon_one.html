@@ -1,17 +1,16 @@
 ﻿{% load i18n %}
 
     <!-- Information on one sermon-->
-    <div sermonid="{{sermon.obj.id}}" level="{{level}}" id="sermon_{{sermon.number}}"
+    <div sermonid="{{sermon.obj.id}}" level="{{level}}" id="sermon_{{sermon.obj.id}}"
          class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
       <table class="func-view sermons" style="width: 100%;">
         <tbody>
           <!-- Horizontal ruler that can be expanded -->
           <tr style="font-size: 1px;" class="">
             <td colspan="2" class="ruler ruler_white" 
-                ondragover="ru.passim.seeker.sermon_dragenter(event);" 
-                ondragenter="ru.passim.seeker.sermon_dragenter(event);"
-                ondragleave="ru.passim.seeker.sermon_dragleave(event);"
-                ondrop="ru.passim.seeker.sermon_drop(event);"
+                {% if is_app_editor %}ondragover="ru.passim.seeker.sermon_dragenter(event);" 
+                ondragenter="ru.passim.seeker.sermon_dragenter(event);" ondragleave="ru.passim.seeker.sermon_dragleave(event);"
+                ondrop="ru.passim.seeker.sermon_drop(event);"{% endif %}
                 >
 
             </td>
@@ -21,28 +20,27 @@
           <tr>
             <!-- Either '+' sign or empty space -->
             <td valign="top" class="sermonbutton"
-                {% if sermon.isparent %}onclick="ru.passim.seeker.sermon_level(this);"{% endif %}>
+                {% if sermon.isparent %}{% endif %}>
               {% if sermon.isparent %}
-                <span class="glyphicon glyphicon-plus"></span>
+                <span class="glyphicon glyphicon-plus" onclick="ru.passim.seeker.sermon_level(this);"></span>
               {% else %}
                 <span>&nbsp;</span>
               {% endif %}
             </td>
 
             <!-- The number of the sermon in our current hierarchy -->
-            <td valign="top" class="tdnowrap"   style="background-color: white;">
+            <td valign="top" class="sermonnumber tdnowrap" onclick="ru.passim.seeker.sermon_selection(this);">
               <span>{{sermon.number}}</span>
             </td>
 
             <!-- The *LOCUS* of the sermon that serves as drag point -->
             <td valign="top" class="tdnowrap"  style="background-color: white;"
-                ondragover="ru.passim.seeker.sermon_dragenter(event);" 
-                ondragenter="ru.passim.seeker.sermon_dragenter(event);"
-                ondragleave="ru.passim.seeker.sermon_dragleave(event);"
-                ondrop="ru.passim.seeker.sermon_drop(event);"
+                {% if is_app_editor %}ondragover="ru.passim.seeker.sermon_dragenter(event);" 
+                ondragenter="ru.passim.seeker.sermon_dragenter(event);" ondragleave="ru.passim.seeker.sermon_dragleave(event);"
+                ondrop="ru.passim.seeker.sermon_drop(event);"{% endif %}
                 >
                 <code draggable="true" class="draggable" 
-                      ondragstart="ru.passim.seeker.sermon_drag(event);"
+                      {% if is_app_editor %}ondragstart="ru.passim.seeker.sermon_drag(event);"{% endif %}
                       >{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
             </td>
 

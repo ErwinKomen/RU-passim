@@ -48,7 +48,7 @@ from xml.dom import minidom
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
-from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, Report
+from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails
@@ -225,7 +225,7 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
                 # Set the default status type
-                sermon.stype = "imp"    # Imported
+                sermon.stype = STYPE_IMPORTED    # Imported
 
                 # Set my parent manuscript
                 sermon.manu = manuscript

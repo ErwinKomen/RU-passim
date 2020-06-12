@@ -49,7 +49,21 @@ VISIBILITY_TYPE = "seeker.visibility"
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
+LINK_SIM = "sim"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
+LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
+
+STYPE_IMPORTED = 'imp'
+STYPE_MANUAL = 'man'
+STYPE_EDITED = 'edi'
+STYPE_APPROVED = 'app'
+traffic_red = ['-', STYPE_IMPORTED]
+traffic_orange = [STYPE_MANUAL, STYPE_EDITED]
+traffic_green = [STYPE_APPROVED]
+traffic_light = '<span title="{}"><span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                                 '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                                 '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
+                '</span>'
 
 class FieldChoice(models.Model):
 
@@ -245,6 +259,34 @@ def get_searchable(sText):
         # Make sure to TRIM the text
         sText = sText.strip()
     return sText
+
+def get_stype_light(stype):
+    """HTML visualization of the different STYPE statuses"""
+
+    sBack = ""
+    if stype == "": stype = "-"
+    red = "gray"
+    orange = "gray"
+    green = "gray"
+    # Determine what the light is going to be
+    
+    if stype in traffic_orange:
+        orange = "orange"
+        htext = "This item has been edited and needs final approval"
+    elif stype in traffic_green:
+        green = "green"
+        htext = "This item has been completely revised and approved"
+    elif stype in traffic_red:
+        red = "red"
+        htext = "This item has been automatically received and needs editing and approval"
+
+    # We have the color of the light: visualize it
+    # sBack = "<span class=\"glyphicon glyphicon-record\" title=\"{}\" style=\"color: {};\"></span>".format(htext, light)
+    sBack = traffic_light.format(htext, red, orange, green)
+
+    # Return what we made
+    return sBack
+
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1345,6 +1387,20 @@ class Visit(models.Model):
             result = False
         # Return the result
         return result
+
+
+class Stype(models.Model):
+    """Status of M/S/SG/SSG"""
+
+    # [1] THe abbreviation code of the status
+    abbr = models.CharField("Status abbreviation", max_length=50)
+    # [1] The English name
+    nameeng = models.CharField("Name (ENglish)", max_length=50)
+    # [1] The Dutch name
+    namenld = models.CharField("Name (Dutch)", max_length=50)
+
+    def __str__(self):
+        return self.abbr
 
 
 class LocationType(models.Model):
@@ -2517,8 +2573,9 @@ class Manuscript(models.Model):
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
     # [1] Every manuscript has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
@@ -2602,7 +2659,7 @@ class Manuscript(models.Model):
             return None
 
     def find_or_create(name,yearstart, yearfinish, library, idno="", 
-                       filename=None, url="", support = "", extent = "", format = "", source=None, stype="imp"):
+                       filename=None, url="", support = "", extent = "", format = "", source=None, stype=STYPE_IMPORTED):
         """Find an existing manuscript, or create a new one"""
 
         oErr = ErrHandle()
@@ -2789,6 +2846,9 @@ class Manuscript(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
+
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
         
@@ -2912,7 +2972,7 @@ class Manuscript(models.Model):
                     if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
                     # Set the default status type
-                    sermon.stype = "imp"    # Imported
+                    sermon.stype = STYPE_IMPORTED    # Imported
 
                     # Set my parent manuscript
                     sermon.manu = manuscript
@@ -3483,7 +3543,7 @@ class Author(models.Model):
 
         iNumber = -1
         # Validate this author
-        if self.name.lower() == "undecided" or self.name.lower() == "anonymus":
+        if self.name.lower() == "undecided":
             return -1
         # Check if this author already has a number
         if not self.number:
@@ -3552,6 +3612,18 @@ class EqualGold(models.Model):
     # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
+    # [1] Every SSG has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="-")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+
+    # ============= CALCULATED FIELDS =============
+    # [1] We need to have the size of the equality set for sorting
+    sgcount = models.IntegerField("Equality set size", default=0)
+    # [1] The first signature
+    firstsig = models.CharField("Code", max_length=LONG_STRING, blank=True, null=True)
+
+    # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
     relations = models.ManyToManyField("self", through="EqualGoldLink", symmetrical=False, related_name="related_to")
 
@@ -3622,7 +3694,7 @@ class EqualGold(models.Model):
     def create_new(self):
         """Create a copy of [self]"""
 
-        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code']
+        fields = ['author', 'incipit', 'srchincipit', 'explicit', 'srchexplicit', 'number', 'code', 'stype', 'moved']
         org = EqualGold()
         for field in fields:
             value = getattr(self, field)
@@ -3645,9 +3717,31 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_explicit_markdown(self):
+    def get_editions_markdown(self):
+        """Get all the editions associated with the SGs in this equality set"""
+
+        lHtml = []
+        # Visit all editions
+        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        for edi in qs:
+            # Determine where clicking should lead to
+            url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_explicit_markdown(self, add_search = False):
         """Get the contents of the explicit field using markdown"""
-        return adapt_markdown(self.explicit)
+
+        if add_search:
+            parsed = adapt_markdown(self.explicit)
+            search = self.srchexplicit
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        else:
+            sBack = adapt_markdown(self.explicit)
+        return sBack
 
     def get_goldset_markdown(self):
 
@@ -3664,10 +3758,16 @@ class EqualGold(models.Model):
         sBack = " ".join(lHtml)
         return sBack
 
-    def get_incipit_markdown(self):
+    def get_incipit_markdown(self, add_search = False):
         """Get the contents of the incipit field using markdown"""
         # Perform
-        return adapt_markdown(self.incipit)
+        if add_search:
+            parsed = adapt_markdown(self.incipit)
+            search = self.srchincipit
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        else:
+            sBack = adapt_markdown(self.incipit)
+        return sBack
 
     def get_keywords_markdown(self):
         lHtml = []
@@ -3693,7 +3793,7 @@ class EqualGold(models.Model):
 
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()]
+        siglist = [x.short() for x in Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()]
         lHtml.append(" | ".join(siglist))
 
         # Treat the author
@@ -3712,6 +3812,22 @@ class EqualGold(models.Model):
 
         # Return the results
         return "".join(lHtml)
+
+    def get_litrefs_markdown(self):
+        """Get all the literature references associated with the SGs in this equality set"""
+
+        lHtml = []
+        # Visit all editions
+        qs = LitrefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        # Visit all literature references
+        for litref in qs:
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_moved_code(self):
         """Get the passim code of the one this is replaced by"""
@@ -3762,7 +3878,7 @@ class EqualGold(models.Model):
         lHtml.append("{}".format(self.code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3773,6 +3889,9 @@ class EqualGold(models.Model):
             lHtml.append(" {} ".format(self.author.name))
         # Return the results
         return "".join(lHtml)
+
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
 
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
@@ -3797,7 +3916,7 @@ class EqualGold(models.Model):
         lHtml.append("{}".format(self.code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3824,7 +3943,7 @@ class EqualGold(models.Model):
         lHtml.append("<span class='passimcode'>{}</span> ".format(code))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
-        qs = Signature.objects.filter(gold__in=equal_set).order_by('editype', 'code').distinct()
+        qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
             for item in qs:
@@ -3865,6 +3984,24 @@ class EqualGold(models.Model):
             iNumber = qs_ssg.first().number + 1
         return iNumber
 
+    def set_firstsig(self):
+        # Calculate the first signature
+        first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
+        if first != None:
+            self.firstsig = first.code
+            # Save changes
+            self.save()
+        return True
+
+    def set_sgcount(self):
+        # Calculate and set the sgcount
+        sgcount = self.sgcount
+        iSize = self.equal_goldsermons.all().count()
+        if iSize != sgcount:
+            self.sgcount = iSize
+            self.save()
+        return True
+
 
 class SermonGold(models.Model):
     """The signature of a standard sermon"""
@@ -3888,8 +4025,9 @@ class SermonGold(models.Model):
     siglist = models.TextField("List of signatures", default="[]")
 
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default=STYPE_MANUAL)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # [0-1] Each SermonGold should belong to exactly one equality group
     equal = models.ForeignKey(EqualGold, null=True, blank=True, on_delete=models.SET_NULL, related_name="equal_goldsermons")
@@ -3924,11 +4062,21 @@ class SermonGold(models.Model):
         """Ordered sample of gold collections"""
         return self.collections_gold.all().order_by("name")
 
+    def delete(self, using = None, keep_parents = False):
+        # Remember the equal set
+        equal = self.equal
+        # DO the removing
+        response = super(SermonGold, self).delete(using, keep_parents)
+        # Adjust the SGcount
+        equal.set_sgcount()
+        # REturn our response
+        return response
+
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         self.siglist = json.dumps(lSign)
         # And save myself
@@ -3942,7 +4090,7 @@ class SermonGold(models.Model):
             lEdition.append(item.reference.short)
         return " | ".join(lEdition)
 
-    def find_or_create(author, incipit, explicit, stype="imp"):
+    def find_or_create(author, incipit, explicit, stype=STYPE_IMPORTED):
         """Find or create a SermonGold"""
 
         lstQ = []
@@ -4056,12 +4204,15 @@ class SermonGold(models.Model):
 
         html = []
         # Make available the set of Gold Sermons that belongs to the same EqualGold
-        qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
-        for item in qs:
-            sigs = json.loads(item.siglist)
-            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
-            url = reverse('gold_details', kwargs={'pk': item.id})
-            html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+        if self.equal == None:
+            html.append("<i>This Sermon Gold is not part of a Super Sermon Gold</i>")
+        else:
+            qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
+            for item in qs:
+                sigs = json.loads(item.siglist)
+                first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+                url = reverse('gold_details', kwargs={'pk': item.id})
+                html.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
         # Return the combination
         return " ".join(html)
 
@@ -4184,14 +4335,14 @@ class SermonGold(models.Model):
     
     def get_signatures(self):
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         return lSign
 
     def get_signatures_markdown(self):
         lHtml = []
         # Visit all signatures
-        for sig in self.goldsignatures.all().order_by('editype', 'code'):
+        for sig in self.goldsignatures.all().order_by('-editype', 'code'):
             # Determine where clicking should lead to
             url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
             # Create a display for this topic
@@ -4202,11 +4353,18 @@ class SermonGold(models.Model):
 
     def get_ssg_markdown(self):
         lHtml = []
-        url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
-        code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
-        lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        if self.equal:
+            url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+            code = self.equal.code if self.equal.code else "(ssg id {})".format(self.equal.id)
+            lHtml.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        else:
+            # There is no EqualGold link...
+            lHtml.append("<span class='passimlink'>(not linked to a super-sermon-gold)</span>")
         sBack = "".join(lHtml)
         return sBack
+
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
 
     def get_view(self):
         """Get a HTML valid view of myself similar to [sermongold_view.html]"""
@@ -4542,18 +4700,19 @@ class SermonGold(models.Model):
         self.srchincipit = get_searchable(self.incipit)
         self.srchexplicit = get_searchable(self.explicit)
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         self.siglist = json.dumps(lSign)
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
+
         return response
 
     def signatures(self):
         """Combine all signatures into one string"""
 
         lSign = []
-        for item in self.goldsignatures.all():
+        for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
         return " | ".join(lSign)
 
@@ -4576,6 +4735,12 @@ class EqualGoldLink(models.Model):
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)
         return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Perform the actual save() method on [self]
+        response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+        # Return the actual save() method response
+        return response
 
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))
@@ -4833,8 +4998,9 @@ class SermonDescr(models.Model):
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
-    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), 
-                            max_length=5, default="man")
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # ================ MANYTOMANY relations ============================
 
@@ -5016,7 +5182,7 @@ class SermonDescr(models.Model):
                     if sig.id not in lSig: lSig.append(sig.id)
 
         # Get an ordered set of signatures
-        for sig in Signature.objects.filter(id__in=lSig).order_by('editype', 'code'):
+        for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
             # Create a display for this topic
             if type == "first":
                 # Determine where clicking should lead to
@@ -5187,7 +5353,7 @@ class SermonDescr(models.Model):
     def get_sermonsignatures_markdown(self):
         lHtml = []
         # Visit all signatures
-        for sig in self.sermonsignatures.all().order_by('editype', 'code'):
+        for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
             # Determine where clicking should lead to
             url = ""
             if sig.gsig:
@@ -5197,6 +5363,9 @@ class SermonDescr(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
+
+    def get_stype_light(self):
+        return get_stype_light(self.stype)
 
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + super"""

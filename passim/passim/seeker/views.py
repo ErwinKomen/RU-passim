@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_PARTIAL
+    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -119,8 +119,13 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None):
-    """Adapt the 'field' of 'instance' to contain only the items in 'qs'"""
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None,
+              added=None, deleted=None):
+    """Adapt the 'field' of 'instance' to contain only the items in 'qs'
+    
+    The lists [added] and [deleted] (if specified) will contain links to the elements that have been added and deleted
+    If [deleted] is specified, then the items will not be deleted by adapt_m2m(). Caller needs to do this.
+    """
 
     errHandle = ErrHandle()
     try:
@@ -145,7 +150,9 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
                         # Copy the field with this name from [obj] to 
                         args[item] = getattr(obj, item)
                     # cls.objects.create(**{field1: instance, field2: obj})
-                    cls.objects.create(**args)
+                    new = cls.objects.create(**args)
+                    if added != None:
+                        added.append(new)
 
         # Remove from [cls] all associations that are not in [qs]
         # NOTE: do not allow userplus to delete
@@ -155,8 +162,11 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
             else:
                 obj = getattr(item, field2)
             if obj not in qs:
-                # Remove this item
-                item.delete()
+                if deleted == None:
+                    # Remove this item
+                    item.delete()
+                else:
+                    deleted.append(item)
         # Return okay
         return True
     except:
@@ -1132,6 +1142,7 @@ def do_stype(request):
     """Add stype on the appropriate places"""
 
     oErr = ErrHandle()
+    phases = []
     try:
         assert isinstance(request, HttpRequest)
         # Specify the template
@@ -1157,34 +1168,58 @@ def do_stype(request):
         result_list = []
 
         # Phase 1: Manuscript
-        with transaction.atomic():
-            added = 0
-            for item in Manuscript.objects.all():
-                if item.stype == "-":
-                    item.stype = "imp"
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'Manuscript changed stype', 'result': added})
+        if '1' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in Manuscript.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'Manuscript changed stype', 'result': added})
 
         # Phase 2: SermonDescr
-        with transaction.atomic():
-            added = 0
-            for item in SermonDescr.objects.all():
-                if item.stype == "-":
-                    item.stype = "imp"
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'SermonDescr changed stype', 'result': added})
+        if '2' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in SermonDescr.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'SermonDescr changed stype', 'result': added})
 
         # Phase 3: SermonGold
-        with transaction.atomic():
-            added = 0
-            for item in SermonGold.objects.all():
-                if item.stype == "-":
-                    item.stype = "imp"
-                    item.save()
-                    added += 1
-            result_list.append({'part': 'SermonGold changed stype', 'result': added})
+        if '3' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in SermonGold.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                result_list.append({'part': 'SermonGold changed stype', 'result': added})
+
+        # Phase 4: EqualGold
+        if '4' in phases:
+            with transaction.atomic():
+                added = 0
+                for item in EqualGold.objects.all():
+                    if item.stype == "-":
+                        item.stype = STYPE_IMPORTED
+                        item.save()
+                        added += 1
+                    else:
+                        # Check i it is in Action
+                        if item.sgcount > 1 or Action.objects.filter(itemtype='EqualGold', itemid=item.id).exists():
+                            item.stype = STYPE_EDITED
+                            item.save()
+                            added += 1
+                        elif item.equalgold_src.all().exists():
+                            item.stype = STYPE_EDITED
+                            item.save()
+                            added += 1
+                result_list.append({'part': 'EqualGold changed stype', 'result': added})
 
         context['result_list'] = result_list
     
@@ -2133,10 +2168,44 @@ def user_is_in_team(request):
 def passim_action_add(view, instance, details, actiontype):
     """User can fill this in to his/her liking"""
 
-    # Get the username: 
-    username = view.request.user.username
-    # Process the action
-    Action.add(username, instance.__class__.__name__, instance.id, actiontype, json.dumps(details))
+    # Check if this needs processing
+    stype_edi_fields = getattr(view, "stype_edi_fields", None)
+    if stype_edi_fields:
+        # Get the username: 
+        username = view.request.user.username
+        # Process the action
+        cls_name = instance.__class__.__name__
+        Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
+        # Check the details:
+        if 'changes' in details:
+            changes = details['changes']
+            if 'stype' not in changes or len(changes) > 1:
+                # Check if the current STYPE is *not* 'Edited*
+                stype = getattr(instance, "stype", "")
+                if stype != STYPE_EDITED:
+                    bNeedSaving = False
+                    key = ""
+                    if 'model' in details:
+                        bNeedSaving = details['model'] in stype_edi_fields
+                    if not bNeedSaving:
+                        # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
+                        for k,v in changes.items():
+                            if k in stype_edi_fields:
+                                bNeedSaving = True
+                                key = k
+                                break
+
+                    if bNeedSaving:
+                        # Need to set the stype to EDI
+                        instance.stype = STYPE_EDITED
+                        # Adapt status note
+                        snote = json.loads(instance.snote)
+                        snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
+                        instance.snote = json.dumps(snote)
+                        # Save it
+                        instance.save()
+    # Now we are ready
+    return None
 
 def passim_get_history(instance):
     lhtml= []
@@ -3492,7 +3561,7 @@ def get_gold(request, pk=None):
                 info['keywords'] = [x['id'] for x in obj.keywords.all().values('id')]
 
                 # Copy signatures
-                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().values('id')]
+                info['signatures'] = [x['id'] for x in obj.goldsignatures.all().order_by('-editype').values('id')]
 
                 data['data'] = info
 
@@ -5229,11 +5298,11 @@ class OriginListView(BasicList):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', 'location', 'note', '']
     order_default = order_cols
-    order_heads = [{'name': 'Name', 'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
+    order_heads = [{'name': 'Name',     'order': 'o=1', 'type': 'str', 'custom': 'origin', 'main': True, 'linkdetails': True},
                    {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
-                   {'name': 'Note', 'order': 'o=3', 'type': 'str', 'custom': 'note'},
-                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
-    filters = [ {"name": "Location",         "id": "filter_location",     "enabled": False},
+                   {'name': 'Note',     'order': 'o=3', 'type': 'str', 'custom': 'note'},
+                   {'name': '',         'order': '',    'type': 'str', 'custom': 'manulink' }]
+    filters = [ {"name": "Location",        "id": "filter_location",    "enabled": False},
                 {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
     searches = [
@@ -5250,7 +5319,7 @@ class OriginListView(BasicList):
             count = instance.origin_manuscripts.all().count()
             url = reverse('search_manuscript')
             if count > 0:
-                html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
+                html.append("<a href='{}?manu-origin={}'><span class='badge jumbo-3 clickable' title='{} manuscripts with this origin'>{}</span></a>".format(
                     url, instance.id, count, count))
         elif custom == "location":
             sLocation = ""
@@ -5370,7 +5439,14 @@ class SermonEdit(BasicDetails):
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
-       
+
+    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'postscriptum', 'quote', 
+                                'bibnotes', 'feast', 'bibleref', 'additional', 'note',
+                        #'kwlist',
+                        'SermonSignature', 'siglist',
+                        #'CollectionSerm', 'collist_s',
+                        'SermonDescrEqual', 'superlist']
+           
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -5378,7 +5454,7 @@ class SermonEdit(BasicDetails):
         iStop = 1
         manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display,'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
             # {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'idonly'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
@@ -5629,7 +5705,7 @@ class SermonListView(BasicList):
     has_select2 = True
     use_team_group = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
     order_default = order_cols
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
@@ -5637,7 +5713,7 @@ class SermonListView(BasicList):
                    {'name': 'Manuscript', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
                    {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
                    {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
-                   {'name': 'Status', 'order': '', 'type': 'str', 'custom': 'status'}]
+                   {'name': 'Status', 'order': 'o=7', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
@@ -5646,6 +5722,7 @@ class SermonListView(BasicList):
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
+                {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
@@ -5674,8 +5751,7 @@ class SermonListView(BasicList):
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
-            #{'filter': 'keyword',       'fkfield': 'keywords',          'keyS': 'keyword',   
-            #                            'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' }, 
+            {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
@@ -5759,7 +5835,9 @@ class SermonListView(BasicList):
                         html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
         elif custom == "status":
             # Provide that status badge
-            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+            # html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_light(), instance.stype[:1]))
+            html.append(instance.get_stype_light())
+            
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
@@ -6667,6 +6745,15 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+
+    stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
+                        'hierarchy',
+                        'Daterange', 'datelist',
+                        #'kwlist',
+                        #'CollectionMan', 'collist',
+                        'LitrefMan', 'litlist',
+                        'ProvenanceMan', 'provlist'
+                        'ManuscriptExt', 'extlist']
     
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -6674,13 +6761,13 @@ class ManuscriptEdit(BasicDetails):
         # Define the main items to show and edit
         y = instance
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_display(),  'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
             {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
             {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity'},
             {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
             {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
             {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
+            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origone'},
             {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
              'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
@@ -7379,6 +7466,7 @@ class ManuscriptListView(BasicList):
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
+        {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
@@ -7391,15 +7479,16 @@ class ManuscriptListView(BasicList):
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'manuid',           'dbfield': 'idno',                                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',          'fkfield': 'library__lcountry',                      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',             'fkfield': 'library__lcity',                         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',          'fkfield': 'library',                                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',       'fkfield': 'provenances__location',                  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',           'fkfield': 'origin',                                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',          'fkfield': 'keywords',                               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',                         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',                        'keyS': 'date_until'},
+            {'filter': 'manuid',           'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',          'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',             'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',          'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance',       'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',           'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',          'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',        'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
+            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
+            {'filter': 'stype',            'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
@@ -7451,18 +7540,7 @@ class ManuscriptListView(BasicList):
         else:
             qs = Manuscript.objects.all()
         return qs
-
-    def adapt_search(self, fields):
-        # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-        return fields, None, None
-
+    
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
@@ -7491,7 +7569,8 @@ class ManuscriptListView(BasicList):
             for item in instance.manuscript_dateranges.all():
                 html.append("<div>{}</div".format(item.yearfinish))
         elif custom == "status":
-            html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            # html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
+            html.append(instance.get_stype_light())
             sTitle = instance.get_stype_display()
         elif custom == "links":
             sLinks = ""
@@ -7520,6 +7599,14 @@ class ManuscriptListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+        # Check if the prjlist is identified
+        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+            # Get the default project
+            qs = Project.objects.all()
+            if qs.count() > 0:
+                prj_default = qs.first()
+                qs = Project.objects.filter(id=prj_default.id)
+                fields['prjlist'] = qs
         return fields, lstExclude, qAlternative
   
 
@@ -7741,7 +7828,7 @@ class SermonGoldListView(BasicList):
     has_select2 = True
     use_team_group = True
     paginate_by = 20
-    order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', '']
+    order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', 'stype']
     order_cols = order_default
     order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author'}, 
                    {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
@@ -7757,6 +7844,7 @@ class SermonGoldListView(BasicList):
         {"name": "Incipit",         "id": "filter_incipit",     "enabled": False},
         {"name": "Explicit",        "id": "filter_explicit",    "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
+        {"name": "Status",          "id": "filter_stype",       "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",  "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",   "enabled": False, "head_id": "filter_collection"},
@@ -7767,11 +7855,15 @@ class SermonGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'code',      'fkfield': 'equal',             'keyFk': 'code',     'keyList': 'codelist', 'infield': 'code'},
-            {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' } 
-            # {'filter': 'keyword',   'fkfield': 'keywords',          'keyS': 'keyword',   'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' } 
+            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
+             'keyFk': 'name',       'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 
+             'keyFk': 'code',       'keyList': 'siglist',   'keyId': 'signatureid', 'infield': 'code' },
+            {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',          
+             'keyFk': 'code',       'keyList': 'codelist',  'infield': 'code'},
+            {'filter': 'keyword',   'fkfield': 'keywords',          
+             'keyFk': 'name',       'keyList': 'kwlist',    'infield': 'name' },
+            {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' } 
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
@@ -7810,7 +7902,7 @@ class SermonGoldListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-            for sig in instance.goldsignatures.all():
+            for sig in instance.goldsignatures.all().order_by('-editype'):
                 editype = sig.editype
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
@@ -7842,7 +7934,9 @@ class SermonGoldListView(BasicList):
                     html.append("<span class='badge {}' title='{}'>{}</span>".format(link_def['class'], link_def['title'], link_def['count']))
         elif custom == "status":
             # Provide that status badge
-            html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_display(), instance.stype[:1]))
+            # html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_light(), instance.stype[:1]))
+            html.append(instance.get_stype_light())
+            sTitle = instance.get_stype_display()
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
@@ -7875,6 +7969,20 @@ class SermonGoldListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
+        # Adapt the search for empty passim codes
+        if 'codetype' in fields:
+            codetype = fields['codetype']
+            if codetype == "non":
+                lstExclude = []
+                lstExclude.append(Q(equal__isnull=False))
+            elif codetype == "spe":
+                lstExclude = []
+                lstExclude.append(Q(equal__isnull=True))
+            # Reset the codetype
+            fields['codetype'] = ""
+
+        # Return the adapted stuff
         return fields, lstExclude, qAlternative
 
 
@@ -8112,6 +8220,14 @@ class SermonGoldEdit(BasicDetails):
                        {'formsetClass': GlitFormSet,  'prefix': 'glit',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'},
                        {'formsetClass': GftxtFormSet, 'prefix': 'gftxt', 'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
+    stype_edi_fields = ['author', 'authorname', 'incipit', 'explicit', 'bibliography', 'equal',
+                        #'kwlist', 
+                        'Signature', 'siglist',
+                        #'CollectionGold', 'collist_sg',
+                        'EdirefSG', 'edilist',
+                        'LitrefSG', 'litlist',
+                        'Ftextlink', 'ftxtlist']
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -8121,7 +8237,7 @@ class SermonGoldEdit(BasicDetails):
              'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
             {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
              'title': 'Other Sermons Gold members of the same equality set'},
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_display, 'field_key': 'stype', 'hidenew': True},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
             {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
@@ -8260,6 +8376,24 @@ class SermonGoldEdit(BasicDetails):
                 errors.append(form.errors)
                 bResult = False
         return None
+
+    def before_save(self, form, instance):
+        # Get the old equal
+        equal_old = SermonGold.objects.filter(id=instance.id).first().equal
+        # Get the new equal
+        equal = instance.equal
+        # Normal behaviour
+        response = super(SermonGoldEdit, self).before_save(form, instance)
+        # If old differs from new
+        if equal_old != equal:
+            # Adapt the SG count value
+            if equal_old != None: equal_old.set_sgcount()
+            if equal != None: equal.set_sgcount()
+            # Adapt the 'firstsig' value
+            if equal_old != None: equal_old.set_firstsig()
+            if equal != None: equal.set_firstsig()
+        # Return result
+        return response
 
     def after_save(self, form, instance):
         msg = ""
@@ -8423,27 +8557,42 @@ class EqualGoldEdit(BasicDetails):
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
         ]
 
+    stype_edi_fields = ['author', 'number', 'code', 'incipit', 'explicit',
+                        #'kwlist', 
+                        #'CollectionSuper', 'collist_ssg',
+                        'EqualGoldLink', 'superlist',
+                        'LitrefSG', 'litlist',
+                        'goldlist']
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
         # Define the main items to show and edit
         context['mainitems'] = [
+            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
-            {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
-             'title': 'This is the automatically assigned sermon number for this particular author' },
+
+            # Issue #212: remove this sermon number
+            # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
+            # 'title': 'This is the automatically assigned sermon number for this particular author' },
+
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown, 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown,'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown(True), 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown(True),'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code, 'empty': 'hide', 'link': instance.get_moved_url},
-            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code, 'empty': 'hide', 'link': instance.get_previous_url},
+            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
             {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
             {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
                 'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
             {'type': 'line',    'label': "Links:",  'title': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
                 'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'}
+                'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+             'title': 'All the editions associated with the Gold Sermons in this equality set'},
+            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+             'title': 'All the literature references associated with the Gold Sermons in this equality set'}
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
@@ -8512,6 +8661,19 @@ class EqualGoldEdit(BasicDetails):
                                     # Set the right parameters for creation later on
                                     form.instance.linktype = linktype
                                     form.instance.dst = super
+
+                                    # Double check reverse
+                                    if linktype in LINK_BIDIR:
+                                        lst_reverse = EqualGoldLink.objects.filter(src=super, dst=instance)
+                                        if lst_reverse.count() == 0:
+                                            # Add it
+                                            EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                        else:
+                                            # Double check the linktype
+                                            rev = lst_reverse.first()
+                                            if rev.linktype != linktype:
+                                                rev.linktype = linktype
+                                                rev.save()
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -8539,7 +8701,27 @@ class EqualGoldEdit(BasicDetails):
 
             # (2) links from one SSG to another SSG
             superlist = form.cleaned_data['superlist']
-            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True)
+            super_added = []
+            super_deleted = []
+            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True,
+                      added=super_added, deleted=super_deleted)
+            # Check for partial links in 'deleted'
+            for obj in super_deleted:
+                if obj.linktype in LINK_BIDIR:
+                    # First find and remove the other link
+                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse != None:
+                        reverse.delete()
+                    # Then remove myself
+                    obj.delete()
+            # Make sure to add the reverse link in the bidirectionals
+            for obj in super_added:
+                if obj.linktype in LINK_BIDIR:
+                    # Find the reversal
+                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse == None:
+                        # Create the reversal 
+                        reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
 
             # (3) 'keywords'
             kwlist = form.cleaned_data['kwlist']
@@ -8548,7 +8730,14 @@ class EqualGoldEdit(BasicDetails):
             # Process many-to-ONE changes
             # (1) links from SG to SSG
             goldlist = form.cleaned_data['goldlist']
+            ssglist = [x.equal for x in goldlist]
             adapt_m2o(SermonGold, instance, "equal", goldlist)
+            # Adapt the SSGs needed
+            for ssg in ssglist:
+                # Adapt the SG count value
+                ssg.set_sgcount()
+                # Adapt the 'firstsig' value
+                ssg.set_firstsig()
 
         except:
             msg = oErr.get_error_message()
@@ -8612,16 +8801,24 @@ class EqualGoldDetails(EqualGoldEdit):
                 manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
                 rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                  'link': reverse('manuscript_details', kwargs={'pk': item.id})})
-                rel_item.append({'value': item.manusermons.all().count(), 'align': "right"})
-                rel_item.append({'value': item.yearstart, 'align': "right"})
-                rel_item.append({'value': item.yearfinish, 'align': "right"})
+
+                # Location number and link to the correct point in the manuscript details view...
+                itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
+                                 'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+
+                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                rel_item.append({'value': daterange, 'align': "right"})
+                # Issue #214: combine start and end into daterange
+                # rel_item.append({'value': item.yearfinish, 'align': "right"})
+                # rel_item.append({'value': item.yearstart, 'align': "right"})
 
                 sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
                 rel_item.append({'value': sermon.locus, 'title': sermo_name, 
                                  'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['Manuscript', 'Items', 'From', 'Until', 'Sermon manifestation']
+            manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
@@ -8649,18 +8846,23 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
-    order_cols = ['code', 'author', 'number', '', 'srchincipit', '' ]
+    # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
-        {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+
+        # Issue #212: remove sermon number from listview
+        # {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
+
         {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis',           'order': ''   , 'type': 'str', 'custom': 'sig',
+        {'name': 'Gryson/Clavis',           'order': 'o=4', 'type': 'str', 'custom': 'sig',
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
-        {'name': 'Size',                    'order': ''   , 'type': 'int', 'custom': 'size',
-         'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"}
+        {'name': 'Size',                    'order': 'o=6'   , 'type': 'int', 'custom': 'size',
+         'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
+        {'name': 'Status',                  'order': 'o=7',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -8670,6 +8872,7 @@ class EqualGoldListView(BasicList):
         {"name": "Number",          "id": "filter_number",            "enabled": False},
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
+        {"name": "Status",          "id": "filter_stype",             "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -8684,6 +8887,7 @@ class EqualGoldListView(BasicList):
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -8693,6 +8897,42 @@ class EqualGoldListView(BasicList):
             {'filter': 'collsuper', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }
             ]}
         ]
+
+    def initializations(self):
+        if Information.get_kvalue("author_anonymus") != "done":
+            # Get all SSGs with anyonymus
+            with transaction.atomic():
+                ano = "anonymus"
+                qs = EqualGold.objects.filter(Q(author__name__iexact=ano))
+                for ssg in qs:
+                    ssg.save()
+            Information.set_kvalue("author_anonymus", "done")
+
+        if Information.get_kvalue("ssg_bidirectional") != "done":
+            # Put all links in a list
+            lst_link = []
+            lst_remove = []
+            lst_reverse = []
+            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_BIDIR):
+                # Check for any other eqg-links with the same source
+                lst_src = EqualGoldLink.objects.filter(src=obj.src, dst=obj.dst).exclude(id=obj.id)
+                if lst_src.count() > 0:
+                    # Add them to the removal
+                    for item in lst_src:
+                        lst_remove.append(item)
+                else:
+                    # Add the obj to the list
+                    lst_link.append(obj)
+            for obj in lst_link:
+                # Find the reverse link
+                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src)
+                if reverse.count() == 0:
+                    # Create the reversal
+                    reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+
+            Information.set_kvalue("ssg_bidirectional", "done")
+
+        return None
     
     def add_to_context(self, context, initial):
         # Find out who the user is
@@ -8720,11 +8960,13 @@ class EqualGoldListView(BasicList):
                 html.append(instance.author.name)
             else:
                 html.append("<i>(not specified)</i>")
-        elif custom == "number":
-            sNumber = "-" if instance.number  == None else instance.number
-            html.append("{}".format(sNumber))
+        # Issue #212: remove sermon number
+        #elif custom == "number":
+        #    sNumber = "-" if instance.number  == None else instance.number
+        #    html.append("{}".format(sNumber))
         elif custom == "size":
-            iSize = instance.equal_goldsermons.all().count()
+            # iSize = instance.equal_goldsermons.all().count()
+            iSize = instance.sgcount
             html.append("{}".format(iSize))
         elif custom == "code":
             sCode = "-" if instance.code  == None else instance.code
@@ -8736,12 +8978,15 @@ class EqualGoldListView(BasicList):
             html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "sig":
             # Get all the associated signatures
-            qs = Signature.objects.filter(gold__equal=instance).order_by('editype', 'code')
+            qs = Signature.objects.filter(gold__equal=instance).order_by('-editype', 'code')
             for sig in qs:
                 editype = sig.editype
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "status":
+            # Provide the status traffic light
+            html.append(instance.get_stype_light())
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
