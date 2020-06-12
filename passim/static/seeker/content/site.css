@@ -819,6 +819,9 @@ table.func-view {
   vertical-align: top;
   padding: 2px;
 }
+table.func-view.sermons {
+    padding: 0px 2px 0px 2px;
+}
 table.func-view th {
   border: 1px solid white;
   font-size: 12px;
@@ -881,6 +884,9 @@ table.func-view td {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
+}
+table.func-view.sermons td {
+    padding: 0px 2px 0px 2px;
 }
 table.func-view td.vmiddle {
   vertical-align: middle;
@@ -1069,7 +1075,7 @@ table.compact-table td:hover {
 
 .error, .err-msg {
     background-color: lightgoldenrodyellow;
-    color: darkred;
+    color: red;
     font-family: monospace;
     font-size: smaller;
 }
@@ -1104,6 +1110,24 @@ table.compact-table td:hover {
 .manuscript-city, .manuscript-library {
   min-width: 92px;
 }
+
+.passimlink {
+    color: darkgreen;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.passimlink:hover {
+    color: whitesmoke;
+    background-color: darkblue;
+    cursor: pointer;
+}
+
+
 
 .keyword {
     color: darkblue;
@@ -1244,7 +1268,7 @@ span.badge.signature.gr {
 span.badge.signature.cl {
   background-color: lightgreen;
 }
-span.badge.signature.ot {
+span.badge.signature.ot, span.badge.signature.eqset  {
   background-color: lightgoldenrodyellow;
 }
 
@@ -1298,7 +1322,13 @@ a.sermon:link, a.sermon:visited {
   color: darkblue;
 }
 
-div.view-mode a {
+.passimcode {
+  /* font-family: monospace; */
+  font-size: smaller;
+  color: darkgreen;
+}
+
+div.view-mode a, div.any-mode a {
   text-decoration: none;
   color: inherit;
 }
@@ -1359,3 +1389,73 @@ input:checked + .slider:before {
 .slider.round {   border-radius: 34px; }
 
 .slider.round:before {   border-radius: 50%; }
+
+/* Sermon tree */
+.tree[level='1'] {
+    margin-left: 10px;
+}
+.tree[level='2'] {
+    margin-left: 20px;
+}
+.tree[level='3'] {
+    margin-left: 30px;
+}
+.tree[level='4'] {
+    margin-left: 40px;
+}
+.tree[level='5'] {
+    margin-left: 50px;
+}
+
+/* Drag and drop stuff */
+.draggable:hover {
+    /* border: 1px solid yellow; */
+    background-color: lightsalmon;
+    color: white;
+    cursor: move;
+}
+
+.td {
+    font-size: small;
+    /* background-color: lightgray;
+    border: 1px solid white;
+    /* line-height: 0/8; */
+    /* display: block; */
+}
+.tdhead {
+  border: 1px solid white;
+  font-size: 12px;
+  background-color: darkgreen;
+  color: white;
+  border-radius: 3px 3px;
+  margin-top: 0px;
+  vertical-align: top;
+  padding: 2px;
+}
+
+.sermonbutton {
+    white-space:nowrap !important;
+    background-color: white; 
+    min-width: 20px;
+}
+.sermonbutton:hover {
+    background-color: antiquewhite;
+    cursor: pointer;
+}
+
+.dragover {
+    background-color: yellow !important;
+    border: 1px dotted red;
+}
+
+.ruler_white {
+    background-color: white;
+}
+.ruler_black {
+    /* background-color: black; */
+    border: 1px solid black !important;
+}
+.ruler_show {
+    height: 12px;
+    border: 1px dashed black !important;
+}

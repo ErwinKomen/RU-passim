@@ -62,7 +62,7 @@ from passim.basic.views import BasicList, BasicDetails
 # NEW METHODS
 reader_uploads = [
     {"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "type": "multiple","msg": "Upload e-codices XML files (n)"},
-    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "type": "multiple","msg": "Upload 'archives et manuscripts' XML files"}
+    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "type": "multiple","msg": "Upload 'Archives et Manuscripts' XML files"}
     ]
 # Global debugging 
 bDebug = False
@@ -587,14 +587,97 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
 def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
     """Import an XML from EAD with manuscript data and add it to the DB
         
-    This approach makes use of MINIDOM (which is part of the standard xml.dom)
-    TODO: Thijs Hermsen will add code here
+    This approach makes use of MINIDOM (which is part of the standard xml.dom)    
     """
+
+    # Number to order all the items we read        
+    order = 0   
+
+    def read_msitem(msItem, oParent, lMsItem, level=0):
+        """Recursively process one <msItem> and return in an object"""
         
-    order = 0   # Number to order all the items we read
+        errHandle = ErrHandle()
+        sError = ""
+        nonlocal order
+            
+        level += 1
+        order  += 1
+        try:
+            # Create a new item
+            oMsItem = {}
+            oMsItem['level'] = level
+            oMsItem['order'] = order 
+            oMsItem['childof'] = 0 if len(oParent) == 0 else oParent['order']
+
+            # Already put it into the overall list
+            lMsItem.append(oMsItem)
+
+            # Check if we have a title
+            if not 'unittitle' in oMsItem:
+                # Perhaps we have a parent <msItem> that contains a title
+                parent = msItem.parentNode
+                if parent.nodeName == "msItem":
+                    # Check if this one has a title
+                    if 'unittitle' in parent.childNodes:
+                        oMsItem['unittitle'] = getText(parent.childNodes['unittitle'])
+
+            # If there is no author, then supply the default author (if that exists)
+            if not 'author' in oMsItem and 'author' in oParent:
+                oMsItem['author'] = oParent['author']
+
+            # Process all child nodes
+            lastChild = None
+            lAdditional = []
+            for item in msItem.childNodes:
+                if item.nodeType == minidom.Node.ELEMENT_NODE:
+                    # Get the tag name of this item
+                    sTag = item.tagName
+                    # Action depends on the tag
+                    if sTag in mapItem:
+                        oMsItem[mapItem[sTag]] = getText(item)
+                    elif sTag == "note":
+                        if not 'note' in oMsItem:
+                            oMsItem['note'] = ""
+                        oMsItem['note'] = oMsItem['note'] + getText(item) + " "
+                    elif sTag == "msItem":
+                        # This is another <msItem>, a child of mine
+                        bResult, oChild, msg = read_msitem(item, oMsItem, lMsItem, level=level)
+                        if bResult:
+                            if 'firstChild' in oMsItem:
+                                lastChild['next'] = oChild
+                            else:
+                                oMsItem['firstChild'] = oChild
+                                lastChild = oChild
+                        else:
+                            sError = msg
+                            break
+                    else:
+                        # Add the text to 'additional'
+                        sAdd = getText(item).strip()
+                        if sAdd != "":
+                            lAdditional.append(sAdd)
+            # Process the additional stuff
+            if len(lAdditional) > 0:
+                oMsItem['additional'] = " | ".join(lAdditional)
+            # Return what we made
+            return True, oMsItem, "" 
+        except:
+            if sError == "":
+                sError = errHandle.get_error_message()
+            return False, None, sError
+    
+    #def add_msitem(msItem, type="recursive"):
+    #    """Add one item to the list of sermons for this manuscript"""
+
+    #    errHandle = ErrHandle()
+    #    sError = ""
+    #    nonlocal iSermCount
+
     oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
     errHandle = ErrHandle()
     iSermCount = 0
+
+
     # ================= INITIALISATIONS =============================
 
 
@@ -972,13 +1055,13 @@ class ReaderImport(View):
                     bOkay, code = self.process_files(request, lResults)
 
                     if bOkay:
-                        # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
+                        # Adapt the 'source' to tell what we did 
                         source.code = code
                         source.save()
                         # Indicate we are ready
                         oStatus.set("ready")
                         # Get a list of errors
-                        error_list = [str(item) for item in arErr]
+                        error_list = [str(item) for item in self.arErr]
 
                         # Create the context
                         context = dict(
@@ -987,14 +1070,14 @@ class ReaderImport(View):
                             error_list=error_list
                             )
                     else:
-                        arErr.append(code)
+                        self.arErr.append(code)
 
-                    if len(arErr) == 0:
+                    if len(self.arErr) == 0:
                         # Get the HTML response
                         self.data['html'] = render_to_string(template_name, context, request)
                     else:
                         lHtml = []
-                        for item in arErr:
+                        for item in self.arErr:
                             lHtml.append(item)
                         self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
                 except:
@@ -1094,7 +1177,7 @@ class ReaderEcodex(ReaderImport):
 
                     # Get the source file
                     if data_file == None or data_file == "":
-                        arErr.append("No source file specified for the selected project")
+                        self.arErr.append("No source file specified for the selected project")
                     else:
                         # Check the extension
                         arFile = filename.split(".")
@@ -1107,7 +1190,7 @@ class ReaderEcodex(ReaderImport):
                         oResult = None
                         if extension == "xml":
                             # This is an XML file
-                            oResult = read_ecodex(username, data_file, filename, arErr, source=source)
+                            oResult = read_ecodex(username, data_file, filename, self.arErr, source=source)
 
                             if oResult == None or oResult['status'] == "error":
                                 # Process results
@@ -1149,7 +1232,7 @@ class ReaderEcodex(ReaderImport):
                                         xml_file = sResult
                                         name = xml_url.split("/")[-1]
                                         # (4) Read the e-codex manuscript
-                                        oResult = read_ecodex(username, xml_file, name, arErr, source=source)
+                                        oResult = read_ecodex(username, xml_file, name, self.arErr, source=source)
                                         # (5) Check before continuing
                                         if oResult == None or oResult['status'] == "error":
                                             msg = "unknown"  
@@ -1157,7 +1240,7 @@ class ReaderEcodex(ReaderImport):
                                                 msg = oResult['msg']
                                             elif 'status' in oResult:
                                                 msg = oResult['status']
-                                            arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
+                                            self.arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
                                             # Process results
                                             self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
                                                             filename=oResult['filename'])
@@ -1171,7 +1254,7 @@ class ReaderEcodex(ReaderImport):
                                                             idno=obj.idno,filename=oResult['filename'])
 
                                     else:
-                                        aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
+                                        self.aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
@@ -1180,7 +1263,7 @@ class ReaderEcodex(ReaderImport):
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
                         if oResult == None:
-                            arErr.append("There was an error. No manuscripts have been added")
+                            self.arErr.append("There was an error. No manuscripts have been added")
                         else:
                             lResults.append(oResult)
             code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
@@ -1195,7 +1278,7 @@ class ReaderEad(ReaderImport):
 
     import_type = "ead"
     sourceinfo_url = "https://ccfr.bnf.fr/"
-
+    # Dit moet dus deels aangepast worden
     def process_files(self, request, lResults):
         file_list = []
         oErr = ErrHandle()
@@ -1215,7 +1298,7 @@ class ReaderEad(ReaderImport):
 
                     # Get the source file
                     if data_file == None or data_file == "":
-                        arErr.append("No source file specified for the selected project")
+                        self.arErr.append("No source file specified for the selected project")
                     else:
                         # Check the extension
                         arFile = filename.split(".")
@@ -1228,7 +1311,7 @@ class ReaderEad(ReaderImport):
                         oResult = None
                         if extension == "xml":
                             # This is an XML file
-                            oResult = read_ead(username, data_file, filename, arErr, source=source)
+                            oResult = read_ead(username, data_file, filename, self.arErr, source=source)
 
                             if oResult == None or oResult['status'] == "error":
                                 # Process results
@@ -1269,7 +1352,7 @@ class ReaderEad(ReaderImport):
                                         # We have the filename
                                         xml_file = sResult
                                         name = xml_url.split("/")[-1]
-                                        # (4) Read the e-codex manuscript
+                                        # (4) Read the ead manuscript
                                         oResult = read_ead(username, xml_file, name, arErr, source=source)
                                         # (5) Check before continuing
                                         if oResult == None or oResult['status'] == "error":
