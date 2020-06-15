@@ -1295,7 +1295,7 @@ class ReaderEad(ReaderImport):
 
                     # Set the status
                     oStatus.set("reading", msg="file={}".format(filename))
-
+                    
                     # Get the source file
                     if data_file == None or data_file == "":
                         self.arErr.append("No source file specified for the selected project")
@@ -1310,7 +1310,7 @@ class ReaderEad(ReaderImport):
                         # Further processing depends on the extension
                         oResult = None
                         if extension == "xml":
-                            # This is an XML file
+                            # This is an XML file TH: waarom username en source leeg?
                             oResult = read_ead(username, data_file, filename, self.arErr, source=source)
 
                             if oResult == None or oResult['status'] == "error":
@@ -1326,56 +1326,56 @@ class ReaderEad(ReaderImport):
                                                 yearfinish=obj.yearfinish,library=obj.library.name,
                                                 idno=obj.idno,filename=oResult['filename'])
 
-                        elif extension == "txt":
-                            # Set the status
-                            oStatus.set("reading list", msg="file={}".format(filename))
-                            # (1) Read the TXT file
-                            lines = []
-                            bFirst = True
-                            for line in data_file:
-                                # Get a good view of the line
-                                sLine = line.decode("utf-8").strip()
-                                if bFirst:
-                                    if "\ufeff" in sLine:
-                                        sLine = sLine.replace("\ufeff", "")
-                                    bFirst = False
-                                lines.append(sLine)
-                            # (2) Walk through the list of XML file names
-                            for idx, xml_url in enumerate(lines):
-                                xml_url = xml_url.strip()
-                                if xml_url != "" and ".xml" in xml_url:
-                                    # Set the status
-                                    oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
-                                    # (3) Download the file from the internet and save it 
-                                    bOkay, sResult = download_file(xml_url)
-                                    if bOkay:
-                                        # We have the filename
-                                        xml_file = sResult
-                                        name = xml_url.split("/")[-1]
-                                        # (4) Read the ead manuscript
-                                        oResult = read_ead(username, xml_file, name, arErr, source=source)
-                                        # (5) Check before continuing
-                                        if oResult == None or oResult['status'] == "error":
-                                            msg = "unknown"  
-                                            if 'msg' in oResult: 
-                                                msg = oResult['msg']
-                                            elif 'status' in oResult:
-                                                msg = oResult['status']
-                                            arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
-                                            # Process results
-                                            self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
-                                                            filename=oResult['filename'])
-                                        else:
-                                            # Get the results from oResult
-                                            obj = oResult['obj']
-                                            # Process results
-                                            self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                                                            name=oResult['name'], yearstart=obj.yearstart,
-                                                            yearfinish=obj.yearfinish,library=obj.library.name,
-                                                            idno=obj.idno,filename=oResult['filename'])
+                        #elif extension == "txt":
+                        #    # Set the status
+                        #    oStatus.set("reading list", msg="file={}".format(filename))
+                        #    # (1) Read the TXT file
+                        #    lines = []
+                        #    bFirst = True
+                        #    for line in data_file:
+                        #        # Get a good view of the line
+                        #        sLine = line.decode("utf-8").strip()
+                        #        if bFirst:
+                        #            if "\ufeff" in sLine:
+                        #                sLine = sLine.replace("\ufeff", "")
+                        #            bFirst = False
+                        #        lines.append(sLine)
+                        #    # (2) Walk through the list of XML file names
+                        #    for idx, xml_url in enumerate(lines):
+                        #        xml_url = xml_url.strip()
+                        #        if xml_url != "" and ".xml" in xml_url:
+                        #            # Set the status
+                        #            oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
+                        #            # (3) Download the file from the internet and save it 
+                        #            bOkay, sResult = download_file(xml_url)
+                        #            if bOkay:
+                        #                # We have the filename
+                        #                xml_file = sResult
+                        #                name = xml_url.split("/")[-1]
+                        #                # (4) Read the ead manuscript
+                        #                oResult = read_ead(username, xml_file, name, arErr, source=source)
+                        #                # (5) Check before continuing
+                        #                if oResult == None or oResult['status'] == "error":
+                        #                    msg = "unknown"  
+                        #                    if 'msg' in oResult: 
+                        #                        msg = oResult['msg']
+                        #                    elif 'status' in oResult:
+                        #                        msg = oResult['status']
+                        #                    arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
+                        #                    # Process results
+                        #                    self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                        #                                    filename=oResult['filename'])
+                        #                else:
+                        #                    # Get the results from oResult
+                        #                    obj = oResult['obj']
+                        #                    # Process results
+                        #                    self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                        #                                    name=oResult['name'], yearstart=obj.yearstart,
+                        #                                    yearfinish=obj.yearfinish,library=obj.library.name,
+                        #                                    idno=obj.idno,filename=oResult['filename'])
 
-                                    else:
-                                        aErr.append("Import-ead: failed to download file {}".format(xml_url))
+                        #            else:
+                        #                aErr.append("Import-ead: failed to download file {}".format(xml_url))
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
