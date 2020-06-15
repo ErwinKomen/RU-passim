@@ -269,35 +269,39 @@
         <!-- Allow importing list items from Excel -->
         {% if is_app_uploader and uploads %}
           {% for uitem in uploads %}
-            <div id="import_{{uitem.title}}" class="row hidden container">
-              <form action="{{uitem.url}}" method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                <!-- Room for the filename to appear -->
-                <div class="col-md-6 form-group" id="{{uitem.title}}-import_info"
-                     targetid="{{uitem.title}}_data_import"
-                     targeturl="{{uitem.url}}">
-                  <div class="input-group">
-                    <span>{{uitem.msg}}</span>
-                    <span class="input-group-btn">
-                      <span class="btn btn-default btn-xs btn-file">
-                        Browse...
-                        {% if uitem.type == "multiple" %}
-                          <input id="id_{{uitem.title}}-files_field" name="files_field" required="" multiple="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
-                        {% else %}
-                          <input id="id_{{uitem.title}}-file_source" name="file_source" required="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
-                        {% endif %}
+            <div id="import_{{uitem.title}}" class="hidden container">
+              <div class="row">
+                <form action="{{uitem.url}}" method="POST" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <!-- Room for the filename to appear -->
+                  <div class="col-md-6 form-group" id="{{uitem.title}}-import_info"
+                       sync-progress="{% url 'sync_progress' %}?synctype={{uitem.title}}"
+                       targetid="{{uitem.title}}_data_import"
+                       targeturl="{{uitem.url}}">
+                    <div class="input-group">
+                      <span>{{uitem.msg}}</span>
+                      <span class="input-group-btn">
+                        <span class="btn btn-default btn-xs btn-file">
+                          Browse...
+                          {% if uitem.type == "multiple" %}
+                            <input id="id_{{uitem.title}}-files_field" name="files_field" required="" multiple="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
+                          {% else %}
+                            <input id="id_{{uitem.title}}-file_source" name="file_source" required="" type="file" oninput="ru.basic.import_data('{{uitem.title}}');" />
+                          {% endif %}
+                        </span>
                       </span>
-                    </span>
-                  </div>
+                    </div>
             
-                </div>
-                <!-- Progress of upload indicator -->
-                <div class="col-md-6">
-                  <progress class="hidden" style="width:100%;" id="{{uitem.title}}-import_progress" value="0" min="0" max="100"></progress>
-                </div>
-                <!-- Any error reporting -->
-                <div id="{{uitem.title}}-import_error"></div>
-              </form>
+                  </div>
+                  <!-- Progress of upload indicator -->
+                  <div class="col-md-6">
+                    <progress class="hidden" style="width:100%;" id="{{uitem.title}}-import_progress" value="0" min="0" max="100"></progress>
+                  </div>
+                  <div class="save-warning"></div>
+                  <!-- Any error reporting -->
+                  <div id="{{uitem.title}}-import_error"></div>
+                </form>
+              </div>
 
               <!-- Import information -->
               <div id="{{uitem.title}}_data_import" class="project-part hidden"></div>

@@ -1094,13 +1094,16 @@ class Report(models.Model):
     def make(username, rtype, contents):
         """Create a report"""
 
-        # Retrieve the user
-        user = User.objects.filter(username=username).first()
-        obj = Report(user=user, reptype=rtype, contents=contents)
-        obj.save()
-        # Add a create action
-        details = {'reptype': rtype, 'id': obj.id}
-        Action.add(user, "Report", "create", json.dumps(details))
+        oErr = ErrHandle()
+        obj = None
+        try:
+            # Retrieve the user
+            user = User.objects.filter(username=username).first()
+            obj = Report(user=user, reptype=rtype, contents=contents)
+            obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Report.make")
         # Return the object
         return obj
 
@@ -2638,15 +2641,19 @@ class Manuscript(models.Model):
 
         oErr = ErrHandle()
         sermon = None
+        take_author = False
         try:
             lstQ = []
             if 'title' in oDescr: lstQ.append(Q(title__iexact=oDescr['title']))
-            if 'gryson' in oDescr: lstQ.append(Q(gryson__iexact=oDescr['gryson']))
             if 'location' in oDescr: lstQ.append(Q(locus__iexact=oDescr['location']))
-            if 'author' in oDescr: lstQ.append(Q(author__name__iexact=oDescr['author']))
             if 'incipit' in oDescr: lstQ.append(Q(incipit__iexact=oDescr['incipit']))
             if 'explicit' in oDescr: lstQ.append(Q(explicit__iexact=oDescr['explicit']))
             if 'quote' in oDescr: lstQ.append(Q(quote__iexact=oDescr['quote']))
+
+            # Do *not* take the author into account, since he may have been initially stored
+            #   in 'note', and later on replaced by someone else
+            if take_author and 'author' in oDescr: 
+                lstQ.append(Q(note__icontains=oDescr['author']))
 
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
             sermon = self.manusermons.filter(*lstQ).first()
@@ -2655,7 +2662,7 @@ class Manuscript(models.Model):
             return sermon
         except:
             sMsg = oErr.get_error_message()
-            oErr.DoError("Manuscript/find_or_create")
+            oErr.DoError("Manuscript/find_sermon")
             return None
 
     def find_or_create(name,yearstart, yearfinish, library, idno="", 
@@ -2689,14 +2696,20 @@ class Manuscript(models.Model):
                 manuscript = qs[0]
                 # Check if any fields need to be adapted
                 bNeedSave = False
-                if name != manuscript.name: manuscript.name = name ; bNeedSave = True
-                if filename != manuscript.filename: manuscript.filename = filename ; bNeedSave = True
-                if support != manuscript.support: manuscript.support = support ; bNeedSave = True
-                if extent != manuscript.extent: manuscript.extent = extent ; bNeedSave = True
-                if format != manuscript.format: manuscript.format = format ; bNeedSave = True
-                if url != manuscript.url: manuscript.url = url ; bNeedSave = True
-                if source != None: manuscript.source=source ; bNeedSave = True
+                if name != manuscript.name: 
+                    manuscript.name = name ; bNeedSave = True
+                if filename != manuscript.filename: 
+                    manuscript.filename = filename ; bNeedSave = True
+                if support != manuscript.support: 
+                    manuscript.support = support ; bNeedSave = True
+                if extent != manuscript.extent: 
+                    manuscript.extent = extent ; bNeedSave = True
+                if format != manuscript.format: 
+                    manuscript.format = format ; bNeedSave = True
+                if url != manuscript.url: 
+                    manuscript.url = url ; bNeedSave = True
                 if bNeedSave:
+                    if source != None: manuscript.source=source
                     manuscript.save()
             return manuscript
         except:
