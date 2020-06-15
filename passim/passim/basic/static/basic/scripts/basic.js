@@ -32,6 +32,7 @@ var ru = (function ($, ru) {
     var loc_divErr = "basic_err",
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
+        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         KEYS = {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
@@ -142,6 +143,7 @@ var ru = (function ($, ru) {
        */
       check_progress: function (progrurl, sTargetDiv) {
         var elTarget = "#" + sTargetDiv,
+            elInfo = "",
             sMsg = "",
             lHtml = [];
 
@@ -159,6 +161,15 @@ var ru = (function ($, ru) {
                   // NO NEED for further action
                   //// Indicate we are ready
                   //$(elTarget).html("READY");
+                  $(".save-warning").html("");
+                  break;
+                case "readyclose":
+                  elInfo = elTarget.replace("_data_import", "-import_info");
+                  // Make info visible again
+                  $(elInfo).removeClass("hidden");
+                  // Close myself
+                  //$(elTarget).html("READY");
+                  $(".save-warning").html("");
                   break;
                 case "error":
                   // Show the error
@@ -507,7 +518,7 @@ var ru = (function ($, ru) {
           $(elProg).attr("value", "0");
           $(elProg).removeClass("hidden");
           if (bDoLoad) {
-            $(".save-warning").html("loading the definition..." + loc_sWaiting);
+            $(".save-warning").html("import in progress..." + loc_sWaiting);
             $(".submit-row button").prop("disabled", true);
           }
 
@@ -526,6 +537,7 @@ var ru = (function ($, ru) {
             loc_progr = [];
             window.setTimeout(function () { ru.basic.check_progress(progrurl, sTargetDiv); }, 2000);
           }
+          $(".save-warning").html("importing..." + loc_sWaiting);
 
           // Upload XHR
           $(elInput).upload(targeturl,
@@ -536,7 +548,6 @@ var ru = (function ($, ru) {
 
               // Show where we are
               $(el).addClass("hidden");
-              $(".save-warning").html("saving..." + loc_sWaiting);
 
               // First leg has been done
               if (response === undefined || response === null || !("status" in response)) {
@@ -555,6 +566,8 @@ var ru = (function ($, ru) {
                         } else {
                           switch (response.status) {
                             case "ok":
+                            case "ready":
+                            case "readyclose":
                               // Show the response in the appropriate location
                               $("#" + sTargetDiv).html(response.html);
                               $("#" + sTargetDiv).removeClass("hidden");
@@ -572,6 +585,7 @@ var ru = (function ($, ru) {
                               }
                               break;
                           }
+                          $(".save-warning").html("");
                           // Make sure events are in place again
                           ru.basic.init_events();
                           switch (sFtype) {
@@ -595,6 +609,7 @@ var ru = (function ($, ru) {
                       // Place the response here
                       $("#" + sTargetDiv).html(response.html);
                       $("#" + sTargetDiv).removeClass("hidden");
+                      $(".save-warning").html("");
                     }
                     break;
                   default:

@@ -48,7 +48,9 @@ from xml.dom import minidom
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
-from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, Report, STYPE_IMPORTED
+from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
+    Library, Location, SermonSignature, Author, \
+    Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails
@@ -82,6 +84,39 @@ def getText(nodeStart):
             # Recursive
             rc.append(getText(node))
     return ' '.join(rc)
+
+def download_file(url):
+    """Download a file from the indicated URL"""
+
+    bResult = True
+    sResult = ""
+    errHandle = ErrHandle()
+    # Get the filename from the url
+    name = url.split("/")[-1]
+    # Set the output directory
+    outdir = os.path.abspath(os.path.join(MEDIA_DIR, "e-codices"))
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    # Create a filename where we can store it
+    filename = os.path.abspath(os.path.join(outdir, name))
+    try:
+        r = requests.get(url)
+    except:
+        sMsg = errHandle.get_error_message()
+        errHandle.DoError("Request problem")
+        return False, sMsg
+    if r.status_code == 200:
+        # Read the response
+        sText = r.text
+        # Write away
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(sText)
+        sResult = filename
+    else:
+        bResult = False
+        sResult = "download_file received status {} for {}".format(r.status_code, url)
+    # Return the result
+    return bResult, sResult
 
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
@@ -211,19 +246,17 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 if 'author' in msItem:
                     author = Author.find(msItem['author'])
                     if author == None:
-                        # Create a nickname
-                        nickname = Nickname.find_or_create(msItem['author'])
-                        sermon.nickname = nickname
+                        # Add to the NOTE
+                        space = "" if sermon.note == "" else " "
+                        sermon.note = "{}{}AUTHOR: {}".format(sermon.note, space, msItem['author']) ; bNeedSaving = True
                     else:
                         sermon.author = author
-
-                # The following items are [0-n]
-                #  -- These may be replaced by separate entries in SermonSignature
-                if 'gryson' in msItem: sermon.gryson = msItem['gryson']     # SermonSignature
-                if 'clavis' in msItem: sermon.clavis = msItem['clavis']     # SermonSignature
-                if 'keyword' in msItem: sermon.keyword = msItem['keyword']  # Keyword
-                if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
-
+                    bNeedSaving = True
+                # Added information into .note:
+                if 'edition' in msItem and msItem['edition'] != "Elektronische Version nach TEI P5.1": 
+                    space = "" if sermon.note == "" else " "
+                    sermon.note = "{}{}EDITION: {}".format(sermon.note, space, msItem['edition']) ; bNeedSaving = True
+                    
                 # Set the default status type
                 sermon.stype = STYPE_IMPORTED    # Imported
 
@@ -232,6 +265,15 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
 
                 # Now save it
                 sermon.save()
+
+                # The following items are [0-n]
+                # Connected to 'SermonDescr' with one-to-many
+                if 'gryson' in msItem : 
+                    code = msItem['gryson']
+                    sig = SermonSignature.objects.create(sermon=sermon, editype="gr", code=code)
+                if 'clavis' in msItem : 
+                    code = msItem['clavis']
+                    sig = SermonSignature.objects.create(sermon=sermon, editype="cl", code=code)
 
                 # Keep track of the number of sermons added
                 iSermCount += 1
@@ -246,30 +288,47 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 # However: double check the fields
                 bNeedSaving = False
 
+                # Main attributes of 'SermonDescr'
                 if 'title' in msItem and sermon.title != msItem['title']: sermon.title = msItem['title'] ; bNeedSaving = True
                 if 'location' in msItem and sermon.locus != msItem['location']: sermon.locus = msItem['location'] ; bNeedSaving = True
                 if 'incipit' in msItem and sermon.incipit != msItem['incipit']: sermon.incipit = msItem['incipit'] ; bNeedSaving = True
                 if 'explicit' in msItem and sermon.explicit != msItem['explicit']: sermon.explicit = msItem['explicit'] ; bNeedSaving = True
-                if 'edition' in msItem and sermon.edition != msItem['edition']: sermon.edition = msItem['edition'] ; bNeedSaving = True
                 if 'quote' in msItem and sermon.quote != msItem['quote']: sermon.quote = msItem['quote'] ; bNeedSaving = True
-                if 'gryson' in msItem and sermon.gryson != msItem['gryson']: sermon.gryson = msItem['gryson'] ; bNeedSaving = True
-                if 'clavis' in msItem and sermon.clavis != msItem['clavis']: sermon.clavis = msItem['clavis'] ; bNeedSaving = True
                 if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = msItem['feast'] ; bNeedSaving = True
-                if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
+                # OLD (doesn't exist in e-codices)if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
                 if 'bibleref' in msItem and sermon.bibleref != msItem['bibleref']: sermon.bibleref = msItem['bibleref'] ; bNeedSaving = True
                 if 'additional' in msItem and sermon.additional != msItem['additional']: sermon.additional = msItem['additional'] ; bNeedSaving = True
                 if 'note' in msItem and sermon.note != msItem['note']: sermon.note = msItem['note'] ; bNeedSaving = True
                 if 'order' in msItem and sermon.order != msItem['order']: sermon.order = msItem['order'] ; bNeedSaving = True
-                if 'author' in msItem and (    (sermon.author == None or sermon.author.name != msItem['author']) and
-                                            (sermon.nickname == None or sermon.nickname != msItem['author'])):
+
+                if 'author' in msItem and (sermon.author == None or sermon.author.name != msItem['author'] ):
                     author = Author.find(msItem['author'])
                     if author == None:
-                        # Create a nickname
-                        nickname = Nickname.find_or_create(msItem['author'])
-                        sermon.nickname = nickname
+                        # Add to the NOTE
+                        space = "" if sermon.note == "" else " "
+                        sermon.note = "{}{}AUTHOR: {}".format(sermon.note, space, msItem['author']) ; bNeedSaving = True
                     else:
                         sermon.author = author
                     bNeedSaving = True
+
+                # Added information into .note:
+                if 'edition' in msItem and msItem['edition'] != "Elektronische Version nach TEI P5.1": 
+                    space = "" if sermon.note == "" else " "
+                    sermon.note = "{}{}EDITION: {}".format(sermon.note, space, msItem['edition']) ; bNeedSaving = True
+
+                # Connected to 'SermonDescr' with one-to-many
+                if 'gryson' in msItem : 
+                    code = msItem['gryson']
+                    sig = SermonSignature.objects.filter(sermon=sermon, editype="gr", code=code).first()
+                    if sig == None:
+                        sig = SermonSignature.objects.create(sermon=sermon, editype="gr", code=code)
+                if 'clavis' in msItem : 
+                    code = msItem['clavis']
+                    sig = SermonSignature.objects.filter(sermon=sermon, editype="cl", code=code).first()
+                    if sig == None:
+                        sig = SermonSignature.objects.create(sermon=sermon, editype="cl", code=code)
+
+                # Connected to 'SermonDescr' with many-to-many
 
                 if bNeedSaving:
                     # Now save it
@@ -495,10 +554,20 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                         pass
 
         # Now [oInfo] has a full description of the contents to be added to the database
-        # (1) Get the country from the city
-        city = City.objects.filter(name__iexact=oInfo['city']).first()
+        # (1a) Get the city
+        # OLD: city = City.objects.filter(name__iexact=oInfo['city']).first()
+        city = Location.objects.filter(name__iexact=oInfo['city'], loctype__name="city").first()
+        # (1b) Get the country from the city
         country = None 
-        if city != None and city.country != None: country = city.country.name
+        # OLD: if city != None and city.country != None: country = city.country.name
+        if city != None:
+            # Get all the locations inside which I am contained
+            lst_above = city.above()
+            for loc in lst_above:
+                if loc.loctype.name == "country":
+                    # Get the name of the country
+                    country = loc.name
+                    break
 
         # (2) Get the library from the info object
         library = Library.find_or_create(oInfo['city'], oInfo['library'], country)
@@ -523,18 +592,21 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
         # If there is an URL, then this is an external reference and it needs to be added separately
         if url != None and url != "":
             # There is an actual URL: Create a new ManuscriptExt instance
-            mext = ManuscriptExt(url=url, manuscript=manuscript)
-            mext.save()
+            mext = ManuscriptExt.objects.filter(url=url, manuscript=manuscript).first()
+            if mext == None:
+                mext = ManuscriptExt.objects.create(url=url, manuscript=manuscript)
 
 
-        # Add all the provenances we know of
+        # Add all the provenances we know of -- only if they don't exist yet!!!
         if provenance_origin != None:
-            pm = ProvenanceMan(provenance=provenance_origin, manuscript=manuscript)
-            pm.save()
+            pm = ProvenanceMan.objects.filter(provenance=provenance_origin, manuscript=manuscript).first()
+            if pm == None:
+                pm = ProvenanceMan.objects.create(provenance=provenance_origin, manuscript=manuscript)
         for oProv in lProvenances:
             provenance = Provenance.find_or_create(oProv['name'], oProv['note'])
-            pm = ProvenanceMan(provenance=provenance, manuscript=manuscript)
-            pm.save()
+            pm = ProvenanceMan.objects.filter(provenance=provenance, manuscript=manuscript).first()
+            if pm == None:
+                pm = ProvenanceMan.objects.create(provenance=provenance, manuscript=manuscript)
 
         # (5) Create or emend all the manuscript content items
         # NOTE: doesn't work with transaction.atomic(), because need to find similar ones that include just-created-ones
@@ -1017,6 +1089,7 @@ class ReaderImport(View):
     bClean = False
     import_type = "undefined"
     sourceinfo_url = "undefined"
+    username = ""
     mForm = UploadFilesForm
     
     def post(self, request, pk=None):
@@ -1027,6 +1100,7 @@ class ReaderImport(View):
         self.data['status'] = "ok"
 
         username = request.user.username
+        self.username = username
 
         if self.checkAuthentication(request):
             # Remove previous status object for this user
@@ -1048,20 +1122,21 @@ class ReaderImport(View):
                     lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
                     # Create a SourceInfo object for this extraction
-                    source = SourceInfo(url=self.sourceinfo_url, collector=username)
-                    source.save()
+                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username)
 
                     # Process the request
-                    bOkay, code = self.process_files(request, lResults)
+                    bOkay, code = self.process_files(request, source, lResults, lHeader)
 
                     if bOkay:
                         # Adapt the 'source' to tell what we did 
                         source.code = code
                         source.save()
                         # Indicate we are ready
-                        oStatus.set("ready")
+                        oStatus.set("readyclose")
                         # Get a list of errors
                         error_list = [str(item) for item in self.arErr]
+
+                        statuscode = "error" if len(error_list) > 0 else "completed"
 
                         # Create the context
                         context = dict(
@@ -1074,7 +1149,7 @@ class ReaderImport(View):
 
                     if len(self.arErr) == 0:
                         # Get the HTML response
-                        self.data['html'] = render_to_string(template_name, context, request)
+                        self.data['html'] = render_to_string(self.template_name, context, request)
                     else:
                         lHtml = []
                         for item in self.arErr:
@@ -1146,7 +1221,7 @@ class ReaderImport(View):
             lst_read.append(oInfo)
         return True
 
-    def process_files(self, request, lResults):
+    def process_files(self, request, source, lResults, lHeader):
         bOkay = True
         code = ""
         return bOkay, code
@@ -1158,13 +1233,16 @@ class ReaderEcodex(ReaderImport):
     import_type = "ecodex"
     sourceinfo_url = "http://e-codices.unifr.ch"
 
-    def process_files(self, request, lResults):
+    def process_files(self, request, source, lResults, lHeader):
         file_list = []
         oErr = ErrHandle()
         bOkay = True
         code = ""
         oStatus = self.oStatus
         try:
+            # Make sure we have the username
+            username = self.username
+
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
             if files != None:
@@ -1279,13 +1357,16 @@ class ReaderEad(ReaderImport):
     import_type = "ead"
     sourceinfo_url = "https://ccfr.bnf.fr/"
     # Dit moet dus deels aangepast worden
-    def process_files(self, request, lResults):
+    def process_files(self, request, source, lResults, lHeader):
         file_list = []
         oErr = ErrHandle()
         bOkay = True
         code = ""
         oStatus = self.oStatus
         try:
+            # Make sure we have the username
+            username = self.username
+
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
             if files != None:
@@ -1295,7 +1376,7 @@ class ReaderEad(ReaderImport):
 
                     # Set the status
                     oStatus.set("reading", msg="file={}".format(filename))
-                    
+
                     # Get the source file
                     if data_file == None or data_file == "":
                         self.arErr.append("No source file specified for the selected project")
@@ -1310,7 +1391,7 @@ class ReaderEad(ReaderImport):
                         # Further processing depends on the extension
                         oResult = None
                         if extension == "xml":
-                            # This is an XML file TH: waarom username en source leeg?
+                            # This is an XML file
                             oResult = read_ead(username, data_file, filename, self.arErr, source=source)
 
                             if oResult == None or oResult['status'] == "error":
@@ -1326,56 +1407,56 @@ class ReaderEad(ReaderImport):
                                                 yearfinish=obj.yearfinish,library=obj.library.name,
                                                 idno=obj.idno,filename=oResult['filename'])
 
-                        #elif extension == "txt":
-                        #    # Set the status
-                        #    oStatus.set("reading list", msg="file={}".format(filename))
-                        #    # (1) Read the TXT file
-                        #    lines = []
-                        #    bFirst = True
-                        #    for line in data_file:
-                        #        # Get a good view of the line
-                        #        sLine = line.decode("utf-8").strip()
-                        #        if bFirst:
-                        #            if "\ufeff" in sLine:
-                        #                sLine = sLine.replace("\ufeff", "")
-                        #            bFirst = False
-                        #        lines.append(sLine)
-                        #    # (2) Walk through the list of XML file names
-                        #    for idx, xml_url in enumerate(lines):
-                        #        xml_url = xml_url.strip()
-                        #        if xml_url != "" and ".xml" in xml_url:
-                        #            # Set the status
-                        #            oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
-                        #            # (3) Download the file from the internet and save it 
-                        #            bOkay, sResult = download_file(xml_url)
-                        #            if bOkay:
-                        #                # We have the filename
-                        #                xml_file = sResult
-                        #                name = xml_url.split("/")[-1]
-                        #                # (4) Read the ead manuscript
-                        #                oResult = read_ead(username, xml_file, name, arErr, source=source)
-                        #                # (5) Check before continuing
-                        #                if oResult == None or oResult['status'] == "error":
-                        #                    msg = "unknown"  
-                        #                    if 'msg' in oResult: 
-                        #                        msg = oResult['msg']
-                        #                    elif 'status' in oResult:
-                        #                        msg = oResult['status']
-                        #                    arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
-                        #                    # Process results
-                        #                    self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
-                        #                                    filename=oResult['filename'])
-                        #                else:
-                        #                    # Get the results from oResult
-                        #                    obj = oResult['obj']
-                        #                    # Process results
-                        #                    self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                        #                                    name=oResult['name'], yearstart=obj.yearstart,
-                        #                                    yearfinish=obj.yearfinish,library=obj.library.name,
-                        #                                    idno=obj.idno,filename=oResult['filename'])
+                        elif extension == "txt":
+                            # Set the status
+                            oStatus.set("reading list", msg="file={}".format(filename))
+                            # (1) Read the TXT file
+                            lines = []
+                            bFirst = True
+                            for line in data_file:
+                                # Get a good view of the line
+                                sLine = line.decode("utf-8").strip()
+                                if bFirst:
+                                    if "\ufeff" in sLine:
+                                        sLine = sLine.replace("\ufeff", "")
+                                    bFirst = False
+                                lines.append(sLine)
+                            # (2) Walk through the list of XML file names
+                            for idx, xml_url in enumerate(lines):
+                                xml_url = xml_url.strip()
+                                if xml_url != "" and ".xml" in xml_url:
+                                    # Set the status
+                                    oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
+                                    # (3) Download the file from the internet and save it 
+                                    bOkay, sResult = download_file(xml_url)
+                                    if bOkay:
+                                        # We have the filename
+                                        xml_file = sResult
+                                        name = xml_url.split("/")[-1]
+                                        # (4) Read the ead manuscript
+                                        oResult = read_ead(username, xml_file, name, self.arErr, source=source)
+                                        # (5) Check before continuing
+                                        if oResult == None or oResult['status'] == "error":
+                                            msg = "unknown"  
+                                            if 'msg' in oResult: 
+                                                msg = oResult['msg']
+                                            elif 'status' in oResult:
+                                                msg = oResult['status']
+                                            self.arErr.append("Import-ead: file {} has not been loaded ({})".format(xml_url, msg))
+                                            # Process results
+                                            self.add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
+                                                            filename=oResult['filename'])
+                                        else:
+                                            # Get the results from oResult
+                                            obj = oResult['obj']
+                                            # Process results
+                                            self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                            name=oResult['name'], yearstart=obj.yearstart,
+                                                            yearfinish=obj.yearfinish,library=obj.library.name,
+                                                            idno=obj.idno,filename=oResult['filename'])
 
-                        #            else:
-                        #                aErr.append("Import-ead: failed to download file {}".format(xml_url))
+                                    else:
+                                        aErr.append("Import-ead: failed to download file {}".format(xml_url))
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
@@ -1384,7 +1465,7 @@ class ReaderEad(ReaderImport):
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
                         if oResult == None:
-                            arErr.append("There was an error. No manuscripts have been added")
+                            self.arErr.append("There was an error. No manuscripts have been added")
                         else:
                             lResults.append(oResult)
             code = "Imported using the [import_ead] function on these XML files: {}".format(", ".join(file_list))
