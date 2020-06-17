@@ -390,6 +390,7 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
             if "xml:base" in ndTEI.attributes:
                 url = ndTEI.attributes["xml:base"].value
         oInfo['url'] = url
+        
         # Try to get a main author
         authors = xmldoc.getElementsByTagName("persName")
         mainAuthor = ""
@@ -658,85 +659,131 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
 
 def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
     """Import an XML from EAD with manuscript data and add it to the DB
-        
+         
     This approach makes use of MINIDOM (which is part of the standard xml.dom)    
     """
+    oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+    errHandle = ErrHandle()
+    iSermCount = 0
 
     # Number to order all the items we read        
     order = 0   
-
-    def read_msitem(msItem, oParent, lMsItem, level=0):
-        """Recursively process one <msItem> and return in an object"""
+        # Overall keeping track of ms items
+    
+    lst_msitem = []
+    
+    try:
+        # Make sure we have the data
+        if xmldoc == None:
+            # Read and parse the data into a DOM element
+            xmldoc = minidom.parse(data_file)
+                   
+        # First create a list with all manuscripts in the XML 
+        # (since there are more than one in each XML) 
         
-        errHandle = ErrHandle()
-        sError = ""
-        nonlocal order
+        manu_list = xmldoc.getElementsByTagName("c")
+
+        for manu in manu_list:
             
-        level += 1
-        order  += 1
-        try:
-            # Create a new item
-            oMsItem = {}
-            oMsItem['level'] = level
-            oMsItem['order'] = order 
-            oMsItem['childof'] = 0 if len(oParent) == 0 else oParent['order']
+            # Try to get an URL from each description 
+            url = ""
+            dao_list = xmldoc.getElementsByTagName("dao")
+            for dao in dao_list:
+                if 'href' in dao_list.attributes: # tot hier gaat het goed, daarna niet meer
+                    url = dao_list.attributes["href"].value
+            oInfo['url'] = url
+        
+            # Try to get a main author
+            mainAuthor = ""
+            authors = xmldoc.getElementsByTagName("persName")
+            for person in authors:
+                # Check if this is linked as author
+                if 'role' in person.attributes and person.attributes['role'].value == "0070":
+                    mainAuthor = getText(person)
+                    # Don't look further: the first author is the *main* author of it 
+                    # TH: geldt dit ook hier? Wat gebeurt er eigenlijk met deze naam?
+                    break
 
-            # Already put it into the overall list
-            lMsItem.append(oMsItem)
+            # Get the main title, to prevent it from remaining empty
+            title_list = xmldoc.getElementsByTagName("unittitle")
+            if title_list.length > 0:
+                # Get the first title
+                title = title_list[0]
+                oInfo['name'] = getText(title)
 
-            # Check if we have a title
-            if not 'unittitle' in oMsItem:
-                # Perhaps we have a parent <msItem> that contains a title
-                parent = msItem.parentNode
-                if parent.nodeName == "msItem":
-                    # Check if this one has a title
-                    if 'unittitle' in parent.childNodes:
-                        oMsItem['unittitle'] = getText(parent.childNodes['unittitle'])
+     #def read_msitem(msItem, oParent, lMsItem, level=0):
+     #   """Recursively process one <msItem> and return in an object"""
+        
+     #   errHandle = ErrHandle()
+     #   sError = ""
+     #   nonlocal order
+            
+     #   level += 1
+     #   order  += 1
+     #   try:
+     #       # Create a new item
+     #       oMsItem = {}
+     #       oMsItem['level'] = level
+     #       oMsItem['order'] = order 
+     #       oMsItem['childof'] = 0 if len(oParent) == 0 else oParent['order']
 
-            # If there is no author, then supply the default author (if that exists)
-            if not 'author' in oMsItem and 'author' in oParent:
-                oMsItem['author'] = oParent['author']
+     #       # Already put it into the overall list
+     #       lMsItem.append(oMsItem)
 
-            # Process all child nodes
-            lastChild = None
-            lAdditional = []
-            for item in msItem.childNodes:
-                if item.nodeType == minidom.Node.ELEMENT_NODE:
-                    # Get the tag name of this item
-                    sTag = item.tagName
-                    # Action depends on the tag
-                    if sTag in mapItem:
-                        oMsItem[mapItem[sTag]] = getText(item)
-                    elif sTag == "note":
-                        if not 'note' in oMsItem:
-                            oMsItem['note'] = ""
-                        oMsItem['note'] = oMsItem['note'] + getText(item) + " "
-                    elif sTag == "msItem":
-                        # This is another <msItem>, a child of mine
-                        bResult, oChild, msg = read_msitem(item, oMsItem, lMsItem, level=level)
-                        if bResult:
-                            if 'firstChild' in oMsItem:
-                                lastChild['next'] = oChild
-                            else:
-                                oMsItem['firstChild'] = oChild
-                                lastChild = oChild
-                        else:
-                            sError = msg
-                            break
-                    else:
-                        # Add the text to 'additional'
-                        sAdd = getText(item).strip()
-                        if sAdd != "":
-                            lAdditional.append(sAdd)
-            # Process the additional stuff
-            if len(lAdditional) > 0:
-                oMsItem['additional'] = " | ".join(lAdditional)
-            # Return what we made
-            return True, oMsItem, "" 
-        except:
-            if sError == "":
-                sError = errHandle.get_error_message()
-            return False, None, sError
+     #       # Check if we have a title
+     #       if not 'unittitle' in oMsItem:
+     #           # Perhaps we have a parent <msItem> that contains a title
+     #           parent = msItem.parentNode
+     #           if parent.nodeName == "msItem":
+     #               # Check if this one has a title
+     #               if 'unittitle' in parent.childNodes:
+     #                   oMsItem['unittitle'] = getText(parent.childNodes['unittitle'])
+
+     #       # If there is no author, then supply the default author (if that exists)
+     #       if not 'author' in oMsItem and 'author' in oParent:
+     #           oMsItem['author'] = oParent['author']
+
+     #       # Process all child nodes
+     #       lastChild = None
+     #       lAdditional = []
+     #       for item in msItem.childNodes:
+     #           if item.nodeType == minidom.Node.ELEMENT_NODE:
+     #               # Get the tag name of this item
+     #               sTag = item.tagName
+     #               # Action depends on the tag
+     #               if sTag in mapItem:
+     #                   oMsItem[mapItem[sTag]] = getText(item)
+     #               elif sTag == "note":
+     #                   if not 'note' in oMsItem:
+     #                       oMsItem['note'] = ""
+     #                   oMsItem['note'] = oMsItem['note'] + getText(item) + " "
+     #               elif sTag == "msItem":
+     #                   # This is another <msItem>, a child of mine
+     #                   bResult, oChild, msg = read_msitem(item, oMsItem, lMsItem, level=level)
+     #                   if bResult:
+     #                       if 'firstChild' in oMsItem:
+     #                           lastChild['next'] = oChild
+     #                       else:
+     #                           oMsItem['firstChild'] = oChild
+     #                           lastChild = oChild
+     #                   else:
+     #                       sError = msg
+     #                       break
+     #               else:
+     #                   # Add the text to 'additional'
+     #                   sAdd = getText(item).strip()
+     #                   if sAdd != "":
+     #                       lAdditional.append(sAdd)
+     #       # Process the additional stuff
+     #       if len(lAdditional) > 0:
+     #           oMsItem['additional'] = " | ".join(lAdditional)
+     #       # Return what we made
+     #       return True, oMsItem, "" 
+     #   except:
+     #       if sError == "":
+     #           sError = errHandle.get_error_message()
+     #       return False, None, sError
     
     #def add_msitem(msItem, type="recursive"):
     #    """Add one item to the list of sermons for this manuscript"""
@@ -745,21 +792,18 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     #    sError = ""
     #    nonlocal iSermCount
 
-    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
-    errHandle = ErrHandle()
-    iSermCount = 0
+    
 
 
     # ================= INITIALISATIONS =============================
 
 
-    # ===============================================================
+    
 
-    try:
-        # ================= PUT YOUR CODE HERE ==========================
-        code_of_thijs = "here"
+ 
+        
 
-        # ===============================================================
+        
     except:
         sError = errHandle.get_error_message()
         oBack['filename'] = filename
@@ -1393,7 +1437,7 @@ class ReaderEad(ReaderImport):
                         if extension == "xml":
                             # This is an XML file
                             oResult = read_ead(username, data_file, filename, self.arErr, source=source)
-
+                            # Tot HIER in read_ead aanpassen 
                             if oResult == None or oResult['status'] == "error":
                                 # Process results
                                 self.add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
