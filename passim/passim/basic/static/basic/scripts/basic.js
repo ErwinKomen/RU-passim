@@ -51,6 +51,27 @@ var ru = (function ($, ru) {
       },
 
       /** 
+       *  createDiv - needed for resizableGrid
+       */
+      createDiv: function (height, colidx) {
+        var div = document.createElement('div');
+        div.style.top = 0;
+        div.style.right = 0;
+        div.style.width = '5px';
+        div.style.position = 'absolute';
+        div.style.cursor = 'col-resize';
+        /* remove backGroundColor later 
+        div.style.backgroundColor = 'red';*/
+        div.style.userSelect = 'none';
+        /* table height */
+        div.style.height = height + 'px';
+        // Set one custom style: the column index
+        $(div).attr("colidx", colidx.toString());
+        // REturn the div that has been made
+        return div;
+      },
+
+      /** 
        *  errClear - clear the error <div>
        */
       errClear: function () {
@@ -66,6 +87,173 @@ var ru = (function ($, ru) {
           sHtml = sHtml + ex.message;
         }
         $("#" + loc_divErr).html(sHtml);
+      },
+
+      /** 
+       *  getStyleVal - needed for resizableGrid
+       */
+      getStyleVal: function (elm, css) {
+        return (window.getComputedStyle(elm, null).getPropertyValue(css))
+      },
+
+      /** 
+       *  paddingDiff - needed for resizableGrid
+       */
+      paddingDiff: function (col) {
+        if (private_methods.getStyleVal(col, 'box-sizing') == 'border-box') {
+          return 0;
+        }
+
+        var padLeft = private_methods.getStyleVal(col, 'padding-left');
+        var padRight = private_methods.getStyleVal(col, 'padding-right');
+        return (parseInt(padLeft) + parseInt(padRight));
+      },
+
+      /**
+       * resizableGrid
+       *    Set the table to have resizable columns
+       *    
+       *    Idea: https://www.brainbell.com/javascript/making-resizable-table-js.html
+       *
+       */
+      resizableGrid: function (elTable) {
+        var row = null,
+            cols = null,
+            div = null,
+            tableHeight = 0;
+
+        try {
+          // Get the row and the columns
+          row = $(elTable).find("tr").first();
+          cols = $(row).children();
+
+          // Sanity:
+          if (!cols) return;
+
+          // Get the table height
+          tableHeight = elTable.offsetHeight;
+          // Add a div with a listener
+          for (var i = 0; i < cols.length; i++) {
+            div = private_methods.createDiv(tableHeight, i);
+            cols[i].appendChild(div);
+            cols[i].style.position = 'relative';
+            cols[i].style.cursor = 'pointer';
+            private_methods.setListeners(div);
+            // Add a click event listener to the <th> column
+            cols[i].addEventListener('click', private_methods.toggle_column); 
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("resizableGrid", ex);
+        }
+      },
+
+      /** 
+       *  setListeners - needed for resizableGrid
+       */
+      setListeners: function (div) {
+        var pageX,
+            curCol,
+            nxtCol,
+            colidx,
+            rows,
+            curColWidth,
+            nxtColWidth;
+
+        // What happens when user clicks on a mouse
+        div.addEventListener('mousedown', function (e) {
+          curCol = e.target.parentElement;    // The column where the cursor is
+          nxtCol = curCol.nextElementSibling; // The next column
+          pageX = e.pageX; 
+          colidx = parseInt($(e.target).attr("colidx"), 10);
+ 
+          var padding = private_methods.paddingDiff(curCol);
+ 
+          curColWidth = curCol.offsetWidth - padding;
+          if (nxtCol)
+            nxtColWidth = nxtCol.offsetWidth - padding;
+
+          // Set what the rows are
+          rows = $(e.target).closest("table").find("tbody tr");
+        });
+
+        // What happens when user hovers over
+        div.addEventListener('mouseover', function (e) {
+          e.target.style.borderRight = '2px solid #0000ff';
+        })
+
+        // The mouse goes out of the area of attention
+        div.addEventListener('mouseout', function (e) {
+          e.target.style.borderRight = '';
+        })
+
+        // User is moving the mouse
+        document.addEventListener('mousemove', function (e) {
+
+          if (curCol) {
+            var diffX = e.pageX - pageX;
+ 
+            if (nxtCol) {
+              nxtCol.style.width = (nxtColWidth - (diffX)) + 'px';
+              nxtCol.style.maxWidth = (nxtColWidth - (diffX)) + 'px';
+            }
+
+            curCol.style.width = (curColWidth + diffX)+'px';
+            curCol.style.maxWidth = (curColWidth + diffX) + 'px';
+
+            // Make sure the width of all table columns at this position is set
+            
+            $(rows).each(function (idx, el) {
+              var td = $(el).find("td")[colidx];
+              td.style.maxWidth = curCol.style.maxWidth;
+              td.style.width = curCol.style.maxWidth;
+            });
+          }
+        });
+
+        // User does mouse 'up'
+        document.addEventListener('mouseup', function (e) {
+          curCol = undefined;
+          nxtCol = undefined;
+          pageX = undefined;
+          nxtColWidth = undefined;
+          curColWidth = undefined
+        });
+      },
+
+      /** 
+       *  toggle_column - show or hide column
+       */
+      toggle_column: function (e) {
+        var th = $(e.target).closest("th"),
+            table = $(th).closest("table"),
+            bSkip = false,
+            colid = parseInt($(th).find("div").first().attr("colidx"), 10);
+
+        // Calculate values
+        // Walk all rows in the table
+        $(table).find("tr").each(function (idx, el) {
+          var td = null;
+
+          if (idx === 0) {
+            td = $(el).find("th")[colid];
+            if (td.style.width.indexOf("100%") >= 0) {
+              bSkip = true;
+            }
+          } else if (!bSkip) {
+            // Get this td
+            td = $(el).find("td")[colid];
+            // Check if max-width equals 10px
+            if (td.style.maxWidth === "10px") {
+              // Reset max and min width
+              td.style = "";
+            } else {
+              // Set max and min width
+              td.style.maxWidth = "10px";
+              td.style.minWidth = "10px";
+            }
+          }
+        });
       },
 
       /** 
@@ -846,6 +1034,11 @@ var ru = (function ($, ru) {
               // Now make it happen
               $(el).parent().find(".django-select2").djangoSelect2(options);
             }
+          });
+
+          // Resizable table columns
+          $("table.resizable").each(function (idx, el) {
+            private_methods.resizableGrid(el);
           });
 
         } catch (ex) {

@@ -5144,12 +5144,15 @@ class SermonDescr(models.Model):
 
         # Initialisations
         lHtml = []
-        gold_list = []
+        ssg_list = []
 
-        # Visit all linked gold sermons
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon
-            gold_list.append(linked.gold.id)
+        # Visit all linked SSG items
+        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Add this SSG
+            ssg_list.append(linked.super.id)
+
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
         # Visit all the editions references of this gold sermon 
         for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('reference__short').distinct():
@@ -5180,22 +5183,35 @@ class SermonDescr(models.Model):
         lHtml = []
         lEqual = []
         lSig = []
-        # Get all the SG linked to me with EQUAL
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon's EQUAL
-            equal = linked.gold.equal
-            if equal not in lEqual: lEqual.append(equal)
+        ssg_list = []
 
-        # Visit all equality sets that I am part of
-        for eqset in lEqual:
-            # Visit all Sermons Gold in this set
-            for gold in eqset.equal_goldsermons.all():
-                # Visit all signatures
-                for sig in gold.goldsignatures.all():
-                    if sig.id not in lSig: lSig.append(sig.id)
+        # Visit all linked SSG items
+        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Add this SSG
+            ssg_list.append(linked.super.id)
+
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+
+        # Get all signatures part of these GS-items
+
+        ## Get all the SG linked to me with EQUAL
+        #for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        #    # Access the gold sermon's EQUAL
+        #    equal = linked.gold.equal
+        #    if equal not in lEqual: lEqual.append(equal)
+
+        ## Visit all equality sets that I am part of
+        #for eqset in lEqual:
+        #    # Visit all Sermons Gold in this set
+        #    for gold in eqset.equal_goldsermons.all():
+        #        # Visit all signatures
+        #        for sig in gold.goldsignatures.all():
+        #            if sig.id not in lSig: lSig.append(sig.id)
 
         # Get an ordered set of signatures
-        for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
+        # OLD: for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
+        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
             # Create a display for this topic
             if type == "first":
                 # Determine where clicking should lead to

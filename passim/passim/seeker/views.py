@@ -5484,7 +5484,8 @@ class SermonEdit(BasicDetails):
              'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
             {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
-            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
+            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
+             'title': "Editions of the Sermons Gold that are part of the same equality set"},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
             {'type': 'line',    'label': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
              'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
@@ -8789,36 +8790,99 @@ class EqualGoldDetails(EqualGoldEdit):
             related_objects = []
 
             # List of manuscripts related to the SSG via sermon descriptions
-            manuscripts = dict(title="Manuscripts", prefix="manu")
+            manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
 
-            # Get all SermonDescr instances linking to the correct eqg instance
-            qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+            # WAS: Get all SermonDescr instances linking to the correct eqg instance
+            # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+
+            # New: Get all the SermonDescr instances linked with equality to SSG:
+            qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
             rel_list =[]
-            for sermon in qs_s:
+            method = "FourColumns"
+            method = "Issue216"
+            for sermonlink in qs_s:
+                sermon = sermonlink.sermon
                 # Get the 'item': the manuscript
                 item = sermon.manu
                 rel_item = []
-                manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
-                rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-                                 'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+                
+                if method == "FourColumns":
+                    # Name as CITY - LIBRARY - IDNO + Name
+                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
-                # Location number and link to the correct point in the manuscript details view...
-                itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
-                rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
-                                 'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+                    # Location number and link to the correct point in the manuscript details view...
+                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
+                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
 
-                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                rel_item.append({'value': daterange, 'align': "right"})
-                # Issue #214: combine start and end into daterange
-                # rel_item.append({'value': item.yearfinish, 'align': "right"})
-                # rel_item.append({'value': item.yearstart, 'align': "right"})
+                    # date range
+                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                    rel_item.append({'value': daterange, 'align': "right"})
 
-                sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
-                rel_item.append({'value': sermon.locus, 'title': sermo_name, 
-                                 'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                    # Sermon Locus + Title + link
+                    sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+                    rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+                                     'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                elif method == "Issue216":
+                    # Shelfmark = IDNO
+                    manu_full = "{}, {}, {}".format(item.library.lcity.name, item.library.name, item.idno)
+                    manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+
+                    # Origin
+                    or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+                    rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
+
+                    # date range
+                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                    rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
+
+                    # Collection(s)
+                    coll_info = item.get_collections_markdown()
+                    rel_item.append({'value': coll_info, 'initial': 'small'})
+
+                    # Location number and link to the correct point in the manuscript details view...
+                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
+                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+
+                    # Folio number of the item
+                    rel_item.append({'value': sermon.locus, 'initial': 'small'})
+
+                    # Attributed author
+                    rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
+
+                    # Incipit
+                    rel_item.append({'value': sermon.get_incipit_markdown(), 'initial': 'small'})
+
+                    # Explicit
+                    rel_item.append({'value': sermon.get_explicit_markdown(), 'initial': 'small'})
+
+                    # Keywords
+                    rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
+
+                # Add this Manu/Sermon line to the list
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
+
+            if method == "FourColumns":
+                manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
+            elif method == "Issue216":
+                manuscripts['columns'] = [
+                    'Shelfmark', 
+                    '<span title="Origin/Provenance">or./prov.</span>', 
+                    '<span title="Date range">date</span>', 
+                    '<span title="Collection name">coll.</span>', 
+                    '<span title="Item">item</span>', 
+                    '<span title="Folio number">ff.</span>', 
+                    '<span title="Attributed author">auth.</span>', 
+                    '<span title="Incipit">inc.</span>', 
+                    '<span title="Explicit">expl.</span>', 
+                    '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
+                    ]
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
