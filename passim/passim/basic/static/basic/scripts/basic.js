@@ -60,12 +60,11 @@ var ru = (function ($, ru) {
         div.style.width = '5px';
         div.style.position = 'absolute';
         div.style.cursor = 'col-resize';
-        /* remove backGroundColor later 
-        div.style.backgroundColor = 'red';*/
         div.style.userSelect = 'none';
-        /* table height */
+
+        // The table height determines how large the line is going to be
         div.style.height = height + 'px';
-        // Set one custom style: the column index
+        // Set one custom attribut: the column index
         $(div).attr("colidx", colidx.toString());
         // REturn the div that has been made
         return div;
@@ -130,7 +129,7 @@ var ru = (function ($, ru) {
           // Sanity:
           if (!cols) return;
 
-          // Get the table height
+          // Get the table height and the table width
           tableHeight = elTable.offsetHeight;
           // Add a div with a listener
           for (var i = 0; i < cols.length; i++) {
@@ -228,12 +227,16 @@ var ru = (function ($, ru) {
         var th = $(e.target).closest("th"),
             table = $(th).closest("table"),
             bSkip = false,
+            tableWidth = 0,
             colid = parseInt($(th).find("div").first().attr("colidx"), 10);
 
         // Calculate values
+        tableWidth = table[0].offsetWidth;
         // Walk all rows in the table
         $(table).find("tr").each(function (idx, el) {
-          var td = null;
+          var td = null,
+              width = 0,
+              maxWidth = 0;
 
           if (idx === 0) {
             td = $(el).find("th")[colid];
@@ -243,12 +246,22 @@ var ru = (function ($, ru) {
           } else if (!bSkip) {
             // Get this td
             td = $(el).find("td")[colid];
-            // Check if max-width equals 10px
+
+            // See which way the toggling goes: check if max-width equals 10px
             if (td.style.maxWidth === "10px") {
-              // Reset max and min width
+              // Expand: remove max and min width
+              width = td.style.width;
+              maxWidth = td.style.maxWidth;
+              // Now reset the current styling
               td.style = "";
+              // Check how wide we become
+              if (table[0].offsetWidth > tableWidth) {
+                // Revert: we are not able to expand further
+                td.style.width = width;
+                td.style.maxWidth = maxWidth;
+              }
             } else {
-              // Set max and min width
+              // Shrink: set max and min width
               td.style.maxWidth = "10px";
               td.style.minWidth = "10px";
             }
