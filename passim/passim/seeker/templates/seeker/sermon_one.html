@@ -50,6 +50,9 @@
                 {% if sermon.obj.goldsermons.count > 0 %}
                   <span class="badge signature ot" title="This links to {{sermon.obj.goldsermons.count}} Sermons Gold">G</span>
                 {% endif %}
+                {% if sermon.obj.get_eqsetcount > 0 %}
+                  <span class="glyphicon glyphicon-link" style="color: darkgreen;" title="This links to {{sermon.obj.get_eqsetcount}} Super Sermons Gold"></span>
+                {% endif %}
                 <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
                   <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
                 </a>

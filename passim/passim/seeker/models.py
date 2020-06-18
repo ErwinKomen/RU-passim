@@ -5176,6 +5176,13 @@ class SermonDescr(models.Model):
         """Get the contents of the postscriptum field using markdown"""
         return adapt_markdown(self.postscriptum)
 
+    def get_eqsetcount(self):
+        """Get the number of SSGs this sermon is part of"""
+
+        # Visit all linked SSG items
+        ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        return ssg_count
+
     def get_eqsetsignatures_markdown(self, type="all"):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
