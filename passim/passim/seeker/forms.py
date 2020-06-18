@@ -206,14 +206,15 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
     addonly = False
 
     def label_from_instance(self, obj):
-        sLabel = obj.get_label(do_incexpl = True)
+        # sLabel = obj.get_label(do_incexpl = False)
+        sLabel = obj.code
         return sLabel
 
     def get_queryset(self):
         if self.addonly:
             qs = EqualGold.objects.none()
         else:
-            qs = EqualGold.objects.all().order_by('code').distinct()
+            qs = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code').distinct()
         return qs
 
 
@@ -891,6 +892,9 @@ class SermonForm(PassimModelForm):
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -984,6 +988,7 @@ class SermonForm(PassimModelForm):
             # The available Sermondescr-Equal list
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
