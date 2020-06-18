@@ -3685,6 +3685,21 @@ class EqualGold(models.Model):
             oErr.DoError("Equalgold.save")
             return None
 
+    def author_help(self, info):
+        """Provide help for this particular author"""
+
+        html = []
+
+        # Provide the name of the author + button for modal dialogue
+        author = "(not set)" if self.author == None else self.author.name
+        html.append("<div><span>{}</span>&nbsp;<a class='btn jumbo-1 btn-xs' data-toggle='modal' data-target='#author_info'>".format(author))
+        html.append("<span class='glyphicon glyphicon-info-sign' style='color: darkblue;'></span></a></div>")
+
+        # Provide the Modal contents
+        html.append(info)
+
+        return "\n".join(html)
+
     def create_empty():
         """Create an empty new one"""
 

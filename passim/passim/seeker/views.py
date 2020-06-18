@@ -8568,10 +8568,13 @@ class EqualGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
+        info = render_to_string('seeker/author_info.html')
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
-            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
+            {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
 
             # Issue #212: remove this sermon number
             # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
