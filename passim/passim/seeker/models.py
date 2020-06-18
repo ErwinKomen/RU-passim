@@ -1935,6 +1935,8 @@ class Litref(models.Model):
 
     # [1] The itemId for this literature reference
     itemid = models.CharField("Item ID", max_length=LONG_STRING)
+    # Optional year field
+    year = models.IntegerField("Publication year", blank=True, null=True)
     # [0-1] The actual 'data' contents as a JSON string
     data = models.TextField("JSON data", blank=True, default="")
     # [0-1] The abbreviation (retrieved) for this item
@@ -2146,11 +2148,19 @@ class Litref(models.Model):
                                 result = "{} ({})".format(authors, year)
                             else:
                                 result = "{} ({})".format(short_title, year)
+                        elif year != "" and short_title != "":
+                            result = "{} ({})".format(short_title, year)
 
  
                     if result != "":
-                        # update the full field
+                        # update the short field
                         self.short = result
+
+                    if year != "" and year != "?":
+                        try:
+                            self.year = int(year)
+                        except:
+                            pass
 
                     # Now update this item
                     self.save()
@@ -3750,12 +3760,14 @@ class EqualGold(models.Model):
 
         lHtml = []
         # Visit all editions
-        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('-reference__year', 'reference__short')
         for edi in qs:
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -4218,11 +4230,13 @@ class SermonGold(models.Model):
     def get_editions_markdown(self):
         lHtml = []
         # Visit all editions
-        for edi in self.sermon_gold_editions.all().order_by('reference__short'):
+        for edi in self.sermon_gold_editions.all().order_by('-reference__year', 'reference__short'):
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -5170,11 +5184,13 @@ class SermonDescr(models.Model):
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
         # Visit all the editions references of this gold sermon 
-        for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('reference__short').distinct():
+        for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('-reference__year', 'reference__short').distinct():
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
                 
         sBack = ", ".join(lHtml)
         return sBack
