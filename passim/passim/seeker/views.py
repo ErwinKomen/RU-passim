@@ -8834,6 +8834,8 @@ class EqualGoldDetails(EqualGoldEdit):
                     # Shelfmark = IDNO
                     manu_full = "{}, {}, {}".format(item.library.lcity.name, item.library.name, item.idno)
                     manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                    # Name as CITY - LIBRARY - IDNO + Name
+                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
                     rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                      'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
