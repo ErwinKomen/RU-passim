@@ -5695,6 +5695,13 @@ class SermonDetails(SermonEdit):
 
                 # Now save the adapted EqualGold obj
                 obj.save()
+
+                # Mark these changes, which are done outside the normal 'form' system
+                actiontype = "save"
+                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
+                details = dict(savetype="change", id=obj.id, changes=changes)
+                passim_action_add(self, obj, details, actiontype)
+
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
         else:
@@ -8823,6 +8830,13 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # Now save the adapted EqualGold obj
                 obj.save()
+
+                # Mark these changes, which are done outside the normal 'form' system
+                actiontype = "save"
+                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
+                details = dict(savetype="change", id=obj.id, changes=changes)
+                passim_action_add(self, obj, details, actiontype)
+
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
         else:
