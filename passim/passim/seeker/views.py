@@ -5487,7 +5487,7 @@ class SermonEdit(BasicDetails):
             {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
              'title': "Editions of the Sermons Gold that are part of the same equality set"},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
-            {'type': 'line',    'label': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
+            {'type': 'line',    'label': "Super Sermon gold links:",  'value': self.get_superlinks_markdown(instance), 
              'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
              'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
             ]
@@ -5517,6 +5517,19 @@ class SermonEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_superlinks_markdown(self, instance):
+        context = {}
+        template_name = 'seeker/sermon_superlinks.html'
+        sBack = ""
+        if instance:
+            # Add to context
+            context['superlist'] = instance.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist')
+            context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+            context['object_id'] = instance.id
+            # Calculate with the template
+            sBack = render_to_string(template_name, context)
+        return sBack
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
@@ -5663,13 +5676,35 @@ class SermonDetails(SermonEdit):
         # Start by executing the standard handling
         super(SermonDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        # Are we copying information?? (only allowed if we are the app_editor)
+        if 'supercopy' in self.qd and context['is_app_editor']:
+            # Get the ID of the SSG from which information is to be copied to the S
+            superid = self.qd['supercopy']
+            # Get the SSG instance
+            equal = EqualGold.objects.filter(id=superid).first()
 
-        # List of post-load objects
-        context['postload_objects'] = []
+            if equal != None:
+                # Copy all relevant information to the EqualGold obj (which is a SSG)
+                obj = self.object
+                # (1) copy author
+                if equal.author != None: obj.author = equal.author
+                # (2) copy incipit
+                if equal.incipit != None and equal.incipit != "": obj.incipit = equal.incipit ; obj.srchincipit = equal.srchincipit
+                # (3) copy explicit
+                if equal.explicit != None and equal.explicit != "": obj.explicit = equal.explicit ; obj.srchexplicit = equal.srchexplicit
 
-        # Lists of related objects
-        context['related_objects'] = []
+                # Now save the adapted EqualGold obj
+                obj.save()
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+        else:
+            context['sections'] = []
+
+            # List of post-load objects
+            context['postload_objects'] = []
+
+            # Lists of related objects
+            context['related_objects'] = []
 
         # Return the context we have made
         return context

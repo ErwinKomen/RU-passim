@@ -3783,20 +3783,20 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         return sBack
 
-    def get_goldset_markdown(self):
+    #def get_goldset_markdown(self):
 
-        context = []
-        template_name = 'seeker/super_goldset.html'
+    #    context = []
+    #    template_name = 'seeker/super_goldset.html'
 
 
-        lHtml = []
-        for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
-            sigs = json.loads(item.siglist)
-            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
-            url = reverse('gold_details', kwargs={'pk': item.id})
-            lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
-        sBack = " ".join(lHtml)
-        return sBack
+    #    lHtml = []
+    #    for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
+    #        sigs = json.loads(item.siglist)
+    #        first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+    #        url = reverse('gold_details', kwargs={'pk': item.id})
+    #        lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+    #    sBack = " ".join(lHtml)
+    #    return sBack
 
     def get_incipit_markdown(self, add_search = False):
         """Get the contents of the incipit field using markdown"""
@@ -5434,20 +5434,20 @@ class SermonDescr(models.Model):
     def get_stype_light(self):
         return get_stype_light(self.stype)
 
-    def get_superlinks_markdown(self):
-        """Return all the SSG links = type + super"""
+    #def get_superlinks_markdown(self):
+    #    """Return all the SSG links = type + super"""
 
-        lHtml = []
-        sBack = ""
-        for superlink in self.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist'):
-            lHtml.append("<tr class='view-row'>")
-            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
-            url = reverse('equalgold_details', kwargs={'pk': superlink.super.id})
-            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.super.get_view()))
-            lHtml.append("</tr>")
-        if len(lHtml) > 0:
-            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
-        return sBack
+    #    lHtml = []
+    #    sBack = ""
+    #    for superlink in self.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist'):
+    #        lHtml.append("<tr class='view-row'>")
+    #        lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
+    #        url = reverse('equalgold_details', kwargs={'pk': superlink.super.id})
+    #        lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.super.get_view()))
+    #        lHtml.append("</tr>")
+    #    if len(lHtml) > 0:
+    #        sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+    #    return sBack
 
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
