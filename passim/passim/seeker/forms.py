@@ -895,6 +895,8 @@ class SermonForm(PassimModelForm):
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
+    passimcode  = forms.CharField(label=_("Passim code"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -1551,6 +1553,9 @@ class SuperSermonGoldForm(PassimModelForm):
     superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
                                                          'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
@@ -1577,7 +1582,7 @@ class SuperSermonGoldForm(PassimModelForm):
         fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
         widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
-                                                       'data-placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
+                                                       'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1601,6 +1606,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 

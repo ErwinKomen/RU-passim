@@ -5748,7 +5748,7 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
-            {'filter': 'code',          'fkfield': 'sermondescr_super', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
@@ -8954,7 +8954,7 @@ class EqualGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
+            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
