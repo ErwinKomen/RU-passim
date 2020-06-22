@@ -7470,6 +7470,7 @@ class ManuscriptListView(BasicList):
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
+        {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
@@ -7482,16 +7483,17 @@ class ManuscriptListView(BasicList):
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'manuid',           'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',          'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',             'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',          'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',       'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',           'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',          'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
-            {'filter': 'stype',            'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
+            {'filter': 'manuid',        'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',     'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
+            {'filter': 'code',          'fkfield': 'manusermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
