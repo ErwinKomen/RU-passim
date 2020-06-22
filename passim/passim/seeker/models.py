@@ -960,6 +960,27 @@ def add_gold2gold_ORIGINAL(src, dst, ltype):
     # Return the number of added relations
     return added, lst_total
 
+def moveup(instance, tblGeneral, tblUser):
+    """Move this keyword into the general keyword-link-table"""
+        
+    oErr = ErrHandle()
+    try:
+        # Check if the kw is not in the general table yet
+        general = tblGeneral.objects.filter(keyword=self.keyword).first()
+        if general == None:
+            # Add the keyword
+            tblGeneral.objects.create(keyword=self.keyword, equal=self.equal)
+        # Remove the *user* specific references to this keyword (for *all*) users
+        tblUser.objects.filter(keyword=self.keyword).delete()
+        # Return positively
+        bOkay = True
+    except:
+        sMsg = oErr.get_error_message()
+        oErr.DoError("moveup")
+        bOkay = False
+    return bOkay
+
+
 
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
@@ -4325,6 +4346,22 @@ class SermonGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_keywords_ssg_markdown(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Determine where clicking should lead to
+            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_label(self, do_incexpl=False):
         """Get a string view of myself to be put on a label"""
 
@@ -4817,6 +4854,23 @@ class EqualGoldKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class EqualGoldKeywordUser(models.Model):
+    """Relation between an EqualGold and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equal_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="equal_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="equal_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, EqualGoldKeyword, EqualGoldKeywordUser)
+
+
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
 
@@ -4850,6 +4904,30 @@ class SermonGoldKeyword(models.Model):
         if self.gold and self.keyword_id:
             response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
+
+
+class SermonGoldKeywordUser(models.Model):
+    """Relation between a SermonGold and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, related_name="sermongold_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermongold_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="sermongold_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Note: only save if there is both a gold and a keyword
+        if self.gold and self.keyword_id:
+            response = super(SermonGoldKeywordUser, self).save(force_insert, force_update, using, update_fields)
+        return response
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, SermonGoldKeyword, SermonGoldKeywordUser)
 
 
 class Ftextlink(models.Model):
@@ -5323,6 +5401,24 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_keywords_ssg_markdown(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all the SSGs to which I link with equality
+        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Determine where clicking should lead to
+            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_litrefs_markdown(self):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
@@ -5562,6 +5658,23 @@ class SermonDescrKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class SermonDescrKeywordUser(models.Model):
+    """Relation between a SermonDescr and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="sermondescr_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, SermonDescrKeyword, SermonDescrKeywordUser)
+
+
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -5571,6 +5684,23 @@ class ManuscriptKeyword(models.Model):
     keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptKeywordUser(models.Model):
+    """Relation between a Manuscript and a Keyword - restricted to user"""
+
+    # [1] The link is between a Manuscript instance ...
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="manuscript_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="manuscript_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
 
 
 class SermonDescrEqual(models.Model):

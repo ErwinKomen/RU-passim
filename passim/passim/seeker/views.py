@@ -5485,6 +5485,8 @@ class SermonEdit(BasicDetails):
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
              'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+             'title': 'Keywords attached to the Super Sermon Gold(s)'},
             {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
              'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
@@ -6125,7 +6127,7 @@ class ProfileListView(BasicList):
             lHtml = []
             for g in instance.user.groups.all():
                 name = g.name.replace("passim_", "")
-                lHtml.append("<span class='badge signatures gr'>{}</span>".format(name))
+                lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
             sBack = ", ".join(lHtml)
         return sBack, sTitle
 
@@ -8380,6 +8382,8 @@ class SermonGoldEdit(BasicDetails):
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
              #'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+             'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
             {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
