@@ -56,6 +56,7 @@ PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -82,6 +83,12 @@ def user_is_ingroup(request, sGroup):
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
+
+def user_is_superuser(request):
+    # Is this user part of the indicated group?
+    username = request.user.username
+    user = User.objects.filter(username=username).first()
+    return user.is_superuser
 
 def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
     """Process one visit and return updated breadcrumbs"""
@@ -617,6 +624,7 @@ class BasicList(ListView):
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
+        context['is_app_moderator'] = user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)
 
         # Process this visit and get the new breadcrumbs object
         prevpage = reverse('home')
@@ -841,6 +849,7 @@ class BasicDetails(DetailView):
     permission = "write"    # Permission can be: (nothing), "read" and "write"
     new_button = False
     do_not_save = False
+    no_delete = False
     newRedirect = False     # Redirect the page name to a correct one after creating
     use_team_group = False
     redirectpage = ""       # Where to redirect to
@@ -1027,11 +1036,13 @@ class BasicDetails(DetailView):
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
+        context['is_app_moderator'] = user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
         context['afternewurl'] = ""
 
         context['topleftbuttons'] = ""
         context['history_button'] = self.history_button
+        context['no_delete'] = self.no_delete
 
         if context['authenticated']:
             self.permission = "read"

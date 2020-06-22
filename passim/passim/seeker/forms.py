@@ -1090,6 +1090,45 @@ class KeywordForm(forms.ModelForm):
             self.fields['visibility'].initial = instance.visibility
 
 
+class ProfileForm(forms.ModelForm):
+    """Profile list and details"""
+
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Profile
+        fields = ['user', 'ptype', 'affiliation']
+        widgets={'user':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'ptype':       forms.Select(attrs={'class': 'input-sm', 'placeholder': 'User profile status...',  'style': 'width: 100%;'}),
+                 'affiliation': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'List all affiliation details...'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProfileForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['user'].required = False
+        self.fields['ptype'].required = False
+        self.fields['affiliation'].required = False
+        # Initialize choices for linktype
+        init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            self.fields['ptype'].initial = instance.ptype
+            self.fields['user'].initial = instance.user
+            self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+
+    def clean_user(self):
+        data = self.cleaned_data.get("user")
+        if data == None:
+            data = self.fields['user'].initial
+        return data
+    
+
 class ProjectForm(forms.ModelForm):
     """Project list"""
 

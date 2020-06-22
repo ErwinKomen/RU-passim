@@ -43,6 +43,7 @@ LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 VISIBILITY_TYPE = "seeker.visibility"
 
@@ -286,7 +287,6 @@ def get_stype_light(stype):
 
     # Return what we made
     return sBack
-
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1147,8 +1147,13 @@ class Profile(models.Model):
 
     # [1] Every profile is linked to a user
     user = models.ForeignKey(User)
+    # [1] Every user has a profile-status
+    ptype = models.CharField("Profile status", choices=build_abbr_list(PROFILE_TYPE), max_length=5, default="unk")
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
+
+    # [0-1] Affiliation of this user with as many details as needed
+    affiliation = models.TextField("Affiliation", blank=True, null=True)
 
     # [1] Each of the four basket types has a history
     historysermo = models.TextField("Sermon history", default="[]")
@@ -1267,6 +1272,18 @@ class Profile(models.Model):
         # Get to the profile of this user
         profile = Profile.objects.filter(user=user).first()
         return profile
+
+    def get_groups_markdown(self):
+        """Get all the groups this user is member of"""
+
+        lHtml = []
+        # Visit all keywords
+        for group in self.user.groups.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""

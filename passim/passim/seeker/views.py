@@ -65,7 +65,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm
+                                SuperSermonGoldCollectionForm, ProfileForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -107,6 +107,7 @@ PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 
 
 def treat_bom(sHtml):
@@ -316,6 +317,12 @@ def user_is_ingroup(request, sGroup):
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
+
+def user_is_superuser(request):
+    # Is this user part of the indicated group?
+    username = request.user.username
+    user = User.objects.filter(username=username).first()
+    return user.is_superuser
 
 def add_visit(request, name, is_menu):
     """Add the visit to the current path"""
@@ -677,6 +684,7 @@ def home(request):
                 'site_url': admin.site.site_url}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -6042,6 +6050,84 @@ class KeywordListView(BasicList):
             fields['visibility'] = "all"
 
         return fields, lstExclude, qAlternative
+
+
+class ProfileEdit(BasicDetails):
+    """Details view of profile"""
+
+    model = Profile
+    mForm = ProfileForm
+    prefix = "prof"
+    title = "ProfileEdit"
+    rtype = "json"
+    history_button = True
+    no_delete = True
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "User",          'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Username:",     'value': instance.user.username, },
+            {'type': 'plain', 'label': "Email:",        'value': instance.user.email, },
+            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name, },
+            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name, },
+            {'type': 'plain', 'label': "Is staff:",     'value': instance.user.is_staff, },
+            {'type': 'plain', 'label': "Is superuser:", 'value': instance.user.is_superuser, },
+            {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
+            {'type': 'plain', 'label': "Last login:",   'value': instance.user.last_login.strftime("%d/%b/%Y %H:%M"), },
+            {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(), 'field_key': 'ptype'},
+            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,         'field_key': 'affiliation'}
+            ]
+        # Return the context we have made
+        return context
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class ProfileDetails(ProfileEdit):
+    """Like Profile Edit, but then html output"""
+    rtype = "html"
+
+
+class ProfileListView(BasicList):
+    """List user profiles"""
+
+    model = Profile
+    listform = ProfileForm
+    prefix = "prof"
+    new_button = False      # Do not allow adding new ones here
+    order_cols = ['user__username', '', 'ptype', 'affiliation', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Username',    'order': 'o=1', 'type': 'str', 'custom': 'name', 'default': "(unnamed)", 'linkdetails': True},
+        {'name': 'Email',       'order': '',    'type': 'str', 'custom': 'email', 'linkdetails': True},
+        {'name': 'Status',      'order': 'o=3', 'type': 'str', 'custom': 'status', 'linkdetails': True},
+        {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
+        {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "name":
+            sBack = instance.user.username
+        elif custom == "email":
+            sBack = instance.user.email
+        elif custom == "status":
+            sBack = instance.get_ptype_display()
+        elif custom == "affiliation":
+            sBack = "-" if instance.affiliation == None else instance.affiliation
+        elif custom == "groups":
+            lHtml = []
+            for g in instance.user.groups.all():
+                name = g.name.replace("passim_", "")
+                lHtml.append("<span class='badge signatures gr'>{}</span>".format(name))
+            sBack = ", ".join(lHtml)
+        return sBack, sTitle
 
 
 class ProjectEdit(PassimDetails):
