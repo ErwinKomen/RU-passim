@@ -319,10 +319,14 @@ def user_is_ingroup(request, sGroup):
     return bIsInGroup
 
 def user_is_superuser(request):
+    bFound = False
     # Is this user part of the indicated group?
     username = request.user.username
-    user = User.objects.filter(username=username).first()
-    return user.is_superuser
+    if username != "":
+        user = User.objects.filter(username=username).first()
+        if user != None:
+            bFound = user.is_superuser
+    return bFound
 
 def add_visit(request, name, is_menu):
     """Add the visit to the current path"""
