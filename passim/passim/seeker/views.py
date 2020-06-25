@@ -65,14 +65,16 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm
+                                SuperSermonGoldCollectionForm, ProfileForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
+    CollectionMan, CollectionSuper, CollectionGold, \
+    EqualGoldKeywordUser, ManuscriptKeywordUser, SermonDescrKeywordUser, SermonGoldKeywordUser, \
+   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -107,6 +109,7 @@ PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 
 
 def treat_bom(sHtml):
@@ -119,7 +122,7 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through = False, userplus = None,
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, related_is_through = False, userplus = None,
               added=None, deleted=None):
     """Adapt the 'field' of 'instance' to contain only the items in 'qs'
     
@@ -149,6 +152,8 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], related_is_through 
                     for item in extra:
                         # Copy the field with this name from [obj] to 
                         args[item] = getattr(obj, item)
+                    for k,v in extrargs.items():
+                        args[k] = v
                     # cls.objects.create(**{field1: instance, field2: obj})
                     new = cls.objects.create(**args)
                     if added != None:
@@ -316,6 +321,16 @@ def user_is_ingroup(request, sGroup):
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
+
+def user_is_superuser(request):
+    bFound = False
+    # Is this user part of the indicated group?
+    username = request.user.username
+    if username != "":
+        user = User.objects.filter(username=username).first()
+        if user != None:
+            bFound = user.is_superuser
+    return bFound
 
 def add_visit(request, name, is_menu):
     """Add the visit to the current path"""
@@ -677,6 +692,7 @@ def home(request):
                 'site_url': admin.site.site_url}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -5450,8 +5466,10 @@ class SermonEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
-        iStop = 1
         manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
@@ -5477,6 +5495,10 @@ class SermonEdit(BasicDetails):
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
              'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+             'title': 'Keywords attached to the Super Sermon Gold(s)'},
             {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
              'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
@@ -5484,9 +5506,10 @@ class SermonEdit(BasicDetails):
              'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
             {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
-            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown()},
+            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
+             'title': "Editions of the Sermons Gold that are part of the same equality set"},
             {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
-            {'type': 'line',    'label': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
+            {'type': 'line',    'label': "Super Sermon gold links:",  'value': self.get_superlinks_markdown(instance), 
              'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
              'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
             ]
@@ -5516,6 +5539,19 @@ class SermonEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_superlinks_markdown(self, instance):
+        context = {}
+        template_name = 'seeker/sermon_superlinks.html'
+        sBack = ""
+        if instance:
+            # Add to context
+            context['superlist'] = instance.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist')
+            context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+            context['object_id'] = instance.id
+            # Calculate with the template
+            sBack = render_to_string(template_name, context)
+        return sBack
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
@@ -5626,15 +5662,20 @@ class SermonEdit(BasicDetails):
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
 
-            # (2) 'Links to Gold Signatures'
+            # (2) user-specific 'keywords'
+            ukwlist = form.cleaned_data['ukwlist']
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(SermonDescrKeywordUser, instance, "sermon", ukwlist, "keyword", extrargs = {'profile': profile})
+
+            # (3) 'Links to Gold Signatures'
             siglist = form.cleaned_data['siglist']
             adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
 
-            # (3) 'Links to Gold Sermons'
+            # (4) 'Links to Gold Sermons'
             superlist = form.cleaned_data['superlist']
             adapt_m2m(SermonDescrEqual, instance, "sermon", superlist, "super", extra = ['linktype'], related_is_through=True)
 
-            # (4) 'collections'
+            # (5) 'collections'
             collist_s = form.cleaned_data['collist_s']
             adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
 
@@ -5662,13 +5703,42 @@ class SermonDetails(SermonEdit):
         # Start by executing the standard handling
         super(SermonDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        # Are we copying information?? (only allowed if we are the app_editor)
+        if 'supercopy' in self.qd and context['is_app_editor']:
+            # Get the ID of the SSG from which information is to be copied to the S
+            superid = self.qd['supercopy']
+            # Get the SSG instance
+            equal = EqualGold.objects.filter(id=superid).first()
 
-        # List of post-load objects
-        context['postload_objects'] = []
+            if equal != None:
+                # Copy all relevant information to the EqualGold obj (which is a SSG)
+                obj = self.object
+                # (1) copy author
+                if equal.author != None: obj.author = equal.author
+                # (2) copy incipit
+                if equal.incipit != None and equal.incipit != "": obj.incipit = equal.incipit ; obj.srchincipit = equal.srchincipit
+                # (3) copy explicit
+                if equal.explicit != None and equal.explicit != "": obj.explicit = equal.explicit ; obj.srchexplicit = equal.srchexplicit
 
-        # Lists of related objects
-        context['related_objects'] = []
+                # Now save the adapted EqualGold obj
+                obj.save()
+
+                # Mark these changes, which are done outside the normal 'form' system
+                actiontype = "save"
+                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
+                details = dict(savetype="change", id=obj.id, changes=changes)
+                passim_action_add(self, obj, details, actiontype)
+
+            # And in all cases: make sure we redirect to the 'clean' GET page
+            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+        else:
+            context['sections'] = []
+
+            # List of post-load objects
+            context['postload_objects'] = []
+
+            # Lists of related objects
+            context['related_objects'] = []
 
         # Return the context we have made
         return context
@@ -5723,6 +5793,7 @@ class SermonListView(BasicList):
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
+                {"name": "Passim code",      "id": "filter_code",           "enabled": False},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
@@ -5746,6 +5817,7 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
+            {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
@@ -5997,6 +6069,84 @@ class KeywordListView(BasicList):
             fields['visibility'] = "all"
 
         return fields, lstExclude, qAlternative
+
+
+class ProfileEdit(BasicDetails):
+    """Details view of profile"""
+
+    model = Profile
+    mForm = ProfileForm
+    prefix = "prof"
+    title = "ProfileEdit"
+    rtype = "json"
+    history_button = True
+    no_delete = True
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "User",          'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Username:",     'value': instance.user.username, },
+            {'type': 'plain', 'label': "Email:",        'value': instance.user.email, },
+            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name, },
+            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name, },
+            {'type': 'plain', 'label': "Is staff:",     'value': instance.user.is_staff, },
+            {'type': 'plain', 'label': "Is superuser:", 'value': instance.user.is_superuser, },
+            {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
+            {'type': 'plain', 'label': "Last login:",   'value': instance.user.last_login.strftime("%d/%b/%Y %H:%M"), },
+            {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(), 'field_key': 'ptype'},
+            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,         'field_key': 'affiliation'}
+            ]
+        # Return the context we have made
+        return context
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class ProfileDetails(ProfileEdit):
+    """Like Profile Edit, but then html output"""
+    rtype = "html"
+
+
+class ProfileListView(BasicList):
+    """List user profiles"""
+
+    model = Profile
+    listform = ProfileForm
+    prefix = "prof"
+    new_button = False      # Do not allow adding new ones here
+    order_cols = ['user__username', '', 'ptype', 'affiliation', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Username',    'order': 'o=1', 'type': 'str', 'custom': 'name', 'default': "(unnamed)", 'linkdetails': True},
+        {'name': 'Email',       'order': '',    'type': 'str', 'custom': 'email', 'linkdetails': True},
+        {'name': 'Status',      'order': 'o=3', 'type': 'str', 'custom': 'status', 'linkdetails': True},
+        {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
+        {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "name":
+            sBack = instance.user.username
+        elif custom == "email":
+            sBack = instance.user.email
+        elif custom == "status":
+            sBack = instance.get_ptype_display()
+        elif custom == "affiliation":
+            sBack = "-" if instance.affiliation == None else instance.affiliation
+        elif custom == "groups":
+            lHtml = []
+            for g in instance.user.groups.all():
+                name = g.name.replace("passim_", "")
+                lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
+            sBack = ", ".join(lHtml)
+        return sBack, sTitle
 
 
 class ProjectEdit(PassimDetails):
@@ -6758,8 +6908,10 @@ class ManuscriptEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
-        y = instance
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
             {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
@@ -6773,8 +6925,10 @@ class ManuscriptEdit(BasicDetails):
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
             {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
             {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),   'field_key': 'project'},
-            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),  'field_list': 'kwlist'},
+            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
+            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
+            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
             {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
                 'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
             {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
@@ -6901,11 +7055,16 @@ class ManuscriptEdit(BasicDetails):
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(ManuscriptKeyword, instance, "manuscript", kwlist, "keyword")
 
-            # (3) 'literature'
+            # (3) user-specific 'keywords'
+            ukwlist = form.cleaned_data['ukwlist']
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(ManuscriptKeywordUser, instance, "manuscript", ukwlist, "keyword", extrargs = {'profile': profile})
+
+            # (4) 'literature'
             litlist = form.cleaned_data['litlist']
             adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
 
-            # (4) 'provenances'
+            # (5) 'provenances'
             provlist = form.cleaned_data['provlist']
             adapt_m2m(ProvenanceMan, instance, "manuscript", provlist, "provenance")
 
@@ -7042,284 +7201,6 @@ class ManuscriptDetails(ManuscriptEdit):
 
     def after_save(self, form, instance):
         return True, ""
-
-
-class ManuscriptEdit_ORG(PassimDetails):
-    """The details of one manuscript"""
-
-    model = Manuscript  
-    mForm = ManuscriptForm
-    template_name = 'seeker/manuscript_edit.html'  
-    title = "Manuscript" 
-    afternewurl = ""
-    prefix = "manu"
-    use_team_group = True
-    history_button = True
-    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-                                         form=DaterangeForm, min_num=1,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
-    McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
-                                       form=ManuscriptCollectionForm, min_num=0,
-                                       fk_name="manuscript", extra=0)
-    MlitFormSet = inlineformset_factory(Manuscript, LitrefMan,
-                                         form = ManuscriptLitrefForm, min_num=0,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
-
-    formset_objects = [{'formsetClass': MdrFormSet,  'prefix': 'mdr',  'readonly': False},
-                       {'formsetClass': McolFormSet, 'prefix': 'mcol', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MlitFormSet, 'prefix': 'mlit', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
-
-    def add_to_context(self, context, instance):
-
-        # context['afternewurl'] = reverse('search_manuscript')
-        context['afterdelurl'] = reverse('search_manuscript')
-
-        # All us wellL return the adapted context
-        return context
-    
-    def process_formset(self, prefix, request, formset):
-
-        errors = []
-        bResult = True
-        oErr = ErrHandle()
-        try:
-            instance = formset.instance
-            for form in formset:
-                if form.is_valid():
-                    cleaned = form.cleaned_data
-                    # Action depends on prefix
-                    if prefix == "mcol":
-                        # Keyword processing
-                        if 'newcol' in cleaned and cleaned['newcol'] != "":
-                            newcol = cleaned['newcol']
-                            # Is the COL already existing?
-                            obj = Collection.objects.filter(name=newcol).first()
-                            if obj == None:
-                                # TODO: add profile here
-                                profile = Profile.get_user_profile(request.user.username)
-                                obj = Collection.objects.create(name=newcol, type='manu', owner=profile)
-                            # Make sure we set the keyword
-                            form.instance.collection = obj
-                            # Note: it will get saved with formset.save()
-                    elif prefix == "mlit":
-                        # Literature reference processing
-                        newpages = ""
-                        if 'newpages' in cleaned and cleaned['newpages'] != "":
-                            newpages = cleaned['newpages']
-                        # Also get the litref
-                        if 'oneref' in cleaned:
-                            litref = cleaned['oneref']
-                            # Check if all is in order
-                            if litref:
-                                form.instance.reference = litref
-                                if newpages:
-                                    form.instance.pages = newpages
-                        # Note: it will get saved with form.save()
-                
-                else:
-                    errors.append(form.errors)
-                    bResult = False
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("ManuscriptEdit - process_formset")
-        return None
-
-    def before_save(self, form, instance = None):
-        bOkay = True
-        # Check if a new 'Origin' has been added
-        if 'origname_ta' in form.changed_data:
-
-            # TODO: check if this is not already taken care of...
-
-            # Get its value
-            sOrigin = form.cleaned_data['origname_ta']
-            # Check if it is already in the Nicknames
-            origin = Origin.find_or_create(sOrigin)
-            if instance.origin != origin:
-                # Add it
-                instance.origin = origin
-
-        return bOkay, ""
-    
-    def after_save(self, form, instance):
-        msg = ""
-        bResult = True
-        oErr = ErrHandle()
-        
-        try:
-            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
-            collist = form.cleaned_data['collist']
-            adapt_m2m(CollectionMan, instance, "manuscript", collist, "collection")
-            kwlist = form.cleaned_data['kwlist']
-            adapt_m2m(ManuscriptKeyword, instance, "manuscript", kwlist, "keyword")
-            litlist = form.cleaned_data['litlist']
-            adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
-                    
-        except:
-            msg = oErr.get_error_message()
-            bResult = False
-        
-        return bResult, msg
-
-    def get_history(self, instance):
-        lhtml= []
-        lhtml.append("<table><thead><tr><td>User</td><td>Date</td><td>Description</td></tr></thead><tbody>")
-        # Get the history for this item
-        lHistory = instance.get_history()
-        for obj in lHistory:
-            description = ""
-            if obj['actiontype'] == "new":
-                description = "Create New {}".format(obj['itemid'])
-            elif obj['actiontype'] == "delete":
-                description = "Delete {}".format(obj['itemid'])
-            elif obj['actiontype'] == "change":
-                lchanges = []
-                for key, value in obj['changes'].items():
-                    lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
-                changes = ", ".join(lchanges)
-                description = "Changes in {}: {}".format(obj['itemid'], changes)
-            lhtml.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(obj['username'], obj['when'], description))
-        lhtml.append("</tbody></table>")
-
-        sBack = "\n".join(lhtml)
-        return sBack
-
-
-class ManuscriptDetails_ORG(ManuscriptEdit):
-    """Editable manuscript details"""
-
-    template_name = 'seeker/manuscript_details.html'    # Use this for GET requests
-    afternewurl = ""
-    rtype = "html"      # Load this as straight forward html
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        # Set a redirect page
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('manuscript_details', kwargs={'pk': instance.id})
-        return True, "" 
-
-    def before_save(self, form, instance):
-        bNeedSaving = False
-        if instance:
-            if not instance.project:
-                # Set the default project: Passim
-                passim = Project.objects.filter(Q(name__iexact="passim")).first()
-                instance.project = passim
-                bNeedSaving = True
-            if instance.source == None:
-                # Create a source info element
-                source = SourceInfo(collector=self.request.user.username, code="Manually added") # TH: aanpassen, klopt niet, ccfr
-                source.save()
-                instance.source = source
-                bNeedSaving = True
-        return bNeedSaving, ""
-
-    def add_to_context(self, context, instance):
-        template_sermon = 'seeker/sermon_view.html'
-
-        def sermon_object(obj ):
-            # Calculate the HTML for this sermon
-            context = dict(msitem=obj)
-            html = treat_bom( render_to_string(template_sermon, context))
-            # Determine what the label is going to be
-            label = obj.locus
-            # Determine the parent, if any
-            parent = 1 if obj.parent == None else obj.parent.order + 1
-            id = obj.order + 1
-            # Create a sermon representation
-            oSermon = dict(id=id, parent=parent, pos=label, child=[], f = dict(order=obj.order, html=html))
-            return oSermon
-
-        # Construct the hierarchical list
-        sermon_list = []
-        maxdepth = 0
-        build_htable = False
-
-        if instance != None:
-            # Create a well sorted list of sermons
-            qs = instance.manusermons.filter(order__gte=0).order_by('order')
-            prev_level = 0
-            for sermon in qs:
-                # Need this first, because it also REPAIRS possible parent errors
-                level = sermon.getdepth()
-
-                # Only then continue!
-                oSermon = {}
-                oSermon['obj'] = sermon
-                oSermon['nodeid'] = sermon.order + 1
-                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                oSermon['level'] = level
-                oSermon['pre'] = (level-1) * 20
-                # If this is a new level, indicate it
-                oSermon['group'] = (sermon.firstchild != None)
-                sermon_list.append(oSermon)
-                # Bookkeeping
-                if level > maxdepth: maxdepth = level
-                prev_level = level
-            # Review them all and fill in the colspan
-            for oSermon in sermon_list:
-                oSermon['cols'] = maxdepth - oSermon['level'] + 1
-                if oSermon['group']: oSermon['cols'] -= 1
-
-            # Alternative method: create a hierarchical object of sermons
-            if build_htable:
-                lSermon = []
-                for sermon in qs:
-                    # Create sermon object
-                    oSermon = sermon_object(sermon)
-                    # Add it to the list
-                    lSermon.append(oSermon)
-                    # Immediately attach it to the correct parent
-                    parent_id = oSermon['parent']
-                    if parent_id:
-                        oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
-                        if oParent:
-                            oParent['child'].append(oSermon)
-                # Retain the top sermon
-                oSermon = lSermon[0]
-                # Remove the list
-                lSermon = []
-
-                # DEBUGGING: show what we have
-                sSermon = json.dumps(oSermon)
-                context['sermon_htable'] = sSermon
-
-        # Add instances to the list, noting their childof and order
-        context['sermon_list'] = sermon_list
-        context['sermon_count'] = len(sermon_list)
-        context['maxdepth'] = maxdepth
-        #context['isnew'] = bNew
-
-        # Figure out what the identity of this manuscript is
-        manu_name = "Manuscript details"
-        if instance == "None":
-            manu_name = "New manuscript"
-        else:
-            if instance.idno:
-                manu_name = "{}".format(instance.idno)
-            elif instance.name:
-                manu_name = "Manuscript [{}]".format(instance.name)
-            elif instance.library:
-                manu_name = "Manuscript from: [{}]".format(instance.library.name)
-            else:
-                manu_name = "Manuscript (unidentified)"
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('search_manuscript')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Manuscripts', prevpage])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, manu_name, False, crumbs)
-
-        context['afternewurl'] = reverse('search_manuscript')
-
-        return context
 
 
 class ManuscriptHierarchy(ManuscriptDetails):
@@ -7467,6 +7348,7 @@ class ManuscriptListView(BasicList):
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
+        {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
@@ -7479,16 +7361,17 @@ class ManuscriptListView(BasicList):
 
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'manuid',           'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
-            {'filter': 'country',          'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',             'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',          'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'provenance',       'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',           'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'keyword',          'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'daterange',        'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
-            {'filter': 'daterange',        'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
-            {'filter': 'stype',            'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
+            {'filter': 'manuid',        'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',     'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
+            {'filter': 'code',          'fkfield': 'manusermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
@@ -8231,6 +8114,9 @@ class SermonGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
@@ -8246,7 +8132,10 @@ class SermonGoldEdit(BasicDetails):
             {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
-             #'multiple': True, 'field_list': 'kwlist', 'fso': self.formset_objects[1]},
+            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+             'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
             {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
@@ -8410,11 +8299,16 @@ class SermonGoldEdit(BasicDetails):
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonGoldKeyword, instance, "gold", kwlist, "keyword", userplus=userplus)
             
-            # (2) 'editions'
+            # (2) user-specific 'keywords'
+            ukwlist = form.cleaned_data['ukwlist']
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(SermonGoldKeywordUser, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile})
+
+            # (3) 'editions'
             edilist = form.cleaned_data['edilist']
             adapt_m2m(EdirefSG, instance, "sermon_gold", edilist, "reference", extra=['pages'], related_is_through = True)
 
-            # (3) 'collections'
+            # (4) 'collections'
             collist_sg = form.cleaned_data['collist_sg']
             adapt_m2m(CollectionGold, instance, "gold", collist_sg, "collection")
 
@@ -8567,10 +8461,16 @@ class EqualGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
+        info = render_to_string('seeker/author_info.html')
+
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
-            {'type': 'plain', 'label': "Author:",        'value': instance.author, 'field_key': 'author'},
+            {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
 
             # Issue #212: remove this sermon number
             # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -8580,6 +8480,8 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown(True), 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown(True),'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
             {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
             {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
             {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
             {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
@@ -8727,6 +8629,11 @@ class EqualGoldEdit(BasicDetails):
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(EqualGoldKeyword, instance, "equal", kwlist, "keyword")
 
+            # (4) user-specific 'keywords'
+            ukwlist = form.cleaned_data['ukwlist']
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(EqualGoldKeywordUser, instance, "equal", ukwlist, "keyword", extrargs = {'profile': profile})
+
             # Process many-to-ONE changes
             # (1) links from SG to SSG
             goldlist = form.cleaned_data['goldlist']
@@ -8780,6 +8687,13 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # Now save the adapted EqualGold obj
                 obj.save()
+
+                # Mark these changes, which are done outside the normal 'form' system
+                actiontype = "save"
+                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
+                details = dict(savetype="change", id=obj.id, changes=changes)
+                passim_action_add(self, obj, details, actiontype)
+
             # And in all cases: make sure we redirect to the 'clean' GET page
             self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
         else:
@@ -8789,36 +8703,101 @@ class EqualGoldDetails(EqualGoldEdit):
             related_objects = []
 
             # List of manuscripts related to the SSG via sermon descriptions
-            manuscripts = dict(title="Manuscripts", prefix="manu")
+            manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
 
-            # Get all SermonDescr instances linking to the correct eqg instance
-            qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+            # WAS: Get all SermonDescr instances linking to the correct eqg instance
+            # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+
+            # New: Get all the SermonDescr instances linked with equality to SSG:
+            qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
             rel_list =[]
-            for sermon in qs_s:
+            method = "FourColumns"
+            method = "Issue216"
+            for sermonlink in qs_s:
+                sermon = sermonlink.sermon
                 # Get the 'item': the manuscript
                 item = sermon.manu
                 rel_item = []
-                manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
-                rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-                                 'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+                
+                if method == "FourColumns":
+                    # Name as CITY - LIBRARY - IDNO + Name
+                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
-                # Location number and link to the correct point in the manuscript details view...
-                itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
-                rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
-                                 'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+                    # Location number and link to the correct point in the manuscript details view...
+                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
+                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
 
-                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                rel_item.append({'value': daterange, 'align': "right"})
-                # Issue #214: combine start and end into daterange
-                # rel_item.append({'value': item.yearfinish, 'align': "right"})
-                # rel_item.append({'value': item.yearstart, 'align': "right"})
+                    # date range
+                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                    rel_item.append({'value': daterange, 'align': "right"})
 
-                sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
-                rel_item.append({'value': sermon.locus, 'title': sermo_name, 
-                                 'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                    # Sermon Locus + Title + link
+                    sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+                    rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+                                     'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                elif method == "Issue216":
+                    # Shelfmark = IDNO
+                    manu_full = "{}, {}, {}".format(item.library.lcity.name, item.library.name, item.idno)
+                    manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                    # Name as CITY - LIBRARY - IDNO + Name
+                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+
+                    # Origin
+                    or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+                    rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
+
+                    # date range
+                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                    rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
+
+                    # Collection(s)
+                    coll_info = item.get_collections_markdown()
+                    rel_item.append({'value': coll_info, 'initial': 'small'})
+
+                    # Location number and link to the correct point in the manuscript details view...
+                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
+                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+
+                    # Folio number of the item
+                    rel_item.append({'value': sermon.locus, 'initial': 'small'})
+
+                    # Attributed author
+                    rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
+
+                    # Incipit
+                    rel_item.append({'value': sermon.get_incipit_markdown(), 'initial': 'small'})
+
+                    # Explicit
+                    rel_item.append({'value': sermon.get_explicit_markdown(), 'initial': 'small'})
+
+                    # Keywords
+                    rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
+
+                # Add this Manu/Sermon line to the list
                 rel_list.append(rel_item)
             manuscripts['rel_list'] = rel_list
-            manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
+
+            if method == "FourColumns":
+                manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
+            elif method == "Issue216":
+                manuscripts['columns'] = [
+                    'Shelfmark', 
+                    '<span title="Origin/Provenance">or./prov.</span>', 
+                    '<span title="Date range">date</span>', 
+                    '<span title="Collection name">coll.</span>', 
+                    '<span title="Item">item</span>', 
+                    '<span title="Folio number">ff.</span>', 
+                    '<span title="Attributed author">auth.</span>', 
+                    '<span title="Incipit">inc.</span>', 
+                    '<span title="Explicit">expl.</span>', 
+                    '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
+                    ]
             related_objects.append(manuscripts)
 
             context['related_objects'] = related_objects
@@ -8883,7 +8862,7 @@ class EqualGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit'},
-            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code'},
+            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },

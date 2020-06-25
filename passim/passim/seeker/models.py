@@ -43,6 +43,7 @@ LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 VISIBILITY_TYPE = "seeker.visibility"
 
@@ -286,7 +287,6 @@ def get_stype_light(stype):
 
     # Return what we made
     return sBack
-
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -960,6 +960,27 @@ def add_gold2gold_ORIGINAL(src, dst, ltype):
     # Return the number of added relations
     return added, lst_total
 
+def moveup(instance, tblGeneral, tblUser):
+    """Move this keyword into the general keyword-link-table"""
+        
+    oErr = ErrHandle()
+    try:
+        # Check if the kw is not in the general table yet
+        general = tblGeneral.objects.filter(keyword=self.keyword).first()
+        if general == None:
+            # Add the keyword
+            tblGeneral.objects.create(keyword=self.keyword, equal=self.equal)
+        # Remove the *user* specific references to this keyword (for *all*) users
+        tblUser.objects.filter(keyword=self.keyword).delete()
+        # Return positively
+        bOkay = True
+    except:
+        sMsg = oErr.get_error_message()
+        oErr.DoError("moveup")
+        bOkay = False
+    return bOkay
+
+
 
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
@@ -1147,8 +1168,13 @@ class Profile(models.Model):
 
     # [1] Every profile is linked to a user
     user = models.ForeignKey(User)
+    # [1] Every user has a profile-status
+    ptype = models.CharField("Profile status", choices=build_abbr_list(PROFILE_TYPE), max_length=5, default="unk")
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
+
+    # [0-1] Affiliation of this user with as many details as needed
+    affiliation = models.TextField("Affiliation", blank=True, null=True)
 
     # [1] Each of the four basket types has a history
     historysermo = models.TextField("Sermon history", default="[]")
@@ -1267,6 +1293,18 @@ class Profile(models.Model):
         # Get to the profile of this user
         profile = Profile.objects.filter(user=user).first()
         return profile
+
+    def get_groups_markdown(self):
+        """Get all the groups this user is member of"""
+
+        lHtml = []
+        # Visit all keywords
+        for group in self.user.groups.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
@@ -1935,6 +1973,8 @@ class Litref(models.Model):
 
     # [1] The itemId for this literature reference
     itemid = models.CharField("Item ID", max_length=LONG_STRING)
+    # Optional year field
+    year = models.IntegerField("Publication year", blank=True, null=True)
     # [0-1] The actual 'data' contents as a JSON string
     data = models.TextField("JSON data", blank=True, default="")
     # [0-1] The abbreviation (retrieved) for this item
@@ -2146,11 +2186,19 @@ class Litref(models.Model):
                                 result = "{} ({})".format(authors, year)
                             else:
                                 result = "{} ({})".format(short_title, year)
+                        elif year != "" and short_title != "":
+                            result = "{} ({})".format(short_title, year)
 
  
                     if result != "":
-                        # update the full field
+                        # update the short field
                         self.short = result
+
+                    if year != "" and year != "?":
+                        try:
+                            self.year = int(year)
+                        except:
+                            pass
 
                     # Now update this item
                     self.save()
@@ -2481,7 +2529,7 @@ class Keyword(models.Model):
 
     # [1] Obligatory text of a keyword
     name = models.CharField("Name", max_length=LONG_STRING)
-    # [1] Every manuscript has a visibility - default is 'all'
+    # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
 
     def __str__(self):
@@ -2798,6 +2846,19 @@ class Manuscript(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
             url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.manuscript_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -3685,6 +3746,21 @@ class EqualGold(models.Model):
             oErr.DoError("Equalgold.save")
             return None
 
+    def author_help(self, info):
+        """Provide help for this particular author"""
+
+        html = []
+
+        # Provide the name of the author + button for modal dialogue
+        author = "(not set)" if self.author == None else self.author.name
+        html.append("<div><span>{}</span>&nbsp;<a class='btn jumbo-1 btn-xs' data-toggle='modal' data-target='#author_info'>".format(author))
+        html.append("<span class='glyphicon glyphicon-info-sign' style='color: darkblue;'></span></a></div>")
+
+        # Provide the Modal contents
+        html.append(info)
+
+        return "\n".join(html)
+
     def create_empty():
         """Create an empty new one"""
 
@@ -3735,12 +3811,14 @@ class EqualGold(models.Model):
 
         lHtml = []
         # Visit all editions
-        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('reference__short')
+        qs = EdirefSG.objects.filter(sermon_gold__equal=self).order_by('-reference__year', 'reference__short')
         for edi in qs:
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -3756,20 +3834,20 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         return sBack
 
-    def get_goldset_markdown(self):
+    #def get_goldset_markdown(self):
 
-        context = []
-        template_name = 'seeker/super_goldset.html'
+    #    context = []
+    #    template_name = 'seeker/super_goldset.html'
 
 
-        lHtml = []
-        for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
-            sigs = json.loads(item.siglist)
-            first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
-            url = reverse('gold_details', kwargs={'pk': item.id})
-            lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
-        sBack = " ".join(lHtml)
-        return sBack
+    #    lHtml = []
+    #    for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
+    #        sigs = json.loads(item.siglist)
+    #        first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
+    #        url = reverse('gold_details', kwargs={'pk': item.id})
+    #        lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
+    #    sBack = " ".join(lHtml)
+    #    return sBack
 
     def get_incipit_markdown(self, add_search = False):
         """Get the contents of the incipit field using markdown"""
@@ -3788,6 +3866,19 @@ class EqualGold(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
             url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.equal_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?ssg-ukwlist={}".format(reverse('equalgold_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -4203,11 +4294,13 @@ class SermonGold(models.Model):
     def get_editions_markdown(self):
         lHtml = []
         # Visit all editions
-        for edi in self.sermon_gold_editions.all().order_by('reference__short'):
+        for edi in self.sermon_gold_editions.all().order_by('-reference__year', 'reference__short'):
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -4273,6 +4366,35 @@ class SermonGold(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
             url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.sermongold_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?gold-ukwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_ssg_markdown(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Determine where clicking should lead to
+            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -4771,6 +4893,23 @@ class EqualGoldKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class EqualGoldKeywordUser(models.Model):
+    """Relation between an EqualGold and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equal_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="equal_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="equal_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, EqualGoldKeyword, EqualGoldKeywordUser)
+
+
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
 
@@ -4804,6 +4943,30 @@ class SermonGoldKeyword(models.Model):
         if self.gold and self.keyword_id:
             response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
+
+
+class SermonGoldKeywordUser(models.Model):
+    """Relation between a SermonGold and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, related_name="sermongold_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermongold_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="sermongold_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Note: only save if there is both a gold and a keyword
+        if self.gold and self.keyword_id:
+            response = super(SermonGoldKeywordUser, self).save(force_insert, force_update, using, update_fields)
+        return response
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, SermonGoldKeyword, SermonGoldKeywordUser)
 
 
 class Ftextlink(models.Model):
@@ -5144,19 +5307,24 @@ class SermonDescr(models.Model):
 
         # Initialisations
         lHtml = []
-        gold_list = []
+        ssg_list = []
 
-        # Visit all linked gold sermons
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon
-            gold_list.append(linked.gold.id)
+        # Visit all linked SSG items
+        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Add this SSG
+            ssg_list.append(linked.super.id)
+
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
         # Visit all the editions references of this gold sermon 
-        for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('reference__short').distinct():
+        for edi in EdirefSG.objects.filter(sermon_gold_id__in=gold_list).order_by('-reference__year', 'reference__short').distinct():
             # Determine where clicking should lead to
             url = "{}#edi_{}".format(reverse('literature_list'), edi.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown()))
+            edi_display = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url,edi.get_short_markdown())
+            if edi_display not in lHtml:
+                lHtml.append(edi_display)
                 
         sBack = ", ".join(lHtml)
         return sBack
@@ -5173,6 +5341,13 @@ class SermonDescr(models.Model):
         """Get the contents of the postscriptum field using markdown"""
         return adapt_markdown(self.postscriptum)
 
+    def get_eqsetcount(self):
+        """Get the number of SSGs this sermon is part of"""
+
+        # Visit all linked SSG items
+        ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        return ssg_count
+
     def get_eqsetsignatures_markdown(self, type="all"):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
@@ -5180,22 +5355,35 @@ class SermonDescr(models.Model):
         lHtml = []
         lEqual = []
         lSig = []
-        # Get all the SG linked to me with EQUAL
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon's EQUAL
-            equal = linked.gold.equal
-            if equal not in lEqual: lEqual.append(equal)
+        ssg_list = []
 
-        # Visit all equality sets that I am part of
-        for eqset in lEqual:
-            # Visit all Sermons Gold in this set
-            for gold in eqset.equal_goldsermons.all():
-                # Visit all signatures
-                for sig in gold.goldsignatures.all():
-                    if sig.id not in lSig: lSig.append(sig.id)
+        # Visit all linked SSG items
+        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+            # Add this SSG
+            ssg_list.append(linked.super.id)
+
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+
+        # Get all signatures part of these GS-items
+
+        ## Get all the SG linked to me with EQUAL
+        #for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        #    # Access the gold sermon's EQUAL
+        #    equal = linked.gold.equal
+        #    if equal not in lEqual: lEqual.append(equal)
+
+        ## Visit all equality sets that I am part of
+        #for eqset in lEqual:
+        #    # Visit all Sermons Gold in this set
+        #    for gold in eqset.equal_goldsermons.all():
+        #        # Visit all signatures
+        #        for sig in gold.goldsignatures.all():
+        #            if sig.id not in lSig: lSig.append(sig.id)
 
         # Get an ordered set of signatures
-        for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
+        # OLD: for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
+        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
             # Create a display for this topic
             if type == "first":
                 # Determine where clicking should lead to
@@ -5245,7 +5433,38 @@ class SermonDescr(models.Model):
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
-            url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.sermondescr_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_ssg_markdown(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all the SSGs to which I link with equality
+        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Determine where clicking should lead to
+            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -5380,21 +5599,6 @@ class SermonDescr(models.Model):
     def get_stype_light(self):
         return get_stype_light(self.stype)
 
-    def get_superlinks_markdown(self):
-        """Return all the SSG links = type + super"""
-
-        lHtml = []
-        sBack = ""
-        for superlink in self.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist'):
-            lHtml.append("<tr class='view-row'>")
-            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
-            url = reverse('equalgold_details', kwargs={'pk': superlink.super.id})
-            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.super.get_view()))
-            lHtml.append("</tr>")
-        if len(lHtml) > 0:
-            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
-        return sBack
-
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
         lst_author = []
@@ -5491,6 +5695,23 @@ class SermonDescrKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class SermonDescrKeywordUser(models.Model):
+    """Relation between a SermonDescr and a Keyword - restricted to user"""
+
+    # [1] The link is between a SermonGold instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="sermondescr_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, SermonDescrKeyword, SermonDescrKeywordUser)
+
+
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -5500,6 +5721,23 @@ class ManuscriptKeyword(models.Model):
     keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptKeywordUser(models.Model):
+    """Relation between a Manuscript and a Keyword - restricted to user"""
+
+    # [1] The link is between a Manuscript instance ...
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kwu")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="manuscript_kwu")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="manuscript_kwu")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""        
+        return moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
 
 
 class SermonDescrEqual(models.Model):

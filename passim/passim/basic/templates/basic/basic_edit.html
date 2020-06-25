@@ -38,7 +38,7 @@
             <!-- Little error message room -->
             <span id="gold_err_msg" class="err-msg"></span>
 
-            {% if is_app_editor  and permission == "write" %}
+            {% if is_app_editor  and permission == "write" and not no_delete %}
               <!-- Put the delete button completely to the right-->
               <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
                  onclick="ru.basic.delete_confirm(this);">

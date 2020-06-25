@@ -832,6 +832,7 @@ table.func-view th {
   margin-left:20px;
   vertical-align: top;
   padding: 2px;
+  background-clip: padding-box;
 }
 table.func-view th.selected {
   background-color: darkorange;
@@ -884,6 +885,10 @@ table.func-view td {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
+  overflow: hidden;
+  /*
+  overflow-wrap: normal;
+  text-overflow: clip;*/
 }
 table.func-view.sermons td {
     padding: 0px 2px 0px 2px;
@@ -1474,4 +1479,15 @@ input:checked + .slider:before {
 .searchincexp {
     font-size: x-small;
     color: darkblue;
+}
+
+.eqg-manu-col.full {
+    white-space:nowrap !important;
+}
+.eqg-manu-col.abbreviated {
+    min-width: 20px;
+}
+
+.columnSelector:hover {
+    border-right: 2px solid blue;
 }

@@ -145,13 +145,15 @@
                     <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
                   {% else %}
                     <!-- List of related items -->
-                    <table class="func-view compact-simple" style="width: 100%;">
+                    <table class="func-view compact-simple {{related.gridclass}}" style="width: 100%;">
                       <thead>
                         <tr>
                           {% if related.use_counter %}
                             <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                           {% endif %}
-                          {% for col in related.columns %}<th class="tdnowrap">{{col}}</th>{% endfor %}
+                          {% for col in related.columns %}
+                            <th class="tdnowrap">{{col|safe}}</th>
+                          {% endfor %}
                         </tr>
                       </thead>
                       <tbody>
@@ -165,7 +167,7 @@
                             <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
                                 class="tdnowrap {% if relcol.link %}clickable{% endif %}"
                                 {% if relcol.align %}align="{{relcol.align}}"{% endif %}
-                                {% if relcol.main %}style="width: 100%;"{% endif %}
+                                style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
                                 >
                               {% if relcol.value %}
                                 {% if relcol.link %}

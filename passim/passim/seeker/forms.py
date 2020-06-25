@@ -206,14 +206,15 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
     addonly = False
 
     def label_from_instance(self, obj):
-        sLabel = obj.get_label(do_incexpl = True)
+        # sLabel = obj.get_label(do_incexpl = False)
+        sLabel = obj.code
         return sLabel
 
     def get_queryset(self):
         if self.addonly:
             qs = EqualGold.objects.none()
         else:
-            qs = EqualGold.objects.all().order_by('code').distinct()
+            qs = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code').distinct()
         return qs
 
 
@@ -756,6 +757,11 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
+    passimcode  = forms.CharField(label=_("Passim code"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -807,6 +813,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -888,9 +895,16 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
+    passimcode  = forms.CharField(label=_("Passim code"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -973,10 +987,13 @@ class SermonForm(PassimModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
+                self.fields['ukwlist'].widget.is_team = True
             else:
                 self.fields['kwlist'].widget.is_team = False
+                self.fields['ukwlist'].widget.is_team = False
             # Note: what we show the user is the set of GOLD-signatures
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
@@ -984,6 +1001,7 @@ class SermonForm(PassimModelForm):
             # The available Sermondescr-Equal list
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1076,6 +1094,45 @@ class KeywordForm(forms.ModelForm):
             instance = kwargs['instance']
             self.fields['visibility'].initial = instance.visibility
 
+
+class ProfileForm(forms.ModelForm):
+    """Profile list and details"""
+
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Profile
+        fields = ['user', 'ptype', 'affiliation']
+        widgets={'user':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'ptype':       forms.Select(attrs={'class': 'input-sm', 'placeholder': 'User profile status...',  'style': 'width: 100%;'}),
+                 'affiliation': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'List all affiliation details...'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProfileForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['user'].required = False
+        self.fields['ptype'].required = False
+        self.fields['affiliation'].required = False
+        # Initialize choices for linktype
+        init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            self.fields['ptype'].initial = instance.ptype
+            self.fields['user'].initial = instance.user
+            self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+
+    def clean_user(self):
+        data = self.cleaned_data.get("user")
+        if data == None:
+            data = self.fields['user'].initial
+        return data
+    
 
 class ProjectForm(forms.ModelForm):
     """Project list"""
@@ -1344,6 +1401,8 @@ class SermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwnew       = forms.CharField(label=_("New keyword"), required=False, 
                 widget=forms.TextInput(attrs={'placeholder': 'Keyword...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1404,6 +1463,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
+            self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
@@ -1421,8 +1481,10 @@ class SermonGoldForm(PassimModelForm):
 
             if user_is_in_team(username, team_group, userplus):
                 self.fields['kwlist'].widget.is_team = True
+                self.fields['ukwlist'].widget.is_team = True
             else:
                 self.fields['kwlist'].widget.is_team = False
+                self.fields['ukwlist'].widget.is_team = False
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
@@ -1546,8 +1608,13 @@ class SuperSermonGoldForm(PassimModelForm):
     superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
                                                          'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1572,7 +1639,7 @@ class SuperSermonGoldForm(PassimModelForm):
         fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
         widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
-                                                       'data-placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
+                                                       'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1596,8 +1663,10 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
@@ -1611,8 +1680,10 @@ class SuperSermonGoldForm(PassimModelForm):
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
+                self.fields['ukwlist'].widget.is_team = True
             else:
                 self.fields['kwlist'].widget.is_team = False
+                self.fields['ukwlist'].widget.is_team = False
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
@@ -2326,6 +2397,8 @@ class ManuscriptForm(PassimModelForm):
                 widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ukwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -2337,7 +2410,7 @@ class ManuscriptForm(PassimModelForm):
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
-                  'kwlist', 'listlist', 'collist', 'provlist', 'extlist', 'datelist']
+                  'ukwlist', 'kwlist', 'listlist', 'collist', 'provlist', 'extlist', 'datelist']
     exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
@@ -2379,11 +2452,14 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
+                self.fields['ukwlist'].widget.is_team = True
             else:
                 self.fields['kwlist'].widget.is_team = False
+                self.fields['ukwlist'].widget.is_team = False
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
