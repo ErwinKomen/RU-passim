@@ -662,14 +662,15 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
          
     This approach makes use of MINIDOM (which is part of the standard xml.dom)    
     """
-    oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'list': []}
+    mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'idno'}
+    oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'url':'', 'list': []}
     oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
     errHandle = ErrHandle()
     iSermCount = 0
 
     # Number to order all the items we read        
     order = 0   
-        # Overall keeping track of ms items
+    # Overall keeping track of ms items
     
     lst_msitem = []
     
@@ -678,40 +679,96 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         if xmldoc == None:
             # Read and parse the data into a DOM element
             xmldoc = minidom.parse(data_file)
-                   
+                
+        # Eerst de algemene info in de XML? Nee, beter eerst de specifieke en dan steeds terug naar de bovenste
+        # algemene delen van de XML 
+     
         # First create a list with all manuscripts in the XML 
         # (since there are more than one in each XML) 
         
-        manu_list = xmldoc.getElementsByTagName("c")
+        manu_parent = xmldoc.getElementsByTagName("dsc")
+        if len(manu_parent.childNodes) > 0:
+            # (4) Walk all the ./msContents/msItem, which are the content items
+            manu_list = manu_parent.childNodes[0].getElementsByTagName("c")
 
-        for manu in manu_list:
-            
-            # Try to get an URL from each description 
-            url = ""
-            dao_list = xmldoc.getElementsByTagName("dao")
-            for dao in dao_list:
-                if 'href' in dao_list.attributes: # tot hier gaat het goed, daarna niet meer
-                    url = dao_list.attributes["href"].value
-            oInfo['url'] = url
+            for manu in manu_list:
+                # Process all child nodes of this [c] - Manuscript
+
+
+        #if dsc.length > 0:
+               
+        #    # Set the method to process [msItem]
+        #    itemProcessing = "recursive"
+        #    lItems = []
+        #    # order = 0
+
+        #    # Action depends on the processing type
+        #    if itemProcessing == "recursive":
+        #        # Get to the *first* (and only) [c] item
+        #        high_c = dsc.getElementsByTagName("c")
+        #        for cOne in high_c:
+        #            for item in cOne.childNodes:
+        #                if item.nodeType == minidom.Node.ELEMENT_NODE and item.tagName == "c":
+        #                    # Now we have one 'top-level' <msItem> instance
+        #                    manu_high = item
+        #                    # Process this top-level item 
+        #                    bResult, oMsItem, msg = read_msitem(msItem, {}, lst_msitem)
+        #                    # Add to the list of items -- provided it is not empty
+        #                    if len(oMsItem) > 0:
+        #                        lItems.append(oMsItem)    
+
         
-            # Try to get a main author
-            mainAuthor = ""
-            authors = xmldoc.getElementsByTagName("persName")
-            for person in authors:
-                # Check if this is linked as author
-                if 'role' in person.attributes and person.attributes['role'].value == "0070":
-                    mainAuthor = getText(person)
-                    # Don't look further: the first author is the *main* author of it 
-                    # TH: geldt dit ook hier? Wat gebeurt er eigenlijk met deze naam?
-                    break
 
-            # Get the main title, to prevent it from remaining empty
-            title_list = xmldoc.getElementsByTagName("unittitle")
-            if title_list.length > 0:
-                # Get the first title
-                title = title_list[0]
-                oInfo['name'] = getText(title)
+        
 
+
+        # dit moet weg, itereren over de childnotes
+       
+
+        # de manuscripten zijn gelaagd, iig twee lagen, zie bijv Latin 12 (1-3)
+        # Latin 12 1 - 3 vallen na elkaar onder Latin 12 (1-3)
+        # je kunt hier niet xmldoc.getElements gebruiken omdat er steeds meer dan 1 is in elke file, met die
+        # methode pak je alles in 1 keer.
+
+        
+
+            
+            ## Try to get an URL from each description 
+            #url = ""
+            #dao_list = xmldoc.getElementsByTagName("dao")
+            #for dao in dao_list:
+            #    if 'href' in dao_list.attributes: # tot hier gaat het goed, daarna niet meer
+            #        url = dao_list.attributes["href"].value
+            #oInfo['url'] = url
+        
+            ## Try to get a main author
+            #mainAuthor = ""
+            #authors = xmldoc.getElementsByTagName("persName")
+            #for person in authors:
+            #    # Check if this is linked as author
+            #    if 'role' in person.attributes and person.attributes['role'].value == "0070":
+            #        mainAuthor = getText(person)
+            #        # Don't look further: the first author is the *main* author of it 
+            #        # TH: geldt dit ook hier? Wat gebeurt er eigenlijk met deze naam?
+            #        break
+
+            ## Get the main title, to prevent it from remaining empty
+            #title_list = xmldoc.getElementsByTagName("unittitle")
+            #if title_list.length > 0:
+            #    # Get the first title
+            #    title = title_list[0]
+            #    oInfo['name'] = getText(title)
+            
+            ## Try to get the identifier
+            #unitid_list = xmldoc.getElementsByTagName("unitid")
+            #if unitid_list.length > 0:
+            #    # Get the first unitid
+            #    id = unitid_list[0]
+            #    oInfo['name'] = getText(id) 
+        
+           
+
+            
      #def read_msitem(msItem, oParent, lMsItem, level=0):
      #   """Recursively process one <msItem> and return in an object"""
         
@@ -792,18 +849,6 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     #    sError = ""
     #    nonlocal iSermCount
 
-    
-
-
-    # ================= INITIALISATIONS =============================
-
-
-    
-
- 
-        
-
-        
     except:
         sError = errHandle.get_error_message()
         oBack['filename'] = filename
