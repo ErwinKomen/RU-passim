@@ -2855,7 +2855,7 @@ class Manuscript(models.Model):
     def get_keywords_user_markdown(self, profile):
         lHtml = []
         # Visit all keywords
-        for kwlink in self.manuscript_kwu.filter(profile=profile).order_by('keyword__name'):
+        for kwlink in self.manu_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
             # Determine where clicking should lead to
             url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
@@ -3875,7 +3875,7 @@ class EqualGold(models.Model):
     def get_keywords_user_markdown(self, profile):
         lHtml = []
         # Visit all keywords
-        for kwlink in self.equal_kwu.filter(profile=profile).order_by('keyword__name'):
+        for kwlink in self.super_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
             # Determine where clicking should lead to
             url = "{}?ssg-ukwlist={}".format(reverse('equalgold_list'), keyword.id)
@@ -4375,7 +4375,7 @@ class SermonGold(models.Model):
     def get_keywords_user_markdown(self, profile):
         lHtml = []
         # Visit all keywords
-        for kwlink in self.sermongold_kwu.filter(profile=profile).order_by('keyword__name'):
+        for kwlink in self.gold_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
             # Determine where clicking should lead to
             url = "{}?gold-ukwlist={}".format(reverse('gold_list'), keyword.id)
@@ -5443,7 +5443,7 @@ class SermonDescr(models.Model):
     def get_keywords_user_markdown(self, profile):
         lHtml = []
         # Visit all keywords
-        for kwlink in self.sermondescr_kwu.filter(profile=profile).order_by('keyword__name'):
+        for kwlink in self.sermo_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
             # Determine where clicking should lead to
             url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
@@ -5738,6 +5738,56 @@ class ManuscriptKeywordUser(models.Model):
     def moveup(self):
         """Move this keyword into the general keyword-link-table"""        
         return moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
+
+
+class UserKeyword(models.Model):
+    """Relation between a M/S/SG/SSG and a Keyword - restricted to user"""
+
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="kw_userkeywords")
+    # [1] It is part of a user profile
+    profile = models.ForeignKey(Profile, related_name="profile_userkeywords")
+    # [1] Each "UserKeyword" has only 1 type, one of M/S/SG/SSG
+    type = models.CharField("Type of user keyword", choices=build_abbr_list(COLLECTION_TYPE), max_length=5)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # ==== Depending on the type, only one of these will be filled
+    # [0-1] The link is with a Manuscript instance ...
+    manu = models.ForeignKey(Manuscript, blank=True, null=True, related_name="manu_userkeywords")
+    # [0-1] The link is with a SermonDescr instance ...
+    sermo = models.ForeignKey(SermonDescr, blank=True, null=True, related_name="sermo_userkeywords")
+    # [0-1] The link is with a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, blank=True, null=True, related_name="gold_userkeywords")
+    # [0-1] The link is with a EqualGold instance ...
+    super = models.ForeignKey(EqualGold, blank=True, null=True, related_name="super_userkeywords")
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Note: only save if all obligatory elements are there
+        if self.keyword_id:
+            bOkay = (self.type == "manu" and self.manu != None) or \
+                    (self.type == "sermo" and self.sermo != None) or \
+                    (self.type == "gold" and self.gold != None) or \
+                    (self.type == "super" and self.super != None)
+            if bOkay:
+                response = super(UserKeyword, self).save(force_insert, force_update, using, update_fields)
+        return response
+
+    def moveup(self):
+        """Move this keyword into the general keyword-link-table"""   
+        src = None
+        dst = None
+        response = false     
+        if self.type == "manu":
+            response = moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
+        elif self.type == "sermo":
+            response = moveup(self, SermonDescrKeyword, SermonDescrKeywordUser)
+        elif self.type == "gold":
+            response = moveup(self, SermonGoldKeyword, SermonGoldKeywordUser)
+        elif self.type == "super":
+            response = moveup(self, EqualGoldKeyword, EqualGoldKeywordUser)
+        return response
 
 
 class SermonDescrEqual(models.Model):

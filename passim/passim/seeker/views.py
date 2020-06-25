@@ -72,8 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, \
-    EqualGoldKeywordUser, ManuscriptKeywordUser, SermonDescrKeywordUser, SermonGoldKeywordUser, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
@@ -5665,7 +5664,7 @@ class SermonEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(SermonDescrKeywordUser, instance, "sermon", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'sermo'})
 
             # (3) 'Links to Gold Signatures'
             siglist = form.cleaned_data['siglist']
@@ -6067,6 +6066,124 @@ class KeywordListView(BasicList):
         if not self.in_team:
             # restrict access to "all" marked ons
             fields['visibility'] = "all"
+
+        return fields, lstExclude, qAlternative
+
+
+class UserKeywordEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = Keyword
+    mForm = KeywordForm
+    prefix = 'kw'
+    title = "UserKeywordEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",      'value': instance.name,                    'field_key': 'name'},
+            {'type': 'plain', 'label': "Visibility:",'value': instance.get_visibility_display(), 'field_key': 'visibility'}
+            ]
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class UserKeywordDetails(KeywordEdit):
+    """Like UserKeyword Edit, but then html output"""
+    rtype = "html"
+    
+
+class UserKeywordListView(BasicList):
+    """Search and list keywords"""
+
+    model = Keyword
+    listform = KeywordForm
+    prefix = "kw"
+    paginate_by = 20
+    has_select2 = True
+    in_team = False
+    order_cols = ['name', 'visibility', '']
+    order_default = order_cols
+    order_heads = [{'name': 'User',     'order': 'o=1', 'type': 'str', 'custom': 'profile'},
+                   {'name': 'Keyword',  'order': 'o=2', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                   {'name': 'Type',     'order': 'o=3', 'type': 'str', 'custom': 'visibility'},
+                   {'name': 'Link',     'order': '',    'type': 'str', 'custom': 'links'},
+                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'links'}]
+    filters = [ {"name": "Keyword",     "id": "filter_keyword", "enabled": False},
+                {"name": "User",        "id": "filter_profile", "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'keyword',   'dbfield': 'name',  'keyList': 'kwlist', 'infield': 'id' },
+            {'filter': 'profile',   'fkfield': 'manuscript_kwu__profile|sermondescr_kwu__profile|sermongold_kwu__profile|equal_kwu__profile',   
+             'keyList': 'profilelist' }]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "links":
+            html = []
+            # Get the HTML code for the links of this instance
+            number = instance.freqsermo()
+            if number > 0:
+                url = reverse('sermon_list')
+                html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+            number = instance.freqgold()
+            if number > 0:
+                url = reverse('search_gold')
+                html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+            number = instance.freqmanu()
+            if number > 0:
+                url = reverse('search_manuscript')
+                html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            number = instance.freqsuper()
+            if number > 0:
+                url = reverse('equalgold_list')
+                html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
+                html.append("<span class='badge jumbo-4 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+            # Combine the HTML code
+            sBack = "\n".join(html)
+        elif custom == "visibility":
+            sBack = instance.get_visibility_display()
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+
+        # Make sure the search is restricted to keywords that are connected through one of the M/S/SG/SSG link tables
+        lstQ = []
+        lstQ.append(Q(id__in=manuscript_kwu__keyword__id))
+        lstQ.append(Q(id__in=sermondescr_kwu__keyword__id))
+        lstQ.append(Q(id__in=sermongold_kwu__keyword__id))
+        lstQ.append(Q(id__in=equal_kwu__keyword__id))
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Add this to the existing filter
+            lstQ.append(Q(id__in=kwlist))
+            filter = "|".join(lstQ)
+            fields['kwlist'] = Keyword.objects.filter(filter).values('id')
+        else:
+            # THe kwlist still needs to be filled
+            filter = "|".join(lstQ)
+            fields['kwlist'] = Keyword.objects.filter(filter).values("id")
 
         return fields, lstExclude, qAlternative
 
@@ -7058,7 +7175,7 @@ class ManuscriptEdit(BasicDetails):
             # (3) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(ManuscriptKeywordUser, instance, "manuscript", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'manu'})
 
             # (4) 'literature'
             litlist = form.cleaned_data['litlist']
@@ -8302,7 +8419,7 @@ class SermonGoldEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(SermonGoldKeywordUser, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'gold'})
 
             # (3) 'editions'
             edilist = form.cleaned_data['edilist']
@@ -8632,7 +8749,7 @@ class EqualGoldEdit(BasicDetails):
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(EqualGoldKeywordUser, instance, "equal", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "equal", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'super'})
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
