@@ -2529,7 +2529,7 @@ class Keyword(models.Model):
 
     # [1] Obligatory text of a keyword
     name = models.CharField("Name", max_length=LONG_STRING)
-    # [1] Every manuscript has a visibility - default is 'all'
+    # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
 
     def __str__(self):
@@ -2846,6 +2846,19 @@ class Manuscript(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
             url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.manuscript_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -3859,6 +3872,19 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.equal_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?ssg-ukwlist={}".format(reverse('equalgold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_label(self, do_incexpl=False):
         """Get a string view of myself to be put on a label"""
 
@@ -4340,6 +4366,19 @@ class SermonGold(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
             url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.sermongold_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?gold-ukwlist={}".format(reverse('gold_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -5394,7 +5433,20 @@ class SermonDescr(models.Model):
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
             # Determine where clicking should lead to
-            url = "{}?gold-kwlist={}".format(reverse('gold_list'), keyword.id)
+            url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_user_markdown(self, profile):
+        lHtml = []
+        # Visit all keywords
+        for kwlink in self.sermondescr_kwu.filter(profile=profile).order_by('keyword__name'):
+            keyword = kwlink.keyword
+            # Determine where clicking should lead to
+            url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
@@ -5546,21 +5598,6 @@ class SermonDescr(models.Model):
 
     def get_stype_light(self):
         return get_stype_light(self.stype)
-
-    #def get_superlinks_markdown(self):
-    #    """Return all the SSG links = type + super"""
-
-    #    lHtml = []
-    #    sBack = ""
-    #    for superlink in self.sermondescr_super.all().order_by('sermon__author__name', 'sermon__siglist'):
-    #        lHtml.append("<tr class='view-row'>")
-    #        lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
-    #        url = reverse('equalgold_details', kwargs={'pk': superlink.super.id})
-    #        lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.super.get_view()))
-    #        lHtml.append("</tr>")
-    #    if len(lHtml) > 0:
-    #        sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
-    #    return sBack
 
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
