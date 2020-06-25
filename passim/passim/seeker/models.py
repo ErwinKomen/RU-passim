@@ -4893,23 +4893,6 @@ class EqualGoldKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
-class EqualGoldKeywordUser(models.Model):
-    """Relation between an EqualGold and a Keyword - restricted to user"""
-
-    # [1] The link is between a SermonGold instance ...
-    equal = models.ForeignKey(EqualGold, related_name="equal_kwu")
-    # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="equal_kwu")
-    # [1] It is part of a user profile
-    profile = models.ForeignKey(Profile, related_name="equal_kwu")
-    # [1] And a date: the date of saving this relation
-    created = models.DateTimeField(default=get_current_datetime)
-
-    def moveup(self):
-        """Move this keyword into the general keyword-link-table"""        
-        return moveup(self, EqualGoldKeyword, EqualGoldKeywordUser)
-
-
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
 
@@ -4943,30 +4926,6 @@ class SermonGoldKeyword(models.Model):
         if self.gold and self.keyword_id:
             response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
-
-
-class SermonGoldKeywordUser(models.Model):
-    """Relation between a SermonGold and a Keyword - restricted to user"""
-
-    # [1] The link is between a SermonGold instance ...
-    gold = models.ForeignKey(SermonGold, related_name="sermongold_kwu")
-    # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="sermongold_kwu")
-    # [1] It is part of a user profile
-    profile = models.ForeignKey(Profile, related_name="sermongold_kwu")
-    # [1] And a date: the date of saving this relation
-    created = models.DateTimeField(default=get_current_datetime)
-
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        response = None
-        # Note: only save if there is both a gold and a keyword
-        if self.gold and self.keyword_id:
-            response = super(SermonGoldKeywordUser, self).save(force_insert, force_update, using, update_fields)
-        return response
-
-    def moveup(self):
-        """Move this keyword into the general keyword-link-table"""        
-        return moveup(self, SermonGoldKeyword, SermonGoldKeywordUser)
 
 
 class Ftextlink(models.Model):
@@ -5695,23 +5654,6 @@ class SermonDescrKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
-class SermonDescrKeywordUser(models.Model):
-    """Relation between a SermonDescr and a Keyword - restricted to user"""
-
-    # [1] The link is between a SermonGold instance ...
-    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kwu")
-    # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kwu")
-    # [1] It is part of a user profile
-    profile = models.ForeignKey(Profile, related_name="sermondescr_kwu")
-    # [1] And a date: the date of saving this relation
-    created = models.DateTimeField(default=get_current_datetime)
-
-    def moveup(self):
-        """Move this keyword into the general keyword-link-table"""        
-        return moveup(self, SermonDescrKeyword, SermonDescrKeywordUser)
-
-
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -5721,23 +5663,6 @@ class ManuscriptKeyword(models.Model):
     keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
-
-
-class ManuscriptKeywordUser(models.Model):
-    """Relation between a Manuscript and a Keyword - restricted to user"""
-
-    # [1] The link is between a Manuscript instance ...
-    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kwu")
-    # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="manuscript_kwu")
-    # [1] It is part of a user profile
-    profile = models.ForeignKey(Profile, related_name="manuscript_kwu")
-    # [1] And a date: the date of saving this relation
-    created = models.DateTimeField(default=get_current_datetime)
-
-    def moveup(self):
-        """Move this keyword into the general keyword-link-table"""        
-        return moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
 
 
 class UserKeyword(models.Model):
