@@ -459,7 +459,7 @@ class BasicList(ListView):
 
         oErr = ErrHandle()
 
-        #self.initializations()
+        # self.before_context()
 
         # Get parameters for the search
         if self.initial == None:

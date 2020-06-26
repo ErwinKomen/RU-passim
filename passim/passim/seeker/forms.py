@@ -288,6 +288,22 @@ class KeywordAllWidget(KeywordWidget):
     is_team = False
 
 
+class KeywordOneWidget(ModelSelect2Widget):
+    model = Keyword
+    search_fields = [ 'name__icontains' ]
+    is_team = True
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.is_team:
+            qs = Keyword.objects.all().order_by('name').distinct()
+        else:
+            qs = Keyword.objects.exclude(visibility="edi").order_by('name').distinct()
+        return qs
+
+
 class LitrefWidget(ModelSelect2Widget):
     model = Litref
     search_fields = [ 'full__icontains' ]
@@ -429,6 +445,17 @@ class ProjectWidget(ModelSelect2MultipleWidget):
 
 
 class ProfileWidget(ModelSelect2MultipleWidget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
+
+
+class ProfileOneWidget(ModelSelect2Widget):
     model = Profile
     search_fields = [ 'user__username__icontains' ]
 
@@ -1093,6 +1120,44 @@ class KeywordForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
             self.fields['visibility'].initial = instance.visibility
+
+
+class UserKeywordForm(forms.ModelForm):
+    """Keyword list"""
+
+    profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = UserKeyword
+        fields = ['keyword', 'profile', 'type']
+        widgets={'keyword': KeywordOneWidget(attrs={'data-placeholder': 'Select one keyword...', 'style': 'width: 100%;'}),
+                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+                 'type':    forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Item type...',  'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(UserKeywordForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['keyword'].required = False
+        self.fields['profile'].required = False
+        self.fields['type'].required = False
+
+        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
+        # Initialize choices for the type
+        init_choices(self, 'type', COLLECTION_TYPE, bUseAbbr=True, use_helptext=False)
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            self.fields['keyword'].initial = instance.keyword
+            self.fields['profile'].initial = instance.profile
+            self.fields['type'].initial = instance.type
 
 
 class ProfileForm(forms.ModelForm):

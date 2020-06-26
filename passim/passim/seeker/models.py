@@ -960,7 +960,7 @@ def add_gold2gold_ORIGINAL(src, dst, ltype):
     # Return the number of added relations
     return added, lst_total
 
-def moveup(instance, tblGeneral, tblUser):
+def moveup(instance, tblGeneral, tblUser, ItemType):
     """Move this keyword into the general keyword-link-table"""
         
     oErr = ErrHandle()
@@ -971,7 +971,7 @@ def moveup(instance, tblGeneral, tblUser):
             # Add the keyword
             tblGeneral.objects.create(keyword=self.keyword, equal=self.equal)
         # Remove the *user* specific references to this keyword (for *all*) users
-        tblUser.objects.filter(keyword=self.keyword).delete()
+        tblUser.objects.filter(keyword=self.keyword, type=ItemType).delete()
         # Return positively
         bOkay = True
     except:
@@ -3834,21 +3834,6 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         return sBack
 
-    #def get_goldset_markdown(self):
-
-    #    context = []
-    #    template_name = 'seeker/super_goldset.html'
-
-
-    #    lHtml = []
-    #    for item in self.equal_goldsermons.all().order_by('author__name', 'siglist'):
-    #        sigs = json.loads(item.siglist)
-    #        first = "id{}".format(item.id) if len(sigs) == 0 else sigs[0]
-    #        url = reverse('gold_details', kwargs={'pk': item.id})
-    #        lHtml.append("<span class='badge signature eqset'><a href='{}' title='{}'>{}</a></span>".format(url, item.siglist, first))
-    #    sBack = " ".join(lHtml)
-    #    return sBack
-
     def get_incipit_markdown(self, add_search = False):
         """Get the contents of the incipit field using markdown"""
         # Perform
@@ -3972,6 +3957,14 @@ class EqualGold(models.Model):
         origin = EqualGold.objects.filter(moved=self).first()
         if origin != None: sBack = reverse('equalgold_details', kwargs={'pk': origin.id})
         # REturn the information
+        return sBack
+
+    def get_goldsigfirst(self):
+        sBack = ""
+        # Calculate the first signature
+        first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
+        if first != None:
+            sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
         return sBack
 
     def get_short(self):
@@ -5324,22 +5317,6 @@ class SermonDescr(models.Model):
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
-        # Get all signatures part of these GS-items
-
-        ## Get all the SG linked to me with EQUAL
-        #for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-        #    # Access the gold sermon's EQUAL
-        #    equal = linked.gold.equal
-        #    if equal not in lEqual: lEqual.append(equal)
-
-        ## Visit all equality sets that I am part of
-        #for eqset in lEqual:
-        #    # Visit all Sermons Gold in this set
-        #    for gold in eqset.equal_goldsermons.all():
-        #        # Visit all signatures
-        #        for sig in gold.goldsignatures.all():
-        #            if sig.id not in lSig: lSig.append(sig.id)
-
         # Get an ordered set of signatures
         # OLD: for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
         for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
@@ -5699,19 +5676,48 @@ class UserKeyword(models.Model):
                 response = super(UserKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
 
+    def get_profile_markdown(self):
+        sBack = ""
+        uname = self.profile.user.username
+        url = reverse("profile_details", kwargs = {'pk': self.profile.id})
+        sBack = "<a href='{}'>{}</a>".format(url, uname)
+        return sBack
+
     def moveup(self):
-        """Move this keyword into the general keyword-link-table"""   
-        src = None
-        dst = None
-        response = false     
-        if self.type == "manu":
-            response = moveup(self, ManuscriptKeyword, ManuscriptKeywordUser)
-        elif self.type == "sermo":
-            response = moveup(self, SermonDescrKeyword, SermonDescrKeywordUser)
-        elif self.type == "gold":
-            response = moveup(self, SermonGoldKeyword, SermonGoldKeywordUser)
-        elif self.type == "super":
-            response = moveup(self, EqualGoldKeyword, EqualGoldKeywordUser)
+        """Move this keyword into the general keyword-link-table"""  
+        
+        oErr = ErrHandle()
+        response = False
+        try: 
+            src = None
+            dst = None
+            tblGeneral = None
+            if self.type == "manu":
+                tblGeneral = ManuscriptKeyword
+                itemfield = "manuscript"
+            elif self.type == "sermo":
+                tblGeneral = SermonDescrKeyword
+                itemfield = "sermon"
+            elif self.type == "gold":
+                tblGeneral = SermonGoldKeyword
+                itemfield = "gold"
+            elif self.type == "super":
+                tblGeneral = EqualGoldKeyword
+                itemfield = "equal"
+            if tblGeneral != None:
+                # Check if the kw is not in the general table yet
+                general = tblGeneral.objects.filter(keyword=self.keyword).first()
+                if general == None:
+                    # Add the keyword
+                    obj = tblGeneral(keyword=self.keyword)
+                    setattr(obj, itemfield, getattr(self, self.type))
+                    obj.save()
+                # Remove the *user* specific references to this keyword (for *all*) users
+                UserKeyword.objects.filter(keyword=self.keyword, type=self.type).delete()
+                # Return positively
+                response = True
+        except:
+            msg = oErr.get_error_message()
         return response
 
 

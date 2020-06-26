@@ -693,7 +693,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 
             for manu in manu_list:
                 # Process all child nodes of this [c] - Manuscript
-
+                pass
 
         #if dsc.length > 0:
                
