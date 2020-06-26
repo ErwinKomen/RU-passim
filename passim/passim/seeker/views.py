@@ -65,15 +65,14 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm, ProfileForm
+                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, \
-    EqualGoldKeywordUser, ManuscriptKeywordUser, SermonDescrKeywordUser, SermonGoldKeywordUser, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
 from passim.reader.views import reader_uploads
 
@@ -5665,7 +5664,7 @@ class SermonEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(SermonDescrKeywordUser, instance, "sermon", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'sermo'})
 
             # (3) 'Links to Gold Signatures'
             siglist = form.cleaned_data['siglist']
@@ -6069,6 +6068,217 @@ class KeywordListView(BasicList):
             fields['visibility'] = "all"
 
         return fields, lstExclude, qAlternative
+
+
+class UserKeywordEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = UserKeyword
+    mForm = UserKeywordForm
+    prefix = 'ukw'
+    title = "UserKeywordEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "User:",     'value': instance.get_profile_markdown(),    },
+            {'type': 'plain', 'label': "Keyword:",  'value': instance.keyword.name,     },
+            {'type': 'plain', 'label': "Type:",     'value': instance.get_type_display()},
+            {'type': 'plain', 'label': "Link:",     'value': self.get_link(instance)},
+            {'type': 'plain', 'label': "Proposed:", 'value': instance.created.strftime("%d/%b/%Y %H:%M")}
+            ]
+
+        if context['is_app_editor']:
+            lhtml = []
+            lbuttons = [dict(href="{}?approvelist={}".format(reverse('userkeyword_list'), instance.id), label="Approve Keyword", 
+                             title="Approving this keyword attaches it to the target and removes it from the list of user keywords.")]
+            lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+            for item in lbuttons:
+                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' href='{}'>".format(item['title'], item['href']))
+                lhtml.append("     <span class='glyphicon glyphicon-ok'></span>{}</a>".format(item['label']))
+            lhtml.append("</div></div>")
+            context['after_details'] = "\n".join(lhtml)
+
+        # Return the context we have made
+        return context
+
+    def get_link(self, instance):
+        details = ""
+        value = ""
+        url = ""
+        sBack = ""
+        if instance.type == "manu" and instance.manu: 
+            # Manuscript: shelfmark
+            url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
+            value = instance.manu.idno
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
+        elif instance.type == "sermo" and instance.sermo: 
+            # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
+            sig = instance.sermo.get_eqsetsignatures_markdown("first")
+            # Sermon identification
+            url = reverse('sermon_details', kwargs = {'pk': instance.sermo.id})
+            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.manusermons.all().count())
+            sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
+            # Manuscript shelfmark
+            url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
+            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, instance.sermo.manu.idno)
+            # Combine
+            sBack = "{} {} {}".format(sermo, manu, sig)
+        elif instance.type == "gold" and instance.gold: 
+            # Get signatures
+            sig = instance.gold.get_signatures_markdown()
+            # Get Gold URL
+            url = reverse('gold_details', kwargs = {'pk': instance.gold.id})
+            # Combine
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "gold", sig)
+        elif instance.type == "super" and instance.super: 
+            # Get signatures
+            sig = instance.super.get_goldsigfirst()
+            # Get Gold URL
+            url = reverse('equalgold_details', kwargs = {'pk': instance.super.id})
+            # Combine
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "super", sig)
+        return sBack
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class UserKeywordDetails(UserKeywordEdit):
+    """Like UserKeyword Edit, but then html output"""
+    rtype = "html"
+    
+
+class UserKeywordListView(BasicList):
+    """Search and list keywords"""
+
+    model = UserKeyword
+    listform = UserKeywordForm
+    prefix = "ukw"
+    paginate_by = 20
+    has_select2 = True
+    in_team = False
+    new_button = False
+    order_cols = ['profile__user__username', 'keyword__name',  'type', '', 'created']
+    order_default = order_cols
+    order_heads = [{'name': 'User',     'order': 'o=1', 'type': 'str', 'custom': 'profile'},
+                   {'name': 'Keyword',  'order': 'o=2', 'type': 'str', 'custom': 'keyword', 'main': True, 'linkdetails': True},
+                   {'name': 'Type',     'order': 'o=3', 'type': 'str', 'custom': 'itemtype'},
+                   {'name': 'Link',     'order': '',    'type': 'str', 'custom': 'link'},
+                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'date'}]
+    filters = [ {"name": "Keyword",     "id": "filter_keyword", "enabled": False},
+                {"name": "User",        "id": "filter_profile", "enabled": False},
+                {"name": "Type",        "id": "filter_type",    "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'keyword',   'fkfield': 'keyword', 'keyFk': 'id', 'keyList': 'kwlist',      'infield': 'id' },
+            {'filter': 'profile',   'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id' },
+            {'filter': 'type',      'dbfield': 'type',    'keyS': 'type' }]}
+        ]
+
+    def initializations(self):
+        if self.request.user:
+            username = self.request.user.username
+            # See if there is a list of approved id's
+            approvelist = self.request.GET.get("approvelist", None)
+            if approvelist != None:
+                # Does this user have the right privilages?
+                if user_is_superuser(self.request) or user_is_ingroup(self.request, app_editor):
+                    # Approve the UserKeyword stated here
+                    for ukw_id in approvelist:
+                        obj = UserKeyword.objects.filter(id=ukw_id).first()
+                        if obj != None:
+                            obj.moveup()
+        return None
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "keyword":
+            sBack = instance.keyword.name
+        elif custom == "profile":
+            username = instance.profile.user.username
+            url = reverse("profile_details", kwargs = {'pk': instance.profile.id})
+            sBack = "<a href='{}'>{}</a>".format(url, username)
+        elif custom == "itemtype":
+            sBack = instance.get_type_display()
+        elif custom == "link":
+            sBack = self.get_link(instance)
+        elif custom == "date":
+            sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        return sBack, sTitle
+
+    def get_link(self, instance):
+        details = ""
+        value = ""
+        url = ""
+        sBack = ""
+        if instance.type == "manu" and instance.manu: 
+            # Manuscript: shelfmark
+            url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
+            value = instance.manu.idno
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
+        elif instance.type == "sermo" and instance.sermo: 
+            # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
+            sig = instance.sermo.get_eqsetsignatures_markdown("first")
+            # Sermon identification
+            url = reverse('sermon_details', kwargs = {'pk': instance.sermo.id})
+            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.manusermons.all().count())
+            sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
+            # Manuscript shelfmark
+            url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
+            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, instance.sermo.manu.idno)
+            # Combine
+            sBack = "{} {} {}".format(sermo, manu, sig)
+        elif instance.type == "gold" and instance.gold: 
+            # Get signatures
+            sig = instance.gold.get_signatures_markdown()
+            # Get Gold URL
+            url = reverse('gold_details', kwargs = {'pk': instance.gold.id})
+            # Combine
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "gold", sig)
+        elif instance.type == "super" and instance.super: 
+            # Get signatures
+            sig = instance.super.get_goldsigfirst()
+            # Get Gold URL
+            url = reverse('equalgold_details', kwargs = {'pk': instance.super.id})
+            # Combine
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "super", sig)
+        return sBack
+
+    #def adapt_search(self, fields):
+    #    lstExclude=None
+    #    qAlternative = None
+
+    #    # Make sure the search is restricted to keywords that are connected through one of the M/S/SG/SSG link tables
+    #    lstQ = []
+    #    lstQ.append(Q(id__in=manuscript_kwu__keyword__id))
+    #    lstQ.append(Q(id__in=sermondescr_kwu__keyword__id))
+    #    lstQ.append(Q(id__in=sermongold_kwu__keyword__id))
+    #    lstQ.append(Q(id__in=equal_kwu__keyword__id))
+    #    # Check if a list of keywords is given
+    #    if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+    #        # Get the list
+    #        kwlist = fields['kwlist']
+    #        # Add this to the existing filter
+    #        lstQ.append(Q(id__in=kwlist))
+    #        filter = "|".join(lstQ)
+    #        fields['kwlist'] = Keyword.objects.filter(filter).values('id')
+    #    else:
+    #        # THe kwlist still needs to be filled
+    #        filter = "|".join(lstQ)
+    #        fields['kwlist'] = Keyword.objects.filter(filter).values("id")
+
+    #    return fields, lstExclude, qAlternative
 
 
 class ProfileEdit(BasicDetails):
@@ -7058,7 +7268,7 @@ class ManuscriptEdit(BasicDetails):
             # (3) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(ManuscriptKeywordUser, instance, "manuscript", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'manu'})
 
             # (4) 'literature'
             litlist = form.cleaned_data['litlist']
@@ -8302,7 +8512,7 @@ class SermonGoldEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(SermonGoldKeywordUser, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'gold'})
 
             # (3) 'editions'
             edilist = form.cleaned_data['edilist']
@@ -8632,7 +8842,7 @@ class EqualGoldEdit(BasicDetails):
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(EqualGoldKeywordUser, instance, "equal", ukwlist, "keyword", extrargs = {'profile': profile})
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'super'})
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
