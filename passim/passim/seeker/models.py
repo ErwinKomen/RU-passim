@@ -51,6 +51,7 @@ LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
 LINK_SIM = "sim"
+LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
 
@@ -5262,7 +5263,8 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        for linked in SermonDescrEqual.objects.filter(sermon=self):
             # Add this SSG
             ssg_list.append(linked.super.id)
 
@@ -5297,7 +5299,8 @@ class SermonDescr(models.Model):
         """Get the number of SSGs this sermon is part of"""
 
         # Visit all linked SSG items
-        ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        # ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
     def get_eqsetsignatures_markdown(self, type="all"):
@@ -5310,7 +5313,8 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        for linked in SermonDescrEqual.objects.filter(sermon=self):
             # Add this SSG
             ssg_list.append(linked.super.id)
 
@@ -5729,7 +5733,7 @@ class SermonDescrEqual(models.Model):
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="eq")
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="uns")
 
     def __str__(self):
         # Temporary fix: sermon.id

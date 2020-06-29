@@ -1406,6 +1406,7 @@ class SermonDescrSuperForm(forms.ModelForm):
         self.fields['newsuper'].required = False
         self.fields['super'].required = False
         self.fields['linktype'].required = False
+        self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
         self.fields['newsuper'].queryset = EqualGold.objects.order_by('author__name', 'siglist')
         # Get the instance

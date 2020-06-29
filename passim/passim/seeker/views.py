@@ -73,7 +73,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, \
-   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
+   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -8920,7 +8920,8 @@ class EqualGoldDetails(EqualGoldEdit):
             # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
 
             # New: Get all the SermonDescr instances linked with equality to SSG:
-            qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
+            # qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
+            qs_s = SermonDescrEqual.objects.filter(super=instance).order_by('sermon__manu__idno', 'sermon__locus')
             rel_list =[]
             method = "FourColumns"
             method = "Issue216"
@@ -9121,6 +9122,14 @@ class EqualGoldListView(BasicList):
                     reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
 
             Information.set_kvalue("ssg_bidirectional", "done")
+
+        if Information.get_kvalue("s_to_ssg_link") != "done":
+            qs = SermonDescrEqual.objects.all()
+            with transaction.atomic():
+                for obj in qs:
+                    obj.linktype = LINK_UNSPECIFIED
+                    obj.save()
+            Information.set_kvalue("s_to_ssg_link", "done")
 
         return None
     
