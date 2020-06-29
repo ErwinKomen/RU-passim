@@ -1165,9 +1165,6 @@ class UserKeywordForm(forms.ModelForm):
 class ProvenanceForm(forms.ModelForm):
     """Provenance list"""
 
-    location_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                    widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
-
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -1186,11 +1183,7 @@ class ProvenanceForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['location'].required = False
-        self.fields['location_new'].required = False
         self.fields['note'].required = False
-        # self.fields['location'].queryset = Location.objects.all().order_by('name')
-        self.fields['location_new'].queryset = Location.objects.all().order_by('name')
-
 
         # Get the instance
         if 'instance' in kwargs:
