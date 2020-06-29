@@ -5314,9 +5314,11 @@ class SermonDescr(models.Model):
 
         # Visit all linked SSG items
         # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
-        for linked in SermonDescrEqual.objects.filter(sermon=self):
-            # Add this SSG
-            ssg_list.append(linked.super.id)
+        #for linked in SermonDescrEqual.objects.filter(sermon=self):
+        #    # Add this SSG
+        #    ssg_list.append(linked.super.id)
+        for linked in self.sermondescr_super.all():
+            ssg_list.append(linked.id)
 
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
@@ -5368,6 +5370,16 @@ class SermonDescr(models.Model):
 
         return adapt_markdown(self.incipit)
 
+    def get_keywords_plain(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_keywords_markdown(self):
         lHtml = []
         # Visit all keywords
@@ -5407,6 +5419,22 @@ class SermonDescr(models.Model):
             url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
             # Create a display for this topic
             lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_keywords_ssg_plain(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all the SSGs to which I link with equality
+        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(keyword.name))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -5607,12 +5635,37 @@ class SermonDescr(models.Model):
         return response
 
     def signature_string(self):
-        """Combine all signatures into one string"""
+        """Combine all signatures into one string: manual ones"""
 
         lSign = []
-        for item in self.sermonsignatures.all():
+        # Get the manual signatures
+        for item in self.sermonsignatures.all().order_by("-editype", "code"):
             lSign.append(item.short())
-        return " | ".join(lSign)
+
+        # REturn the combination
+        combi = " | ".join(lSign)
+        if combi == "": combi = "[-]"
+        return combi
+
+    def signature_auto_string(self):
+        """Combine all signatures into one string: automatic ones"""
+
+        lSign = []
+
+        # Get the automatic signatures
+        ssg_list = []
+        for linked in self.sermondescr_super.all():
+            ssg_list.append(linked.id)
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+        # Get an ordered set of signatures
+        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
+            lSign.append(sig.short())
+
+        # REturn the combination
+        combi = " | ".join(lSign)
+        if combi == "": combi = "[-]"
+        return combi
 
     def signatures_ordered(self):
         # Provide an ordered list of signatures

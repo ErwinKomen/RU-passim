@@ -46,7 +46,29 @@
           <table class="func-view sermons" style="width: 100%;">
             <thead>
               <tr>
-                <th class="draggable" style="width: 100%;">Details of this manuscript's {{object.manusermons.count}} items</th>
+                <th class="draggable" style="width: 100%;">
+                  <span>Details of this manuscript's {{object.manusermons.count}} items</span>
+                  <span role="group" aria-label="erwin" class="btn-group btn-group-xs pull-right">
+                    <span type="button" class="btn jumbo-1" title="Gryson/Clavis codes linked through the Super Sermon Gold"
+                          onclick="ru.passim.seeker.manusermo(this, 'sig-auto');">Gryson A</span>
+                    <span type="button" class="btn jumbo-2" title="Gryson/Clavis codes added manually"
+                          onclick="ru.passim.seeker.manusermo(this, 'sig-manual');">Gryson M</span>
+                    <span type="button" class="btn jumbo-2" title="Title of this sermon/item"
+                          onclick="ru.passim.seeker.manusermo(this, 'title');">Title</span>
+                    <span type="button" class="btn jumbo-2" title="Attributed author"
+                          onclick="ru.passim.seeker.manusermo(this, 'author');">Author</span>
+                    <span type="button" class="btn jumbo-2" title="Incipit"
+                          onclick="ru.passim.seeker.manusermo(this, 'incipit');">Inc</span>
+                    <span type="button" class="btn jumbo-2" title="Explicit"
+                          onclick="ru.passim.seeker.manusermo(this, 'explicit');">Exc</span>
+                    <span type="button" class="btn jumbo-1" title="Note"
+                          onclick="ru.passim.seeker.manusermo(this, 'note');">Note</span>
+                    <span type="button" class="btn jumbo-1" title="Kewords attached to the Super Sermon Gold"
+                          onclick="ru.passim.seeker.manusermo(this, 'kw-auto');">Keywords A</span>
+                    <span type="button" class="btn jumbo-1" title="Kewords manually attached to this sermon"
+                          onclick="ru.passim.seeker.manusermo(this, 'kw-manual');">Keywords M</span>
+                  </span>
+                </th>
                 <th class="tdnowrap">
                   {% if is_app_editor %}
                     <span>

@@ -1,21 +1,40 @@
 ﻿{% load i18n %}
 
-    {% if msitem.sermonsignatures.all|length > 0 %}
-      <span class="signature">{{msitem.signature_string}}</span>
-    {% elif msitem.goldsignatures.all|length > 0 %}
-      <span class="signature">{{msitem.signature_string}}</span>
-    {% else %}
-      [-]
-    {% endif %}
-    {% if msitem.title %}<b>{{msitem.title}}</b>{% endif %}
-    {% if msitem.author %}
-      (<span class="sermon-author">{{msitem.author.name}}</span>)
-    {% elif msitem.nickname %}
-      (<span class="sermon-nickname">{{msitem.nickname.name}}</span>)
-    {% else %}
-      (<i>no author</i>)
-    {% endif %}
-    {% if msitem.incipit %}<i>{{msitem.incipit}}</i>{% endif %}
-    {% if msitem.incipit or msitem.explicit %}...-...{% endif %}
-    {% if msitem.explicit %}<i>{{msitem.explicit}}</i>{% endif %}
-    {% if msitem.note %}(Note: {{msitem.note}}){% endif %}
+<span class="manusermo sig-auto hidden">
+  <span class="signature">{{msitem.signature_auto_string}}</span>
+</span>
+<span class="manusermo sig-manual">
+  {% if msitem.sermonsignatures.all|length > 0 %}
+    <span class="signature ma">{{msitem.signature_string}}</span>
+  {% elif msitem.goldsignatures.all|length > 0 %}
+    <span class="signature ma">{{msitem.signature_string}}</span>
+  {% else %}
+    [-]
+  {% endif %}
+</span>
+
+{% if msitem.title %}<span class="manusermo title"><b>{{msitem.title}}</b></span>{% endif %}
+
+<span class="manusermo author">
+  {% if msitem.author %}
+    (<span class="sermon-author">{{msitem.author.name}}</span>)
+  {% elif msitem.nickname %}
+    (<span class="sermon-nickname">{{msitem.nickname.name}}</span>)
+  {% else %}
+    (<i>no author</i>)
+  {% endif %}
+</span>
+
+<span class="manusermo incipit">
+  {% if msitem.incipit %}<i>{{msitem.incipit}}</i>{% endif %}
+  {% if msitem.incipit or msitem.explicit %}...-...{% endif %}
+</span>
+<span class="manusermo explicit">
+  {% if msitem.explicit %}<i>{{msitem.explicit}}</i>{% endif %}
+</span>
+
+{% if msitem.note %}<span class="manusermo note hidden">(Note: {{msitem.note}})</span>{% endif %}
+
+<span class="manusermo kw-auto hidden">{{msitem.get_keywords_plain|safe}}</span>
+
+<span class="manusermo kw-manual hidden">{{msitem.get_keywords_ssg_plain|safe}}</span>

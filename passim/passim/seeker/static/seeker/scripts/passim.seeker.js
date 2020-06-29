@@ -1388,6 +1388,38 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  manusermo
+       *      Visibility buttons for sermons within a manuscript
+       *
+       */
+      manusermo: function (elThis, target) {
+        var elTree = "#sermon_tree",
+            cls = ".manusermo." + target;
+
+        try {
+          // CHeck if we need to switch visibility on or off
+          if ($(elTree).find(cls).first().hasClass("hidden")) {
+            // It is hidden, we must show them
+            $(elTree).find(cls).removeClass("hidden");
+            // Make sure the color of the button is right
+            $(elThis).removeClass("jumbo-1");
+            $(elThis).removeClass("jumbo-2");
+            $(elThis).addClass("jumbo-2");
+          } else {
+            // It is shown, we must hide them
+            $(elTree).find(cls).addClass("hidden");
+            // Make sure the color of the button is right
+            $(elThis).removeClass("jumbo-1");
+            $(elThis).removeClass("jumbo-2");
+            $(elThis).addClass("jumbo-1");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("manusermo", ex);
+        }
+      },
+
       sermon_drag: function (ev) {
         var elTree = null,
             divId = "",
