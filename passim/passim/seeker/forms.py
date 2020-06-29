@@ -1125,7 +1125,7 @@ class KeywordForm(forms.ModelForm):
 
 
 class UserKeywordForm(forms.ModelForm):
-    """Keyword list"""
+    """User Keyword list"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -1160,6 +1160,42 @@ class UserKeywordForm(forms.ModelForm):
             self.fields['keyword'].initial = instance.keyword
             self.fields['profile'].initial = instance.profile
             self.fields['type'].initial = instance.type
+
+
+class ProvenanceForm(forms.ModelForm):
+    """Provenance list"""
+
+    location_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+                    widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Provenance
+        fields = ['name', 'location', 'note']
+        widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching', 'placeholder': 'Name for this provenance'}),
+                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
+                 'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'Notes on this provenance...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProvenanceForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['location'].required = False
+        self.fields['location_new'].required = False
+        self.fields['note'].required = False
+        # self.fields['location'].queryset = Location.objects.all().order_by('name')
+        self.fields['location_new'].queryset = Location.objects.all().order_by('name')
+
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
 
 
 class ProfileForm(forms.ModelForm):

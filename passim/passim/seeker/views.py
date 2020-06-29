@@ -65,7 +65,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm
+                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -6279,6 +6279,104 @@ class UserKeywordListView(BasicList):
             context['ukw_selection'] = lst_ukw
             context['ukw_list'] = reverse("userkeyword_list")
         return context
+
+
+class ProvenanceEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = Provenance
+    mForm = ProvenanceForm
+    prefix = 'prov'
+    title = "ProvenanceEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",         'value': instance.name,             'field_key': "name"},
+            {'type': 'plain', 'label': "Location:",     'value': instance.get_location(),   'field_key': 'location'     },
+            {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
+            {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def get_manuscripts(self, instance):
+        # find the shelfmark
+        lManu = []
+        for obj in instance.manuscripts_provenances.all():
+            # Add the shelfmark of this one
+            manu = obj.manuscript
+            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            shelfmark = manu.idno[:20]
+            lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+        sBack = ", ".join(lManu)
+        return sBack
+
+
+class ProvenanceDetails(ProvenanceEdit):
+    """Like Provenance Edit, but then html output"""
+    rtype = "html"
+    
+
+class ProvenanceListView(BasicList):
+    """Search and list provenances"""
+
+    model = Provenance
+    listform = ProvenanceForm
+    prefix = "prov"
+    has_select2 = True
+    new_button = False  # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
+    order_cols = ['location__name', 'name', 'note', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Location',    'order': 'o=1', 'type': 'str', 'custom': 'location', 'linkdetails': True},
+        {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
+        {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        ]
+    filters = [
+        ]
+    searches = [
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "manuscript":
+            # find the shelfmark
+            lManu = []
+            for obj in instance.manuscripts_provenances.all():
+                # Add the shelfmark of this one
+                manu = obj.manuscript
+                url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+                shelfmark = manu.idno[:20]
+                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+            sBack = ", ".join(lManu)
+        elif custom == "location":
+            sBack = ""
+            if instance.location:
+                sBack = instance.location.name
+        elif custom == "note":
+            sBack = ""
+            if instance.note:
+                sBack = instance.note[:40]
+        return sBack, sTitle
 
 
 class ProfileEdit(BasicDetails):

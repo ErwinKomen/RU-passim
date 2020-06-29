@@ -1943,6 +1943,14 @@ class Provenance(models.Model):
         # Return what we found or created
         return hit
 
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
 
 class SourceInfo(models.Model):
     """Details of the source from which we get information"""
@@ -2909,12 +2917,12 @@ class Manuscript(models.Model):
         lHtml = []
         # Visit all literature references
         for prov in self.provenances.all().order_by('name'):
+            # Get the URL
+            url = reverse("provenance_details", kwargs = {'pk': prov.id})
             if prov.location == None:
                 # Create a display for this item
-                lHtml.append("<span class='badge signature cl'>{}</span>".format(prov.name))
+                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
             else:
-                # Determine where clicking should lead to
-                url = reverse('location_details', kwargs={'pk': prov.location.id})
                 # Create a display for this item
                 lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
 
