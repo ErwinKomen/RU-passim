@@ -1005,6 +1005,7 @@ class SermonForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['manu'].required = False
@@ -1065,6 +1066,7 @@ class SermonForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
                 # Determine the initial collections
                 self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
@@ -1515,6 +1517,7 @@ class SermonGoldForm(PassimModelForm):
             username = self.username        # kwargs.pop('username', "")
             team_group = self.team_group    # kwargs.pop('team_group', "")
             userplus = self.userplus
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['codename'].required = False
@@ -1570,6 +1573,7 @@ class SermonGoldForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.gold_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('-editype', 'code')]
                 self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
                 self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
@@ -1718,6 +1722,7 @@ class SuperSermonGoldForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['authorname'].required = False
             self.fields['stype'].required = False
@@ -1769,6 +1774,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 qs = instance.equalgold_dst.all()
@@ -2508,6 +2514,7 @@ class ManuscriptForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
             #self.fields['yearstart'].required = False
@@ -2572,6 +2579,7 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
                 self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]

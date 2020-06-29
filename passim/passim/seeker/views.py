@@ -121,8 +121,8 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, related_is_through = False, userplus = None,
-              added=None, deleted=None):
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, qfilter = {}, 
+              related_is_through = False, userplus = None, added=None, deleted=None):
     """Adapt the 'field' of 'instance' to contain only the items in 'qs'
     
     The lists [added] and [deleted] (if specified) will contain links to the elements that have been added and deleted
@@ -133,6 +133,7 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, rela
     try:
         # Get current associations
         lstQ = [Q(**{field1: instance})]
+        for k,v in qfilter.items(): lstQ.append(Q(**{k: v}))
         through_qs = cls.objects.filter(*lstQ)
         if related_is_through:
             related_qs = through_qs
@@ -5664,7 +5665,7 @@ class SermonEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'sermo'})
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
 
             # (3) 'Links to Gold Signatures'
             siglist = form.cleaned_data['siglist']
@@ -6199,11 +6200,16 @@ class UserKeywordListView(BasicList):
                 # See if this needs translation
                 if approvelist[0] == "[":
                     approvelist = json.loads(approvelist)
+                else:
+                    approvelist = [ approvelist ]
                 # Does this user have the right privilages?
                 if user_is_superuser(self.request) or user_is_ingroup(self.request, app_editor):
+                    # Get the profile
+                    profile = Profile.get_user_profile(username)
+
                     # Approve the UserKeyword stated here
                     for ukw_id in approvelist:
-                        obj = UserKeyword.objects.filter(id=ukw_id).first()
+                        obj = UserKeyword.objects.filter(profile=profile, id=ukw_id).first()
                         if obj != None:
                             obj.moveup()
         return None
@@ -6225,7 +6231,7 @@ class UserKeywordListView(BasicList):
             sBack = instance.created.strftime("%d/%b/%Y %H:%M")
         elif custom == "approve":
             url = "{}?approvelist={}".format(reverse("userkeyword_list"), instance.id)
-            sBack = "<a class='btn btn-xs jumbo-2' role='button' href='{}' title='Approve this keyword'><span class='glyphicon glyphicon-ok'></span></a>".format(url)
+            sBack = "<a class='btn btn-xs jumbo-2' role='button' href='{}' title='Approve this keyword'><span class='glyphicon glyphicon-thumbs-up'></span></a>".format(url)
         return sBack, sTitle
 
     def get_link(self, instance):
@@ -7262,7 +7268,7 @@ class ManuscriptEdit(BasicDetails):
             # (3) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'manu'})
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'manu'})
 
             # (4) 'literature'
             litlist = form.cleaned_data['litlist']
@@ -8507,7 +8513,7 @@ class SermonGoldEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'gold'})
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'gold'})
 
             # (3) 'editions'
             edilist = form.cleaned_data['edilist']
@@ -8837,7 +8843,7 @@ class EqualGoldEdit(BasicDetails):
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'super'})
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'super'})
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
