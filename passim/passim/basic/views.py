@@ -448,6 +448,7 @@ class BasicList(ListView):
     use_team_group = False
     lst_typeaheads = []
     sort_order = ""
+    qs = None
     page_function = "ru.basic.search_paged_start"
 
     def initializations(self):
@@ -825,6 +826,7 @@ class BasicList(ListView):
         self.entrycount = len(qs)
 
         # Return the resulting filtered and sorted queryset
+        self.qs = qs
         return qs
 
     def post(self, request, *args, **kwargs):

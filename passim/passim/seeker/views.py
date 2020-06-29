@@ -6095,7 +6095,8 @@ class UserKeywordEdit(BasicDetails):
 
         if context['is_app_editor']:
             lhtml = []
-            lbuttons = [dict(href="{}?approvelist={}".format(reverse('userkeyword_list'), instance.id), label="Approve Keyword", 
+            lbuttons = [dict(href="{}?approvelist={}".format(reverse('userkeyword_list'), instance.id), 
+                             label="Approve Keyword", 
                              title="Approving this keyword attaches it to the target and removes it from the list of user keywords.")]
             lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
             for item in lbuttons:
@@ -6168,13 +6169,14 @@ class UserKeywordListView(BasicList):
     has_select2 = True
     in_team = False
     new_button = False
-    order_cols = ['profile__user__username', 'keyword__name',  'type', '', 'created']
+    order_cols = ['profile__user__username', 'keyword__name',  'type', '', 'created', '']
     order_default = order_cols
     order_heads = [{'name': 'User',     'order': 'o=1', 'type': 'str', 'custom': 'profile'},
                    {'name': 'Keyword',  'order': 'o=2', 'type': 'str', 'custom': 'keyword', 'main': True, 'linkdetails': True},
                    {'name': 'Type',     'order': 'o=3', 'type': 'str', 'custom': 'itemtype'},
                    {'name': 'Link',     'order': '',    'type': 'str', 'custom': 'link'},
-                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'date'}]
+                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'date'},
+                   {'name': 'Approve',  'order': '',    'type': 'str', 'custom': 'approve', 'align': 'right'}]
     filters = [ {"name": "Keyword",     "id": "filter_keyword", "enabled": False},
                 {"name": "User",        "id": "filter_profile", "enabled": False},
                 {"name": "Type",        "id": "filter_type",    "enabled": False}]
@@ -6184,13 +6186,19 @@ class UserKeywordListView(BasicList):
             {'filter': 'profile',   'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id' },
             {'filter': 'type',      'dbfield': 'type',    'keyS': 'type' }]}
         ]
+    custombuttons = [{"name": "approve_keywords", "title": "Approve currently filtered keywords", 
+                      "icon": "music", "template_name": "seeker/approve_keywords.html" }]
 
     def initializations(self):
         if self.request.user:
             username = self.request.user.username
             # See if there is a list of approved id's
-            approvelist = self.request.GET.get("approvelist", None)
+            qd = self.request.GET if self.request.method == "GET" else self.request.POST
+            approvelist = qd.get("approvelist", None)
             if approvelist != None:
+                # See if this needs translation
+                if approvelist[0] == "[":
+                    approvelist = json.loads(approvelist)
                 # Does this user have the right privilages?
                 if user_is_superuser(self.request) or user_is_ingroup(self.request, app_editor):
                     # Approve the UserKeyword stated here
@@ -6215,6 +6223,9 @@ class UserKeywordListView(BasicList):
             sBack = self.get_link(instance)
         elif custom == "date":
             sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        elif custom == "approve":
+            url = "{}?approvelist={}".format(reverse("userkeyword_list"), instance.id)
+            sBack = "<a class='btn btn-xs jumbo-2' role='button' href='{}' title='Approve this keyword'><span class='glyphicon glyphicon-ok'></span></a>".format(url)
         return sBack, sTitle
 
     def get_link(self, instance):
@@ -6255,30 +6266,13 @@ class UserKeywordListView(BasicList):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "super", sig)
         return sBack
 
-    #def adapt_search(self, fields):
-    #    lstExclude=None
-    #    qAlternative = None
-
-    #    # Make sure the search is restricted to keywords that are connected through one of the M/S/SG/SSG link tables
-    #    lstQ = []
-    #    lstQ.append(Q(id__in=manuscript_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=sermondescr_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=sermongold_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=equal_kwu__keyword__id))
-    #    # Check if a list of keywords is given
-    #    if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-    #        # Get the list
-    #        kwlist = fields['kwlist']
-    #        # Add this to the existing filter
-    #        lstQ.append(Q(id__in=kwlist))
-    #        filter = "|".join(lstQ)
-    #        fields['kwlist'] = Keyword.objects.filter(filter).values('id')
-    #    else:
-    #        # THe kwlist still needs to be filled
-    #        filter = "|".join(lstQ)
-    #        fields['kwlist'] = Keyword.objects.filter(filter).values("id")
-
-    #    return fields, lstExclude, qAlternative
+    def add_to_context(self, context, initial):
+        # Make sure to add a list of the currently filtered keywords
+        if self.qs != None:
+            lst_ukw = [x.id for x in self.qs]
+            context['ukw_selection'] = lst_ukw
+            context['ukw_list'] = reverse("userkeyword_list")
+        return context
 
 
 class ProfileEdit(BasicDetails):
@@ -7597,7 +7591,8 @@ class ManuscriptListView(BasicList):
             ]}
          ]
     uploads = reader_uploads
-    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
+                      "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def initializations(self):
         # Check if signature adaptation is needed
