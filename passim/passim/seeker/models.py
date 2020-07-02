@@ -5500,35 +5500,12 @@ class SermonDescr(models.Model):
         # manu = self.manu
         # lref_list = []
         for item in LitrefMan.objects.filter(manuscript=self.manu).order_by('reference__short', 'pages'):
-            #oAdd = {}
-            #oAdd['reference_id'] = item.reference.id
-            #oAdd['short'] = item.reference.short
-            #oAdd['reference'] = item.reference
-            #oAdd['pages'] = item.pages
-            #oAdd['short_markdown'] = item.get_short_markdown()
-            # OLD: lref_list.append(oAdd)
-
             # Determine where clicking should lead to
             url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
             # Create a display for this item
             lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
                 url,item.get_short_markdown()))
        
-        ## (2) Second the litrefs from the linked Gold sermons: 
-        #for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL).order_by('reference__short', 'reference__pages'):
-        #    # Access the gold sermon
-        #    gold = linked.gold
-        #    # Get all the literature references of this gold sermon 
-        #    for item in LitrefSG.objects.filter(sermon_gold_id = gold):
-                
-        #        oAdd = {}
-        #        oAdd['reference_id'] = item.reference.id
-        #        oAdd['short'] = item.reference.short
-        #        oAdd['reference'] = item.reference
-        #        oAdd['pages'] = item.pages
-        #        oAdd['short_markdown'] = item.get_short_markdown()
-        #        lref_list.append(oAdd)
-
         # (2) The literature references available in all the SGs that are part of the SSG
         ssg_id = self.equalgolds.all().values('id')
         #     Note: the *linktype* for SSG-S doesn't matter anymore
@@ -5541,45 +5518,6 @@ class SermonDescr(models.Model):
             # Create a display for this item
             lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
                 url,item.get_short_markdown()))
-
-                
-        ## (3) Set the sort order TH: werkt
-        #lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
-                
-        ## (4) Remove duplicates 
-        #unique_litref_list=[]                
-        #previous = None
-        #for item in lref_list:
-        #    # Keep the first
-        #    if previous == None:
-        #        unique_litref_list.append(item)
-        #    # Try to compare current item to previous
-        #    elif previous != None:
-        #        # Are they the same?
-        #        if item['reference_id'] == previous['reference_id'] and \
-        #            item['pages'] == previous['pages']:
-        #            # They are the same, no need to copy
-        #            pass
-                            
-        #        # elif previous == None: 
-        #        #    unique_litref_list.append(item)
-        #        else:
-        #            # Add this item to the new list
-        #            unique_litref_list.append(item)
-
-        #    # assign previous
-        #    previous = item
-              
-        ## (5) The outcome:              
-        #litref_list = unique_litref_list
-        
-        ## (6) Combine into HTML code
-        #lHtml = []
-        #for litref in litref_list:
-        #    # Determine where clicking should lead to
-        #    url = "{}#lit_{}".format(reverse('literature_list'), litref['reference'].id)
-        #    # Create a display for this item
-        #    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref['short_markdown']))
 
         sBack = ", ".join(lHtml)
         return sBack
