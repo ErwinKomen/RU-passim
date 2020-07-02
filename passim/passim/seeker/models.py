@@ -43,6 +43,7 @@ LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 VISIBILITY_TYPE = "seeker.visibility"
@@ -54,6 +55,13 @@ LINK_SIM = "sim"
 LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
+
+# Author certainty levels
+CERTAIN_LOWEST = 'vun'  # very uncertain
+CERTAIN_LOW = 'unc'     # uncertain
+CERTAIN_AVE = 'ave'     # average
+CERTAIN_HIGH = 'rea'    # reasonably certain
+CERTAIN_HIGHEST = 'vce' # very certain
 
 STYPE_IMPORTED = 'imp'
 STYPE_MANUAL = 'man'
@@ -2785,7 +2793,8 @@ class Manuscript(models.Model):
         if self.library != None:
             lhtml.append(self.library.name)
         # (3) Idno
-        lhtml.append(self.idno)
+        if self.idno != None:
+            lhtml.append(self.idno)
 
         return ", ".join(lhtml)
 
@@ -5108,6 +5117,8 @@ class SermonDescr(models.Model):
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
+    # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
+    autype = models.CharField("Author certainty", choices=build_abbr_list(CERTAINTY_TYPE), max_length=5, default="ave")
     # [0-1] But most often we only start out with having just a nickname of the author
     # NOTE: THE NICKNAME IS NO LONGER IN USE (oct/2019)
     nickname = models.ForeignKey(Nickname, null=True, blank=True, on_delete = models.SET_NULL, related_name="nickname_sermons")
@@ -5145,7 +5156,11 @@ class SermonDescr(models.Model):
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
 
     # [0-n] Link to one or more golden standard sermons
+    #       NOTE: this link is legacy. We now have the EqualGold link through 'SermonDescrEqual'
     goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [0-n] Link to one or more SSG (equalgold)
+    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual")
 
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
@@ -5248,9 +5263,39 @@ class SermonDescr(models.Model):
 
         if self.author:
             sName = self.author.name
+            # Also get the certainty level of the author and the corresponding flag color
+            sAuType = self.get_autype()
+
+            # Combine all of this
+            sBack = "<span>{}</span>&nbsp;{}".format(sName, sAuType)
         else:
-            sName = "-"
-        return sName
+            sBack = "-"
+        return sBack
+
+    def get_autype(self):
+        # Also get the certainty level of the author and the corresponding flag color
+        autype = self.autype
+        color = "red"
+        title = ""
+        if autype == CERTAIN_LOWEST: 
+            color = "red"
+            title = "Author: very uncertain"
+        elif autype == CERTAIN_LOW: 
+            color = "orange"
+            title = "Author: uncertain"
+        elif autype == CERTAIN_AVE: 
+            color = "gray"
+            title = "Author: average certainty"
+        elif autype == CERTAIN_HIGH: 
+            color = "lightgreen"
+            title = "Author: reasonably certain"
+        else: 
+            color = "green"
+            title = "Author: very certain"
+
+        # Combine all of this
+        sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
+        return sBack
     
     def get_collections_markdown(self):
         lHtml = []
@@ -5450,70 +5495,91 @@ class SermonDescr(models.Model):
     def get_litrefs_markdown(self):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
-        # (1) First the litrefs from the manuscript: 
-        manu = self.manu
-        lref_list = []
-        for item in LitrefMan.objects.filter(manuscript=manu):
-            oAdd = {}
-            oAdd['reference_id'] = item.reference.id
-            oAdd['short'] = item.reference.short
-            oAdd['reference'] = item.reference
-            oAdd['pages'] = item.pages
-            oAdd['short_markdown'] = item.get_short_markdown()
-            lref_list.append(oAdd)
-       
-        # (2) Second the litrefs from the linked Gold sermons: 
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon
-            gold = linked.gold
-            # Get all the literature references of this gold sermon 
-            for item in LitrefSG.objects.filter(sermon_gold_id = gold):
-                
-                oAdd = {}
-                oAdd['reference_id'] = item.reference.id
-                oAdd['short'] = item.reference.short
-                oAdd['reference'] = item.reference
-                oAdd['pages'] = item.pages
-                oAdd['short_markdown'] = item.get_short_markdown()
-                lref_list.append(oAdd)
-                
-        # (3) Set the sort order TH: werkt
-        lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
-                
-        # (4) Remove duplicates 
-        unique_litref_list=[]                
-        previous = None
-        for item in lref_list:
-            # Keep the first
-            if previous == None:
-                unique_litref_list.append(item)
-            # Try to compare current item to previous
-            elif previous != None:
-                # Are they the same?
-                if item['reference_id'] == previous['reference_id'] and \
-                    item['pages'] == previous['pages']:
-                    # They are the same, no need to copy
-                    pass
-                            
-                # elif previous == None: 
-                #    unique_litref_list.append(item)
-                else:
-                    # Add this item to the new list
-                    unique_litref_list.append(item)
-
-            # assign previous
-            previous = item
-              
-        # (5) The outcome:              
-        litref_list = unique_litref_list
-        
-        # (6) Combine into HTML code
         lHtml = []
-        for litref in litref_list:
+        # (1) First the litrefs from the manuscript: 
+        # manu = self.manu
+        # lref_list = []
+        for item in LitrefMan.objects.filter(manuscript=self.manu).order_by('reference__short', 'pages'):
+            #oAdd = {}
+            #oAdd['reference_id'] = item.reference.id
+            #oAdd['short'] = item.reference.short
+            #oAdd['reference'] = item.reference
+            #oAdd['pages'] = item.pages
+            #oAdd['short_markdown'] = item.get_short_markdown()
+            # OLD: lref_list.append(oAdd)
+
             # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), litref['reference'].id)
+            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref['short_markdown']))
+            lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
+                url,item.get_short_markdown()))
+       
+        ## (2) Second the litrefs from the linked Gold sermons: 
+        #for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL).order_by('reference__short', 'reference__pages'):
+        #    # Access the gold sermon
+        #    gold = linked.gold
+        #    # Get all the literature references of this gold sermon 
+        #    for item in LitrefSG.objects.filter(sermon_gold_id = gold):
+                
+        #        oAdd = {}
+        #        oAdd['reference_id'] = item.reference.id
+        #        oAdd['short'] = item.reference.short
+        #        oAdd['reference'] = item.reference
+        #        oAdd['pages'] = item.pages
+        #        oAdd['short_markdown'] = item.get_short_markdown()
+        #        lref_list.append(oAdd)
+
+        # (2) The literature references available in all the SGs that are part of the SSG
+        ssg_id = self.equalgolds.all().values('id')
+        #     Note: the *linktype* for SSG-S doesn't matter anymore
+        # ssg_id = [x.super.id for x in SermonDescrEqual.objects.filter(sermon=self)]
+        gold_id = SermonGold.objects.filter(equal__id__in=ssg_id).values('id')
+        # Visit all the litrefSGs
+        for item in LitrefSG.objects.filter(sermon_gold__id__in = gold_id).order_by('reference__short', 'pages'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
+                url,item.get_short_markdown()))
+
+                
+        ## (3) Set the sort order TH: werkt
+        #lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
+                
+        ## (4) Remove duplicates 
+        #unique_litref_list=[]                
+        #previous = None
+        #for item in lref_list:
+        #    # Keep the first
+        #    if previous == None:
+        #        unique_litref_list.append(item)
+        #    # Try to compare current item to previous
+        #    elif previous != None:
+        #        # Are they the same?
+        #        if item['reference_id'] == previous['reference_id'] and \
+        #            item['pages'] == previous['pages']:
+        #            # They are the same, no need to copy
+        #            pass
+                            
+        #        # elif previous == None: 
+        #        #    unique_litref_list.append(item)
+        #        else:
+        #            # Add this item to the new list
+        #            unique_litref_list.append(item)
+
+        #    # assign previous
+        #    previous = item
+              
+        ## (5) The outcome:              
+        #litref_list = unique_litref_list
+        
+        ## (6) Combine into HTML code
+        #lHtml = []
+        #for litref in litref_list:
+        #    # Determine where clicking should lead to
+        #    url = "{}#lit_{}".format(reverse('literature_list'), litref['reference'].id)
+        #    # Create a display for this item
+        #    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref['short_markdown']))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -5632,6 +5698,9 @@ class SermonDescr(models.Model):
         istop = 1
         if self.incipit: self.srchincipit = get_searchable(self.incipit)
         if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        # Preliminary saving, before accessing m2m fields
+        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        # Process signatures
         lSign = []
         bNeedSave = False
         for item in self.sermonsignatures.all():

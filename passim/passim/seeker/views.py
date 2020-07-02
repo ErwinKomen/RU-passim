@@ -5473,24 +5473,29 @@ class SermonEdit(BasicDetails):
         manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
-            # {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'idonly'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
-            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author,       'field_key': 'author'},
+            {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
+            {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
             {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
+            {'type': 'safe',  'label': "Lectio:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
             {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
-            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle'},
+            # Issue #237, delete subtitle
+            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle', 
+             'editonly': True, 'title': 'The subtitle field is legacy. It is edit-only, non-viewable'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
              'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
             {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown,
              'field_key': 'postscriptum'}, 
-            {'type': 'safe',  'label': "Quote:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
-            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes'},
+            # Issue #23: delete bibliographic notes
+            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
+             'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
-            {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
+            {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
+             'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
@@ -5649,6 +5654,12 @@ class SermonEdit(BasicDetails):
                 bResult = False
         return None
 
+    def before_save(self, form, instance):
+        if hasattr(form, 'cleaned_data') and 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
+            autype = form.cleaned_data['autype']
+            form.instance.autype = autype
+        return True, ""
+
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
 
@@ -5661,7 +5672,7 @@ class SermonEdit(BasicDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
-
+            
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)

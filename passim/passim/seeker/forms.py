@@ -61,6 +61,17 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
+class AutypeWidget(ModelSelect2Widget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
@@ -961,6 +972,8 @@ class SermonForm(PassimModelForm):
     origin      = forms.CharField(required=False)
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    autype      = forms.ChoiceField(label=_("Author certainty type"), required=False,
+                     widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Author certainty level...',  'style': 'width: 100%;'}))
     prov        = forms.CharField(required=False)
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
@@ -1006,8 +1019,10 @@ class SermonForm(PassimModelForm):
             username = self.username
             team_group = self.team_group
             profile = Profile.get_user_profile(username)
+
             # Some fields are not required
-            self.fields['stype'].required = False
+            self.fields['autype'].required = False
+            init_choices(self, 'autype', CERTAINTY_TYPE, bUseAbbr=True)
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -1083,6 +1098,7 @@ class SermonForm(PassimModelForm):
                 # Make sure the initial superlist captures exactly what we have
                 self.fields['superlist'].queryset = SermonDescrEqual.objects.filter(Q(id__in = self.fields['superlist'].initial))
 
+                self.fields['autype'].initial = instance.autype
 
                 iStop = 1
         except:
