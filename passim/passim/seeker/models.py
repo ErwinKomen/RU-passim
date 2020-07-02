@@ -5366,29 +5366,43 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
-        #for linked in SermonDescrEqual.objects.filter(sermon=self):
-        #    # Add this SSG
-        #    ssg_list.append(linked.super.id)
         for linked in self.sermondescr_super.all():
             ssg_list.append(linked.id)
 
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
-        # Get an ordered set of signatures
-        # OLD: for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
-        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
-            # Create a display for this topic
-            if type == "first":
-                # Determine where clicking should lead to
-                url = reverse('gold_details', kwargs={'pk': sig.gold.id})
-                lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
-                break
-            else:
+        if type == "combi":
+            # Need to have both the automatic as well as the manually linked ones
+            gold_id_list = [x['id'] for x in gold_list]
+            manual_list = []
+            for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
+                if sig.gsig:
+                    gold_id_list.append(sig.gsig.id)
+                else:
+                    manual_list.append(sig.id)
+            # (a) Show the gold signatures
+            for sig in Signature.objects.filter(id__in=gold_id_list).order_by('-editype', 'code'):
                 # Determine where clicking should lead to
                 url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
                 lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            # (b) Show the manual ones
+            for sig in self.sermonsignatures.filter(id__in=manual_list).order_by('-editype', 'code'):
+                # Create a display for this topic - without URL
+                lHtml.append("<span class='badge signature {}'>{}</span>".format(sig.editype,sig.code))
+        else:
+            # Get an ordered set of signatures - automatically linked
+            for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
+                # Create a display for this topic
+                if type == "first":
+                    # Determine where clicking should lead to
+                    url = reverse('gold_details', kwargs={'pk': sig.gold.id})
+                    lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
+                    break
+                else:
+                    # Determine where clicking should lead to
+                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
         sBack = ", ".join(lHtml)
         return sBack
