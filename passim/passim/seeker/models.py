@@ -5375,6 +5375,7 @@ class SermonDescr(models.Model):
         if type == "combi":
             # Need to have both the automatic as well as the manually linked ones
             gold_id_list = [x['id'] for x in gold_list]
+            auto_list = copy.copy(gold_id_list)
             manual_list = []
             for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
                 if sig.gsig:
@@ -5385,7 +5386,9 @@ class SermonDescr(models.Model):
             for sig in Signature.objects.filter(id__in=gold_id_list).order_by('-editype', 'code'):
                 # Determine where clicking should lead to
                 url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+                # Check if this is an automatic code
+                auto = "" if sig.id in auto_list else "view-mode"
+                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype,auto, url,sig.code))
             # (b) Show the manual ones
             for sig in self.sermonsignatures.filter(id__in=manual_list).order_by('-editype', 'code'):
                 # Create a display for this topic - without URL
@@ -5404,7 +5407,7 @@ class SermonDescr(models.Model):
                     url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
                     lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = ", ".join(lHtml)
+        sBack = "<span class='view-mode'>,</span> ".join(lHtml)
         return sBack
 
     def get_goldlinks_markdown(self):
