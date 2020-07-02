@@ -5531,6 +5531,17 @@ class SermonDescr(models.Model):
         """Get the contents of the note field using markdown"""
         return adapt_markdown(self.note)
 
+    def get_passimcode_markdown(self):
+        """Get the Passim code (and a link to it)"""
+
+        sBack = ""
+        # Get the first equalgold
+        equal = self.equalgolds.all().order_by('code', 'author__name', 'number').first()
+        if equal != None and equal.code != "":
+            url = reverse('equalgold_details', kwargs={'pk': equal.id})
+            sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, equal.code)
+        return sBack
+
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""
         return adapt_markdown(self.quote)

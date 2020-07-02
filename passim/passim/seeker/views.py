@@ -5535,7 +5535,9 @@ class SermonEdit(BasicDetails):
             idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
         # Add something right to the SermonDetails title
-        context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+        # OLD: context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+        # Changed in issue #241: show the PASSIM code
+        context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
         context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(idno)
 
