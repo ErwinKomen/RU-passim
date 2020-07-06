@@ -78,9 +78,6 @@
                              aria-haspopup="true" aria-expanded="false">Developers<span class="caret"></span></a>
                         
                          <ul class="dropdown-menu">
-                            <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
-                            
-                            <li role="separator" class="divider"></li>
                             <li><a href_was="#" href="{% url 'create_pdf_lit' %}" title="Create PDF with literature references">Create PDF with literature references</a></li> 
                             
                             <li role="separator" class="divider"></li>
@@ -89,21 +86,26 @@
                             <li role="separator" class="divider"></li>
                             <li><a href_was="#" href="{% url 'create_pdf_manu' %}" title="Create PDF with all manuscripts in PASSIM">Create PDF with all manuscripts in PASSIM</a></li> 
                             
+                           <!--
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'do_goldsearch' %}" title="Re-make gold sermon srchincipit/srchexplicit">Gold re-index searching</a></li>
-                            <li><a href="{% url 'do_goldtogold' %}" title="Correct all gold-to-gold relations">Gold to gold Relations correct</a></li>
-                            <li><a href="{% url 'do_provenance' %}" title="Remove duplicate Manuscript-Provenance links">Tweak provenances</a></li>
-                            <li><a href="{% url 'do_daterange' %}" title="Copy Manuscript dateranges to table Daterange">Update Dateranges</a></li>
-                            <li><a href="{% url 'do_mext' %}" title="Copy URL to ManuscriptExt">Copy manuscript links to externals</a></li>
-                            <li><a href="{% url 'do_sermons' %}" title="Remove duplicate SermonDescr from Manuscripts">Tweak manuscript-sermons</a></li>
+                            <li><a href="{% url 'entries_json' %}" title="Upload lists, like names of libraries">Upload lists</a></li>
+                            
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#" href_was="{% url 'do_goldsearch' %}" title="Re-make gold sermon srchincipit/srchexplicit">Gold re-index searching</a></li>
+                            <li><a href="#" href_was="{% url 'do_goldtogold' %}" title="Correct all gold-to-gold relations">Gold to gold Relations correct</a></li>
+                            <li><a href="#" href_was="{% url 'do_provenance' %}" title="Remove duplicate Manuscript-Provenance links">Tweak provenances</a></li>
+                            <li><a href="#" href_was="{% url 'do_daterange' %}" title="Copy Manuscript dateranges to table Daterange">Update Dateranges</a></li>
+                            <li><a href="#" href_was="{% url 'do_mext' %}" title="Copy URL to ManuscriptExt">Copy manuscript links to externals</a></li>
+                            <li><a href="#" href_was="{% url 'do_sermons' %}" title="Remove duplicate SermonDescr from Manuscripts">Tweak manuscript-sermons</a></li>
 
-                            <li><a href="{% url 'do_ssgmigrate' %}" title="Perform migration from EqualGold to SSG">Super sermon gold migration</a></li>
+                            <li><a href="#" href_was="{% url 'do_ssgmigrate' %}" title="Perform migration from EqualGold to SSG">Super sermon gold migration</a></li>
 
                             <li role="separator" class="divider"></li>
                             <li><a href="#" href_was="{% url 'do_clavis' %}" title="Correct Clavis by adding CPPM to number-only">Clavis correct</a></li>
                             <li><a href="#" href_was="{% url 'do_stype' %}" title="Correct Status Types for Gold, Sermon, Manuscript">Stype Setting</a></li>
                             <li><a href="#" href_was="{% url 'do_locations' %}" title="Convert locations">Convert locations</a></li>
                             <li><a href="#" href_was="{% url 'do_mext' %}" title="Copy URL to ManuscriptExt">Copy manuscript links to externals</a></li>
+                             -->
                           </ul>
                         </li>
                       {% endif %}

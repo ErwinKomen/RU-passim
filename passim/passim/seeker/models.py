@@ -2672,6 +2672,11 @@ class Manuscript(models.Model):
         bResult = True
         msg = ""
         oErr = ErrHandle()
+
+        # ========== provisionally ================
+        method = "original"
+        method = "msitem"   # "sermondescr"
+        # =========================================
         try:
             count = Manuscript.objects.all().count()
             with transaction.atomic():
@@ -2679,23 +2684,42 @@ class Manuscript(models.Model):
                 for idx, manu in enumerate(Manuscript.objects.all()):
                     oErr.Status("Sermon # {}/{}".format(idx, count))
                     # Walk all sermons in this manuscript, in order
-                    qs = manu.manusermons.all().order_by('order')
-                    for sermo in qs:
-                        # Reset saving
-                        bNeedSaving = False
-                        # Check presence of 'firstchild' and 'next'
-                        firstchild = manu.manusermons.filter(parent=sermo).order_by('order').first()
-                        if sermo.firstchild != firstchild:
-                            sermo.firstchild = firstchild
-                            bNeedSaving = True
-                        # Check for the 'next' one
-                        next = manu.manusermons.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
-                        if sermo.next != next:
-                            sermo.next = next
-                            bNeedSaving = True
-                        # If this needs saving, so do it
-                        if bNeedSaving:
-                            sermo.save()
+                    if method == "msitem":
+                        qs = manu.manuitems.all().order_by('order')
+                        for sermo in qs:
+                            # Reset saving
+                            bNeedSaving = False
+                            # Check presence of 'firstchild' and 'next'
+                            firstchild = manu.manuitems.filter(parent=sermo).order_by('order').first()
+                            if sermo.firstchild != firstchild:
+                                sermo.firstchild = firstchild
+                                bNeedSaving = True
+                            # Check for the 'next' one
+                            next = manu.manuitems.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
+                            if sermo.next != next:
+                                sermo.next = next
+                                bNeedSaving = True
+                            # If this needs saving, so do it
+                            if bNeedSaving:
+                                sermo.save()
+                    else:
+                        qs = manu.manusermons.all().order_by('order')
+                        for sermo in qs:
+                            # Reset saving
+                            bNeedSaving = False
+                            # Check presence of 'firstchild' and 'next'
+                            firstchild = manu.manusermons.filter(parent=sermo).order_by('order').first()
+                            if sermo.firstchild != firstchild:
+                                sermo.firstchild = firstchild
+                                bNeedSaving = True
+                            # Check for the 'next' one
+                            next = manu.manusermons.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
+                            if sermo.next != next:
+                                sermo.next = next
+                                bNeedSaving = True
+                            # If this needs saving, so do it
+                            if bNeedSaving:
+                                sermo.save()
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -2707,6 +2731,7 @@ class Manuscript(models.Model):
         oErr = ErrHandle()
         sermon = None
         take_author = False
+        method = "msitem"   # "sermondescr"
         try:
             lstQ = []
             if 'title' in oDescr: lstQ.append(Q(title__iexact=oDescr['title']))
@@ -2721,7 +2746,11 @@ class Manuscript(models.Model):
                 lstQ.append(Q(note__icontains=oDescr['author']))
 
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
-            sermon = self.manusermons.filter(*lstQ).first()
+            if method == "msitem":
+                lstQ.append(Q(msitem__manu=self))
+                sermon = SermonDescr.objects.filter(*lstQ).first()
+            else:
+                sermon = self.manusermons.filter(*lstQ).first()
 
             # Return the sermon instance
             return sermon
@@ -2937,6 +2966,14 @@ class Manuscript(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
+
+    def get_sermon_count(self):
+        method = "msitem"   # "sermondescr"
+        if method == "msitem":
+            count = SermonDescr.objects.filter(msitem__manu=self).count()
+        else:
+            count = self.manusermons.all().count()
+        return count
 
     def get_stype_light(self):
         return get_stype_light(self.stype)
@@ -5102,6 +5139,50 @@ class Collection(models.Model):
         return qs
 
 
+class MsItem(models.Model):
+    """One item in a manuscript - can be sermon or heading"""
+
+    # ========================================================================
+    # [1] Every MsItem belongs to exactly one manuscript
+    #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
+    manu = models.ForeignKey(Manuscript, null=True, related_name="manuitems")
+
+    # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
+    # [0-1] Parent sermon, if applicable
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_parent")
+    # [0-1] Parent sermon, if applicable
+    firstchild = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_child")
+    # [0-1] Parent sermon, if applicable
+    next = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_next")
+    # [1]
+    order = models.IntegerField("Order", default = -1)
+
+    def getdepth(self):
+        depth = 1
+        node = self
+        while node.parent:
+            # Repair strategy...
+            if node.id == node.parent.id:
+                # This is not correct -- need to repair
+                node.parent = None
+                node.save()
+            else:
+                depth += 1
+                node = node.parent
+        return depth
+
+
+class SermonHead(models.Model):
+    """A hierarchical element in the manuscript structure"""
+
+    # [0-1] Optional location of this sermon on the manuscript
+    locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
+
+    # [1] Every SermonHead belongs to exactly one MsItem
+    #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
+    msitem = models.ForeignKey(MsItem, null=True, related_name="itemheads")
+
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -5172,6 +5253,9 @@ class SermonDescr(models.Model):
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
     manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
+    # [1] Every semondescr belongs to exactly one MsItem
+    #     Note: one [MsItem] will have only one [SermonDescr], but using an FK is easier for processing (than a OneToOneField)
+    msitem = models.ForeignKey(MsItem, null=True, related_name="itemsermons")
 
     # Automatically created and processed fields
     # [1] Every sermondesc has a list of signatures that are automatically created
@@ -5763,6 +5847,10 @@ class UserKeyword(models.Model):
     gold = models.ForeignKey(SermonGold, blank=True, null=True, related_name="gold_userkeywords")
     # [0-1] The link is with a EqualGold instance ...
     super = models.ForeignKey(EqualGold, blank=True, null=True, related_name="super_userkeywords")
+
+    def __str__(self):
+        sBack = self.keyword.name
+        return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None

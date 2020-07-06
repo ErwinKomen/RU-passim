@@ -1,7 +1,7 @@
-﻿{% load i18n %}
+{% load i18n %}
 
     <!-- Information on one sermon-->
-    <div sermonid="{{sermon.obj.id}}" level="{{level}}" id="sermon_{{sermon.obj.id}}"
+    <div sermonid="{{msitem.obj.id}}" level="{{level}}" id="sermon_{{msitem.obj.id}}"
          class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
       <table class="func-view sermons" style="width: 100%;">
         <tbody>
@@ -20,8 +20,8 @@
           <tr>
             <!-- Either '+' sign or empty space -->
             <td valign="top" class="sermonbutton"
-                {% if sermon.isparent %}{% endif %}>
-              {% if sermon.isparent %}
+                {% if msitem.isparent %}{% endif %}>
+              {% if msitem.isparent %}
                 <span class="glyphicon glyphicon-plus" onclick="ru.passim.seeker.sermon_level(this);"></span>
               {% else %}
                 <span>&nbsp;</span>
@@ -30,7 +30,7 @@
 
             <!-- The number of the sermon in our current hierarchy -->
             <td valign="top" class="sermonnumber tdnowrap" onclick="ru.passim.seeker.sermon_selection(this);">
-              <span>{{sermon.number}}</span>
+              <span>{{msitem.number}}</span>
             </td>
 
             <!-- The *LOCUS* of the sermon that serves as drag point -->
@@ -39,31 +39,41 @@
                 ondragenter="ru.passim.seeker.sermon_dragenter(event);" ondragleave="ru.passim.seeker.sermon_dragleave(event);"
                 ondrop="ru.passim.seeker.sermon_drop(event);"{% endif %}
                 >
-                <code draggable="true" class="draggable" 
-                      {% if is_app_editor %}ondragstart="ru.passim.seeker.sermon_drag(event);"{% endif %}
-                      >{% if sermon.obj.locus %}{{sermon.obj.locus}}{% else %}?{% endif %}</code>
+                {% if msitem.sermon %}
+                  <code draggable="true" class="draggable" 
+                        {% if is_app_editor %}ondragstart="ru.passim.seeker.sermon_drag(event);"{% endif %}
+                        >{% if msitem.sermon.locus %}{{msitem.sermon.locus}}{% else %}?{% endif %}</code>
+                {% elif msitem.shead %}
+                  <code draggable="true" class="draggable" 
+                        {% if is_app_editor %}ondragstart="ru.passim.seeker.sermon_drag(event);"{% endif %}
+                        >{% if msitem.shead.locus %}{{msitem.shead.locus}}{% else %}?{% endif %}</code>
+                {% endif %}
             </td>
 
             <!-- The sermon itself -->
             <td valign="top" class="td clickable" style="width: 100%;" >
-              <span draggable="false" targeturl="{{sermon.obj.target}}">
-                {% if sermon.obj.goldsermons.count > 0 %}
-                  <span class="badge signature ot" title="This links to {{sermon.obj.goldsermons.count}} Sermons Gold">G</span>
+              <span draggable="false" targeturl="{{msitem.obj.target}}">
+                {% if msitem.obj.goldsermons.count > 0 %}
+                  <span class="badge signature ot" title="This links to {{msitem.obj.goldsermons.count}} Sermons Gold">G</span>
                 {% endif %}
-                {% if sermon.obj.get_eqsetcount > 0 %}
-                  <span class="glyphicon glyphicon-link" style="color: darkgreen;" title="This links to {{sermon.obj.get_eqsetcount}} Super Sermons Gold"></span>
+                {% if msitem.obj.get_eqsetcount > 0 %}
+                  <span class="glyphicon glyphicon-link" style="color: darkgreen;" title="This links to {{msitem.obj.get_eqsetcount}} Super Sermons Gold"></span>
                 {% endif %}
-                <a href="{% url 'sermon_details' sermon.obj.id %}" class="sermon">
-                  <span>{% include 'seeker/sermon_view.html' with msitem=sermon.obj %}</span>
-                </a>
+                {% if msitem.sermon %}
+                  <a href="{% url 'sermon_details' msitem.sermon.id %}" class="sermon">
+                    <span>{% include 'seeker/sermon_view.html' with sermon=msitem.sermon %}</span>
+                  </a>
+                {% elif msitem.shead %}
+                  <span>(tussenkopje)</span>
+                {% endif %}
               </span>
             </td>
           </tr>
         </tbody>
       </table>
       {% for child in sermon_list %}
-        {% if child.obj.parent and child.obj.parent.id == sermon.obj.id %}
-          {% include 'seeker/sermon_one.html' with sermon=child sermon_list=sermon_list level=level|add:1 %}
+        {% if child.obj.parent and child.obj.parent.id == msitem.obj.id %}
+          {% include 'seeker/sermon_one.html' with msitem=child sermon_list=sermon_list level=level|add:1 %}
         {% endif %}
       {% endfor %}
     </div>
