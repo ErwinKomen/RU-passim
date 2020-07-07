@@ -1337,6 +1337,9 @@ a.sermon:link, a.sermon:visited {
   font-size: smaller;
   color: darkblue;
 }
+.signature.ma {
+    color: darkgreen;
+}
 
 .passimcode {
   /* font-family: monospace; */

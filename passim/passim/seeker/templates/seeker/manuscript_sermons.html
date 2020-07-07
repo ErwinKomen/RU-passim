@@ -34,7 +34,7 @@
       </form>
     </div>
 
-    {% if object.manusermons.count == 0 %}
+    {% if object.manuitems.count == 0 %}
       <p><i>This manuscript does not contain a definition of its contents</i></p>
     {% else %}
 
@@ -46,7 +46,43 @@
           <table class="func-view sermons" style="width: 100%;">
             <thead>
               <tr>
-                <th class="draggable" style="width: 100%;">Details of this manuscript's {{object.manusermons.count}} items</th>
+                <th style="width: 100%;">
+                  <!-- Summary infor of this manuscript's items/sermons -->
+                  <span>Details of this manuscript's {{object.manuitems.count}} items ({{object.get_sermon_count}} sermons)</span>
+                  {% if is_app_editor %}
+                    <span class="tree" sermonid="" id="sermon_new">
+                      <!-- The *LOCUS* of the sermon that serves as drag point -->
+                      <span ondragover="ru.passim.seeker.sermon_dragenter(event);" ondragenter="ru.passim.seeker.sermon_dragenter(event);"
+                            ondragleave="ru.passim.seeker.sermon_dragleave(event);" ondrop="ru.passim.seeker.sermon_drop(event);">
+                        <code draggable="true" class="draggable" title="Add a new structure element from here"
+                              ondragstart="ru.passim.seeker.sermon_drag(event);">Structure...</code>
+                      </span>
+                    </span>
+                  {% endif %}
+
+                  <!-- Buttons completely at the right-->
+                  <span role="group" aria-label="erwin" class="btn-group btn-group-xs pull-right">
+                    <span type="button" class="btn jumbo-1" title="Gryson/Clavis codes linked through the Super Sermon Gold"
+                          onclick="ru.passim.seeker.manusermo(this, 'sig-auto');">Gryson A</span>
+                    <span type="button" class="btn jumbo-2" title="Gryson/Clavis codes added manually"
+                          onclick="ru.passim.seeker.manusermo(this, 'sig-manual');">Gryson M</span>
+                    <span type="button" class="btn jumbo-2" title="Title of this sermon/item"
+                          onclick="ru.passim.seeker.manusermo(this, 'title');">Title</span>
+                    <span type="button" class="btn jumbo-2" title="Attributed author"
+                          onclick="ru.passim.seeker.manusermo(this, 'author');">Author</span>
+                    <span type="button" class="btn jumbo-2" title="Incipit"
+                          onclick="ru.passim.seeker.manusermo(this, 'incipit');">Inc</span>
+                    <span type="button" class="btn jumbo-2" title="Explicit"
+                          onclick="ru.passim.seeker.manusermo(this, 'explicit');">Exc</span>
+                    <span type="button" class="btn jumbo-1" title="Note"
+                          onclick="ru.passim.seeker.manusermo(this, 'note');">Note</span>
+                    <span type="button" class="btn jumbo-1" title="Kewords attached to the Super Sermon Gold"
+                          onclick="ru.passim.seeker.manusermo(this, 'kw-auto');">Keywords A</span>
+                    <span type="button" class="btn jumbo-1" title="Kewords manually attached to this sermon"
+                          onclick="ru.passim.seeker.manusermo(this, 'kw-manual');">Keywords M</span>
+                  </span>
+
+                </th>
                 <th class="tdnowrap">
                   {% if is_app_editor %}
                     <span>
@@ -87,13 +123,55 @@
         </div>
         <!-- This is where the sermon hierarchy is put-->
         <div id="sermon_tree_main">
-          {% for sermon in sermon_list %}
-            {% if sermon.childof == 1 %}
-              {% include 'seeker/sermon_one.html' with sermon=sermon sermon_list=sermon_list level=1 %}
+          {% for msitem in sermon_list %}
+            {% if msitem.childof == 1 %}
+              {% include 'seeker/sermon_one.html' with msitem=msitem sermon_list=sermon_list level=1 %}
             {% endif %}
           {% endfor %}
         </div>
       </div>
+
+      {% if is_app_editor %}
+        <!-- Hidden sermon hierarchy element -->
+        <div sermonid="" id="sermon_hierarchy_element" class="tree hidden">
+          <table class="func-view sermons" style="width: 100%;">
+            <tbody>
+              <!-- Horizontal ruler that can be expanded -->
+              <tr style="font-size: 1px;" class="">
+                <td colspan="2" class="ruler ruler_white"
+                    ondragover="ru.passim.seeker.sermon_dragenter(event);" ondragenter="ru.passim.seeker.sermon_dragenter(event);" 
+                    ondragleave="ru.passim.seeker.sermon_dragleave(event);" ondrop="ru.passim.seeker.sermon_drop(event);" ></td>
+                <td colspan="2" style="background-color: white;"></td>
+              </tr>
+              <!-- Actual line-->
+              <tr>
+                <!-- empty space -->
+                <td valign="top" class="sermonbutton"><span>&nbsp;</span></td>
+
+                <!-- The number of the sermon in our current hierarchy -->
+                <td valign="top" class="sermonnumber tdnowrap" onclick="ru.passim.seeker.sermon_selection(this);">
+                  <span>*</span>
+                </td>
+
+                <!-- The *LOCUS* of the sermon that serves as drag point -->
+                <td valign="top" class="tdnowrap" style="background-color: white;"
+                    ondragover="ru.passim.seeker.sermon_dragenter(event);" ondragenter="ru.passim.seeker.sermon_dragenter(event);" 
+                    ondragleave="ru.passim.seeker.sermon_dragleave(event);" ondrop="ru.passim.seeker.sermon_drop(event);" >
+                  <code draggable="true" class="draggable" ondragstart="ru.passim.seeker.sermon_drag(event);">Hierarchy</code>
+                </td>
+
+                <!-- The sermon itself -->
+                <td valign="top" class="td clickable" style="width: 100%;">
+                  <span draggable="false" targeturl="">
+                    <span class="sermon-new-head">(tussenkopje)</span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
       <!-- Copy of the tree -->
       <div id="sermon_tree_copy" class="hidden"></div>
 

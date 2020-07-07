@@ -21,6 +21,7 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_bManuSaved = false,
         loc_vscrolling = 0,
+        loc_newSermonNumber = 0,
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_goldlink_td = null, // Where the goldlink selection should go
@@ -1388,6 +1389,38 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  manusermo
+       *      Visibility buttons for sermons within a manuscript
+       *
+       */
+      manusermo: function (elThis, target) {
+        var elTree = "#sermon_tree",
+            cls = ".manusermo." + target;
+
+        try {
+          // CHeck if we need to switch visibility on or off
+          if ($(elTree).find(cls).first().hasClass("hidden")) {
+            // It is hidden, we must show them
+            $(elTree).find(cls).removeClass("hidden");
+            // Make sure the color of the button is right
+            $(elThis).removeClass("jumbo-1");
+            $(elThis).removeClass("jumbo-2");
+            $(elThis).addClass("jumbo-2");
+          } else {
+            // It is shown, we must hide them
+            $(elTree).find(cls).addClass("hidden");
+            // Make sure the color of the button is right
+            $(elThis).removeClass("jumbo-1");
+            $(elThis).removeClass("jumbo-2");
+            $(elThis).addClass("jumbo-1");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("manusermo", ex);
+        }
+      },
+
       sermon_drag: function (ev) {
         var elTree = null,
             divId = "",
@@ -1438,6 +1471,7 @@ var ru = (function ($, ru) {
         var elTree = null,
             divSrcId = "",
             divDstId = "",
+            divHierarchy = "#sermon_hierarchy_element",
             divSrc = null,
             divDst = null,
             bChanged = false,
@@ -1461,7 +1495,22 @@ var ru = (function ($, ru) {
           $("#sermon_tree .ruler_show").removeClass("ruler_show");
 
           // Find the actual source div
-          divSrc = $("#sermon_tree").find("#" + divSrcId);
+          if (divSrcId === "sermon_new") {
+            // Create a new element
+            divSrc = $(divHierarchy).clone(true);
+            // Adapt the @id field
+            loc_newSermonNumber += 1;
+            divSrcId = "sermon_new_" + loc_newSermonNumber;
+            $(divSrc).attr("id", divSrcId);
+            // Set the text for 'tussenkopje'
+            $(divSrc).find(".sermon-new-head").first().html("<i>hierarchy element " + loc_newSermonNumber + "</i>");
+            // Add a sermon number
+            $(divSrc).find(".sermonnumber").first().html("<span>H-"+loc_newSermonNumber+"</span>")
+            // Make sure the new element becomes visible
+            $(divSrc).removeClass("hidden");
+          } else {
+            divSrc = $("#sermon_tree").find("#" + divSrcId);
+          }
           // The destination - that is me myself
           divDst = elTree;
 

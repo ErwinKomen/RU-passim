@@ -83,10 +83,10 @@
               <td colspan="2">{{mainitem.field_key}}</td>
             </tr>
         {% elif 'empty' not in mainitem or mainitem.empty == "hidenone" and mainitem.value != "" %}
-          <tr class="view-row">
+          <tr class="view-row {% if 'editonly' in mainitem %}edit-mode hidden{% endif %}">
             <!-- Cell with the name of the field-->
             <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
-              <span>{{mainitem.label}}</span>
+              <span {% if 'editonly' in mainitem %}style="color: gray;"{% if not mainitem.title %}title="This field is edit-only"{% endif %}{% endif %}>{{mainitem.label}}</span>
               {% if is_app_editor and mainitem.multiple and permission == "write"  %}
                 <!-- Multiple value field, i.e. select2 -->
                 <span>

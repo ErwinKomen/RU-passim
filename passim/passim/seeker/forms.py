@@ -61,6 +61,17 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
+class AutypeWidget(ModelSelect2Widget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
@@ -961,6 +972,8 @@ class SermonForm(PassimModelForm):
     origin      = forms.CharField(required=False)
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    autype      = forms.ChoiceField(label=_("Author certainty type"), required=False,
+                     widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Author certainty level...',  'style': 'width: 100%;'}))
     prov        = forms.CharField(required=False)
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
@@ -1005,8 +1018,11 @@ class SermonForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+
             # Some fields are not required
-            self.fields['stype'].required = False
+            self.fields['autype'].required = False
+            init_choices(self, 'autype', CERTAINTY_TYPE, bUseAbbr=True)
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -1065,6 +1081,7 @@ class SermonForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
                 # Determine the initial collections
                 self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
@@ -1081,6 +1098,7 @@ class SermonForm(PassimModelForm):
                 # Make sure the initial superlist captures exactly what we have
                 self.fields['superlist'].queryset = SermonDescrEqual.objects.filter(Q(id__in = self.fields['superlist'].initial))
 
+                self.fields['autype'].initial = instance.autype
 
                 iStop = 1
         except:
@@ -1123,7 +1141,7 @@ class KeywordForm(forms.ModelForm):
 
 
 class UserKeywordForm(forms.ModelForm):
-    """Keyword list"""
+    """User Keyword list"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -1158,6 +1176,35 @@ class UserKeywordForm(forms.ModelForm):
             self.fields['keyword'].initial = instance.keyword
             self.fields['profile'].initial = instance.profile
             self.fields['type'].initial = instance.type
+
+
+class ProvenanceForm(forms.ModelForm):
+    """Provenance list"""
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Provenance
+        fields = ['name', 'location', 'note']
+        widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching', 'placeholder': 'Name for this provenance'}),
+                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
+                 'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'Notes on this provenance...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProvenanceForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['location'].required = False
+        self.fields['note'].required = False
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
 
 
 class ProfileForm(forms.ModelForm):
@@ -1404,6 +1451,7 @@ class SermonDescrSuperForm(forms.ModelForm):
         self.fields['newsuper'].required = False
         self.fields['super'].required = False
         self.fields['linktype'].required = False
+        self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
         self.fields['newsuper'].queryset = EqualGold.objects.order_by('author__name', 'siglist')
         # Get the instance
@@ -1515,6 +1563,7 @@ class SermonGoldForm(PassimModelForm):
             username = self.username        # kwargs.pop('username', "")
             team_group = self.team_group    # kwargs.pop('team_group', "")
             userplus = self.userplus
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['codename'].required = False
@@ -1570,6 +1619,7 @@ class SermonGoldForm(PassimModelForm):
                 self.fields['authorname'].required = False
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.gold_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('-editype', 'code')]
                 self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
                 self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
@@ -1718,6 +1768,7 @@ class SuperSermonGoldForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['authorname'].required = False
             self.fields['stype'].required = False
@@ -1769,6 +1820,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 qs = instance.equalgold_dst.all()
@@ -2508,6 +2560,7 @@ class ManuscriptForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
             #self.fields['yearstart'].required = False
@@ -2572,6 +2625,7 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
                 self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]

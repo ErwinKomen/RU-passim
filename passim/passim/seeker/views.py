@@ -65,15 +65,15 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm
+                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
+    User, Group, Origin, SermonDescr, MsItem, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, \
-   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED
+   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
@@ -121,8 +121,8 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
-def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, related_is_through = False, userplus = None,
-              added=None, deleted=None):
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, qfilter = {}, 
+              related_is_through = False, userplus = None, added=None, deleted=None):
     """Adapt the 'field' of 'instance' to contain only the items in 'qs'
     
     The lists [added] and [deleted] (if specified) will contain links to the elements that have been added and deleted
@@ -133,6 +133,7 @@ def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, rela
     try:
         # Get current associations
         lstQ = [Q(**{field1: instance})]
+        for k,v in qfilter.items(): lstQ.append(Q(**{k: v}))
         through_qs = cls.objects.filter(*lstQ)
         if related_is_through:
             related_qs = through_qs
@@ -1620,7 +1621,7 @@ def do_sermons(request):
         qs_m = Manuscript.objects.all().order_by('id')
         for manu in qs_m:
             # Get all the sermons for this manuscript in appropriate order (reverse ID)
-            sermon_lst = SermonDescr.objects.filter(manu=manu).order_by('-id').values('id', 'title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'note', 'additional', 'order')
+            sermon_lst = SermonDescr.objects.filter(msitem__manu=manu).order_by('-id').values('id', 'title', 'author', 'nickname', 'locus', 'incipit', 'explicit', 'note', 'additional', 'order')
             remove_lst = []
             if manu.id == 1245:
                 iStop = 1
@@ -2084,14 +2085,17 @@ def do_create_pdf_manu(request):
     # Store name of the pdf file 
     filename = "Manu_list_PASSIM.pdf"
 
+    # Which method needs to be used
+    method = "msitem"   # "sermondescr"
+
     # Calculate the qs for the manuscripts       
     qs = Manuscript.objects.all()
     
     # Create temporary list and add relevant fields to the list
     pdf_list_temp = []
     for obj in qs:
-        # Count all items for each manuscript
-        count = obj.manusermons.all().count() # 
+        # Count all (SermonDescr) items for each manuscript
+        count = obj.get_sermon_count()
         
         # Handle empty origin fields
         origin = None if obj.origin == None else obj.origin.name
@@ -5472,24 +5476,29 @@ class SermonEdit(BasicDetails):
         manu_id = None if instance == None or instance.manu == None else instance.manu.id
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
-            # {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'idonly'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
-            {'type': 'plain', 'label': "Attributed author:",    'value': instance.get_author,       'field_key': 'author'},
+            {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
+            {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
             {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
+            {'type': 'safe',  'label': "Lectio:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
             {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
-            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle'},
+            # Issue #237, delete subtitle
+            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle', 
+             'editonly': True, 'title': 'The subtitle field is legacy. It is edit-only, non-viewable'},
             {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
              'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
             {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
              'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
             {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown,
              'field_key': 'postscriptum'}, 
-            {'type': 'safe',  'label': "Quote:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
-            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes'},
+            # Issue #23: delete bibliographic notes
+            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
+             'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
-            {'type': 'plain', 'label': "Additional:",           'value': instance.additional,       'field_key': 'additional'},
+            {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
+             'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'},
             {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
              # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
@@ -5498,10 +5507,10 @@ class SermonEdit(BasicDetails):
              'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
             {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
              'title': 'Keywords attached to the Super Sermon Gold(s)'},
-            {'type': 'line',    'label': "Gryson/Clavis (auto):",'value': instance.get_eqsetsignatures_markdown(),
-             'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set"}, 
+            {'type': 'line',    'label': "Gryson/Clavis:",'value': instance.get_eqsetsignatures_markdown('combi'),
+             'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
             {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
-             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True,
+             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
              'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
             {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
              'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
@@ -5529,7 +5538,9 @@ class SermonEdit(BasicDetails):
             idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
         # Add something right to the SermonDetails title
-        context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+        # OLD: context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+        # Changed in issue #241: show the PASSIM code
+        context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
         context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(idno)
 
@@ -5559,7 +5570,8 @@ class SermonEdit(BasicDetails):
         #self.afternewurl = reverse('sermon_list')
         if instance.manu and instance.order < 0:
             # Calculate how many sermons there are
-            sermon_count = instance.manu.manusermons.all().count()
+            # sermon_count = instance.manu.manusermons.all().count()
+            sermon_count = instance.manu.get_sermon_count()
             # Make sure the new sermon gets changed
             form.instance.order = sermon_count
 
@@ -5648,6 +5660,12 @@ class SermonEdit(BasicDetails):
                 bResult = False
         return None
 
+    def before_save(self, form, instance):
+        if hasattr(form, 'cleaned_data') and 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
+            autype = form.cleaned_data['autype']
+            form.instance.autype = autype
+        return True, ""
+
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
 
@@ -5660,11 +5678,11 @@ class SermonEdit(BasicDetails):
             # (1) 'keywords'
             kwlist = form.cleaned_data['kwlist']
             adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
-
+            
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'sermo'})
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
 
             # (3) 'Links to Gold Signatures'
             siglist = form.cleaned_data['siglist']
@@ -5746,7 +5764,8 @@ class SermonDetails(SermonEdit):
         # Double check for the presence of manu and order
         if instance.manu and instance.order < 0:
             # Calculate how many sermons there are
-            sermon_count = instance.manu.manusermons.all().count()
+            # sermon_count = instance.manu.manusermons.all().count()
+            sermon_count = instance.manu.get_sermon_count()
             # Make sure the new sermon gets changed
             form.instance.order = sermon_count
             #instance.save()
@@ -5896,9 +5915,9 @@ class SermonListView(BasicList):
                           #  <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
                           #</a>
             html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
-                reverse('manuscript_details', kwargs={'pk': instance.manu.id}),
-                instance.manu.idno[:20]))
-            sTitle = instance.manu.idno
+                reverse('manuscript_details', kwargs={'pk': instance.msitem.manu.id}),
+                instance.msitem.manu.idno[:20]))
+            sTitle = instance.msitem.manu.idno
         elif custom == "links":
             for gold in instance.goldsermons.all():
                 for link_def in gold.link_oview():
@@ -6095,7 +6114,8 @@ class UserKeywordEdit(BasicDetails):
 
         if context['is_app_editor']:
             lhtml = []
-            lbuttons = [dict(href="{}?approvelist={}".format(reverse('userkeyword_list'), instance.id), label="Approve Keyword", 
+            lbuttons = [dict(href="{}?approvelist={}".format(reverse('userkeyword_list'), instance.id), 
+                             label="Approve Keyword", 
                              title="Approving this keyword attaches it to the target and removes it from the list of user keywords.")]
             lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
             for item in lbuttons:
@@ -6122,7 +6142,8 @@ class UserKeywordEdit(BasicDetails):
             sig = instance.sermo.get_eqsetsignatures_markdown("first")
             # Sermon identification
             url = reverse('sermon_details', kwargs = {'pk': instance.sermo.id})
-            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.manusermons.all().count())
+            # value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.manusermons.all().count())
+            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.get_sermon_count())
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
@@ -6168,13 +6189,14 @@ class UserKeywordListView(BasicList):
     has_select2 = True
     in_team = False
     new_button = False
-    order_cols = ['profile__user__username', 'keyword__name',  'type', '', 'created']
+    order_cols = ['profile__user__username', 'keyword__name',  'type', '', 'created', '']
     order_default = order_cols
     order_heads = [{'name': 'User',     'order': 'o=1', 'type': 'str', 'custom': 'profile'},
                    {'name': 'Keyword',  'order': 'o=2', 'type': 'str', 'custom': 'keyword', 'main': True, 'linkdetails': True},
                    {'name': 'Type',     'order': 'o=3', 'type': 'str', 'custom': 'itemtype'},
                    {'name': 'Link',     'order': '',    'type': 'str', 'custom': 'link'},
-                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'date'}]
+                   {'name': 'Proposed', 'order': 'o=5', 'type': 'str', 'custom': 'date'},
+                   {'name': 'Approve',  'order': '',    'type': 'str', 'custom': 'approve', 'align': 'right'}]
     filters = [ {"name": "Keyword",     "id": "filter_keyword", "enabled": False},
                 {"name": "User",        "id": "filter_profile", "enabled": False},
                 {"name": "Type",        "id": "filter_type",    "enabled": False}]
@@ -6184,18 +6206,29 @@ class UserKeywordListView(BasicList):
             {'filter': 'profile',   'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id' },
             {'filter': 'type',      'dbfield': 'type',    'keyS': 'type' }]}
         ]
+    custombuttons = [{"name": "approve_keywords", "title": "Approve currently filtered keywords", 
+                      "icon": "music", "template_name": "seeker/approve_keywords.html" }]
 
     def initializations(self):
         if self.request.user:
             username = self.request.user.username
             # See if there is a list of approved id's
-            approvelist = self.request.GET.get("approvelist", None)
+            qd = self.request.GET if self.request.method == "GET" else self.request.POST
+            approvelist = qd.get("approvelist", None)
             if approvelist != None:
+                # See if this needs translation
+                if approvelist[0] == "[":
+                    approvelist = json.loads(approvelist)
+                else:
+                    approvelist = [ approvelist ]
                 # Does this user have the right privilages?
                 if user_is_superuser(self.request) or user_is_ingroup(self.request, app_editor):
+                    # Get the profile
+                    profile = Profile.get_user_profile(username)
+
                     # Approve the UserKeyword stated here
                     for ukw_id in approvelist:
-                        obj = UserKeyword.objects.filter(id=ukw_id).first()
+                        obj = UserKeyword.objects.filter(profile=profile, id=ukw_id).first()
                         if obj != None:
                             obj.moveup()
         return None
@@ -6215,6 +6248,9 @@ class UserKeywordListView(BasicList):
             sBack = self.get_link(instance)
         elif custom == "date":
             sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        elif custom == "approve":
+            url = "{}?approvelist={}".format(reverse("userkeyword_list"), instance.id)
+            sBack = "<a class='btn btn-xs jumbo-2' role='button' href='{}' title='Approve this keyword'><span class='glyphicon glyphicon-thumbs-up'></span></a>".format(url)
         return sBack, sTitle
 
     def get_link(self, instance):
@@ -6232,7 +6268,7 @@ class UserKeywordListView(BasicList):
             sig = instance.sermo.get_eqsetsignatures_markdown("first")
             # Sermon identification
             url = reverse('sermon_details', kwargs = {'pk': instance.sermo.id})
-            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.manusermons.all().count())
+            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.get_sermon_count())
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
@@ -6255,30 +6291,111 @@ class UserKeywordListView(BasicList):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span> {}".format(url, "super", sig)
         return sBack
 
-    #def adapt_search(self, fields):
-    #    lstExclude=None
-    #    qAlternative = None
+    def add_to_context(self, context, initial):
+        # Make sure to add a list of the currently filtered keywords
+        if self.qs != None:
+            lst_ukw = [x.id for x in self.qs]
+            context['ukw_selection'] = lst_ukw
+            context['ukw_list'] = reverse("userkeyword_list")
+        return context
 
-    #    # Make sure the search is restricted to keywords that are connected through one of the M/S/SG/SSG link tables
-    #    lstQ = []
-    #    lstQ.append(Q(id__in=manuscript_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=sermondescr_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=sermongold_kwu__keyword__id))
-    #    lstQ.append(Q(id__in=equal_kwu__keyword__id))
-    #    # Check if a list of keywords is given
-    #    if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-    #        # Get the list
-    #        kwlist = fields['kwlist']
-    #        # Add this to the existing filter
-    #        lstQ.append(Q(id__in=kwlist))
-    #        filter = "|".join(lstQ)
-    #        fields['kwlist'] = Keyword.objects.filter(filter).values('id')
-    #    else:
-    #        # THe kwlist still needs to be filled
-    #        filter = "|".join(lstQ)
-    #        fields['kwlist'] = Keyword.objects.filter(filter).values("id")
 
-    #    return fields, lstExclude, qAlternative
+class ProvenanceEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = Provenance
+    mForm = ProvenanceForm
+    prefix = 'prov'
+    title = "ProvenanceEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",         'value': instance.name,             'field_key': "name"},
+            {'type': 'plain', 'label': "Location:",     'value': instance.get_location(),   'field_key': 'location'     },
+            {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
+            {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def get_manuscripts(self, instance):
+        # find the shelfmark
+        lManu = []
+        for obj in instance.manuscripts_provenances.all():
+            # Add the shelfmark of this one
+            manu = obj.manuscript
+            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            shelfmark = manu.idno[:20]
+            lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+        sBack = ", ".join(lManu)
+        return sBack
+
+
+class ProvenanceDetails(ProvenanceEdit):
+    """Like Provenance Edit, but then html output"""
+    rtype = "html"
+    
+
+class ProvenanceListView(BasicList):
+    """Search and list provenances"""
+
+    model = Provenance
+    listform = ProvenanceForm
+    prefix = "prov"
+    has_select2 = True
+    new_button = False  # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
+    order_cols = ['location__name', 'name', 'note', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Location',    'order': 'o=1', 'type': 'str', 'custom': 'location', 'linkdetails': True},
+        {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
+        {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        ]
+    filters = [
+        ]
+    searches = [
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "manuscript":
+            # find the shelfmark
+            lManu = []
+            for obj in instance.manuscripts_provenances.all():
+                # Add the shelfmark of this one
+                manu = obj.manuscript
+                url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+                shelfmark = manu.idno[:20]
+                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+            sBack = ", ".join(lManu)
+        elif custom == "location":
+            sBack = ""
+            if instance.location:
+                sBack = instance.location.name
+        elif custom == "note":
+            sBack = ""
+            if instance.note:
+                sBack = instance.note[:40]
+        return sBack, sTitle
 
 
 class ProfileEdit(BasicDetails):
@@ -7268,7 +7385,7 @@ class ManuscriptEdit(BasicDetails):
             # (3) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'manu'})
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'manu'})
 
             # (4) 'literature'
             litlist = form.cleaned_data['litlist']
@@ -7309,11 +7426,22 @@ class ManuscriptDetails(ManuscriptEdit):
         template_sermon = 'seeker/sermon_view.html'
 
         def sermon_object(obj ):
-            # Calculate the HTML for this sermon
-            context = dict(msitem=obj)
-            html = treat_bom( render_to_string(template_sermon, context))
-            # Determine what the label is going to be
-            label = obj.locus
+            # Initialisations
+            html = ""
+            label = ""
+            # Check if this points to a sermon
+            sermon = obj.itemsermons.first()
+            if sermon != None:
+                # Calculate the HTML for this sermon
+                context = dict(msitem=sermon)
+                html = treat_bom( render_to_string(template_sermon, context))
+                # Determine what the label is going to be
+                label = obj.locus
+            else:
+                # Determine what the label is going to be
+                head = obj.itemheads.first()
+                if head != None:
+                    label = head.locus
             # Determine the parent, if any
             parent = 1 if obj.parent == None else obj.parent.order + 1
             id = obj.order + 1
@@ -7335,9 +7463,14 @@ class ManuscriptDetails(ManuscriptEdit):
         maxdepth = 0
         build_htable = False
 
+        method = "msitem"   # "sermondescr"
+
         if instance != None:
             # Create a well sorted list of sermons
-            qs = instance.manusermons.filter(order__gte=0).order_by('order')
+            if method == "msitem":
+                qs = instance.manuitems.filter(order__gte=0).order_by('order')
+            else:
+                qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for idx, sermon in enumerate(qs):
                 # Need this first, because it also REPAIRS possible parent errors
@@ -7346,12 +7479,25 @@ class ManuscriptDetails(ManuscriptEdit):
                 parent = sermon.parent
                 firstchild = False
                 if parent:
-                    if sermon.id == instance.manusermons.filter(parent=parent).order_by('order').first().id:
+                    if method == "msitem":
+                        qs_siblings = instance.manuitems.filter(parent=parent).order_by('order')
+                    else:
+                        qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
+                    if sermon.id == qs_siblings.first().id:
                         firstchild = True
 
                 # Only then continue!
                 oSermon = {}
-                oSermon['obj'] = sermon
+                if method == "msitem":
+                    # The 'obj' always is the MsItem itself
+                    oSermon['obj'] = sermon
+                    # Now we need to add a reference to the actual SermonDescr object
+                    oSermon['sermon'] = sermon.itemsermons.first()
+                    # And we add a reference to the SermonHead object
+                    oSermon['shead'] = sermon.itemheads.first()
+                else:
+                    # 'sermon' is the SermonDescr instance
+                    oSermon['obj'] = sermon
                 oSermon['nodeid'] = sermon.order + 1
                 oSermon['number'] = idx + 1
                 oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
@@ -7360,7 +7506,10 @@ class ManuscriptDetails(ManuscriptEdit):
                 # If this is a new level, indicate it
                 oSermon['group'] = firstchild   # (sermon.firstchild != None)
                 # Is this one a parent of others?
-                oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
+                if method == "msitem":
+                    oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
+                else:
+                    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
                 sermon_list.append(oSermon)
                 # Bookkeeping
                 if level > maxdepth: maxdepth = level
@@ -7371,7 +7520,7 @@ class ManuscriptDetails(ManuscriptEdit):
                 if oSermon['group']: oSermon['cols'] -= 1
 
             # Alternative method: create a hierarchical object of sermons
-            if build_htable:
+            if method != "msitem" and build_htable:
                 lSermon = []
                 for sermon in qs:
                     # Create sermon object
@@ -7418,7 +7567,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
     def custom_init(self, instance):
         errHandle = ErrHandle()
-        method = "may2020"
+        method = "july2020"
 
         try:
             # Make sure to set the correct redirect page
@@ -7431,35 +7580,38 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
 
-                if method == "may2020":
-                    # The new May2020 method that uses different parameters
+                if method == "july2020":
+                    # The new July20920 method that uses different parameters and uses MsItem
                     changes = {}
                     hierarchy = []
                     with transaction.atomic():
                         for idx, item in enumerate(hlist):
                             bNeedSaving = False
-                            # Get the sermon of this item
-                            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                            # Get the msitem of this item
+                            msitem = MsItem.objects.filter(id=item['id']).first()
                             # Get the next if any
-                            next = None if item['nextid'] == "" else SermonDescr.objects.filter(id=item['nextid']).first()
+                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=item['nextid']).first()
                             # Get the first child
-                            firstchild = None if item['firstchild'] == "" else SermonDescr.objects.filter(id=item['firstchild']).first()
+                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=item['firstchild']).first()
                             # Get the parent
-                            parent = None if item['parent'] == "" else SermonDescr.objects.filter(id=item['parent']).first()
-
+                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=item['parent']).first()
+                            
                             order = idx + 1
 
-                            sermonlog = dict(sermon=sermon.id)
+                            sermon_id = "none"
+                            if msitem.itemsermons.count() > 0:
+                                sermon_id = msitem.itemsermons.first().id
+                            sermonlog = dict(sermon=sermon_id)
                             bAddSermonLog = False
 
                             # Check if anytyhing changed
-                            if sermon.order != order:
+                            if msitem.order != order:
                                 # Implement the change
-                                sermon.order = order
+                                msitem.order = order
                                 bNeedSaving =True
-                            if sermon.parent is not parent:
+                            if msitem.parent is not parent:
                                 # Track the change
-                                old_parent_id = "none" if sermon.parent == None else sermon.parent.id
+                                old_parent_id = "none" if msitem.parent == None else msitem.parent.id
                                 new_parent_id = "none" if parent == None else parent.id
                                 if old_parent_id != new_parent_id:
                                     # Track the change
@@ -7468,29 +7620,29 @@ class ManuscriptHierarchy(ManuscriptDetails):
                                     bAddSermonLog = True
 
                                     # Implement the change
-                                    sermon.parent = parent
+                                    msitem.parent = parent
                                     bNeedSaving = True
                                 else:
                                     no_change = 1
 
-                            if sermon.firstchild != firstchild:
+                            if msitem.firstchild != firstchild:
                                 # Implement the change
-                                sermon.firstchild = firstchild
+                                msitem.firstchild = firstchild
                                 bNeedSaving =True
-                            if sermon.next != next:
+                            if msitem.next != next:
                                 # Track the change
-                                old_next_id = "none" if sermon.next == None else sermon.next.id
+                                old_next_id = "none" if msitem.next == None else msitem.next.id
                                 new_next_id = "none" if next == None else next.id
                                 sermonlog['next_new'] = new_next_id
                                 sermonlog['next_old'] = old_next_id
                                 bAddSermonLog = True
 
                                 # Implement the change
-                                sermon.next = next
+                                msitem.next = next
                                 bNeedSaving =True
                             # Do we need to save this one?
                             if bNeedSaving:
-                                sermon.save()
+                                msitem.save()
                                 if bAddSermonLog:
                                     # Store the changes
                                     hierarchy.append(sermonlog)
@@ -7580,24 +7732,25 @@ class ManuscriptListView(BasicList):
             {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
             {'filter': 'daterange',     'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
             {'filter': 'daterange',     'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
-            {'filter': 'code',          'fkfield': 'manusermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
-            {'filter': 'collection_sermo', 'fkfield': 'manusermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manusermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manusermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
+            {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
+            {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             ]},
         {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature', 'fkfield': 'manusermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             ]}
          ]
     uploads = reader_uploads
-    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+    custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
+                      "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def initializations(self):
         # Check if signature adaptation is needed
@@ -7654,7 +7807,8 @@ class ManuscriptListView(BasicList):
                 html.append("<span class='manuscript-title'>| {}</span>".format(instance.name[:100]))
                 sTitle = instance.name
         elif custom == "count":
-            html.append("{}".format(instance.manusermons.count()))
+            # html.append("{}".format(instance.manusermons.count()))
+            html.append("{}".format(instance.get_sermon_count()))
         elif custom == "from":
             for item in instance.manuscript_dateranges.all():
                 html.append("<div>{}</div".format(item.yearstart))
@@ -8512,7 +8666,7 @@ class SermonGoldEdit(BasicDetails):
             # (2) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'gold'})
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'gold'})
 
             # (3) 'editions'
             edilist = form.cleaned_data['edilist']
@@ -8842,7 +8996,7 @@ class EqualGoldEdit(BasicDetails):
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", extrargs = {'profile': profile, 'type': 'super'})
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'super'})
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -8919,7 +9073,8 @@ class EqualGoldDetails(EqualGoldEdit):
             # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
 
             # New: Get all the SermonDescr instances linked with equality to SSG:
-            qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
+            # qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
+            qs_s = SermonDescrEqual.objects.filter(super=instance).order_by('sermon__manu__idno', 'sermon__locus')
             rel_list =[]
             method = "FourColumns"
             method = "Issue216"
@@ -8936,7 +9091,7 @@ class EqualGoldDetails(EqualGoldEdit):
                                      'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
                     # Location number and link to the correct point in the manuscript details view...
-                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
                     rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
                                      'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
 
@@ -8970,7 +9125,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     rel_item.append({'value': coll_info, 'initial': 'small'})
 
                     # Location number and link to the correct point in the manuscript details view...
-                    itemloc = "{}/{}".format(sermon.order, item.manusermons.all().count())
+                    itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
                     rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
                                      'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
 
@@ -9120,6 +9275,14 @@ class EqualGoldListView(BasicList):
                     reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
 
             Information.set_kvalue("ssg_bidirectional", "done")
+
+        if Information.get_kvalue("s_to_ssg_link") != "done":
+            qs = SermonDescrEqual.objects.all()
+            with transaction.atomic():
+                for obj in qs:
+                    obj.linktype = LINK_UNSPECIFIED
+                    obj.save()
+            Information.set_kvalue("s_to_ssg_link", "done")
 
         return None
     

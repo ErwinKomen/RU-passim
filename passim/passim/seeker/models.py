@@ -43,6 +43,7 @@ LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 VISIBILITY_TYPE = "seeker.visibility"
@@ -51,8 +52,16 @@ LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
 LINK_SIM = "sim"
+LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
+
+# Author certainty levels
+CERTAIN_LOWEST = 'vun'  # very uncertain
+CERTAIN_LOW = 'unc'     # uncertain
+CERTAIN_AVE = 'ave'     # average
+CERTAIN_HIGH = 'rea'    # reasonably certain
+CERTAIN_HIGHEST = 'vce' # very certain
 
 STYPE_IMPORTED = 'imp'
 STYPE_MANUAL = 'man'
@@ -1942,6 +1951,14 @@ class Provenance(models.Model):
         # Return what we found or created
         return hit
 
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
 
 class SourceInfo(models.Model):
     """Details of the source from which we get information"""
@@ -2655,6 +2672,11 @@ class Manuscript(models.Model):
         bResult = True
         msg = ""
         oErr = ErrHandle()
+
+        # ========== provisionally ================
+        method = "original"
+        method = "msitem"   # "sermondescr"
+        # =========================================
         try:
             count = Manuscript.objects.all().count()
             with transaction.atomic():
@@ -2662,23 +2684,42 @@ class Manuscript(models.Model):
                 for idx, manu in enumerate(Manuscript.objects.all()):
                     oErr.Status("Sermon # {}/{}".format(idx, count))
                     # Walk all sermons in this manuscript, in order
-                    qs = manu.manusermons.all().order_by('order')
-                    for sermo in qs:
-                        # Reset saving
-                        bNeedSaving = False
-                        # Check presence of 'firstchild' and 'next'
-                        firstchild = manu.manusermons.filter(parent=sermo).order_by('order').first()
-                        if sermo.firstchild != firstchild:
-                            sermo.firstchild = firstchild
-                            bNeedSaving = True
-                        # Check for the 'next' one
-                        next = manu.manusermons.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
-                        if sermo.next != next:
-                            sermo.next = next
-                            bNeedSaving = True
-                        # If this needs saving, so do it
-                        if bNeedSaving:
-                            sermo.save()
+                    if method == "msitem":
+                        qs = manu.manuitems.all().order_by('order')
+                        for sermo in qs:
+                            # Reset saving
+                            bNeedSaving = False
+                            # Check presence of 'firstchild' and 'next'
+                            firstchild = manu.manuitems.filter(parent=sermo).order_by('order').first()
+                            if sermo.firstchild != firstchild:
+                                sermo.firstchild = firstchild
+                                bNeedSaving = True
+                            # Check for the 'next' one
+                            next = manu.manuitems.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
+                            if sermo.next != next:
+                                sermo.next = next
+                                bNeedSaving = True
+                            # If this needs saving, so do it
+                            if bNeedSaving:
+                                sermo.save()
+                    else:
+                        qs = manu.manusermons.all().order_by('order')
+                        for sermo in qs:
+                            # Reset saving
+                            bNeedSaving = False
+                            # Check presence of 'firstchild' and 'next'
+                            firstchild = manu.manusermons.filter(parent=sermo).order_by('order').first()
+                            if sermo.firstchild != firstchild:
+                                sermo.firstchild = firstchild
+                                bNeedSaving = True
+                            # Check for the 'next' one
+                            next = manu.manusermons.filter(parent=sermo.parent, order__gt=sermo.order).order_by('order').first()
+                            if sermo.next != next:
+                                sermo.next = next
+                                bNeedSaving = True
+                            # If this needs saving, so do it
+                            if bNeedSaving:
+                                sermo.save()
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -2690,6 +2731,7 @@ class Manuscript(models.Model):
         oErr = ErrHandle()
         sermon = None
         take_author = False
+        method = "msitem"   # "sermondescr"
         try:
             lstQ = []
             if 'title' in oDescr: lstQ.append(Q(title__iexact=oDescr['title']))
@@ -2704,7 +2746,11 @@ class Manuscript(models.Model):
                 lstQ.append(Q(note__icontains=oDescr['author']))
 
             # Find all the SermanMan objects that point to a sermon with the same characteristics I have
-            sermon = self.manusermons.filter(*lstQ).first()
+            if method == "msitem":
+                lstQ.append(Q(msitem__manu=self))
+                sermon = SermonDescr.objects.filter(*lstQ).first()
+            else:
+                sermon = self.manusermons.filter(*lstQ).first()
 
             # Return the sermon instance
             return sermon
@@ -2776,7 +2822,8 @@ class Manuscript(models.Model):
         if self.library != None:
             lhtml.append(self.library.name)
         # (3) Idno
-        lhtml.append(self.idno)
+        if self.idno != None:
+            lhtml.append(self.idno)
 
         return ", ".join(lhtml)
 
@@ -2908,17 +2955,25 @@ class Manuscript(models.Model):
         lHtml = []
         # Visit all literature references
         for prov in self.provenances.all().order_by('name'):
+            # Get the URL
+            url = reverse("provenance_details", kwargs = {'pk': prov.id})
             if prov.location == None:
                 # Create a display for this item
-                lHtml.append("<span class='badge signature cl'>{}</span>".format(prov.name))
+                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
             else:
-                # Determine where clicking should lead to
-                url = reverse('location_details', kwargs={'pk': prov.location.id})
                 # Create a display for this item
                 lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
 
         sBack = ", ".join(lHtml)
         return sBack
+
+    def get_sermon_count(self):
+        method = "msitem"   # "sermondescr"
+        if method == "msitem":
+            count = SermonDescr.objects.filter(msitem__manu=self).count()
+        else:
+            count = self.manusermons.all().count()
+        return count
 
     def get_stype_light(self):
         return get_stype_light(self.stype)
@@ -5084,6 +5139,50 @@ class Collection(models.Model):
         return qs
 
 
+class MsItem(models.Model):
+    """One item in a manuscript - can be sermon or heading"""
+
+    # ========================================================================
+    # [1] Every MsItem belongs to exactly one manuscript
+    #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
+    manu = models.ForeignKey(Manuscript, null=True, related_name="manuitems")
+
+    # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
+    # [0-1] Parent sermon, if applicable
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_parent")
+    # [0-1] Parent sermon, if applicable
+    firstchild = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_child")
+    # [0-1] Parent sermon, if applicable
+    next = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_next")
+    # [1]
+    order = models.IntegerField("Order", default = -1)
+
+    def getdepth(self):
+        depth = 1
+        node = self
+        while node.parent:
+            # Repair strategy...
+            if node.id == node.parent.id:
+                # This is not correct -- need to repair
+                node.parent = None
+                node.save()
+            else:
+                depth += 1
+                node = node.parent
+        return depth
+
+
+class SermonHead(models.Model):
+    """A hierarchical element in the manuscript structure"""
+
+    # [0-1] Optional location of this sermon on the manuscript
+    locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
+
+    # [1] Every SermonHead belongs to exactly one MsItem
+    #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
+    msitem = models.ForeignKey(MsItem, null=True, related_name="itemheads")
+
+
 class SermonDescr(models.Model):
     """A sermon is part of a manuscript"""
 
@@ -5099,6 +5198,8 @@ class SermonDescr(models.Model):
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
     author = models.ForeignKey(Author, null=True, blank=True, on_delete = models.SET_NULL, related_name="author_sermons")
+    # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
+    autype = models.CharField("Author certainty", choices=build_abbr_list(CERTAINTY_TYPE), max_length=5, default="ave")
     # [0-1] But most often we only start out with having just a nickname of the author
     # NOTE: THE NICKNAME IS NO LONGER IN USE (oct/2019)
     nickname = models.ForeignKey(Nickname, null=True, blank=True, on_delete = models.SET_NULL, related_name="nickname_sermons")
@@ -5136,7 +5237,11 @@ class SermonDescr(models.Model):
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
 
     # [0-n] Link to one or more golden standard sermons
+    #       NOTE: this link is legacy. We now have the EqualGold link through 'SermonDescrEqual'
     goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
+
+    # [0-n] Link to one or more SSG (equalgold)
+    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual")
 
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
@@ -5148,6 +5253,9 @@ class SermonDescr(models.Model):
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
     manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
+    # [1] Every semondescr belongs to exactly one MsItem
+    #     Note: one [MsItem] will have only one [SermonDescr], but using an FK is easier for processing (than a OneToOneField)
+    msitem = models.ForeignKey(MsItem, null=True, related_name="itemsermons")
 
     # Automatically created and processed fields
     # [1] Every sermondesc has a list of signatures that are automatically created
@@ -5239,9 +5347,39 @@ class SermonDescr(models.Model):
 
         if self.author:
             sName = self.author.name
+            # Also get the certainty level of the author and the corresponding flag color
+            sAuType = self.get_autype()
+
+            # Combine all of this
+            sBack = "<span>{}</span>&nbsp;{}".format(sName, sAuType)
         else:
-            sName = "-"
-        return sName
+            sBack = "-"
+        return sBack
+
+    def get_autype(self):
+        # Also get the certainty level of the author and the corresponding flag color
+        autype = self.autype
+        color = "red"
+        title = ""
+        if autype == CERTAIN_LOWEST: 
+            color = "red"
+            title = "Author: very uncertain"
+        elif autype == CERTAIN_LOW: 
+            color = "orange"
+            title = "Author: uncertain"
+        elif autype == CERTAIN_AVE: 
+            color = "gray"
+            title = "Author: average certainty"
+        elif autype == CERTAIN_HIGH: 
+            color = "lightgreen"
+            title = "Author: reasonably certain"
+        else: 
+            color = "green"
+            title = "Author: very certain"
+
+        # Combine all of this
+        sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
+        return sBack
     
     def get_collections_markdown(self):
         lHtml = []
@@ -5262,7 +5400,8 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
+        for linked in SermonDescrEqual.objects.filter(sermon=self):
             # Add this SSG
             ssg_list.append(linked.super.id)
 
@@ -5297,7 +5436,8 @@ class SermonDescr(models.Model):
         """Get the number of SSGs this sermon is part of"""
 
         # Visit all linked SSG items
-        ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        # ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
     def get_eqsetsignatures_markdown(self, type="all"):
@@ -5310,28 +5450,48 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Add this SSG
-            ssg_list.append(linked.super.id)
+        for linked in self.sermondescr_super.all():
+            ssg_list.append(linked.id)
 
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
 
-        # Get an ordered set of signatures
-        # OLD: for sig in Signature.objects.filter(id__in=lSig).order_by('-editype', 'code'):
-        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
-            # Create a display for this topic
-            if type == "first":
-                # Determine where clicking should lead to
-                url = reverse('gold_details', kwargs={'pk': sig.gold.id})
-                lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
-                break
-            else:
+        if type == "combi":
+            # Need to have both the automatic as well as the manually linked ones
+            gold_id_list = [x['id'] for x in gold_list]
+            auto_list = copy.copy(gold_id_list)
+            manual_list = []
+            for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
+                if sig.gsig:
+                    gold_id_list.append(sig.gsig.id)
+                else:
+                    manual_list.append(sig.id)
+            # (a) Show the gold signatures
+            for sig in Signature.objects.filter(id__in=gold_id_list).order_by('-editype', 'code'):
                 # Determine where clicking should lead to
                 url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+                # Check if this is an automatic code
+                auto = "" if sig.id in auto_list else "view-mode"
+                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype,auto, url,sig.code))
+            # (b) Show the manual ones
+            for sig in self.sermonsignatures.filter(id__in=manual_list).order_by('-editype', 'code'):
+                # Create a display for this topic - without URL
+                lHtml.append("<span class='badge signature {}'>{}</span>".format(sig.editype,sig.code))
+        else:
+            # Get an ordered set of signatures - automatically linked
+            for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
+                # Create a display for this topic
+                if type == "first":
+                    # Determine where clicking should lead to
+                    url = reverse('gold_details', kwargs={'pk': sig.gold.id})
+                    lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
+                    break
+                else:
+                    # Determine where clicking should lead to
+                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = ", ".join(lHtml)
+        sBack = "<span class='view-mode'>,</span> ".join(lHtml)
         return sBack
 
     def get_goldlinks_markdown(self):
@@ -5363,6 +5523,16 @@ class SermonDescr(models.Model):
                 SermonDescr.init_latin()
 
         return adapt_markdown(self.incipit)
+
+    def get_keywords_plain(self):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_keywords_markdown(self):
         lHtml = []
@@ -5407,73 +5577,48 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_keywords_ssg_plain(self):
+        """Get all the keywords attached to the SSG of which I am part"""
+
+        lHtml = []
+        # Get all the SSGs to which I link with equality
+        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # Get all keywords attached to these SGs
+        qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
+        # Visit all keywords
+        for keyword in qs:
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(keyword.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_litrefs_markdown(self):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
-        # (1) First the litrefs from the manuscript: 
-        manu = self.manu
-        lref_list = []
-        for item in LitrefMan.objects.filter(manuscript=manu):
-            oAdd = {}
-            oAdd['reference_id'] = item.reference.id
-            oAdd['short'] = item.reference.short
-            oAdd['reference'] = item.reference
-            oAdd['pages'] = item.pages
-            oAdd['short_markdown'] = item.get_short_markdown()
-            lref_list.append(oAdd)
-       
-        # (2) Second the litrefs from the linked Gold sermons: 
-        for linked in SermonDescrGold.objects.filter(sermon=self, linktype=LINK_EQUAL):
-            # Access the gold sermon
-            gold = linked.gold
-            # Get all the literature references of this gold sermon 
-            for item in LitrefSG.objects.filter(sermon_gold_id = gold):
-                
-                oAdd = {}
-                oAdd['reference_id'] = item.reference.id
-                oAdd['short'] = item.reference.short
-                oAdd['reference'] = item.reference
-                oAdd['pages'] = item.pages
-                oAdd['short_markdown'] = item.get_short_markdown()
-                lref_list.append(oAdd)
-                
-        # (3) Set the sort order TH: werkt
-        lref_list = sorted(lref_list, key=lambda x: "{}_{}".format(x['short'].lower(), x['pages']))
-                
-        # (4) Remove duplicates 
-        unique_litref_list=[]                
-        previous = None
-        for item in lref_list:
-            # Keep the first
-            if previous == None:
-                unique_litref_list.append(item)
-            # Try to compare current item to previous
-            elif previous != None:
-                # Are they the same?
-                if item['reference_id'] == previous['reference_id'] and \
-                    item['pages'] == previous['pages']:
-                    # They are the same, no need to copy
-                    pass
-                            
-                # elif previous == None: 
-                #    unique_litref_list.append(item)
-                else:
-                    # Add this item to the new list
-                    unique_litref_list.append(item)
-
-            # assign previous
-            previous = item
-              
-        # (5) The outcome:              
-        litref_list = unique_litref_list
-        
-        # (6) Combine into HTML code
         lHtml = []
-        for litref in litref_list:
+        # (1) First the litrefs from the manuscript: 
+        # manu = self.manu
+        # lref_list = []
+        for item in LitrefMan.objects.filter(manuscript=self.manu).order_by('reference__short', 'pages'):
             # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), litref['reference'].id)
+            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
             # Create a display for this item
-            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref['short_markdown']))
+            lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
+                url,item.get_short_markdown()))
+       
+        # (2) The literature references available in all the SGs that are part of the SSG
+        ssg_id = self.equalgolds.all().values('id')
+        #     Note: the *linktype* for SSG-S doesn't matter anymore
+        # ssg_id = [x.super.id for x in SermonDescrEqual.objects.filter(sermon=self)]
+        gold_id = SermonGold.objects.filter(equal__id__in=ssg_id).values('id')
+        # Visit all the litrefSGs
+        for item in LitrefSG.objects.filter(sermon_gold__id__in = gold_id).order_by('reference__short', 'pages'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
+                url,item.get_short_markdown()))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -5486,6 +5631,17 @@ class SermonDescr(models.Model):
     def get_note_markdown(self):
         """Get the contents of the note field using markdown"""
         return adapt_markdown(self.note)
+
+    def get_passimcode_markdown(self):
+        """Get the Passim code (and a link to it)"""
+
+        sBack = ""
+        # Get the first equalgold
+        equal = self.equalgolds.all().order_by('code', 'author__name', 'number').first()
+        if equal != None and equal.code != "":
+            url = reverse('equalgold_details', kwargs={'pk': equal.id})
+            sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, equal.code)
+        return sBack
 
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""
@@ -5592,6 +5748,9 @@ class SermonDescr(models.Model):
         istop = 1
         if self.incipit: self.srchincipit = get_searchable(self.incipit)
         if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        # Preliminary saving, before accessing m2m fields
+        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        # Process signatures
         lSign = []
         bNeedSave = False
         for item in self.sermonsignatures.all():
@@ -5603,12 +5762,37 @@ class SermonDescr(models.Model):
         return response
 
     def signature_string(self):
-        """Combine all signatures into one string"""
+        """Combine all signatures into one string: manual ones"""
 
         lSign = []
-        for item in self.sermonsignatures.all():
+        # Get the manual signatures
+        for item in self.sermonsignatures.all().order_by("-editype", "code"):
             lSign.append(item.short())
-        return " | ".join(lSign)
+
+        # REturn the combination
+        combi = " | ".join(lSign)
+        if combi == "": combi = "[-]"
+        return combi
+
+    def signature_auto_string(self):
+        """Combine all signatures into one string: automatic ones"""
+
+        lSign = []
+
+        # Get the automatic signatures
+        ssg_list = []
+        for linked in self.sermondescr_super.all():
+            ssg_list.append(linked.id)
+        # Get a list of all the SG that are in these equality sets
+        gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+        # Get an ordered set of signatures
+        for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
+            lSign.append(sig.short())
+
+        # REturn the combination
+        combi = " | ".join(lSign)
+        if combi == "": combi = "[-]"
+        return combi
 
     def signatures_ordered(self):
         # Provide an ordered list of signatures
@@ -5663,6 +5847,10 @@ class UserKeyword(models.Model):
     gold = models.ForeignKey(SermonGold, blank=True, null=True, related_name="gold_userkeywords")
     # [0-1] The link is with a EqualGold instance ...
     super = models.ForeignKey(EqualGold, blank=True, null=True, related_name="super_userkeywords")
+
+    def __str__(self):
+        sBack = self.keyword.name
+        return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None
@@ -5729,7 +5917,7 @@ class SermonDescrEqual(models.Model):
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="eq")
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="uns")
 
     def __str__(self):
         # Temporary fix: sermon.id
