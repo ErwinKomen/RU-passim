@@ -687,10 +687,13 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         # (since there are more than one in each XML) 
         
         manu_parent = xmldoc.getElementsByTagName("dsc")
-        if len(manu_parent.childNodes) > 0:
-            # (4) Walk all the ./msContents/msItem, which are the content items
+        # only one "dsc" in each A+M XML (hieronder oorspronkelijk: manu_parent.childNodes > 0: 
+        # dit werkte niet)
+        if len(manu_parent) > 0:
+            # (4) Walk all the ./msContents/msItem, which are the content items 
+            # hieronder werkt het nog niet)
             manu_list = manu_parent.childNodes[0].getElementsByTagName("c")
-
+            # TH: hier komt hij nog niet
             for manu in manu_list:
                 # Process all child nodes of this [c] - Manuscript
                 pass
