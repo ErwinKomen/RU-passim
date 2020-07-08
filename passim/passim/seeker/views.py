@@ -5761,14 +5761,29 @@ class SermonDetails(SermonEdit):
         return context
 
     def before_save(self, form, instance):
+        # If needed, create an MsItem
+        if instance.msitem == None:
+            # Make sure we have the manuscript
+            manu = form.cleaned_data.get("manu", None)
+            msitem = MsItem.objects.create(manu=manu)
+            # Now make sure to set the link from Manuscript to MsItem
+            instance.msitem = msitem
+
         # Double check for the presence of manu and order
-        if instance.manu and instance.order < 0:
+        if instance.msitem and instance.msitem.order < 0:
             # Calculate how many sermons there are
-            # sermon_count = instance.manu.manusermons.all().count()
-            sermon_count = instance.manu.get_sermon_count()
-            # Make sure the new sermon gets changed
-            form.instance.order = sermon_count
-            #instance.save()
+            sermon_count = instance.msitem.manu.get_sermon_count()
+            # Adapt the MsItem order
+            msitem.order = sermon_count
+            msitem.save()
+            # Find out which is the one PRECEDING me (if any) at the HIGHEST level
+            prec_list = instance.msitem.manu.manuitems.filter(parent__isnull=True, order__gt=msitem.order)
+            if prec_list.count() > 0:
+                # Get the last item
+                prec_item = prec_list.last()
+                # Set the 'Next' here correctly
+                prec_item.next = msitem
+                prec_item.save()
 
         return True, ""
 
@@ -8897,6 +8912,16 @@ class EqualGoldEdit(BasicDetails):
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+        # THe SSG items that have a value in *moved* may not be editable
+        editable = (instance.moved == None)
+        if not editable:
+            self.permission = "readonly"
+            context['permission'] = self.permission
+            #remove_fields = ['field_key', 'field_list', 'multiple', 'fso']
+            #for mainitem in context['mainitems']:
+            #    for field in remove_fields:
+            #        mainitem.pop(field, None)
 
         # Signal that we have select2
         context['has_select2'] = True

@@ -5431,10 +5431,6 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
-    def get_postscriptum_markdown(self):
-        """Get the contents of the postscriptum field using markdown"""
-        return adapt_markdown(self.postscriptum)
-
     def get_eqsetcount(self):
         """Get the number of SSGs this sermon is part of"""
 
@@ -5452,9 +5448,10 @@ class SermonDescr(models.Model):
         lSig = []
         ssg_list = []
 
-        # Visit all linked SSG items
-        for linked in self.sermondescr_super.all():
-            ssg_list.append(linked.id)
+        # Get all linked SSG items
+        #for linked in self.sermondescr_super.all():
+        #    ssg_list.append(linked.id)
+        ssg_list = self.equalgolds.all().values('id')
 
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
@@ -5466,16 +5463,16 @@ class SermonDescr(models.Model):
             manual_list = []
             for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
                 if sig.gsig:
-                    gold_id_list.append(sig.gsig.id)
+                    gold_id_list.append(sig.gsig.gold.id)
                 else:
                     manual_list.append(sig.id)
             # (a) Show the gold signatures
-            for sig in Signature.objects.filter(id__in=gold_id_list).order_by('-editype', 'code'):
+            for sig in Signature.objects.filter(gold__id__in=gold_id_list).order_by('-editype', 'code'):
                 # Determine where clicking should lead to
                 url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
                 # Check if this is an automatic code
-                auto = "" if sig.id in auto_list else "view-mode"
-                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype,auto, url,sig.code))
+                auto = "" if sig.gold.id in auto_list else "view-mode"
+                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype, auto, url,sig.code))
             # (b) Show the manual ones
             for sig in self.sermonsignatures.filter(id__in=manual_list).order_by('-editype', 'code'):
                 # Create a display for this topic - without URL
@@ -5567,7 +5564,8 @@ class SermonDescr(models.Model):
 
         lHtml = []
         # Get all the SSGs to which I link with equality
-        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        ssg_id = self.equalgolds.all().values("id")
         # Get all keywords attached to these SGs
         qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
         # Visit all keywords
@@ -5585,7 +5583,8 @@ class SermonDescr(models.Model):
 
         lHtml = []
         # Get all the SSGs to which I link with equality
-        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        ssg_id = self.equalgolds.all().values("id")
         # Get all keywords attached to these SGs
         qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
         # Visit all keywords
@@ -5645,6 +5644,10 @@ class SermonDescr(models.Model):
             url = reverse('equalgold_details', kwargs={'pk': equal.id})
             sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, equal.code)
         return sBack
+
+    def get_postscriptum_markdown(self):
+        """Get the contents of the postscriptum field using markdown"""
+        return adapt_markdown(self.postscriptum)
 
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""

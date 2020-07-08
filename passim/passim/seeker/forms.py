@@ -94,7 +94,7 @@ class CodeWidget(ModelSelect2MultipleWidget):
         return obj.code
 
     def get_queryset(self):
-        return EqualGold.objects.all().order_by('code').distinct()
+        return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
 
 
 class CollectionWidget(ModelSelect2MultipleWidget):
@@ -225,7 +225,7 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
         if self.addonly:
             qs = EqualGold.objects.none()
         else:
-            qs = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code').distinct()
+            qs = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code').distinct()
         return qs
 
 
@@ -263,7 +263,7 @@ class EqualGoldWidget(ModelSelect2Widget):
             qs = EqualGold.objects.none()
         else:
             # qs = EqualGold.objects.all().order_by('code', 'firstsig').distinct()
-            qs = EqualGold.objects.all().order_by(*self.order).distinct()
+            qs = EqualGold.objects.filter(moved__isnull=True).order_by(*self.order).distinct()
         return qs
 
 
@@ -650,7 +650,7 @@ class SuperOneWidget(ModelSelect2Widget):
         return sLabel
 
     def get_queryset(self):
-        return EqualGold.objects.all().order_by('code', 'id').distinct()
+        return EqualGold.objects.filter(moved__isnull=True).order_by('code', 'id').distinct()
 
 
 
@@ -851,7 +851,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1044,7 +1044,7 @@ class SermonForm(PassimModelForm):
             # The available Sermondescr-Equal list
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
-            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1453,7 +1453,7 @@ class SermonDescrSuperForm(forms.ModelForm):
         self.fields['linktype'].required = False
         self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
-        self.fields['newsuper'].queryset = EqualGold.objects.order_by('author__name', 'siglist')
+        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('author__name', 'siglist')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1575,7 +1575,7 @@ class SermonGoldForm(PassimModelForm):
             # Determine the querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-            self.fields['codelist'].queryset = EqualGold.objects.all().order_by('code').distinct()
+            self.fields['codelist'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -1779,7 +1779,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
-            self.fields['passimlist'].queryset = EqualGold.objects.filter(Q(code__isnull=False)).order_by('code')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -1886,7 +1886,7 @@ class EqualGoldLinkForm(forms.ModelForm):
         self.fields['newlinktype'].required = False
         self.fields['dst'].required = False
         self.fields['newsuper'].required = False
-        self.fields['newsuper'].queryset = EqualGold.objects.all().order_by('code')
+        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code')
         # self.fields['target_list'].queryset = EqualGold.objects.none()
         # Get the instance
         if 'instance' in kwargs:
@@ -1896,7 +1896,7 @@ class EqualGoldLinkForm(forms.ModelForm):
                 #       self.fields['linktype'].initial = instance.linktype
                 #       self.fields['dst'].initial = instance.dst
 
-                self.fields['newsuper'].queryset = EqualGold.objects.exclude(id=instance.id).order_by('code')
+                self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=instance.id).order_by('code')
 
         # REturn nothing
         return None

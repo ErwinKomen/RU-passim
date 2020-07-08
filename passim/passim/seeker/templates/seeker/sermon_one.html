@@ -23,6 +23,8 @@
                 {% if msitem.isparent %}{% endif %}>
               {% if msitem.isparent %}
                 <span class="glyphicon glyphicon-plus" onclick="ru.passim.seeker.sermon_level(this);"></span>
+              {% elif msitem.sermon %}
+                <a href="{% url 'sermon_details' msitem.sermon.id %}"><span>&nbsp;</span></a>
               {% else %}
                 <span>&nbsp;</span>
               {% endif %}

@@ -1050,7 +1050,7 @@ class BasicDetails(DetailView):
         context['history_button'] = self.history_button
         context['no_delete'] = self.no_delete
 
-        if context['authenticated']:
+        if context['authenticated'] and self.permission != "readonly":
             self.permission = "read"
             if context['is_app_editor']:
                 self.permission = "write"
