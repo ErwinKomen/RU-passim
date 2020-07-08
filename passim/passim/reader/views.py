@@ -43,6 +43,9 @@ from itertools import chain
 
 # Imports needed for working with XML and other file formats
 from xml.dom import minidom
+# See: http://effbot.org/zone/celementtree.htm
+import xml.etree.cElementTree as ElementTree
+
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR
@@ -670,34 +673,49 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 
     # Number to order all the items we read        
     order = 0   
+    # Overal keeping track of manuscripts
+    lst_manus = []
     # Overall keeping track of ms items
-    
     lst_msitem = []
     
     try:
         # Make sure we have the data
         if xmldoc == None:
             # Read and parse the data into a DOM element
-            xmldoc = minidom.parse(data_file)
-                
+            xmldoc = ElementTree.parse(data_file)                
+            
         # Eerst de algemene info in de XML? Nee, beter eerst de specifieke en dan steeds terug naar de bovenste
         # algemene delen van de XML 
      
-        # First create a list with all manuscripts in the XML 
-        # (since there are more than one in each XML) 
-        
-        manu_parent = xmldoc.getElementsByTagName("dsc")
-        # only one "dsc" in each A+M XML (hieronder oorspronkelijk: manu_parent.childNodes > 0: 
-        # dit werkte niet)
-        if len(manu_parent) > 0:
-            # (4) Walk all the ./msContents/msItem, which are the content items 
-            # hieronder werkt het nog niet)
-            manu_list = manu_parent.childNodes[0].getElementsByTagName("c")
-            # TH: hier komt hij nog niet
-            for manu in manu_list:
-                # Process all child nodes of this [c] - Manuscript
-                pass
+        # (1) Find all the manuscripts in this XML document (use ecodex) 
+        # This is the highest "c" level, there is at least one level "c" lower
+        manu_list = xmldoc.findall(".//dsc/c")
+        for manu in manu_list:
+            # if 
 
+
+
+            pass
+            # Process all XML elements of this manuscript TH: op dit moment zit er nog niks in
+            # What are the elements? Title first 
+            # Moet je dan de lijst met id's gebruiken?
+        #    for id 
+            
+        #    title = 
+
+        #    # Get the title
+                       
+        #    oInfo['name'] = getText(title)
+        #    # Get the main title, to prevent it from remaining empty
+        #    title_list = xmldoc.getElementsByTagName("titleStmt")
+        #if title_list.length > 0:
+        #    # Get the first title
+        #    title = title_list[0]
+        #    oInfo['name'] = getText(title)
+               
+
+         
+ 
         #if dsc.length > 0:
                
         #    # Set the method to process [msItem]
