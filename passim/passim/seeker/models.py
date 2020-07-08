@@ -5178,6 +5178,9 @@ class SermonHead(models.Model):
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
 
+    # [0-1] The title of this structural element to be shown
+    title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
+
     # [1] Every SermonHead belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
     msitem = models.ForeignKey(MsItem, null=True, related_name="itemheads")

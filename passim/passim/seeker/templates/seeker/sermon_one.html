@@ -47,6 +47,14 @@
                   <code draggable="true" class="draggable" 
                         {% if is_app_editor %}ondragstart="ru.passim.seeker.sermon_drag(event);"{% endif %}
                         >{% if msitem.shead.locus %}{{msitem.shead.locus}}{% else %}?{% endif %}</code>
+
+                  {% if is_app_editor %}
+                    <!-- Add a button to (re-)calculate the LOCUS -->
+                    <a class="edit-mode btn btn-xs jumbo-1" onclick="ru.passim.seeker.sermon_locus(this);">
+                      <span class="glyphicon glyphicon-repeat" title="Calculate the LOCUS"></span>
+                    </a>
+                  {% endif %}
+
                 {% endif %}
             </td>
 
@@ -64,7 +72,13 @@
                     <span>{% include 'seeker/sermon_view.html' with sermon=msitem.sermon %}</span>
                   </a>
                 {% elif msitem.shead %}
-                  <span>(tussenkopje)</span>
+                  <span class="shead" {% if is_app_editor %}contenteditable="true"
+                          oninput="ru.passim.seeker.sermon_change(this);"
+                        {% endif %}
+                        >
+                    {% if msitem.shead.title %}{{msitem.shead.title}}{% else %}(structure head){% endif %}
+                  </span>
+
                 {% endif %}
               </span>
             </td>

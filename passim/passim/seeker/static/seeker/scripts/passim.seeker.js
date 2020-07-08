@@ -1007,6 +1007,17 @@ var ru = (function ($, ru) {
             }
 
             oNew = { id: sermonid, previd: previd, nextid: nextid, parent: parent, firstchild: firstchild };
+
+            // Check if this is a structural element
+            if (sermonid.indexOf("new") >= 0) {
+              // If it is a structural element, then also pass on the user-defined title text
+              oNew['title'] = $(el).find(".sermon-new-head > div").text();
+            } else if ($(el).find("table .shead").length > 0) {
+              // THis is a [shead] element
+              oNew['title'] = $(el).find(".shead").first().text();
+              oNew['locus'] = $(el).find("code.draggable").first().text();
+            }
+
             hList.push(oNew);
           });
 
@@ -1502,10 +1513,13 @@ var ru = (function ($, ru) {
             loc_newSermonNumber += 1;
             divSrcId = "sermon_new_" + loc_newSermonNumber;
             $(divSrc).attr("id", divSrcId);
+            // Make a good @sermonid field to be sent to the caller
+            $(divSrc).attr("sermonid", "new_" + loc_newSermonNumber);
             // Set the text for 'tussenkopje'
-            $(divSrc).find(".sermon-new-head").first().html("<i>hierarchy element " + loc_newSermonNumber + "</i>");
+            $(divSrc).find(".sermon-new-head").first().html('<div id="id_shead-' + loc_newSermonNumber + '" name="shead-' +
+              loc_newSermonNumber + '" contenteditable="true">(Structural element)</div>');
             // Add a sermon number
-            $(divSrc).find(".sermonnumber").first().html("<span>H-"+loc_newSermonNumber+"</span>")
+            $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
             // Make sure the new element becomes visible
             $(divSrc).removeClass("hidden");
           } else {
@@ -1570,7 +1584,72 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * sermon_locus
+       *    Calculate the locus of this SermonHead element
+       * 
+       * @param {el} elThis
+       * @returns {bool}
+       */
+      sermon_locus: function (elThis) {
+        var elCode = null,
+            elChildFirst = null,
+            elChildLast = null,
+            sLocusFirst = "",
+            sLocusLast = "",
+            arLocusFirst = null,
+            arLocusLast = null,
+            sLocus = "";
 
+        try {
+          // Determine where the code element is
+          elCode = $(elThis).closest("td").find("code").first();
+          // Find first and last child .tree elements
+          elChildFirst = $(elThis).closest(".tree").children(".tree").first();
+          elChildLast = $(elThis).closest(".tree").children(".tree").last();
+          // Get the first code
+          sLocusFirst = $(elChildFirst).find("code.draggable").first().text()
+          sLocusLast = $(elChildLast).find("code.draggable").first().text()
+          // Calculate the range
+          arLocusFirst = sLocusFirst.split(/–|-/);
+          sLocus = arLocusFirst[0];
+          arLocusLast = sLocusLast.split(/–|-/);
+          sLocus = sLocus + "-" + ((arLocusLast.length == 1) ? arLocusLast[0] : arLocusLast[1]);
+
+          // Store the code where it belongs
+          $(elCode).html(sLocus);
+
+          // Show the SAVE and RESTORE buttons
+          $("#sermon_tree").find(".edit-mode").removeClass("hidden");
+
+          // Return okay
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_locus", ex);
+          return false;
+        }
+      },
+
+      /**
+       * sermon_change
+       *    Signal that changes need to be stored
+       * 
+       * @param {el} elThis
+       * @returns {bool}
+       */
+      sermon_change: function (elThis) {
+        try {
+
+          // Show the SAVE and RESTORE buttons
+          $("#sermon_tree").find(".edit-mode").removeClass("hidden");
+
+          // Return okay
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("sermon_change", ex);
+          return false;
+        }
+      },
 
       /**
        * unique_change

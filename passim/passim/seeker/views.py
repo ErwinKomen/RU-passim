@@ -68,7 +68,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
-    User, Group, Origin, SermonDescr, MsItem, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
+    User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
@@ -7569,6 +7569,14 @@ class ManuscriptHierarchy(ManuscriptDetails):
         errHandle = ErrHandle()
         method = "july2020"
 
+        def getid(item, key, mapping):
+            id_value = item[key]
+            if "new" in id_value:
+                id_value = mapping[id_value]
+            obj = MsItem.objects.filter(id=id_value).first()
+            id = None if obj == None else obj.id
+            return id
+
         try:
             # Make sure to set the correct redirect page
             if instance:
@@ -7582,19 +7590,46 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
                 if method == "july2020":
                     # The new July20920 method that uses different parameters and uses MsItem
+
+                    # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
+                    head_to_id = {}
+                    with transaction.atomic():
+                        for idx, item in enumerate(hlist):
+                            if 'new' in item['id']:
+                                # This is a new structural element - Create an MsItem
+                                msitem = MsItem.objects.create(manu=instance)
+                                # Create a new MsHead item
+                                shead = SermonHead.objects.create(msitem=msitem,title=item['title'])
+                                # Make a mapping
+                                head_to_id[item['id']] = msitem.id
+                                # Testing
+                                id=getid(item, "id", head_to_id)
+
+                    # Step 2: store the hierarchy
                     changes = {}
                     hierarchy = []
                     with transaction.atomic():
                         for idx, item in enumerate(hlist):
                             bNeedSaving = False
                             # Get the msitem of this item
-                            msitem = MsItem.objects.filter(id=item['id']).first()
+                            msitem = MsItem.objects.filter(id=getid(item, "id", head_to_id)).first()
                             # Get the next if any
-                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=item['nextid']).first()
+                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
                             # Get the first child
-                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=item['firstchild']).first()
+                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
                             # Get the parent
-                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=item['parent']).first()
+                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
+
+                            # Possibly adapt the [shead] title and locus
+                            itemhead = msitem.itemheads.first()
+                            if itemhead and 'title' in item and 'locus' in item:
+                                title= item['title']
+                                locus = item['locus']
+                                if itemhead.title != title or itemhead.locus != locus:
+                                    itemhead.title = title
+                                    itemhead.locus = locus
+                                    # Save the itemhead
+                                    itemhead.save()
                             
                             order = idx + 1
 
