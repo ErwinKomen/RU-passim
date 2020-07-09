@@ -1426,7 +1426,7 @@ class SermonDescrGoldForm(forms.ModelForm):
 
 
 class SermonDescrSuperForm(forms.ModelForm):
-    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, #help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
     newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
                 widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 

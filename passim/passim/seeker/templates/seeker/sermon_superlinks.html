@@ -5,8 +5,9 @@
       <tbody>
         {% for instance in superlist %}
           <tr class="form-row">
-            <!-- The kind of link -->
+            <!-- The kind of link 
             <td valign="top"><span class='badge signature ot'>{{instance.get_linktype_display}}</span></td>
+              -->
 
             <!-- The contents of the linked SSG -->
             <td style="width: 100%;">
@@ -14,7 +15,7 @@
               <!-- View-mode: show the destination SSG according to the specs-->
               <div class="view-mode">
                 <!-- Only allow copying, if the link is 'equal' -->
-                {% if instance.linktype == "eqs" %}
+                {% if instance.linktype == "eqs" or instance.linktype == "uns" %}
                   <span>
                     <a class="btn btn-xs jumbo-1" 
                         onclick="ru.passim.seeker.elevate_confirm(this)"
