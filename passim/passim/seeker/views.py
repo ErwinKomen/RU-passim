@@ -5643,17 +5643,20 @@ class SermonEdit(BasicDetails):
                     # SermonDescr-To-EqualGold processing
                     if 'newsuper' in cleaned and cleaned['newsuper'] != "":
                         newsuper = cleaned['newsuper']
-                        # There also must be a linktype
-                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
-                            linktype = cleaned['newlinktype']
-                            # Check existence
-                            obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
-                            if obj == None:
-                                super = EqualGold.objects.filter(id=newsuper).first()
-                                if super != None:
-                                    # Set the right parameters for creation later on
-                                    form.instance.linktype = linktype
-                                    form.instance.super = super
+                        # Take the default linktype
+                        linktype = "uns"
+                        ## There also must be a linktype
+                        #if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                        #    linktype = cleaned['newlinktype']
+
+                        # Check existence
+                        obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
+                        if obj == None:
+                            super = EqualGold.objects.filter(id=newsuper).first()
+                            if super != None:
+                                # Set the right parameters for creation later on
+                                form.instance.linktype = linktype
+                                form.instance.super = super
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)

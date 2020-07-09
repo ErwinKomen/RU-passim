@@ -1453,7 +1453,7 @@ class SermonDescrSuperForm(forms.ModelForm):
         self.fields['linktype'].required = False
         self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
-        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('author__name', 'siglist')
+        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1463,7 +1463,7 @@ class SermonDescrSuperForm(forms.ModelForm):
                 #       self.fields['dst'].initial = instance.dst
 
                 # Make sure we exclude the instance from the queryset
-                self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('author__name', 'siglist')
+                self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('code', 'author__name', 'id')
 
 
 class SermonDescrKeywordForm(forms.ModelForm):

@@ -5785,10 +5785,9 @@ class SermonDescr(models.Model):
 
         lSign = []
 
-        # Get the automatic signatures
-        ssg_list = []
-        for linked in self.sermondescr_super.all():
-            ssg_list.append(linked.id)
+        # Get all linked SSG items
+        ssg_list = self.equalgolds.all().values('id')
+
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
         # Get an ordered set of signatures

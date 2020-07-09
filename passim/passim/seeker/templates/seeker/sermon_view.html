@@ -35,6 +35,6 @@
 
 {% if sermon.note %}<span class="manusermo note hidden">(Note: {{sermon.note}})</span>{% endif %}
 
-<span class="manusermo kw-auto hidden">{{sermon.get_keywords_plain|safe}}</span>
+<span class="manusermo kw-manual hidden">{{sermon.get_keywords_plain|safe}}</span>
 
-<span class="manusermo kw-manual hidden">{{sermon.get_keywords_ssg_plain|safe}}</span>
+<span class="manusermo kw-auto hidden">{{sermon.get_keywords_ssg_plain|safe}}</span>
