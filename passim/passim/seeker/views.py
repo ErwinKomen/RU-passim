@@ -8894,8 +8894,10 @@ class EqualGoldEdit(BasicDetails):
             # 'title': 'This is the automatically assigned sermon number for this particular author' },
 
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown(True), 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown(True),'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
+             'field_key': 'incipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
+             'field_key': 'explicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
             {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
             {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
              'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},

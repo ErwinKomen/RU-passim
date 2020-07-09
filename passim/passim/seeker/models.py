@@ -3878,26 +3878,30 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_explicit_markdown(self, add_search = False):
+    def get_explicit_markdown(self, incexp_type = "actual"):
         """Get the contents of the explicit field using markdown"""
 
-        if add_search:
+        if incexp_type == "both":
             parsed = adapt_markdown(self.explicit)
             search = self.srchexplicit
             sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
-        else:
+        elif incexp_type == "actual":
             sBack = adapt_markdown(self.explicit)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchexplicit)
         return sBack
 
-    def get_incipit_markdown(self, add_search = False):
+    def get_incipit_markdown(self, incexp_type = "actual"):
         """Get the contents of the incipit field using markdown"""
         # Perform
-        if add_search:
+        if incexp_type == "both":
             parsed = adapt_markdown(self.incipit)
             search = self.srchincipit
             sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
-        else:
+        elif incexp_type == "actual":
             sBack = adapt_markdown(self.incipit)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchincipit)
         return sBack
 
     def get_keywords_markdown(self):
