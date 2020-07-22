@@ -2525,6 +2525,14 @@ class Project(models.Model):
             sName = "(unnamed)"
         return sName
 
+    def get_default(username):
+        """Determine the default project for this user"""
+
+        obj = Project.objects.filter(name__iexact = "passim").first()
+        if obj == None:
+            obj = Project.objects.all().first()
+        return obj
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # First do the normal saving
         response = super(Project, self).save(force_insert, force_update, using, update_fields)

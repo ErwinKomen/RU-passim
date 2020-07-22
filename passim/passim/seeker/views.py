@@ -7571,6 +7571,10 @@ class ManuscriptDetails(ManuscriptEdit):
         return context
 
     def before_save(self, form, instance):
+        # If no project ha been selected, then select the default project: Passim
+        if instance.project == None:
+            instance.project = Project.get_default(self.request.user.username)
+
         return True, ""
 
     def process_formset(self, prefix, request, formset):
