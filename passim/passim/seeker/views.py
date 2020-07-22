@@ -9186,10 +9186,10 @@ class EqualGoldDetails(EqualGoldEdit):
                                      'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                 elif method == "Issue216":
                     # Shelfmark = IDNO
-                    manu_full = "{}, {}, {}".format(item.library.lcity.name, item.library.name, item.idno)
+                    manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
                     manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
                     # Name as CITY - LIBRARY - IDNO + Name
-                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
                     rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
                                      'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
