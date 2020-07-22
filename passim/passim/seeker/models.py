@@ -2029,6 +2029,8 @@ class Litref(models.Model):
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
             for grp_num in range( total_groups):
+                # Show where we are
+                oErr.Status("Sync zotero {}/{}".format(grp_num, total_groups))
                 # Calculate the umber to start from
                 start = grp_num * group_size
                 # Fetch these publications
@@ -2146,13 +2148,18 @@ class Litref(models.Model):
                     
                     # Fourth step: make short reference for book 
                     elif itemType == "book":
+                        # ======== DEBUG =========
+                        if year == "1888":
+                            iStop = 1
+                        # ========================
+
                         if extra == "": 
                             if short_title == "": 
                                 # If the books is not an edition/catalogue and there is no short title
                                 if authors !="":
                                     result = "{} ({})".format(authors, year)
                                 # If there are only editors  
-                                    if editors != "": 
+                                elif editors != "": 
                                         result = "{} ({})".format(editors, year)
                             # If there is a short title
                             elif short_title != "": 
