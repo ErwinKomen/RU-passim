@@ -401,7 +401,7 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return obj.idno
 
     def get_queryset(self):
-        return Manuscript.objects.all().order_by('idno').distinct()
+        return Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
 
 
 class ManuscriptExtWidget(ModelSelect2MultipleWidget):

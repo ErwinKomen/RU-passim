@@ -43,6 +43,7 @@ LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+MANIFESTATION_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
@@ -2148,10 +2149,6 @@ class Litref(models.Model):
                     
                     # Fourth step: make short reference for book 
                     elif itemType == "book":
-                        # ======== DEBUG =========
-                        if year == "1888":
-                            iStop = 1
-                        # ========================
 
                         if extra == "": 
                             if short_title == "": 
@@ -2659,6 +2656,9 @@ class Manuscript(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+
+    # [1] Every manuscript may be a manifestation (default) or a template (optional)
+    mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
@@ -5253,6 +5253,9 @@ class SermonDescr(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # [1] Every SermonDescr may be a manifestation (default) or a template (optional)
+    mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
+
     # ================ MANYTOMANY relations ============================
 
     # [0-n] Many-to-many: keywords per SermonDescr
@@ -6354,3 +6357,16 @@ class CollectionSuper(models.Model):
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "super_col")
 
+
+class Template(models.Model):
+    """A template to construct a manuscript"""
+
+    # [1] Every template must be named
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Every template belongs to someone
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profiletemplates")
+    # [1] Every template links to a `Manuscript` that has `mtype` set to `tem` (=template)
+    manu = models.ForeignKey(Manuscript, on_delete=models.CASCADE, related_name="manutemplates")
+
+    def __str__(self):
+        return self.name

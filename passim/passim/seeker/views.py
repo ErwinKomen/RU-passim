@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 
@@ -5876,6 +5876,9 @@ class SermonListView(BasicList):
             {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'datestart',     'dbfield': 'manu__yearstart__gte',    'keyS': 'date_from'},
             {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
             ]}
          ]
 
@@ -5967,6 +5970,10 @@ class SermonListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
+        # Make sure to only show mtype manifestations
+        fields['mtype'] = "man"
+
         return fields, lstExclude, qAlternative
 
 
@@ -6413,6 +6420,94 @@ class ProvenanceListView(BasicList):
             sBack = ""
             if instance.note:
                 sBack = instance.note[:40]
+        return sBack, sTitle
+
+
+class TemplateEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = Template
+    mForm = TemplateForm
+    prefix = 'tmpl'
+    title = "TemplateEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",         'value': instance.name,             'field_key': "name"},
+            {'type': 'plain', 'label': "Location:",     'value': instance.get_location(),   'field_key': 'location'     },
+            {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
+            {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def get_manuscripts(self, instance):
+        # find the shelfmark
+        lManu = []
+        for obj in instance.manuscripts_templates.all():
+            # Add the shelfmark of this one
+            manu = obj.manuscript
+            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            shelfmark = manu.idno[:20]
+            lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+        sBack = ", ".join(lManu)
+        return sBack
+
+
+class TemplateDetails(TemplateEdit):
+    """Like Template Edit, but then html output"""
+    rtype = "html"
+    
+
+class TemplateListView(BasicList):
+    """Search and list templates"""
+
+    model = Template
+    listform = TemplateForm
+    prefix = "tmpl"
+    has_select2 = True
+    new_button = False  # Templates are added in the Manuscript view; each template belongs to one manuscript
+    order_cols = ['profile__user__username', 'name', '', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Owner',       'order': 'o=1', 'type': 'str', 'custom': 'owner'},
+        {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Items',       'order': 'o=3', 'type': 'str', 'custom': 'items', 'linkdetails': True},
+        {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        ]
+    filters = [
+        ]
+    searches = [
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "owner":
+            # find the owner
+            username = instance.profile.user.username
+            sBack = "<span class=''>{}</span>".format(username)
+        elif custom == "items":
+            sBack = ""
+            if instance.location:
+                sBack = instance.location.name
         return sBack, sTitle
 
 
@@ -7803,6 +7898,7 @@ class ManuscriptListView(BasicList):
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
+            {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
             ]}
          ]
     uploads = reader_uploads
@@ -7923,6 +8019,8 @@ class ManuscriptListView(BasicList):
                 prj_default = qs.first()
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
+        # Make sure we only show manifestations
+        fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
   
 
