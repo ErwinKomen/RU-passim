@@ -18,7 +18,7 @@
 
   <div>
 
-    {% if authenticated %}
+    {% if authenticated and permission %}
       <!-- Upper part of the basic list interface -->
 
       <div id="basiclist_top" class="container-small" >
@@ -441,6 +441,10 @@
       </div>
 
     
+    {% elif authenticated and not permission %}
+      <div class="explanation">
+        <p>Dear user, you do not have permission to view this item.</p>
+      </div>
     {% else %}
       <div class="explanation">
         <p>Dear user, you are <b>not</b> logged in.</p>

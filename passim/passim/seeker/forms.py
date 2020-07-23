@@ -846,7 +846,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['name'].required = False
             self.fields['yearstart'].required = False
             self.fields['yearfinish'].required = False
-            self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
@@ -1026,7 +1026,7 @@ class SermonForm(PassimModelForm):
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-            self.fields['manuidlist'].queryset = Manuscript.objects.all().order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -1072,8 +1072,8 @@ class SermonForm(PassimModelForm):
                 # If there is an instance, then check the author specification
                 sAuthor = "" if not instance.author else instance.author.name
 
-                if instance.manu:
-                    self.fields['manu'].queryset = Manuscript.objects.filter(id=instance.manu.id)
+                if instance.get_manuscript():
+                    self.fields['manu'].queryset = Manuscript.objects.filter(id=instance.get_manuscript().id)
 
                 ## If there is an instance, then check the nickname specification
                 #sNickName = "" if not instance.nickname else instance.nickname.name
@@ -2639,6 +2639,44 @@ class ManuscriptForm(PassimModelForm):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("manuscriptForm")
+        return None
+
+
+class TemplateForm(PassimModelForm):
+    profileid = forms.CharField(required=False)
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Template
+        fields = ['name', 'description']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'description': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(TemplateForm, self).__init__(*args, **kwargs)
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+            # Make sure the profile is set correctly
+            self.fields['profileid'].initial = profile.id
+
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['description'].required = False
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                self.fields['profileid'].initial = instance.profile.id
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("TemplateForm")
         return None
 
 

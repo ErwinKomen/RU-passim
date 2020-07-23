@@ -264,6 +264,8 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 sermon.stype = STYPE_IMPORTED    # Imported
 
                 # Set my parent manuscript
+                # TODO: this needs correction of [sermon] actually is a [SermonDescr]: sermon.msitem.manu
+                #       and where is sermon.msitem established??
                 sermon.manu = manuscript
 
                 # Now save it

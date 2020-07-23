@@ -2991,7 +2991,80 @@ class Manuscript(models.Model):
         return count
 
     def get_stype_light(self):
-        return get_stype_light(self.stype)
+        sBack = get_stype_light(self.stype)
+        # Check if I am a template
+        if self.mtype == "tem":
+            # add a clear TEMPLATE indicator
+            sBack = "{}<div class='template_notice'>THIS IS A TEMPLATE</div>".format(sBack)
+        return sBack
+
+    def get_template_copy(self):
+        """Create a 'template' copy of myself"""
+
+        repair = ['parent', 'firstchild', 'next']
+        # Get a link to myself and save it to create a new instance
+        # See: https://docs.djangoproject.com/en/2.2/topics/db/queries/#copying-model-instances
+        obj = self
+        manu_id = self.id
+        obj.pk = None
+        obj.mtype = "tem"   # Change the type
+        obj.stype = "imp"   # Imported
+        obj.save()
+        manu_src = Manuscript.objects.filter(id=manu_id).first()
+        # Note: this doesn't copy relations that are not part of Manuscript proper
+        
+        # copy all the sermons...
+        msitems = []
+        with transaction.atomic():
+            # Walk over all MsItem stuff
+            for msitem in manu_src.manuitems.all().order_by('order'):
+                dst = msitem
+                src_id = msitem.id
+                dst.pk = None
+                dst.manu = obj  # This sets the destination's FK for the manuscript
+                                # Does this leave the original unchanged? I hope so...:)
+                dst.save()
+                src = MsItem.objects.filter(id=src_id).first()
+                msitems.append(dict(src=src, dst=dst))
+
+        # Repair all the relationships from sermon to sermon
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
+                for relation in repair:
+                    src_rel = getattr(src, relation)
+                    if src_rel and src_rel.order:
+                        setattr(dst, relation, obj.manuitems.filter(order=src_rel.order).first())
+                        dst.save()
+                # Copy and save a SermonDescr if needed
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # COpy it
+                    sermon_dst = sermon_src
+                    sermon_dst.pk = None
+                    sermon_dst.msitem = dst
+                    sermon_dst.mtype = "tem"   # Change the type
+                    sermon_dst.stype = "imp"   # Imported
+                    sermon_dst.save()
+        # Walk the msitems again, and make sure SSG-links are copied!!
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # Make sure we also have the destination
+                    sermon_dst = dst.itemsermons.first()
+                    # Walk the SSG links tied with sermon_src
+                    for eq in sermon_src.equalgolds.all():
+                        # Add it to the destination sermon
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+
+
+        # Return the new object
+        return obj
 
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
@@ -5425,8 +5498,8 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
-        for linked in SermonDescrEqual.objects.filter(sermon=self):
+        #    but make sure to exclude the template sermons
+        for linked in SermonDescrEqual.objects.filter(sermon=self).exclude(mtype="tem"):
             # Add this SSG
             ssg_list.append(linked.super.id)
 
@@ -5457,7 +5530,7 @@ class SermonDescr(models.Model):
         """Get the number of SSGs this sermon is part of"""
 
         # Visit all linked SSG items
-        # ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        #    NOTE: do not filter out mtype=tem
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
@@ -5624,7 +5697,7 @@ class SermonDescr(models.Model):
         # (1) First the litrefs from the manuscript: 
         # manu = self.manu
         # lref_list = []
-        for item in LitrefMan.objects.filter(manuscript=self.manu).order_by('reference__short', 'pages'):
+        for item in LitrefMan.objects.filter(manuscript=self.get_manuscript()).order_by('reference__short', 'pages'):
             # Determine where clicking should lead to
             url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
             # Create a display for this item
@@ -5650,7 +5723,10 @@ class SermonDescr(models.Model):
     def get_manuscript(self):
         """Get the manuscript that links to this sermondescr"""
 
-        return obj.manu
+        manu = None
+        if self.msitem and self.msitem.manu:
+            manu = self.msitem.manu
+        return manu
 
     def get_note_markdown(self):
         """Get the contents of the note field using markdown"""
@@ -5717,7 +5793,12 @@ class SermonDescr(models.Model):
         return sBack
 
     def get_stype_light(self):
-        return get_stype_light(self.stype)
+        sBack = get_stype_light(self.stype)
+        # Check if I am a template
+        if self.mtype == "tem":
+            # add a clear TEMPLATE indicator
+            sBack = "{}<div class='template_notice'>THIS IS A TEMPLATE</div>".format(sBack)
+        return sBack
 
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
@@ -5961,7 +6042,7 @@ class SermonDescrEqual(models.Model):
         """Get a list of links that are unique in terms of combination [ssg] [linktype]"""
 
         # We're not really giving unique ones
-        uniques = SermonDescrEqual.objects.order_by('linktype', 'sermon__author__name', 'sermon__siglist')
+        uniques = SermonDescrEqual.objects.exclude(sermon__mtype="tem").order_by('linktype', 'sermon__author__name', 'sermon__siglist')
         return uniques
 
 
@@ -6364,9 +6445,34 @@ class Template(models.Model):
     # [1] Every template must be named
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every template belongs to someone
-    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profiletemplates")
+    profile = models.ForeignKey(Profile, null=True, on_delete=models.CASCADE, related_name="profiletemplates")
+    # [0-1] A template may have an additional description
+    description = models.TextField("Description", null=True, blank=True)
     # [1] Every template links to a `Manuscript` that has `mtype` set to `tem` (=template)
-    manu = models.ForeignKey(Manuscript, on_delete=models.CASCADE, related_name="manutemplates")
+    manu = models.ForeignKey(Manuscript, null=True, on_delete=models.CASCADE, related_name="manutemplates")
 
     def __str__(self):
         return self.name
+
+    def get_count(self):
+        """Count the number of sermons under me"""
+
+        num = 0
+        if self.manu:
+            num = self.manu.get_sermon_count()
+        return num
+
+    def get_username(self):
+        username = ""
+        if self.profile and self.profile.user:
+            username = self.profile.user.username
+        return username
+
+    def get_manuscript_link(self):
+        """Return a piece of HTML with the manuscript link for the user"""
+
+        sBack = ""
+        if self.manu:
+            url = reverse('manuscript_details', kwargs={'pk': self.manu.id})
+            sBack = "<a href='{}' title='Go to the manuscript template'><span class='glyphicon glyphicon-open'></span><span class='badge signature'>Manuscript</span></a>".format(url)
+        return sBack

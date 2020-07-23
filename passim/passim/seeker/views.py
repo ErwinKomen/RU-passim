@@ -65,7 +65,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
                                 SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
-                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm
+                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -707,8 +707,8 @@ def home(request):
     context['newsitem_list'] = newsitem_list
 
     # Gather the statistics
-    context['count_sermon'] = SermonDescr.objects.all().count()
-    context['count_manu'] = Manuscript.objects.all().count()
+    context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
+    context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
 
     # Render and return the page
     return render(request, template_name, context)
@@ -5472,8 +5472,11 @@ class SermonEdit(BasicDetails):
         # Need to know who this user (profile) is
         profile = Profile.get_user_profile(self.request.user.username)
 
+        istemplate = (instance.mtype == "tem")
+
         # Define the main items to show and edit
-        manu_id = None if instance == None or instance.manu == None else instance.manu.id
+        # manu_id = None if instance == None or instance.manu == None else instance.manu.id
+        manu_id = None if instance == None else instance.get_manuscript().id
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
@@ -5499,41 +5502,48 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
             {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
              'title': 'Codicological notes'},
-            {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'},
-            {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-             'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
-             'title': 'Keywords attached to the Super Sermon Gold(s)'},
-            {'type': 'line',    'label': "Gryson/Clavis:",'value': instance.get_eqsetsignatures_markdown('combi'),
-             'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
-            {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
-             'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
-             'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
-            {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
-             'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
-            {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
-             'title': "Editions of the Sermons Gold that are part of the same equality set"},
-            {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
-            {'type': 'line',    'label': "Super Sermon gold links:",  'value': self.get_superlinks_markdown(instance), 
+            {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
+            ]
+        if not istemplate:
+            mainitems_m2m = [
+                {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+                 # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+                 'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+                 'title': 'Keywords attached to the Super Sermon Gold(s)'},
+                {'type': 'line',    'label': "Gryson/Clavis:",'value': instance.get_eqsetsignatures_markdown('combi'),
+                 'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
+                {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
+                 'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
+                 'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
+                {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
+                 'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
+                {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
+                 'title': "Editions of the Sermons Gold that are part of the same equality set"},
+                {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
+                ]
+            for item in mainitems_m2m: context['mainitems'].append(item)
+        # IN all cases
+        mainitems_SSG = {'type': 'line',    'label': "Super Sermon gold links:",  'value': self.get_superlinks_markdown(instance), 
              'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
              'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
-            ]
+        context['mainitems'].append(mainitems_SSG)
         # Notes:
         # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
 
         # Add a button back to the Manuscript
         topleftlist = []
-        if instance.manu:
+        if instance.get_manuscript():
+            manu = instance.get_manuscript()
             buttonspecs = {'label': "M", 
-                 'title': "Go to manuscript {}".format(instance.manu.idno), 
-                 'url': reverse('manuscript_details', kwargs={'pk': instance.manu.id})}
+                 'title': "Go to manuscript {}".format(manu.idno), 
+                 'url': reverse('manuscript_details', kwargs={'pk': manu.id})}
             topleftlist.append(buttonspecs)
-            lcity = "" if instance.manu.lcity == None else "{}, ".format(instance.manu.lcity.name)
-            lib = "" if instance.manu.library == None else "{}, ".format(instance.manu.library.name)
-            idno = "{}{}{}".format(lcity, lib, instance.manu.idno)
+            lcity = "" if manu.lcity == None else "{}, ".format(manu.lcity.name)
+            lib = "" if manu.library == None else "{}, ".format(manu.library.name)
+            idno = "{}{}{}".format(lcity, lib, manu.idno)
         else:
             idno = "(unknown)"
         context['topleftbuttons'] = topleftlist
@@ -5567,11 +5577,10 @@ class SermonEdit(BasicDetails):
         """Action to be performed after adding a new item"""
 
         ## Set the 'afternew' URL
-        #self.afternewurl = reverse('sermon_list')
-        if instance.manu and instance.order < 0:
+        manu = instance.get_manuscript()
+        if manu and instance.order < 0:
             # Calculate how many sermons there are
-            # sermon_count = instance.manu.manusermons.all().count()
-            sermon_count = instance.manu.get_sermon_count()
+            sermon_count = manu.get_sermon_count()
             # Make sure the new sermon gets changed
             form.instance.order = sermon_count
 
@@ -5645,9 +5654,6 @@ class SermonEdit(BasicDetails):
                         newsuper = cleaned['newsuper']
                         # Take the default linktype
                         linktype = "uns"
-                        ## There also must be a linktype
-                        #if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
-                        #    linktype = cleaned['newlinktype']
 
                         # Check existence
                         obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
@@ -5935,10 +5941,11 @@ class SermonListView(BasicList):
                           #<a href="{% url 'manuscript_details' sermon.manu.id %}" class="nostyle">
                           #  <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
                           #</a>
+            manu = instance.get_manuscript()
             html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
-                reverse('manuscript_details', kwargs={'pk': instance.msitem.manu.id}),
-                instance.msitem.manu.idno[:20]))
-            sTitle = instance.msitem.manu.idno
+                reverse('manuscript_details', kwargs={'pk': manu.id}),
+                manu.idno[:20]))
+            sTitle = manu.idno
         elif custom == "links":
             for gold in instance.goldsermons.all():
                 for link_def in gold.link_oview():
@@ -6293,11 +6300,12 @@ class UserKeywordListView(BasicList):
             sig = instance.sermo.get_eqsetsignatures_markdown("first")
             # Sermon identification
             url = reverse('sermon_details', kwargs = {'pk': instance.sermo.id})
-            value = "{}/{}".format(instance.sermo.order, instance.sermo.manu.get_sermon_count())
+            manu_obj = instance.sermo.get_manuscript()
+            value = "{}/{}".format(instance.sermo.order, manu_obj.get_sermon_count())
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
-            url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
-            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, instance.sermo.manu.idno)
+            url = reverse('manuscript_details', kwargs = {'pk': manu_obj.id})
+            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, manu_obj.idno)
             # Combine
             sBack = "{} {} {}".format(sermo, manu, sig)
         elif instance.type == "gold" and instance.gold: 
@@ -6432,6 +6440,7 @@ class TemplateEdit(BasicDetails):
     title = "TemplateEdit"
     rtype = "json"
     history_button = True
+    use_team_group = True
     mainitems = []
     
     def add_to_context(self, context, instance):
@@ -6440,13 +6449,18 @@ class TemplateEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",         'value': instance.name,             'field_key': "name"},
-            {'type': 'plain', 'label': "Location:",     'value': instance.get_location(),   'field_key': 'location'     },
-            {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
-            {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
+            {'type': 'line',  'label': "Description:",  'value': instance.description,      'field_key': 'description'},
+            {'type': 'plain', 'label': "Items:",        'value': instance.get_count()},
+            {'type': 'plain', 'label': "Owner:",        'value': instance.get_username()},
+            {'type': 'plain', 'label': "Manuscript:",   'value': instance.get_manuscript_link()}
             ]
 
         # Signal that we have select2
         context['has_select2'] = True
+
+        # Make sure 'authenticated' is adapted to only include EDITORS
+        if context['authenticated']:
+            if not context['is_app_editor'] and not user_is_superuser(self.request): context['permission'] = False
 
         # Return the context we have made
         return context
@@ -6474,6 +6488,24 @@ class TemplateEdit(BasicDetails):
 class TemplateDetails(TemplateEdit):
     """Like Template Edit, but then html output"""
     rtype = "html"
+
+    def before_save(self, form, instance):
+        bStatus = True
+        msg = ""
+        if instance == None or instance.id == None:
+            # See if we have the profile id
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.profile = profile
+            # See if we have the 'manubase' item
+            manubase = self.qd.get("manubase", None)
+            if manubase != None:
+                # Find out which manuscript this is
+                manu = Manuscript.objects.filter(id=manubase).first()
+                if manu != None:
+                    # Create a 'template-copy' of this manuscript
+                    manutemplate = manu.get_template_copy()
+                    instance.manu = manutemplate
+        return bStatus, msg
     
 
 class TemplateListView(BasicList):
@@ -6484,13 +6516,14 @@ class TemplateListView(BasicList):
     prefix = "tmpl"
     has_select2 = True
     new_button = False  # Templates are added in the Manuscript view; each template belongs to one manuscript
-    order_cols = ['profile__user__username', 'name', '', '']
+    use_team_group = True
+    order_cols = ['profile__user__username', 'name', '']
     order_default = order_cols
     order_heads = [
         {'name': 'Owner',       'order': 'o=1', 'type': 'str', 'custom': 'owner'},
         {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field': 'name', 'main': True, 'linkdetails': True},
-        {'name': 'Items',       'order': 'o=3', 'type': 'str', 'custom': 'items', 'linkdetails': True},
-        {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        {'name': 'Items',       'order': '',    'type': 'str', 'custom': 'items', 'linkdetails': True},
+        {'name': 'Manuscript',  'order': '',    'type': 'str', 'custom': 'manuscript'}
         ]
     filters = [
         ]
@@ -6502,13 +6535,22 @@ class TemplateListView(BasicList):
         sTitle = ""
         if custom == "owner":
             # find the owner
-            username = instance.profile.user.username
-            sBack = "<span class=''>{}</span>".format(username)
+            username = instance.get_username()
+            sBack = "<span class='template_owner'>{}</span>".format(username)
         elif custom == "items":
-            sBack = ""
-            if instance.location:
-                sBack = instance.location.name
+            # The number of sermons (items) part of this manuscript
+            sBack = "{}".format(instance.get_count())
+        elif custom == "manuscript":
+            url = reverse('manuscript_details', kwargs={'pk': instance.manu.id})
+            sBack = "<a href='{}' title='manuscript'><span class='glyphicon glyphicon-open'></span></a>".format(url)
         return sBack, sTitle
+
+    def add_to_context(self, context, initial):
+        # Make sure 'authenticated' is adapted to only include EDITORS
+        if context['authenticated']:
+            context['permission'] = context['is_app_editor'] or user_is_superuser(self.request)
+            # if not context['is_app_editor'] and not user_is_superuser(self.request): context['permission'] = False
+        return context
 
 
 class ProfileEdit(BasicDetails):
@@ -7351,6 +7393,8 @@ class ManuscriptEdit(BasicDetails):
         # Need to know who this user (profile) is
         profile = Profile.get_user_profile(self.request.user.username)
 
+        istemplate = (instance.mtype == "tem")
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
@@ -7365,19 +7409,23 @@ class ManuscriptEdit(BasicDetails):
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
             {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
             {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
-            {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
-            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-            {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
-                'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
-            {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
-                'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-            {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
-                'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
-            {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
-                'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}
             ]
+        if not istemplate:
+            mainitems_m2m = [
+                {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
+                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
+                    'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
+                {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
+                    'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
+                {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
+                    'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
+                {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
+                    'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+                ]
+            for item in mainitems_m2m: context['mainitems'].append(item)
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -7388,13 +7436,31 @@ class ManuscriptEdit(BasicDetails):
 
         if context['is_app_editor']:
             lhtml = []
-            lbuttons = [dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."), 
-                        dict(title="Open a list of locations", href=reverse('location_list'), label="Locations...")]
+            lbuttons = []
+            # Action depends on template/not
+            if not istemplate:
+                lbuttons.append(dict(title="Create template from this manuscript", 
+                             submit="create_new_template", label="Create template..."))
+            # Some buttons are needed anyway...
+            lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
+            lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
+
+            # Build the HTML on the basis of the above
             lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
             for item in lbuttons:
-                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' href='{}'>".format(item['title'], item['href']))
+                if 'submit' in item:
+                    ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                else:
+                    ref = " href='{}'".format(item['href'])
+                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {}>".format(item['title'], ref))
                 lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
             lhtml.append("</div></div>")
+
+            if not istemplate:
+                local_context = dict(manubase=instance.id)
+                lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+
+            # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
 
         # Return the context we have made
@@ -9252,8 +9318,8 @@ class EqualGoldDetails(EqualGoldEdit):
             # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
 
             # New: Get all the SermonDescr instances linked with equality to SSG:
-            # qs_s = SermonDescrEqual.objects.filter(super=instance, linktype=LINK_EQUAL).order_by('sermon__manu__idno', 'sermon__locus')
-            qs_s = SermonDescrEqual.objects.filter(super=instance).order_by('sermon__manu__idno', 'sermon__locus')
+            # But make sure the EXCLUDE those with `mtype` = `tem`
+            qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
             rel_list =[]
             method = "FourColumns"
             method = "Issue216"

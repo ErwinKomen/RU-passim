@@ -446,6 +446,7 @@ class BasicList(ListView):
     delete_line = False
     none_on_empty = False
     use_team_group = False
+    permission = True
     lst_typeaheads = []
     sort_order = ""
     qs = None
@@ -637,6 +638,8 @@ class BasicList(ListView):
         context['breadcrumbs'] = get_breadcrumbs(self.request, self.plural_name, True)
 
         context['usebasket'] = self.basketview
+
+        context['permission'] = self.permission
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)

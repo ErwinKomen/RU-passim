@@ -1494,3 +1494,13 @@ input:checked + .slider:before {
 .columnSelector:hover {
     border-right: 2px solid blue;
 }
+
+.template_notice {
+    width: 100%;
+    background-color: darkolivegreen;
+    color: white;
+}
+.template_notice:hover {
+    background-color: darkslateblue;
+    color: yellow;
+}
