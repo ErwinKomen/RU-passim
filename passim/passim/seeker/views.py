@@ -5465,6 +5465,13 @@ class SermonEdit(BasicDetails):
                         'SermonSignature', 'siglist',
                         #'CollectionSerm', 'collist_s',
                         'SermonDescrEqual', 'superlist']
+
+    def custom_init(self, instance):
+        istemplate = (instance.mtype == "tem")
+        if istemplate:
+            # Need a smaller array of formset objects
+            self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
+        return None
            
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -5478,22 +5485,22 @@ class SermonEdit(BasicDetails):
         # manu_id = None if instance == None or instance.manu == None else instance.manu.id
         manu_id = None if instance == None else instance.get_manuscript().id
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light,'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
             {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
             {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
-            {'type': 'safe',  'label': "Lectio:",                'value': instance.get_quote_markdown,'field_key': 'quote'}, 
+            {'type': 'safe',  'label': "Lectio:",               'value': instance.get_quote_markdown(),'field_key': 'quote'}, 
             {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
             # Issue #237, delete subtitle
             {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle', 
              'editonly': True, 'title': 'The subtitle field is legacy. It is edit-only, non-viewable'},
-            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
+            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown(), 
              'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
+            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown(),
              'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
-            {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown,
+            {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown(),
              'field_key': 'postscriptum'}, 
             # Issue #23: delete bibliographic notes
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
@@ -5504,6 +5511,10 @@ class SermonEdit(BasicDetails):
              'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
             ]
+        #if istemplate:
+        #    # Remove some of the formset_objects
+        #    self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
+        #else:
         if not istemplate:
             mainitems_m2m = [
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
@@ -5593,80 +5604,85 @@ class SermonEdit(BasicDetails):
         bAllowNewSignatureManually = False
         errors = []
         bResult = True
-        instance = formset.instance
-        for form in formset:
-            if form.is_valid():
-                cleaned = form.cleaned_data
-                # Action depends on prefix
-                if prefix == "sdsign" and bAllowNewSignatureManually:
-                    # Signature processing
-                    # NOTE: this should never be reached, because we do not allow adding *new* signatures manually here
-                    editype = ""
-                    code = ""
-                    if 'newgr' in cleaned and cleaned['newgr'] != "":
-                        # Add gryson
-                        editype = "gr"
-                        code = cleaned['newgr']
-                    elif 'newcl' in cleaned and cleaned['newcl'] != "":
-                        # Add gryson
-                        editype = "cl"
-                        code = cleaned['newcl']
-                    elif 'newot' in cleaned and cleaned['newot'] != "":
-                        # Add gryson
-                        editype = "ot"
-                        code = cleaned['newot']
-                    if editype != "":
-                        # Find this item in the Gold Signatures
-                        gsig = Signature.objects.filter(editype=editype, code=code).first()
-                        if gsig != None:
-                            form.instance.gsig = gsig
-                        # Set the correct parameters
-                        form.instance.code = code
-                        form.instance.editype = editype
-                        # Note: it will get saved with formset.save()
-                elif prefix == "sdkw":
-                    # Keyword processing
-                    if 'newkw' in cleaned and cleaned['newkw'] != "":
-                        newkw = cleaned['newkw']
-                        # Is the KW already existing?
-                        obj = Keyword.objects.filter(name=newkw).first()
-                        if obj == None:
-                            obj = Keyword.objects.create(name=newkw)
-                        # Make sure we set the keyword
-                        form.instance.keyword = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "sdcol":
-                    # Collection processing
-                    if 'newcol' in cleaned and cleaned['newcol'] != "":
-                        newcol = cleaned['newcol']
-                        # Is the COL already existing?
-                        obj = Collection.objects.filter(name=newcol).first()
-                        if obj == None:
-                            # TODO: add profile here
-                            profile = Profile.get_user_profile(request.user.username)
-                            obj = Collection.objects.create(name=newcol, type='sermo', owner=profile)
-                        # Make sure we set the keyword
-                        form.instance.collection = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "stossg":
-                    # SermonDescr-To-EqualGold processing
-                    if 'newsuper' in cleaned and cleaned['newsuper'] != "":
-                        newsuper = cleaned['newsuper']
-                        # Take the default linktype
-                        linktype = "uns"
+        oErr = ErrHandle()
+        try:
+            instance = formset.instance
+            for form in formset:
+                if form.is_valid():
+                    cleaned = form.cleaned_data
+                    # Action depends on prefix
+                    if prefix == "sdsign" and bAllowNewSignatureManually:
+                        # Signature processing
+                        # NOTE: this should never be reached, because we do not allow adding *new* signatures manually here
+                        editype = ""
+                        code = ""
+                        if 'newgr' in cleaned and cleaned['newgr'] != "":
+                            # Add gryson
+                            editype = "gr"
+                            code = cleaned['newgr']
+                        elif 'newcl' in cleaned and cleaned['newcl'] != "":
+                            # Add gryson
+                            editype = "cl"
+                            code = cleaned['newcl']
+                        elif 'newot' in cleaned and cleaned['newot'] != "":
+                            # Add gryson
+                            editype = "ot"
+                            code = cleaned['newot']
+                        if editype != "":
+                            # Find this item in the Gold Signatures
+                            gsig = Signature.objects.filter(editype=editype, code=code).first()
+                            if gsig != None:
+                                form.instance.gsig = gsig
+                            # Set the correct parameters
+                            form.instance.code = code
+                            form.instance.editype = editype
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "sdkw":
+                        # Keyword processing
+                        if 'newkw' in cleaned and cleaned['newkw'] != "":
+                            newkw = cleaned['newkw']
+                            # Is the KW already existing?
+                            obj = Keyword.objects.filter(name=newkw).first()
+                            if obj == None:
+                                obj = Keyword.objects.create(name=newkw)
+                            # Make sure we set the keyword
+                            form.instance.keyword = obj
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "sdcol":
+                        # Collection processing
+                        if 'newcol' in cleaned and cleaned['newcol'] != "":
+                            newcol = cleaned['newcol']
+                            # Is the COL already existing?
+                            obj = Collection.objects.filter(name=newcol).first()
+                            if obj == None:
+                                # TODO: add profile here
+                                profile = Profile.get_user_profile(request.user.username)
+                                obj = Collection.objects.create(name=newcol, type='sermo', owner=profile)
+                            # Make sure we set the keyword
+                            form.instance.collection = obj
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "stossg":
+                        # SermonDescr-To-EqualGold processing
+                        if 'newsuper' in cleaned and cleaned['newsuper'] != "":
+                            newsuper = cleaned['newsuper']
+                            # Take the default linktype
+                            linktype = "uns"
 
-                        # Check existence
-                        obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
-                        if obj == None:
-                            super = EqualGold.objects.filter(id=newsuper).first()
-                            if super != None:
-                                # Set the right parameters for creation later on
-                                form.instance.linktype = linktype
-                                form.instance.super = super
-                    # Note: it will get saved with form.save()
-            else:
-                errors.append(form.errors)
-                bResult = False
+                            # Check existence
+                            obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
+                            if obj == None:
+                                super = EqualGold.objects.filter(id=newsuper).first()
+                                if super != None:
+                                    # Set the right parameters for creation later on
+                                    form.instance.linktype = linktype
+                                    form.instance.super = super
+                        # Note: it will get saved with form.save()
+                else:
+                    errors.append(form.errors)
+                    bResult = False
+        except:
+            msg = oErr.get_error_message()
+            iStop = 1
         return None
 
     def before_save(self, form, instance):
@@ -5777,6 +5793,11 @@ class SermonDetails(SermonEdit):
             msitem = MsItem.objects.create(manu=manu)
             # Now make sure to set the link from Manuscript to MsItem
             instance.msitem = msitem
+
+            # If possible, also get the mtype
+            mtype = self.qd.get("sermo-mtype", None)
+            if mtype != None:
+                instance.mtype = mtype
 
         # Double check for the presence of manu and order
         if instance.msitem and instance.msitem.order < 0:

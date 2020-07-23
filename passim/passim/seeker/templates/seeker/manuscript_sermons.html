@@ -23,6 +23,7 @@
       <form id="create_new_sermon" action="{% url 'sermon_details' %}" method="post" >
         {% csrf_token %}
         <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
+        <input type="text" name="sermo-mtype" value="{{manuForm.instance.mtype}}" />
       </form>
     </div>
 
