@@ -5499,7 +5499,7 @@ class SermonDescr(models.Model):
 
         # Visit all linked SSG items
         #    but make sure to exclude the template sermons
-        for linked in SermonDescrEqual.objects.filter(sermon=self).exclude(mtype="tem"):
+        for linked in SermonDescrEqual.objects.filter(sermon=self).exclude(sermon__mtype="tem"):
             # Add this SSG
             ssg_list.append(linked.super.id)
 

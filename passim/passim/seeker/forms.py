@@ -987,7 +987,7 @@ class SermonForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu',
+        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',
                   'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1025,6 +1025,7 @@ class SermonForm(PassimModelForm):
             init_choices(self, 'autype', CERTAINTY_TYPE, bUseAbbr=True)
             self.fields['manu'].required = False
             self.fields['stype'].required = False
+            self.fields['mtype'].required = False
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -1065,6 +1066,9 @@ class SermonForm(PassimModelForm):
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "sermo"
             self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+
+            # For searching/listing
+            self.fields['mtype'].initial = "man"
 
             # Get the instance
             if 'instance' in kwargs:

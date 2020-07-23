@@ -5467,10 +5467,11 @@ class SermonEdit(BasicDetails):
                         'SermonDescrEqual', 'superlist']
 
     def custom_init(self, instance):
-        istemplate = (instance.mtype == "tem")
-        if istemplate:
-            # Need a smaller array of formset objects
-            self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
+        if instance:
+            istemplate = (instance.mtype == "tem")
+            if istemplate:
+                # Need a smaller array of formset objects
+                self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
         return None
            
     def add_to_context(self, context, instance):
