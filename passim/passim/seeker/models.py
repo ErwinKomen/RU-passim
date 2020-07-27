@@ -2853,7 +2853,7 @@ class Manuscript(models.Model):
             city = "-"
         return city
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group):
 
         lHtml = []
         # Visit all collections that I have access to
@@ -2994,13 +2994,20 @@ class Manuscript(models.Model):
 
     def get_stype_light(self):
         sBack = get_stype_light(self.stype)
-        # Check if I am a template
-        if self.mtype == "tem":
-            # add a clear TEMPLATE indicator
-            sBack = "{}<div class='template_notice'>THIS IS A TEMPLATE</div>".format(sBack)
         return sBack
 
-    def get_template_copy(self):
+    def get_template_link(self, profile):
+        sBack = ""
+        # Check if I am a template
+        if self.mtype == "tem":
+            # add a clear TEMPLATE indicator with a link to the actual template
+            template = Template.objects.filter(manu=self, profile=profile).first()
+            if template:
+                url = reverse('template_details', kwargs={'pk': template.id})
+                sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
+        return sBack
+
+    def get_template_copy(self, mtype = "tem"):
         """Create a 'template' copy of myself"""
 
         repair = ['parent', 'firstchild', 'next']
@@ -3009,7 +3016,7 @@ class Manuscript(models.Model):
         obj = self
         manu_id = self.id
         obj.pk = None
-        obj.mtype = "tem"   # Change the type
+        obj.mtype = mtype   # Change the type
         obj.stype = "imp"   # Imported
         obj.save()
         manu_src = Manuscript.objects.filter(id=manu_id).first()
@@ -3047,7 +3054,7 @@ class Manuscript(models.Model):
                     sermon_dst = sermon_src
                     sermon_dst.pk = None
                     sermon_dst.msitem = dst
-                    sermon_dst.mtype = "tem"   # Change the type
+                    sermon_dst.mtype = mtype   # Change the type
                     sermon_dst.stype = "imp"   # Imported
                     sermon_dst.save()
         # Walk the msitems again, and make sure SSG-links are copied!!
@@ -3942,7 +3949,7 @@ class EqualGold(models.Model):
         org.save()
         return org
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group):
 
         lHtml = []
         # Visit all collections that I have access to
@@ -4415,7 +4422,7 @@ class SermonGold(models.Model):
         """Get the contents of the bibliography field using markdown"""
         return adapt_markdown(self.bibliography, False)
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group):
         lHtml = []
         # Visit all collections
         # Visit all collections that I have access to
@@ -5801,10 +5808,17 @@ class SermonDescr(models.Model):
 
     def get_stype_light(self):
         sBack = get_stype_light(self.stype)
+        return sBack
+
+    def get_template_link(self, profile):
+        sBack = ""
         # Check if I am a template
         if self.mtype == "tem":
-            # add a clear TEMPLATE indicator
-            sBack = "{}<div class='template_notice'>THIS IS A TEMPLATE</div>".format(sBack)
+            # add a clear TEMPLATE indicator with a link to the actual template
+            template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            if template:
+                url = reverse('template_details', kwargs={'pk': template.id})
+                sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
         return sBack
 
     def goldauthors(self):
@@ -6479,7 +6493,14 @@ class Template(models.Model):
         """Return a piece of HTML with the manuscript link for the user"""
 
         sBack = ""
+        html = []
         if self.manu:
+            # Navigation to a manuscript template
             url = reverse('manuscript_details', kwargs={'pk': self.manu.id})
-            sBack = "<a href='{}' title='Go to the manuscript template'><span class='glyphicon glyphicon-open'></span><span class='badge signature'>Manuscript</span></a>".format(url)
+            html.append("<a href='{}' title='Go to the manuscript template'><span class='badge signature ot'>Open the Manuscript</span></a>".format(url))
+            # Creation of a new manuscript based on this template:
+            url = reverse('template_apply', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Go to the manuscript template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
+            # Combine response
+            sBack = "\n".join(html)
         return sBack

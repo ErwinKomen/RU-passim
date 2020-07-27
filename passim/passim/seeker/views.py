@@ -5485,7 +5485,14 @@ class SermonEdit(BasicDetails):
         # Define the main items to show and edit
         # manu_id = None if instance == None or instance.manu == None else instance.manu.id
         manu_id = None if instance == None else instance.get_manuscript().id
-        context['mainitems'] = [
+        context['mainitems'] = []
+        # Possibly add the Template identifier
+        if istemplate:
+            context['mainitems'].append(
+                {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
+                )
+        # Get the main items
+        mainitems_main = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
@@ -5512,6 +5519,7 @@ class SermonEdit(BasicDetails):
              'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
             ]
+        for item in mainitems_main: context['mainitems'].append(item)
         #if istemplate:
         #    # Remove some of the formset_objects
         #    self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
@@ -6533,6 +6541,19 @@ class TemplateDetails(TemplateEdit):
         return bStatus, msg
     
 
+class TemplateApply(TemplateDetails):
+    """Create a new manuscript that is based on this template"""
+
+    def custom_init(self, instance):
+        # Get the manuscript
+        manu_template = instance.manu
+        # Create a new manuscript that is based on this one
+        manu_new = manu_template.get_template_copy("man")
+        # Re-direct to this manuscript
+        self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_new.id})
+        return None
+
+
 class TemplateListView(BasicList):
     """Search and list templates"""
 
@@ -6566,8 +6587,8 @@ class TemplateListView(BasicList):
             # The number of sermons (items) part of this manuscript
             sBack = "{}".format(instance.get_count())
         elif custom == "manuscript":
-            url = reverse('manuscript_details', kwargs={'pk': instance.manu.id})
-            sBack = "<a href='{}' title='manuscript'><span class='glyphicon glyphicon-open'></span></a>".format(url)
+            url = reverse('template_apply', kwargs={'pk': instance.id})
+            sBack = "<a href='{}' title='Create a new manuscript based on this template'><span class='glyphicon glyphicon-open'></span></a>".format(url)
         return sBack, sTitle
 
     def add_to_context(self, context, initial):
@@ -7421,7 +7442,14 @@ class ManuscriptEdit(BasicDetails):
         istemplate = (instance.mtype == "tem")
 
         # Define the main items to show and edit
-        context['mainitems'] = [
+        context['mainitems'] = []
+        # Possibly add the Template identifier
+        if istemplate:
+            context['mainitems'].append(
+                {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
+                )
+        # Get the main items
+        mainitems_main = [
             {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
             {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
             {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity'},
@@ -7436,12 +7464,15 @@ class ManuscriptEdit(BasicDetails):
             {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
             {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}
             ]
+        for item in mainitems_main: context['mainitems'].append(item)
         if not istemplate:
+            username = profile.user.username
+            team_group = app_editor
             mainitems_m2m = [
                 {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(), 
+                {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(username, team_group), 
                     'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                 {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                     'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
@@ -8738,6 +8769,8 @@ class SermonGoldEdit(BasicDetails):
 
         # Need to know who this user (profile) is
         profile = Profile.get_user_profile(self.request.user.username)
+        username = profile.user.username
+        team_group = app_editor
 
         # Define the main items to show and edit
         context['mainitems'] = [
@@ -8760,7 +8793,7 @@ class SermonGoldEdit(BasicDetails):
              'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
-            {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(), 
+            {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(username, team_group), 
              'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
             {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
              'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
@@ -9088,6 +9121,8 @@ class EqualGoldEdit(BasicDetails):
 
         # Need to know who this user (profile) is
         profile = Profile.get_user_profile(self.request.user.username)
+        username = profile.user.username
+        team_group = app_editor
 
         # Define the main items to show and edit
         context['mainitems'] = [
@@ -9108,7 +9143,7 @@ class EqualGoldEdit(BasicDetails):
              'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
             {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
             {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-            {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(), 
+            {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(username, team_group), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
             {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
                 'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
@@ -9336,6 +9371,9 @@ class EqualGoldDetails(EqualGoldEdit):
             # Lists of related objects
             related_objects = []
 
+            username = self.request.user.username
+            team_group = app_editor
+
             # List of manuscripts related to the SSG via sermon descriptions
             manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
 
@@ -9391,7 +9429,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
 
                     # Collection(s)
-                    coll_info = item.get_collections_markdown()
+                    coll_info = item.get_collections_markdown(username, team_group)
                     rel_item.append({'value': coll_info, 'initial': 'small'})
 
                     # Location number and link to the correct point in the manuscript details view...
