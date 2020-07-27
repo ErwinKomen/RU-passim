@@ -5517,6 +5517,8 @@ class SermonEdit(BasicDetails):
         #    self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
         #else:
         if not istemplate:
+            username = profile.user.username
+            team_group = app_editor
             mainitems_m2m = [
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                  # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
@@ -5530,7 +5532,7 @@ class SermonEdit(BasicDetails):
                 {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
                  'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
                  'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
-                {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(), 
+                {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(username, team_group), 
                  'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
                 {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
                  'title': "Editions of the Sermons Gold that are part of the same equality set"},
@@ -5836,7 +5838,6 @@ class SermonListView(BasicList):
     basketview = False
     plural_name = "Sermons"
     basic_name = "sermon"
-    has_select2 = True
     use_team_group = True
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
@@ -5920,6 +5921,8 @@ class SermonListView(BasicList):
                 # Success
                 Information.set_kvalue("nicknames", "done")
 
+        # Make sure to set a basic filter
+        self.basic_filter = Q(mtype="man")
         return None
 
     def add_to_context(self, context, initial):

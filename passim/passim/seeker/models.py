@@ -2856,7 +2856,9 @@ class Manuscript(models.Model):
     def get_collections_markdown(self):
 
         lHtml = []
-        for obj in self.collections.all().order_by('name'):
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('manu', username, team_group).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), obj.id)
             lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
         sBack = ", ".join(lHtml)
@@ -3943,7 +3945,9 @@ class EqualGold(models.Model):
     def get_collections_markdown(self):
 
         lHtml = []
-        for obj in self.collections.all().order_by('name'):
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('super', username, team_group).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
             lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
         sBack = ", ".join(lHtml)
@@ -4414,7 +4418,9 @@ class SermonGold(models.Model):
     def get_collections_markdown(self):
         lHtml = []
         # Visit all collections
-        for col in self.collections.all().order_by('name'):
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('gold', username, team_group).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             # Determine where clicking should lead to
             url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
             # Create a display for this topic
@@ -5479,10 +5485,11 @@ class SermonDescr(models.Model):
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
         return sBack
     
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group):
         lHtml = []
-        # Visit all collections
-        for col in self.collections.all().order_by('name'):
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             # Determine where clicking should lead to
             url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
             # Create a display for this topic

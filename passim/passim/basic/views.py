@@ -432,6 +432,7 @@ class BasicList(ListView):
     basic_edit = ""
     basic_details = ""
     basic_add = ""
+    basic_filter = None
     add_text = "Add a new"
     prefix = ""
     order_default = []
@@ -820,7 +821,10 @@ class BasicList(ListView):
         else:
             # No filter and no basked: show all
             self.basketview = False
-            qs = self.model.objects.all().distinct()
+            if self.basic_filter:
+                qs = self.model.objects.filter(self.basic_filter).distinct()
+            else:
+                qs = self.model.objects.all().distinct()
             order = self.order_default
             qs, tmp_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         self.sort_order = colnum
