@@ -38,6 +38,7 @@ PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
 COLLECTION_TYPE = "seeker.coltype" 
+SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
@@ -5124,6 +5125,8 @@ class Collection(models.Model):
     # [1] Each "Collection" has only 1 type    
     type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
                             max_length=5)
+    # [1] Each "collection" has a settype: pd (personal dataset) versus hc (historical collection)
+    settype = models.CharField("Set type", choices=build_abbr_list(SET_TYPE), max_length=5, default="pd")
     # [0-1] Each collection can have one description
     descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] Link to a description or bibliography (url) 
@@ -5205,7 +5208,7 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_scoped_queryset(type, username, team_group):
+    def get_scoped_queryset(type, username, team_group, settype="pd"):
         """Get a filtered queryset, depending on type and username"""
 
         # Initialisations
@@ -5216,14 +5219,14 @@ class Collection(models.Model):
             if username and team_group and username != "" and team_group != "":
                 # First filter on owner
                 owner = Profile.get_user_profile(username)
-                filter = Q(owner=owner)
+                filter = Q(owner=owner) & Q(settype=settype)
                 # Now check for permissions
                 is_team = (owner.user.groups.filter(name=team_group).first() != None)
                 # Adapt the filter accordingly
                 if is_team:
                     # User is part of the team: may not see 'private' from others
                     if type:
-                        filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
+                        filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) & Q(settype=settype) )
                     else:
                         filter = ( filter ) | ( Q(scope__in=non_private)  )
                 else:
@@ -5233,7 +5236,7 @@ class Collection(models.Model):
                     else:
                         filter = ( filter ) | ( Q(scope="publ")  )
             else:
-                filter = Q(type=type)
+                filter = Q(type=type) & Q(settype=settype)
             # Apply the filter
             qs = Collection.objects.filter(filter)
         except:
@@ -6500,7 +6503,7 @@ class Template(models.Model):
             html.append("<a href='{}' title='Go to the manuscript template'><span class='badge signature ot'>Open the Manuscript</span></a>".format(url))
             # Creation of a new manuscript based on this template:
             url = reverse('template_apply', kwargs={'pk': self.id})
-            html.append("<a href='{}' title='Go to the manuscript template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
+            html.append("<a href='{}' title='Create a manuscript based on this template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
             # Combine response
             sBack = "\n".join(html)
         return sBack

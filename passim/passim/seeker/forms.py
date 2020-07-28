@@ -1302,7 +1302,7 @@ class CollectionForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Collection
-        fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type', 'scope']
+        fields = ['name', 'owner', 'descrip', 'readonly', 'url', 'type', 'scope', 'settype']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}), 
                  'owner':       forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'descrip':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
@@ -1324,6 +1324,7 @@ class CollectionForm(PassimModelForm):
         self.fields['descrip'].required = False
         self.fields['readonly'].required = False
         self.fields['type'].required = False
+        self.fields['settype'].required = False
         self.fields['scope'].required = False
         self.fields['url'].required = False
         self.fields['collone'].required = False
@@ -1341,6 +1342,21 @@ class CollectionForm(PassimModelForm):
         if prefix == "any":
             self.fields['collist'].queryset = Collection.objects.all().order_by('name')
             self.fields['collone'].queryset = Collection.objects.all().order_by('name')
+
+        elif prefix == "hist":
+            # Historical collections
+            type = "super"
+            settype = "hc"
+            self.fields['collist'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+            self.fields['collone'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+            # Set the initial type
+            self.fields['type'].initial = type
+            self.initial['type'] = type
+            # Obligatory values for the querysets of m/s/sg/ssg
+            self.fields['collist_m'].queryset = Collection.objects.none()
+            self.fields['collist_s'].queryset = Collection.objects.none()
+            self.fields['collist_sg'].queryset = Collection.objects.none()
+            self.fields['collist_ssg'].queryset = Collection.objects.none()
         else:
             type = prefix.split("-")[0]
             # self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')

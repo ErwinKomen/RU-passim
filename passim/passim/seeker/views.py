@@ -6475,7 +6475,9 @@ class TemplateEdit(BasicDetails):
     history_button = True
     use_team_group = True
     mainitems = []
-    
+
+    stype_edi_fields = ['name', 'description']
+        
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -6777,6 +6779,7 @@ class CollAnyEdit(BasicDetails):
     prefix = "any"
     basic_name_prefix = "coll"
     rtype = "json"
+    settype = "pd"
     title = "Any collection"
     history_button = True
     mainitems = []
@@ -6784,17 +6787,33 @@ class CollAnyEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        prefix_scope = ['any', 'manu', 'sermo', 'gold', 'super']
+        prefix_type = ['any', 'manu', 'sermo', 'gold', 'super', 'priv', 'publ']
+        prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-            {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
-            {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-            {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
-            {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
-            {'type': 'plain', 'label': "Created:",     'value': instance.get_created},
-            {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown}
-            ]
+            {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}]
+
+        # Optionally add Scope
+        if self.prefix in prefix_scope:
+            context['mainitem'].append(
+            {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
+
+        # Optionally add Type
+        context['mainitem'].append(
+            {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
+
+        # Optionally add Readonly
+        if self.prefix in prefix_readonly:
+            context['mainitem'].append(
+            {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
+
+        # Always add Created and Size
+        context['mainitem'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
+        context['mainitem'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
@@ -6843,6 +6862,22 @@ class CollAnyEdit(BasicDetails):
         return passim_get_history(instance)
 
 
+class CollPrivEdit(CollAnyEdit):
+    prefix = "priv"
+    title = "My Dataset"
+
+
+class CollPublEdit(CollAnyEdit):
+    prefix = "publ"
+    title = "Public Dataset"
+
+
+class CollHistEdit(CollAnyEdit):
+    prefix = "super"
+    settype = "hc"
+    title = "Historical collection"
+
+
 class CollManuEdit(CollAnyEdit):
     """Manu: Manuscript collections"""
 
@@ -6873,6 +6908,21 @@ class CollSuperEdit(CollAnyEdit):
 
 class CollAnyDetails(CollAnyEdit):
     """Like CollAnyEdit, but then with html"""
+    rtype = "html"
+
+
+class CollPrivDetails(CollHistEdit):
+    """Like CollPrivEdit, but then with html"""
+    rtype = "html"
+
+
+class CollPublDetails(CollHistEdit):
+    """Like CollPublEdit, but then with html"""
+    rtype = "html"
+
+
+class CollHistDetails(CollHistEdit):
+    """Like CollHistEdit, but then with html"""
     rtype = "html"
 
 
@@ -6980,6 +7030,7 @@ class CollectionListView(BasicList):
     bUseFilter = True
     has_select2 = True
     basic_name_prefix = "coll"
+    settype = "pd"              # Personal Dataset versus Historical Collection
     use_team_group = True
     plural_name = ""
     order_cols = ['scope', 'name', 'created', 'owner__user__username', '']
@@ -6998,6 +7049,7 @@ class CollectionListView(BasicList):
             {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
         {'section': 'other', 'filterlist': [
             {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
+            {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
             {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
         ]
 
@@ -7027,38 +7079,123 @@ class CollectionListView(BasicList):
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Scope',       'order': 'o=2', 'type': 'str', 'custom': 'scope'},
-                {'name': 'Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Dataset',     'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
                 {'name': 'Owner',       'order': 'o=5', 'type': 'str', 'custom': 'owner'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
+        elif self.prefix == "priv":
+            self.new_button = False
+            self.plural_name = "My Datasets"
+            self.sg_name = "My Dataset"  
+            self.order_cols = ['type', 'name', 'created', '']
+            self.order_default = self.order_cols
+            self.order_heads  = [
+                {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
+                {'name': 'Dataset',     'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
+                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+            ]  
+            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+                    {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+                ]
+        elif self.prefix == "publ":
+            self.new_button = False
+            self.plural_name = "Public Datasets"
+            self.sg_name = "Public Dataset"  
+            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '']
+            self.order_default = self.order_cols
+            self.order_heads  = [
+                {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
+                {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',     'order': 'o=3', 'type': 'str', 'custom': 'created'},
+                {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
+                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+            ]  
+            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'},
+                    {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' }]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+                ]
+        elif self.prefix == "hist":
+            self.new_button = False
+            self.settype = "hc"
+            self.plural_name = "Historical Collections"
+            self.sg_name = "Historical Collection"  
+            self.order_cols = ['name', 'created', '']
+            self.order_default = self.order_cols
+            self.order_heads  = [
+                {'name': 'Historical Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
+                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+            ]  
         return None
+
+    def get_own_list(self):
+        # Get the user
+        username = self.request.user.username
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        qs = Profile.objects.filter(user=user)
+        return qs
 
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        # Check if the collist is identified
-        if fields['ownlist'] == None or len(fields['ownlist']) == 0:
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Get to the profile of this user
-            qs = Profile.objects.filter(user=user)
-            profile = qs[0]
-            fields['ownlist'] = qs
+        if self.prefix == "hist":
+            # The settype should be specified
+            fields['settype'] = "hc"
+            # The collection type is 'super'
+            fields['type'] = "super"
+        elif self.prefix == "priv":
+            # Show only private datasets
+            fields['settype'] = "pd"
+            qAlternative = Q(scope="priv")
+            fields['ownlist'] = self.get_own_list()
+            fields['scope'] = "priv"
+        elif self.prefix == "publ":
+            # Show only public datasets
+            fields['settype'] = "pd"
+            qAlternative = Q(scope="publ")
+            fields['scope'] = "publ"
+        else:
+            # Check if the collist is identified
+            if fields['ownlist'] == None or len(fields['ownlist']) == 0:
+                # Get the user
+                #username = self.request.user.username
+                #user = User.objects.filter(username=username).first()
+                ## Get to the profile of this user
+                #qs = Profile.objects.filter(user=user)
+                #profile = qs[0]
+                #fields['ownlist'] = qs
+                fields['ownlist'] = self.get_own_list()
 
-            # Check on what kind of user I am
-            if user_is_ingroup(self.request, app_editor):
-                # This is an editor: may see collections in the team
-                qAlternative = Q(scope="team") | Q(scope="publ")
-            else:
-                # Common user: may only see those with public scope
-                # fields['scope'] = "publ"
-                qAlternative = Q(scope="publ")
+                # Check on what kind of user I am
+                if user_is_ingroup(self.request, app_editor):
+                    # This is an editor: may see collections in the team
+                    qAlternative = Q(scope="team") | Q(scope="publ")
+                else:
+                    # Common user: may only see those with public scope
+                    # fields['scope'] = "publ"
+                    qAlternative = Q(scope="publ")
 
-        # Also make sure that we add the collection type, which is specified in "prefix"
-        if self.prefix != "any":
-            fields['type'] = self.prefix
+            # Also make sure that we add the collection type, which is specified in "prefix"
+            if self.prefix != "any":
+                fields['type'] = self.prefix
+            # The settype should be specified
+            fields['settype'] = "pd"
         return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):
