@@ -1773,6 +1773,7 @@ class SuperSermonGoldForm(PassimModelForm):
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg  = ModelMultipleChoiceField(queryset=None, required=False)
     collist_ssg = ModelMultipleChoiceField(queryset=None, required=False)
+    collist_hist = ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_s = forms.CharField(label=_("Collection s"), required=False,
@@ -1831,6 +1832,9 @@ class SuperSermonGoldForm(PassimModelForm):
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
+                        'settype': 'hc',
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
@@ -1844,6 +1848,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
@@ -1855,7 +1860,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 # If there is an instance, then check the author specification
                 sAuthor = "" if not instance.author else instance.author.name
                 self.fields['authorname'].initial = sAuthor
-                self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
+                self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(settype="pd").order_by('name')]
+                self.fields['collist_hist'].initial = [x.pk for x in instance.collections.filter(settype="hc").order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]

@@ -5540,8 +5540,12 @@ class SermonEdit(BasicDetails):
                 {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
                  'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
                  'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
-                {'type': 'plain',   'label': "Collections:",        'value': instance.get_collections_markdown(username, team_group), 
+                {'type': 'plain',   'label': "Personal datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                  'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
+                {'type': 'plain',   'label': "Public datasets (link):",  'value': instance.get_collection_link("pd"), 
+                 'title': "Public datasets in which a Super Sermon gold is that is linked to this sermon"},
+                {'type': 'plain',   'label': "Historical collections (link):",  'value': instance.get_collection_link("hc"), 
+                 'title': "Historical collections in which a Super Sermon gold is that is linked to this sermon"},
                 {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
                  'title': "Editions of the Sermons Gold that are part of the same equality set"},
                 {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
@@ -5847,6 +5851,7 @@ class SermonListView(BasicList):
     plural_name = "Sermons"
     basic_name = "sermon"
     use_team_group = True
+    has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
     order_default = order_cols
@@ -7706,7 +7711,7 @@ class ManuscriptEdit(BasicDetails):
                 {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                {'type': 'plain', 'label': "Collections:",  'value': instance.get_collections_markdown(username, team_group), 
+                {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                     'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                 {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                     'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
@@ -9027,7 +9032,7 @@ class SermonGoldEdit(BasicDetails):
              'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
             {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
              'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
-            {'type': 'plain', 'label': "Collections:",          'value': instance.get_collections_markdown(username, team_group), 
+            {'type': 'plain', 'label': "Personal datasets:",    'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
              'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
             {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
              'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
@@ -9377,8 +9382,10 @@ class EqualGoldEdit(BasicDetails):
              'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
             {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
             {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-            {'type': 'line',  'label': "Collections:",   'value': instance.get_collections_markdown(username, team_group), 
+            {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+            {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
             {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
                 'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
             {'type': 'line',    'label': "Links:",  'title': "Super Sermon gold links:",  'value': instance.get_superlinks_markdown(), 
@@ -9438,6 +9445,7 @@ class EqualGoldEdit(BasicDetails):
                 cleaned = form.cleaned_data
                 # Action depends on prefix
                 
+                # Note: eqgcol can be either settype 'pd' or 'hc'
                 if prefix == "eqgcol":
                     # Keyword processing
                     if 'newcol' in cleaned and cleaned['newcol'] != "":
@@ -9500,8 +9508,10 @@ class EqualGoldEdit(BasicDetails):
         
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
-            # (1) 'collections'
-            collist_ssg = form.cleaned_data['collist_ssg']
+            # (1) 'Personal Datasets' and 'Historical Collections'
+            collist_ssg_id = form.cleaned_data['collist_ssg'].values('id') 
+            collist_hist_id = form.cleaned_data['collist_hist'].values('id')
+            collist_ssg = Collection.objects.filter(Q(id__in=collist_ssg_id) | Q(id__in=collist_hist_id))
             adapt_m2m(CollectionSuper, instance, "super", collist_ssg, "collection")
 
             # (2) links from one SSG to another SSG
