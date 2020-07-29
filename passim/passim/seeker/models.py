@@ -2860,8 +2860,8 @@ class Manuscript(models.Model):
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('manu', username, team_group).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), obj.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
 
@@ -3956,8 +3956,8 @@ class EqualGold(models.Model):
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('super', username, team_group).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
 
@@ -5166,6 +5166,15 @@ class Collection(models.Model):
         """Frequency in Manuscripts"""
         freq = self.collections_super.all().count()
         return freq
+
+    def get_elevate(self):
+        html = []
+        url = reverse("collhist_elevate", kwargs={'pk': self.id})
+        html.append("<a class='btn btn-xs jumbo-1' href='{}'>Elevate".format(url))
+        html.append("<span class='glyphicon glyphicon-share-alt'></span></a>")
+        html.append("<span>Turn this dataset into a historical collection</span>")
+        sBack = "\n".join(html)
+        return sBack
 
     def get_label(self):
         """Return an appropriate name or label"""

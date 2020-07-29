@@ -1058,7 +1058,8 @@ class BasicDetails(DetailView):
         context['no_delete'] = self.no_delete
 
         if context['authenticated'] and self.permission != "readonly":
-            self.permission = "read"
+            if self.permission != "write":
+                self.permission = "read"
             if context['is_app_editor']:
                 self.permission = "write"
         context['permission'] = self.permission

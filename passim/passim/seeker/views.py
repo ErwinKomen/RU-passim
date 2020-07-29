@@ -6787,9 +6787,10 @@ class CollAnyEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        prefix_scope = ['any', 'manu', 'sermo', 'gold', 'super']
+        prefix_scope = ['any', 'manu', 'sermo', 'gold', 'super', 'priv', 'publ']
         prefix_type = ['any', 'manu', 'sermo', 'gold', 'super', 'priv', 'publ']
         prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
+        prefix_elevate = ['any', 'super', 'priv', 'publ']
 
         # Define the main items to show and edit
         context['mainitems'] = [
@@ -6797,23 +6798,30 @@ class CollAnyEdit(BasicDetails):
             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}]
 
-        # Optionally add Scope
-        if self.prefix in prefix_scope:
-            context['mainitem'].append(
+        # Optionally add Scope: but only for the actual *owner* of this one
+        if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+            context['mainitems'].append(
             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
         # Optionally add Type
-        context['mainitem'].append(
+        context['mainitems'].append(
             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
 
         # Optionally add Readonly
         if self.prefix in prefix_readonly:
-            context['mainitem'].append(
+            context['mainitems'].append(
             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
 
         # Always add Created and Size
-        context['mainitem'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
-        context['mainitem'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
+        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
+        context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
+
+        # Any dataset may optionally be elevated to a historical collection
+        # BUT: only if a person has permission
+        if self.prefix in prefix_elevate and context['authenticated'] and context['is_app_editor']:
+            context['mainitems'].append(
+                {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
+                )
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
@@ -6864,17 +6872,20 @@ class CollAnyEdit(BasicDetails):
 
 class CollPrivEdit(CollAnyEdit):
     prefix = "priv"
+    basic_name = "collpriv"
     title = "My Dataset"
 
 
 class CollPublEdit(CollAnyEdit):
     prefix = "publ"
+    basic_name = "collpubl"
     title = "Public Dataset"
 
 
 class CollHistEdit(CollAnyEdit):
     prefix = "super"
     settype = "hc"
+    basic_name = "collhist"
     title = "Historical collection"
 
 
@@ -6911,19 +6922,79 @@ class CollAnyDetails(CollAnyEdit):
     rtype = "html"
 
 
-class CollPrivDetails(CollHistEdit):
+class CollPrivDetails(CollPrivEdit):
     """Like CollPrivEdit, but then with html"""
     rtype = "html"
 
+    def custom_init(self, instance):
+        # Check if someone acts as if this is a public dataset, whil it is not
+        if instance.settype == "pd":
+            # Determine what kind of dataset/collection this is
+            if instance.owner != Profile.get_user_profile(self.request.user.username):
+                # It is a public dataset after all!
+                self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+        elif instance.settype == "hc":
+            # This is a historical collection
+            self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        return None
 
-class CollPublDetails(CollHistEdit):
+
+class CollPublDetails(CollPublEdit):
     """Like CollPublEdit, but then with html"""
     rtype = "html"
+
+    def custom_init(self, instance):
+        # Check if someone acts as if this is a public dataset, whil it is not
+        if instance.settype == "pd":
+            # Determine what kind of dataset/collection this is
+            if instance.owner == Profile.get_user_profile(self.request.user.username):
+                # It is a private dataset after all!
+                self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+        elif instance.settype == "hc":
+            # This is a historical collection
+            self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        return None
 
 
 class CollHistDetails(CollHistEdit):
     """Like CollHistEdit, but then with html"""
     rtype = "html"
+
+    def custom_init(self, instance):
+        if instance.settype != "hc":
+            # Someone does as if this is a historical collection...
+            # Determine what kind of dataset/collection this is
+            if instance.owner == Profile.get_user_profile(self.request.user.username):
+                # Private dataset
+                self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+            else:
+                # Public dataset
+                self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+        return None
+
+
+class CollHistElevate(CollHistDetails):
+    """ELevate this dataset to be a historical collection"""
+
+    def custom_init(self, instance):
+        if user_is_authenticated(self.request):
+            # Double check if I have the right to do this...
+            if user_is_ingroup(self.request, app_editor):
+                # Change the settype to hc
+                instance.settype = "hc"
+                instance.save()
+                self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+            elif instance.settype == "pd":
+                # Determine what kind of dataset/collection this is
+                if instance.owner == Profile.get_user_profile(self.request.user.username):
+                    # Private dataset
+                    self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+                else:
+                    # Public dataset
+                    self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+        else:
+            self.redirectpage = reverse("home")
+        return None
 
 
 class CollManuDetails(CollManuEdit):
@@ -10935,7 +11006,7 @@ class BasketUpdate(BasicPart):
                 bChanged = False
                 if operation == "collcreate":
                     # Save the current basket as a collection that needs to receive a name
-                    coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, 
+                    coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, settype="pd",
                                                      descrip="Created from a {} listview basket".format(self.colltype), 
                                                      owner=profile, type=self.colltype)
                 elif oFields['collone']:
@@ -10969,7 +11040,8 @@ class BasketUpdate(BasicPart):
                                 bChanged = True
                     # Make sure to redirect to this instance -- but only for COLLCREATE
                     if operation == "collcreate":
-                        self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+                        # self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+                        self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
                     else:
                         # We are adding
                         collurl = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
