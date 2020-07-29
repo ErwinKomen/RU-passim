@@ -6818,7 +6818,8 @@ class CollAnyEdit(BasicDetails):
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
-        if self.prefix in prefix_elevate and context['authenticated'] and context['is_app_editor']:
+        if instance.settype == "pd" and self.prefix in prefix_elevate and \
+            context['authenticated'] and context['is_app_editor']:
             context['mainitems'].append(
                 {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
                 )
@@ -6860,6 +6861,13 @@ class CollAnyEdit(BasicDetails):
             form.instance.owner = profile
             # The collection type is now a parameter
             form.instance.type = self.prefix
+
+            # Check out the name, if this is not in use elsewhere
+            name = form.instance.name
+            if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
+                # The name is already in use, so refuse it.
+                msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
+                return False, msg
         return True, ""
 
     def action_add(self, instance, details, actiontype):
@@ -7167,7 +7175,7 @@ class CollectionListView(BasicList):
                 {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
-            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False}]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
@@ -7190,7 +7198,7 @@ class CollectionListView(BasicList):
                 {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
-            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.filters = [ {"name": "Public dataset", "id": "filter_collection", "enabled": False}]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'},
@@ -7212,6 +7220,16 @@ class CollectionListView(BasicList):
                 {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
+            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+                    {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+                ]
         return None
 
     def get_own_list(self):
@@ -7230,6 +7248,12 @@ class CollectionListView(BasicList):
             fields['settype'] = "hc"
             # The collection type is 'super'
             fields['type'] = "super"
+            # The scope of a historical collection to be shown should be 'public'
+            if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
+                profile = Profile.get_user_profile(self.request.user.username)
+                fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
+            else:
+                fields['scope'] = "publ"
         elif self.prefix == "priv":
             # Show only private datasets
             fields['settype'] = "pd"
@@ -11006,9 +11030,13 @@ class BasketUpdate(BasicPart):
                 bChanged = False
                 if operation == "collcreate":
                     # Save the current basket as a collection that needs to receive a name
-                    coll = Collection.objects.create(name="PROVIDE_SHORT_NAME", path=history, settype="pd",
+                    coll = Collection.objects.create(path=history, settype="pd",
                                                      descrip="Created from a {} listview basket".format(self.colltype), 
                                                      owner=profile, type=self.colltype)
+                    # Assign it a name based on its ID number and the owner
+                    name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)
+                    coll.name = name
+                    coll.save()
                 elif oFields['collone']:
                     coll = oFields['collone']
                 if coll == None:

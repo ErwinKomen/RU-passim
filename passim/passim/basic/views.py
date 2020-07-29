@@ -151,11 +151,19 @@ def action_model_changes(form, instance):
     return changes
 
 def has_string_value(field, obj):
-    response = (field != None and field in obj and obj[field] != None and obj[field] != "")
+    response = (field != None and field in obj and obj[field] != None and obj[field] != "" and \
+                ( isinstance(obj[field], str) or isinstance(obj[field], int) ) )
+    
     return response
 
 def has_list_value(field, obj):
     response = (field != None and field in obj and obj[field] != None and len(obj[field]) > 0)
+    return response
+
+def has_Q_value(field, obj):
+    response = (field != None and field in obj and obj[field] != None and obj[field] != "" and \
+                not isinstance(obj[field], str) and not isinstance(obj[field], int) )
+    
     return response
 
 def has_obj_value(field, obj):
@@ -299,6 +307,8 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__gt".format(dbfield): 0})
                             else:
                                 s_q = Q(**{"{}".format(dbfield): 0})
+                    elif has_Q_value(keyS, oFields):
+                        s_q = oFields[keyS]
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):

@@ -1339,9 +1339,17 @@ class CollectionForm(PassimModelForm):
         self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
+        if prefix == "priv" or prefix == "publ":
+            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+        else:
+            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
+
         if prefix == "any":
-            self.fields['collist'].queryset = Collection.objects.all().order_by('name')
-            self.fields['collone'].queryset = Collection.objects.all().order_by('name')
+            all_collections = Collection.objects.all().order_by('name')
+            self.fields['collist'].queryset = all_collections
+            self.fields['collone'].queryset = all_collections
 
         elif prefix == "hist":
             # Historical collections
