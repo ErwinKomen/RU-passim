@@ -5217,27 +5217,36 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_scoped_queryset(type, username, team_group, settype="pd"):
+    def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
 
         # Initialisations
-        non_private = ['publ', 'team']
+        if scope == None or scope == "":
+            non_private = ['publ', 'team']
+        elif scope == "priv":
+            non_private = ['team']
         oErr = ErrHandle()
         try:
             # Validate
-            if username and team_group and username != "" and team_group != "":
+            if scope == "publ":
+                filter = Q(scope="publ")
+            elif username and team_group and username != "" and team_group != "":
                 # First filter on owner
                 owner = Profile.get_user_profile(username)
-                filter = Q(owner=owner) & Q(settype=settype)
+                filter = Q(owner=owner)
                 # Now check for permissions
                 is_team = (owner.user.groups.filter(name=team_group).first() != None)
                 # Adapt the filter accordingly
                 if is_team:
                     # User is part of the team: may not see 'private' from others
                     if type:
-                        filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) & Q(settype=settype) )
+                        filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
                     else:
                         filter = ( filter ) | ( Q(scope__in=non_private)  )
+                elif scope == "priv":
+                    # THis is a general user: may only see the public ones
+                    if type:
+                        filter = ( filter & Q(type=type))
                 else:
                     # THis is a general user: may only see the public ones
                     if type:
@@ -5245,7 +5254,9 @@ class Collection(models.Model):
                     else:
                         filter = ( filter ) | ( Q(scope="publ")  )
             else:
-                filter = Q(type=type) & Q(settype=settype)
+                filter = Q(type=type)
+            # Make sure the settype is consistent
+            filter = ( filter ) & Q(settype=settype)
             # Apply the filter
             qs = Collection.objects.filter(filter)
         except:

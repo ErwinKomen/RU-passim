@@ -886,7 +886,7 @@ class BasicDetails(DetailView):
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
         # always do this initialisation to get the object
         self.initializations(request, pk)
-        if not request.user.is_authenticated:
+        if not user_is_authenticated(request):
             # Do not allow to get a good response
             if self.rtype == "json":
                 data['html'] = "(No authorization)"
@@ -897,7 +897,7 @@ class BasicDetails(DetailView):
 
                 response = JsonResponse(data)
             else:
-                response = reverse('nlogin')
+                response = redirect( reverse('nlogin'))
         else:
             context = self.get_context_data(object=self.object)
 
@@ -1246,7 +1246,7 @@ class BasicDetails(DetailView):
                 prevpage = context['listview']
                 context['prevpage'] = prevpage
                 crumbs = []
-                crumbs.append([title, prevpage])
+                crumbs.append(["{}s".format(title), prevpage])
                 current_name = title if instance else "{} (new)".format(title)
                 context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 

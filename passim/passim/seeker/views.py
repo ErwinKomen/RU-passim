@@ -6818,7 +6818,7 @@ class CollAnyEdit(BasicDetails):
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
-        if instance.settype == "pd" and self.prefix in prefix_elevate and \
+        if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
             context['authenticated'] and context['is_app_editor']:
             context['mainitems'].append(
                 {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
@@ -7255,15 +7255,17 @@ class CollectionListView(BasicList):
             else:
                 fields['scope'] = "publ"
         elif self.prefix == "priv":
-            # Show only private datasets
+            # Show private datasets as well as those with scope "team", provided the person is in the team
             fields['settype'] = "pd"
-            qAlternative = Q(scope="priv")
-            fields['ownlist'] = self.get_own_list()
-            fields['scope'] = "priv"
+            ownlist = self.get_own_list()
+            if user_is_ingroup(self.request, app_editor):
+                fields['scope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ) | Q(scope="team") )
+            else:
+                fields['scope'] = ( Q(scope="priv") & Q(owner__in=ownlist)  )
         elif self.prefix == "publ":
             # Show only public datasets
             fields['settype'] = "pd"
-            qAlternative = Q(scope="publ")
+            # qAlternative = Q(scope="publ")
             fields['scope'] = "publ"
         else:
             # Check if the collist is identified

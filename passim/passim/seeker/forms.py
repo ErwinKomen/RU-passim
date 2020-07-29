@@ -103,15 +103,22 @@ class CollectionWidget(ModelSelect2MultipleWidget):
     type = None
 
     def label_from_instance(self, obj):
-        return "{} ({})".format( obj.name, obj.owner.user.username)
+        if obj.name and obj.owner:
+            return "{} ({})".format( obj.name, obj.owner.user.username)
+        else:
+            return "coll_{}".format(obj.id)
 
     def get_queryset(self):
         username = self.attrs.pop('username', '')
         team_group = self.attrs.pop('team_group', '')
+        settype = self.attrs.pop('settype', '')
+        scope = self.attrs.pop('scope', '')
         if self.type:
-            qs = Collection.get_scoped_queryset(self.type, username, team_group)
+            qs = Collection.get_scoped_queryset(self.type, username, team_group, settype=settype, scope=scope)
         else:
-            qs = Collection.get_scoped_queryset(None, username, team_group)
+            qs = Collection.get_scoped_queryset(None, username, team_group, settype=settype, scope=scope)
+        #if settype:
+        #    qs = qs.filter(settype=settype)
         return qs
 
 
@@ -1340,8 +1347,11 @@ class CollectionForm(PassimModelForm):
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
         if prefix == "priv" or prefix == "publ":
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
                         'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+        elif prefix == "hist":
+            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
+                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
         else:
             self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
