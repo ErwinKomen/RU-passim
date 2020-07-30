@@ -177,7 +177,7 @@ def adapt_search(val):
     val = '^' + fnmatch.translate(val) + '$'
     return val
 
-def make_search_list(filters, oFields, search_list, qd):
+def make_search_list(filters, oFields, search_list, qd, lstExclude):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
     def enable_filter(filter_id, head_id=None):
@@ -226,6 +226,7 @@ def make_search_list(filters, oFields, search_list, qd):
                 fkfield = get_value(search_item, "fkfield")
                 keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
+                code_function = get_value(search_item, "code")
                 s_q = ""
                 arFkField = []
                 if fkfield != None:
@@ -278,7 +279,7 @@ def make_search_list(filters, oFields, search_list, qd):
                     # We are dealing with a plain direct field for the model
                     # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
                     if keyType == "has":
-                        # Check the count for the db field
+                        # Check the count or the availability for the db field
                         val = oFields[filter_type]
                         if val == "yes" or val == "no":
                             enable_filter(filter_type, head_id)
@@ -286,13 +287,14 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__gt".format(dbfield): 0})
                             else:
                                 s_q = Q(**{"{}".format(dbfield): 0})
-                    elif keyType == "exists":
+                    elif keyType == "exists" and code_function != None:
                         # Check the count or the availability for the db field
-                        val = oFields[filter_type]
+                        val = code_function( oFields[keyS])
                         if val == "yes" or val == "no":
                             enable_filter(filter_type, head_id)
                             if val == "yes":
                                 s_q = Q(**{"{}__exact".format(dbfield): ""})
+                                if lstExclude == None: lstExclude = []
                                 lstExclude.append(s_q)
                                 s_q = ""
                             else:
@@ -353,7 +355,7 @@ def make_search_list(filters, oFields, search_list, qd):
         lstQ = []
 
     # Return what we have created
-    return filters, lstQ, qd
+    return filters, lstQ, qd, lstExclude
 
 def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
@@ -503,9 +505,9 @@ class BasicList(ListView):
         if self.listform:
             prefix = "" if self.prefix == "any" else self.prefix
             if self.use_team_group:
-                frm = self.listform(initial, prefix=prefix, username=self.request.user.username, team_group=app_editor, userplus=app_userplus)
+                frm = self.listform(initial, prefix=self.prefix, username=self.request.user.username, team_group=app_editor, userplus=app_userplus)
             else:
-                frm = self.listform(initial, prefix=prefix)
+                frm = self.listform(initial, prefix=self.prefix)
             if frm.is_valid():
                 context['{}Form'.format(self.prefix)] = frm
                 # Get any possible typeahead parameters
@@ -831,7 +833,7 @@ class BasicList(ListView):
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
                 
-                self.filters, lstQ, self.initial = make_search_list(self.filters, oFields, self.searches, self.qd)
+                self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
                 
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
@@ -864,7 +866,7 @@ class BasicList(ListView):
             elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
-
+                
             # Do the ordering of the results
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
@@ -926,7 +928,7 @@ class BasicDetails(DetailView):
         data = {'status': 'ok', 'html': '', 'statuscode': ''}
         # always do this initialisation to get the object
         self.initializations(request, pk)
-        if not user_is_authenticated(request):
+        if not request.user.is_authenticated:
             # Do not allow to get a good response
             if self.rtype == "json":
                 data['html'] = "(No authorization)"
@@ -937,7 +939,7 @@ class BasicDetails(DetailView):
 
                 response = JsonResponse(data)
             else:
-                response = redirect( reverse('nlogin'))
+                response = reverse('nlogin')
         else:
             context = self.get_context_data(object=self.object)
 
@@ -1171,7 +1173,7 @@ class BasicDetails(DetailView):
                 form_kwargs = self.get_form_kwargs(prefix)
                 if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                     # Only process actual changes!!
-                    if self.request.method == "POST" and self.request.POST and not self.do_not_save:
+                    if self.request.method == "POST" and self.request.POST:
 
                         #if self.add:
                         #    # Saving a NEW item
@@ -1286,7 +1288,7 @@ class BasicDetails(DetailView):
                 prevpage = context['listview']
                 context['prevpage'] = prevpage
                 crumbs = []
-                crumbs.append(["{}s".format(title), prevpage])
+                crumbs.append([title, prevpage])
                 current_name = title if instance else "{} (new)".format(title)
                 context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
@@ -1296,7 +1298,7 @@ class BasicDetails(DetailView):
             if self.history_button:
                 # Retrieve history
                 context['history_contents'] = self.get_history(instance)
-                
+
         # fill in the form values
         if frm and 'mainitems' in context:
             for mobj in context['mainitems']:
@@ -1326,7 +1328,7 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
-    def action_add(self, instance, actiontype, details):
+    def action_add(self, details):
         """User can fill this in to his/her liking"""
 
         # Example: 
@@ -1362,7 +1364,7 @@ class BasicDetails(DetailView):
                     if bResult:
                         # Log the DELETE action
                         details = {'id': instance.id}
-                        self.action_add(instance, details, "delete")
+                        self.action_add(details)
                         
                         # Remove this sermongold instance
                         instance.delete()
@@ -1427,7 +1429,7 @@ class BasicDetails(DetailView):
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, obj)
-                    self.action_add(obj, details, "save")
+                    self.action_add(details)
 
                     # Make sure the form is actually saved completely
                     frm.save()
