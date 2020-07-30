@@ -277,8 +277,28 @@ def make_search_list(filters, oFields, search_list, qd):
                 elif dbfield:
                     # We are dealing with a plain direct field for the model
                     # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
+                    if keyType == "has":
+                        # Check the count for the db field
+                        val = oFields[filter_type]
+                        if val == "yes" or val == "no":
+                            enable_filter(filter_type, head_id)
+                            if val == "yes":
+                                s_q = Q(**{"{}__gt".format(dbfield): 0})
+                            else:
+                                s_q = Q(**{"{}".format(dbfield): 0})
+                    elif keyType == "exists":
+                        # Check the count or the availability for the db field
+                        val = oFields[filter_type]
+                        if val == "yes" or val == "no":
+                            enable_filter(filter_type, head_id)
+                            if val == "yes":
+                                s_q = Q(**{"{}__exact".format(dbfield): ""})
+                                lstExclude.append(s_q)
+                                s_q = ""
+                            else:
+                                s_q = Q(**{"{}__exact".format(dbfield): ""})
                     # Check for keyS
-                    if has_string_value(keyS, oFields):
+                    elif has_string_value(keyS, oFields):
                         # Check for ID field
                         if has_string_value(keyId, oFields):
                             val = oFields[keyId]
@@ -298,15 +318,6 @@ def make_search_list(filters, oFields, search_list, qd):
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
-                    elif keyType == "has":
-                        # Check the count for the db field
-                        val = oFields[filter_type]
-                        if val == "yes" or val == "no":
-                            enable_filter(filter_type, head_id)
-                            if val == "yes":
-                                s_q = Q(**{"{}__gt".format(dbfield): 0})
-                            else:
-                                s_q = Q(**{"{}".format(dbfield): 0})
                     elif has_Q_value(keyS, oFields):
                         s_q = oFields[keyS]
 
@@ -388,15 +399,22 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                         order_heads[idx]['order'] = order_heads[idx]['order'].replace("-", "")
         else:
             orderings = []
-            for order_item in order_default:
+            for idx, order_item in enumerate(order_default):
+                # Get the type
+                sType = order_heads[idx]['type']
                 if ";" in order_item:
                     for sub_item in order_item.split(";"):
-                        orderings.append(sub_item)
+                        orderings.append(dict(type=sType, item=sub_item))
                 else:
-                    orderings.append(order_item)
-            for order_item in orderings:
+                    orderings.append(dict(type=sType, item=order_item))
+            for item in orderings:
+                sType = item['type']
+                order_item = item['item']
                 if order_item != "":
-                    order.append(Lower(order_item))
+                    if sType == "int":
+                        order.append(order_item)
+                    else:
+                        order.append(Lower(order_item))
 
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
@@ -457,6 +475,7 @@ class BasicList(ListView):
     delete_line = False
     none_on_empty = False
     use_team_group = False
+    admin_editable = False
     permission = True
     lst_typeaheads = []
     sort_order = ""
@@ -550,6 +569,8 @@ class BasicList(ListView):
         context['new_button'] = self.new_button
         context['add_text'] = self.add_text
 
+        context['admin_editable'] = self.admin_editable
+
         # Adapt possible downloads
         if len(self.downloads) > 0:
             for item in self.downloads:
@@ -580,6 +601,11 @@ class BasicList(ListView):
         context['order_heads'] = self.order_heads
         context['has_filter'] = self.bFilter
         fsections = []
+        # Initialize the adapted filters
+        for filteritem in self.filters:
+            filteritem['fitems'] = []
+            filteritem['count'] = 0
+            filteritem['hasvalue'] = False
         # Adapt filters with the information from searches
         for section in self.searches:
             oFsection = {}
@@ -591,34 +617,42 @@ class BasicList(ListView):
                 # fsections.append(dict(name=section_name))
             # Copy the relevant search filter
             for item in section['filterlist']:
+                bHasItemValue = False
                 # Find the corresponding item in the filters
                 id = "filter_{}".format(item['filter'])
-                for fitem in self.filters:
-                    if id == fitem['id']:
+                for filteritem in self.filters:
+                    if id == filteritem['id']:
                         try:
+                            # Build a new [fitem]
+                            fitem = {}
                             fitem['search'] = item
                             fitem['has_keylist'] = False
                             # Add possible fields
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 fitem['keyS'] = frm[item['keyS']]
                                 if fitem['keyS'].value(): 
-                                    bHasValue = True
+                                    bHasValue = True ; bHasItemValue = True
                             if 'keyList' in item and item['keyList'] in frm.cleaned_data: 
                                 if frm.fields[item['keyList']].initial or frm.cleaned_data[item['keyList']].count() > 0: 
-                                    bHasValue = True
+                                    bHasValue = True ; bHasItemValue = True
                                 fitem['keyList'] = frm[item['keyList']]
                                 fitem['has_keylist'] = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
                                 if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
                                     fitem['dbfield'] = frm[item['dbfield']]
                                     if fitem['dbfield'].value(): 
-                                        bHasValue = True
+                                        bHasValue = True ; bHasItemValue = True
                                 elif 'fkfield' in item and item['fkfield'] in frm.cleaned_data:
                                     fitem['fkfield'] = frm[item['fkfield']]                                    
-                                    if fitem['fkfield'].value(): bHasValue = True
+                                    if fitem['fkfield'].value(): bHasValue = True ; bHasItemValue = True
                                 else:
                                     # There is a keyS without corresponding fkfield or dbfield
                                     pass
+                            # Append the [fitem] to the [fitems]                            
+                            filteritem['fitems'].append(fitem)
+                            filteritem['count'] = len(filteritem['fitems'])
+                            # Make sure we indicate that there is a value
+                            if  bHasItemValue: filteritem['hasvalue'] = True
                             break
                         except:
                             sMsg = oErr.get_error_message()
@@ -709,6 +743,12 @@ class BasicList(ListView):
                 fields.append(fobj)
             # Make the list of field-values available
             result['fields'] = fields
+            admindetails = "admin:seeker_{}_change".format(self.basic_name)
+            try:
+                result['admindetails'] = reverse(admindetails, args=[obj.id])
+            except:
+                pass
+
             # Add to the list of results
             result_list.append(result)
         return result_list
@@ -1256,8 +1296,7 @@ class BasicDetails(DetailView):
             if self.history_button:
                 # Retrieve history
                 context['history_contents'] = self.get_history(instance)
-
-
+                
         # fill in the form values
         if frm and 'mainitems' in context:
             for mobj in context['mainitems']:

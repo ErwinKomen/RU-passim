@@ -138,21 +138,23 @@
                       <!-- Show the different filters in the list -->
                       {% for filter in filters %}
                         {% if not filter.head_id  %}
-                          <div id="{{filter.id}}" class="{% if not filter.keyS.value and not filter.keyList.value %}hidden{% endif %}">
+                          <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
                             <table style="width: 100%;">
                               <tr class="form-row">
                                 <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
                                 <td style="width: 100%;">
-                                  {% if filter.dbfield %}<span class="keyword-key hidden filter-dbfield">{{filter.dbfield}}</span>{% endif %}
-                                  {% if filter.keyS %}
-                                    <span class="filter-keys">{{filter.keyS}}</span>
-                                    {% if filter.has_keylist %}
-                                      <span> or select: </span>
-                                      <span class="filter-keylist">{{filter.keyList}}</span>
+                                  {% for fitem in filter.fitems %}
+                                    {% if fitem.dbfield %}<span class="keyword-key hidden filter-dbfield">{{fitem.dbfield}}</span>{% endif %}
+                                    {% if fitem.keyS %}
+                                      <span class="filter-keys">{{fitem.keyS}}</span>
+                                      {% if fitem.has_keylist %}
+                                        <span> or select: </span>
+                                        <span class="filter-keylist">{{fitem.keyList}}</span>
+                                      {% endif %}
+                                    {% elif fitem.has_keylist %}
+                                        <span class="filter-keylist">{{fitem.keyList}}</span>
                                     {% endif %}
-                                  {% elif filter.has_keylist %}
-                                      <span class="filter-keylist">{{filter.keyList}}</span>
-                                  {% endif %}
+                                  {% endfor %}
                                 </td>
                               </tr>
                             </table>
@@ -206,21 +208,23 @@
                           <!-- Show the different filters in the list -->
                           {% for filter in filters %}
                             {% if filter.head_id == "filter_"|add:section.name   %}
-                              <div id="{{filter.id}}" class="{% if not filter.keyS.value and not filter.keyList.value %}hidden{% endif %}">
+                              <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
                                 <table style="width: 100%;">
                                   <tr class="form-row">
                                     <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
                                     <td style="width: 100%;">
-                                      {% if filter.dbfield %}<span class="keyword-key hidden">{{filter.dbfield}}</span>{% endif %}
-                                      {% if filter.keyS %}
-                                        <span>{{filter.keyS}}</span>
-                                        {% if filter.keyList %}
-                                          <span> or select: </span>
-                                          <span>{{filter.keyList}}</span>
+                                      {% for fitem in filter.fitems %}
+                                        {% if fitem.dbfield %}<span class="keyword-key hidden">{{fitem.dbfield}}</span>{% endif %}
+                                        {% if fitem.keyS %}
+                                          <span>{{fitem.keyS}}</span>
+                                          {% if fitem.keyList %}
+                                            <span> or select: </span>
+                                            <span>{{fitem.keyList}}</span>
+                                          {% endif %}
+                                        {% elif fitem.keyList %}
+                                            <span>{{fitem.keyList}}</span>
                                         {% endif %}
-                                      {% elif filter.keyList %}
-                                          <span>{{filter.keyList}}</span>
-                                      {% endif %}
+                                      {% endfor %}
                                     </td>
                                   </tr>
                                 </table>
