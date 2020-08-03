@@ -5187,6 +5187,19 @@ class Collection(models.Model):
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
 
+    def get_manuscript_link(self):
+        """Return a piece of HTML with the manuscript link for the user"""
+
+        sBack = ""
+        html = []
+        if self.settype == "hc":
+            # Creation of a new manuscript based on this historical collection:
+            url = reverse('collhist_apply', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a manuscript based on this template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
+            # Combine response
+            sBack = "\n".join(html)
+        return sBack
+
     def get_size_markdown(self):
         """Count the items that belong to me, depending on my type
         

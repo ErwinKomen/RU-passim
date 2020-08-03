@@ -6821,6 +6821,10 @@ class CollAnyEdit(BasicDetails):
         context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
         context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
 
+        # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
+        if instance.settype == "hc" and context['is_app_editor']:
+            context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
+
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
         if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
