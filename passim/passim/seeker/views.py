@@ -7010,6 +7010,21 @@ class CollHistElevate(CollHistDetails):
         return None
 
 
+class CollHistApply(CollHistDetails):
+    """Apply the historical collection to create a manuscript with sermons from the SSGs"""
+
+    def custom_init(self, instance):
+        # Create a new manuscript that is based on this historical collection
+        manu_new = instance.get_template_copy(self.request.user.username)
+        if manu_new == None:
+            # THis wasn't successful: redirect to the details view
+            self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        else:
+            # Re-direct to this manuscript
+            self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_new.id})
+        return None
+
+
 class CollManuDetails(CollManuEdit):
     """Like CollManuEdit, but then with html"""
     rtype = "html"
@@ -7221,10 +7236,12 @@ class CollectionListView(BasicList):
             self.order_cols = ['name', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
-                {'name': 'Historical Collection',  'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
-                {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
+                {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Created',                 'order': 'o=2', 'type': 'str', 'custom': 'created'}
             ]  
+            # Add if user is app editor
+            if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
+                self.order_heads.append({'name': 'Manuscript', 'order': '', 'type': 'str', 'custom': 'manuscript'})
             self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
             self.searches = [
                 {'section': '', 'filterlist': [
@@ -7336,6 +7353,9 @@ class CollectionListView(BasicList):
             sBack = get_crpp_date(instance.created)
         elif custom == "owner":
             sBack = instance.owner.user.username
+        elif custom == "manuscript":
+            url = reverse('collhist_apply', kwargs={'pk': instance.id})
+            sBack = "<a href='{}' title='Create a new manuscript based on this historical collection'><span class='glyphicon glyphicon-open'></span></a>".format(url)
         return sBack, sTitle
 
 
@@ -9774,6 +9794,7 @@ class EqualGoldListView(BasicList):
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Super sermon gold","id": "filter_collsuper",        "enabled": False, "head_id": "filter_collection"},
+        {"name": "Historical",      "id": "filter_collhist",          "enabled": False, "head_id": "filter_collection"},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -9782,15 +9803,23 @@ class EqualGoldListView(BasicList):
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
-            {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
+            {'filter': 'author',    'fkfield': 'author',            
+             'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 
+             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
             ]},
         {'section': 'collection', 'filterlist': [
-            {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collsuper', 'fkfield': 'collections',                                        'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }
+            {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
+             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
+            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        
+             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
+            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
+             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            {'filter': 'collsuper', 'fkfield': 'collections',                                        
+             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
+            {'filter': 'collhist', 'fkfield': 'collections',                                        
+             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' }
             ]}
         ]
 

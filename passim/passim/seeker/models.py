@@ -5210,7 +5210,10 @@ class Collection(models.Model):
         elif self.type == "super":
             size = self.freqsuper()
             # Determine where clicking should lead to
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+            if self.settype == "hc":
+                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
+            else:
+                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
         if size > 0:
             # Create a display for this topic
             lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
@@ -5268,6 +5271,55 @@ class Collection(models.Model):
         # REturn the result
         return qs
 
+    def get_template_copy(self, username):
+        """Create a manuscript + sermons based on the SSGs in this collection"""
+
+        # Double check to see that this is a SSG collection
+        if self.settype != "hc" or self.type != "super":
+            # THis is not the correct starting point
+            return None
+
+        # Now we know that we're okay...
+        project = Project.get_default(username)
+        profile = Profile.get_user_profile(username)
+        source = SourceInfo.objects.create(
+            code="Copy of Historical Collection [{}] (id={})".format(self.name, self.id), 
+            collector=username, 
+            profile=profile)
+
+        # Create an empty Manuscript
+        manu = Manuscript.objects.create(mtype="man", stype="imp", source=source, project=project)
+        
+        # Create all the sermons based on the SSGs
+        msitems = []
+        with transaction.atomic():
+            order = 1
+            for ssg in self.collections_super.all():
+                # Create a MsItem
+                msitem = MsItem.objects.create(manu=manu, order=order)
+                order += 1
+                # Add it to the list
+                msitems.append(msitem)
+                # Create a S based on this SSG
+                sermon = SermonDescr.objects.create(
+                    manu=manu, msitem=msitem, author=ssg.author, 
+                    incipit=ssg.incipit, srchincipit=ssg.srchincipit,
+                    explicit=ssg.explicit, srchexplicit=ssg.srchexplicit,
+                    stype="imp", mtype="man")
+                # Create a link from the S to this SSG
+                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, super=ssg, linktype=LINK_UNSPECIFIED)
+
+        # Now walk and repair the links
+        with transaction.atomic():
+            size = len(msitems)
+            for idx, msitem in enumerate(msitems):
+                # Check if this is not the last one
+                if idx < size-1:
+                    msitem.next = msitems[idx+1]
+                    msitem.save()
+
+        # Return the manuscript that has been created
+        return manu
 
 class MsItem(models.Model):
     """One item in a manuscript - can be sermon or heading"""
@@ -5935,9 +5987,10 @@ class SermonDescr(models.Model):
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
             bNeedSave = True
-        if bNeedSave: self.siglist = json.dumps(lSign)
-        # Do the saving initially
-        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        # Make sure to save the siglist too
+        if bNeedSave: 
+            self.siglist = json.dumps(lSign)
+            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
     def signature_string(self):
