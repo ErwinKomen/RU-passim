@@ -6989,6 +6989,76 @@ class CollHistDetails(CollHistEdit):
                 self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
         return None
 
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(CollHistDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Lists of related objects
+        related_objects = []
+
+        # List of Manuscripts contained in this collection
+        manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
+
+        # New: Get all the SSGs that are part of this historical collection:
+        qs_ssg = instance.collections_super.all().values("id")
+        # Get the manuscripts linked to these SSGs
+        qs_manu = Manuscript.objects.filter(manuitems__itemsermons__sermondescr_super__super__id__in=qs_ssg).order_by(
+            'id').distinct().order_by('idno')
+
+        ## Get all the SermonDescr that are linked to these SSGs
+        #sermons = SermonDescr.objects.filter(sermondescr_super__super__id__in=qs_ssg).order_by(
+        #    "id").distinct().order_by(
+        #    'sermon__msitem__manu__idno', 'sermon__locus')
+
+
+        rel_list =[]
+        for item in qs_manu:
+            rel_item = []
+            # Shelfmark = IDNO
+            manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
+            manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+            # Name as CITY - LIBRARY - IDNO + Name
+            manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
+            rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+
+            # Origin
+            or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+            rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
+
+            # date range
+            daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+            rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
+
+            # Linked SSG(s)
+            ssg_info = item.get_ssg_count()
+            rel_item.append({'value': ssg_info, 'initial': 'small'})
+
+            # Add this Manu line to the list
+            rel_list.append(rel_item)
+
+        manuscripts['rel_list'] = rel_list
+
+        manuscripts['columns'] = [
+            'Shelfmark', 
+            '<span title="Origin/Provenance">or./prov.</span>', 
+            '<span title="Date range">date</span>', 
+            '<span title="Super sermon gold links">ssgs.</span>', 
+            ]
+        related_objects.append(manuscripts)
+
+        context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
+
 
 class CollHistElevate(CollHistDetails):
     """ELevate this dataset to be a historical collection"""
@@ -7377,9 +7447,9 @@ class CollectionListView(BasicList):
         elif custom == "manuscript":
             html = []
             url = reverse('collhist_manu', kwargs={'pk': instance.id})
-            html.append("<a href='{}' title='Create a manuscript based on this historical collection'><span class='glyphicon glyphicon-open jumbo-2'></span></a>".format(url))
+            html.append("<a href='{}' title='Create a manuscript based on this historical collection'><span class='glyphicon glyphicon-open'></span></a>".format(url))
             url = reverse('collhist_temp', kwargs={'pk': instance.id})
-            html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open jumbo-1'></span></a>".format(url))
+            html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
             sBack = "\n".join(html)
         return sBack, sTitle
 

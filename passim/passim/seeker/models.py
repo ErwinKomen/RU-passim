@@ -2997,6 +2997,27 @@ class Manuscript(models.Model):
         sBack = get_stype_light(self.stype)
         return sBack
 
+    def get_ssg_count(self):
+        # Get a list of all SSGs related to [self]
+        ssg_list_num = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=self).order_by('id').distinct().count()
+        url = ""
+        sBack = "<a class='nostyle' href='{}'>{}</a>".format(url, ssg_list_num)
+        # Return the combined information
+        return sBack
+
+    def get_ssg_markdown(self):
+        # Get a list of all SSGs related to [self]
+        ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=self).order_by('id').distinct().order_by('code')
+        html = []
+        for ssg in ssg_list:
+            url = reverse('equalgold_details', kwargs={'pk': ssg.id})
+            code = ssg.code if ssg.code else "(ssg_{})".format(ssg.id)
+            # Add a link to this SSG in the list
+            html.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        sBack = ", ".join(html)
+        # Return the combined information
+        return sBack
+
     def get_template_link(self, profile):
         sBack = ""
         # Check if I am a template
