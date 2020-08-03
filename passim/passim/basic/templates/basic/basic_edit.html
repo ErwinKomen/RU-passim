@@ -4,6 +4,10 @@
   {% if has_select2 %}{{basic_form.media.css}}{% endif %}
 {% endblock %}
 
+<!-- Little error message room -->
+<div id="little_err_msg" class="err-msg"></div>
+
+
 <!-- SermonGold information -->
 <form>
   {% csrf_token %}

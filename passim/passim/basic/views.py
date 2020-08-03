@@ -1328,7 +1328,7 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
-    def action_add(self, details):
+    def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
 
         # Example: 
@@ -1364,7 +1364,7 @@ class BasicDetails(DetailView):
                     if bResult:
                         # Log the DELETE action
                         details = {'id': instance.id}
-                        self.action_add(details)
+                        self.action_add(instance, details, "delete")
                         
                         # Remove this sermongold instance
                         instance.delete()
@@ -1429,7 +1429,7 @@ class BasicDetails(DetailView):
                     details["savetype"] = "new" if bNew else "change"
                     if frm.changed_data != None and len(frm.changed_data) > 0:
                         details['changes'] = action_model_changes(frm, obj)
-                    self.action_add(details)
+                    self.action_add(obj, details, "save")
 
                     # Make sure the form is actually saved completely
                     frm.save()
