@@ -5193,9 +5193,12 @@ class Collection(models.Model):
         sBack = ""
         html = []
         if self.settype == "hc":
+            # Creation of a new template based on this historical collection:
+            url = reverse('collhist_temp', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a template based on this historical collection'><span class='badge signature ot'>Create a Template based on this historical collection</span></a>".format(url))
             # Creation of a new manuscript based on this historical collection:
-            url = reverse('collhist_apply', kwargs={'pk': self.id})
-            html.append("<a href='{}' title='Create a manuscript based on this template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
+            url = reverse('collhist_manu', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a manuscript based on this historical collection'><span class='badge signature gr'>Create a Manuscript based on this historical collection</span></a>".format(url))
             # Combine response
             sBack = "\n".join(html)
         return sBack
@@ -5284,7 +5287,7 @@ class Collection(models.Model):
         # REturn the result
         return qs
 
-    def get_template_copy(self, username):
+    def get_template_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""
 
         # Double check to see that this is a SSG collection
@@ -5301,7 +5304,7 @@ class Collection(models.Model):
             profile=profile)
 
         # Create an empty Manuscript
-        manu = Manuscript.objects.create(mtype="man", stype="imp", source=source, project=project)
+        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
         
         # Create all the sermons based on the SSGs
         msitems = []
@@ -5318,7 +5321,7 @@ class Collection(models.Model):
                     manu=manu, msitem=msitem, author=ssg.author, 
                     incipit=ssg.incipit, srchincipit=ssg.srchincipit,
                     explicit=ssg.explicit, srchexplicit=ssg.srchexplicit,
-                    stype="imp", mtype="man")
+                    stype="imp", mtype=mtype)
                 # Create a link from the S to this SSG
                 ssg_link = SermonDescrEqual.objects.create(sermon=sermon, super=ssg, linktype=LINK_UNSPECIFIED)
 
@@ -5331,8 +5334,17 @@ class Collection(models.Model):
                     msitem.next = msitems[idx+1]
                     msitem.save()
 
-        # Return the manuscript that has been created
-        return manu
+        # Okay, do we need to just make a manuscript, or a template?
+        if mtype == "tem":
+            # Create a template based on this new manuscript
+            obj = Template.objects.create(manu=manu, profile=profile, name="Template_{}_{}".format(profile.user.username, manu.id),
+                                          description="Created from Historical Collection [{}] (id={})".format(self.name, self.id))
+        else:
+            # Just a manuscript is okay
+            obj = manu
+
+        # Return the manuscript or the template that has been created
+        return obj
 
 class MsItem(models.Model):
     """One item in a manuscript - can be sermon or heading"""

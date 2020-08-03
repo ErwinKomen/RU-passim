@@ -7017,16 +7017,33 @@ class CollHistElevate(CollHistDetails):
 class CollHistApply(CollHistDetails):
     """Apply the historical collection to create a manuscript with sermons from the SSGs"""
 
+    apply_type = ""
+
     def custom_init(self, instance):
         # Create a new manuscript that is based on this historical collection
-        manu_new = instance.get_template_copy(self.request.user.username)
-        if manu_new == None:
+        item_new = instance.get_template_copy(self.request.user.username, self.apply_type)
+        if item_new == None:
             # THis wasn't successful: redirect to the details view
             self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        elif self.apply_type == "tem":
+            # A template has been created
+            self.redirectpage = reverse("template_details", kwargs={'pk': item_new.id})
         else:
-            # Re-direct to this manuscript
-            self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_new.id})
+            # Manuscript created: re-direct to this manuscript
+            self.redirectpage = reverse("manuscript_details", kwargs={'pk': item_new.id})
         return None
+
+
+class CollHistManu(CollHistApply):
+    """Apply the historical collection to create a manuscript with sermons from the SSGs"""
+
+    apply_type = "man"
+
+
+class CollHistTemp(CollHistApply):
+    """Apply the historical collection to create a manuscript with sermons from the SSGs"""
+
+    apply_type = "tem"
 
 
 class CollManuDetails(CollManuEdit):
@@ -7358,8 +7375,12 @@ class CollectionListView(BasicList):
         elif custom == "owner":
             sBack = instance.owner.user.username
         elif custom == "manuscript":
-            url = reverse('collhist_apply', kwargs={'pk': instance.id})
-            sBack = "<a href='{}' title='Create a new manuscript based on this historical collection'><span class='glyphicon glyphicon-open'></span></a>".format(url)
+            html = []
+            url = reverse('collhist_manu', kwargs={'pk': instance.id})
+            html.append("<a href='{}' title='Create a manuscript based on this historical collection'><span class='glyphicon glyphicon-open jumbo-2'></span></a>".format(url))
+            url = reverse('collhist_temp', kwargs={'pk': instance.id})
+            html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open jumbo-1'></span></a>".format(url))
+            sBack = "\n".join(html)
         return sBack, sTitle
 
 
