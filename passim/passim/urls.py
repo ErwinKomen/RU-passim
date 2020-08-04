@@ -138,7 +138,7 @@ urlpatterns = [
     url(r'^dataset/elevate(?:/(?P<pk>\d+))?/$', CollHistElevate.as_view(), name='collhist_elevate'),
     url(r'^collection/hist/manuscript(?:/(?P<pk>\d+))?/$', CollHistManu.as_view(), name='collhist_manu'),
     url(r'^collection/hist/template(?:/(?P<pk>\d+))?/$', CollHistTemp.as_view(), name='collhist_temp'),
-    # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
+    url(r'^collection/hist/compare(?:/(?P<pk>\d+))?/$', CollHistCompare.as_view(), name='collhist_compare'),
     
     url(r'^basket/sermo/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/sermo/show', BasketView.as_view(), name='basket_show'),

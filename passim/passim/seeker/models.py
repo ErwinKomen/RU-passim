@@ -2997,11 +2997,14 @@ class Manuscript(models.Model):
         sBack = get_stype_light(self.stype)
         return sBack
 
-    def get_ssg_count(self):
+    def get_ssg_count(self, compare_link=False, collection = None):
         # Get a list of all SSGs related to [self]
         ssg_list_num = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=self).order_by('id').distinct().count()
-        url = ""
-        sBack = "<a class='nostyle' href='{}'>{}</a>".format(url, ssg_list_num)
+        if compare_link:
+            url = "{}?manu={}".format(reverse("collhist_compare", kwargs={'pk': collection.id}), self.id)
+            sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, ssg_list_num)
+        else:
+            sBack = "<span>{}</span>".format(ssg_list_num)
         # Return the combined information
         return sBack
 
@@ -4069,7 +4072,7 @@ class EqualGold(models.Model):
         if self.author:
             lHtml.append("(by {}) ".format(self.author.name))
         else:
-            lHtml.append("(by Unknwon Author) ")
+            lHtml.append("(by Unknown Author) ")
 
         if do_incexpl:
             # Treat incipit
@@ -4145,6 +4148,16 @@ class EqualGold(models.Model):
         first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
         if first != None:
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
+        return sBack
+
+    def get_passimcode_markdown(self):
+        lHtml = []
+        # Add the PASSIM code
+        code = self.code if self.code else "(no Passim code)"
+        url = reverse('equalgold_details', kwargs={'pk': self.id})
+        sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, code)
+        #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+        #sBack = " ".join(lHtml)
         return sBack
 
     def get_short(self):
@@ -5366,6 +5379,7 @@ class Collection(models.Model):
 
         # Return the manuscript or the template that has been created
         return obj
+
 
 class MsItem(models.Model):
     """One item in a manuscript - can be sermon or heading"""
