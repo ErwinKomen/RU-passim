@@ -6797,10 +6797,15 @@ class CollAnyEdit(BasicDetails):
                                          fk_name = "collection",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'}]
+    formset_objects = []
 
     stype_edi_fields = ['name', 'owner', 'readonly', 'type', 'settype', 'descrip', 'url', 'path', 'scope', 
                         'LitrefMan', 'litlist']
+
+    def custom_init(self, instance):
+        if instance != None and instance.settype == "hc":
+            self.formset_objects.append({'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
+        return None
     
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7049,6 +7054,9 @@ class CollHistDetails(CollHistEdit):
     rtype = "html"
 
     def custom_init(self, instance):
+        # First do the original custom init
+        response = super(CollHistDetails, self).custom_init(instance)
+        # Now continue
         if instance.settype != "hc":
             # Someone does as if this is a historical collection...
             # Determine what kind of dataset/collection this is
