@@ -23,6 +23,7 @@ import time
 import fnmatch
 import csv
 import math
+from difflib import SequenceMatcher
 from io import StringIO
 from pyzotero import zotero
 
@@ -298,6 +299,31 @@ def get_stype_light(stype):
 
     # Return what we made
     return sBack
+
+def get_overlap(sBack, sMatch):
+    # Yes, we are matching!!
+    s = SequenceMatcher(lambda x: x == " ", sBack, sMatch)
+    pos = 0
+    html = []
+    ratio = 0.0
+    for block in s.get_matching_blocks():
+        pos_a = block[0]
+        size = block[2]
+        if size > 0:
+            # Add plain previous part (if it is there)
+            if pos_a > pos:
+                html.append(sBack[pos : pos_a - 1])
+            # Add the overlapping part of the string
+            html.append("<span class='overlap'>{}</span>".format(sBack[pos_a : pos_a + size]))
+            # Adapt position
+            pos = pos_a + size
+    ratio = s.ratio()
+    # THe last plain part (if any)
+    if pos < len(sBack) - 1:
+        html.append(sBack[pos : len(sBack) - 1 ])
+    # Calculate the sBack
+    sBack = "".join(html)
+    return sBack, ratio
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -4015,6 +4041,16 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.srchexplicit)
         return sBack
 
+    def get_incexp_match(self, sMatch=""):
+        html = []
+        dots = "..." if self.incipit else ""
+        sBack = "{}{}{}".format(self.srchincipit, dots, self.srchexplicit)
+        ratio = 0.0
+        # Are we matching with something?
+        if sMatch != "":
+            sBack, ratio = get_overlap(sBack, sMatch)
+        return sBack, ratio
+
     def get_incipit_markdown(self, incexp_type = "actual"):
         """Get the contents of the incipit field using markdown"""
         # Perform
@@ -4153,7 +4189,7 @@ class EqualGold(models.Model):
     def get_passimcode_markdown(self):
         lHtml = []
         # Add the PASSIM code
-        code = self.code if self.code else "(no Passim code)"
+        code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         url = reverse('equalgold_details', kwargs={'pk': self.id})
         sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, code)
         #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
@@ -5780,6 +5816,16 @@ class SermonDescr(models.Model):
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         return sBack
 
+    def get_incexp_match(self, sMatch=""):
+        html = []
+        dots = "..." if self.incipit else ""
+        sBack = "{}{}{}".format(self.srchincipit, dots, self.srchexplicit)
+        ratio = 0.0
+        # Are we matching with something?
+        if sMatch != "":
+            sBack, ratio = get_overlap(sBack, sMatch)
+        return sBack, ratio
+
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
         return self.srchincipit
@@ -5893,6 +5939,12 @@ class SermonDescr(models.Model):
                 url,item.get_short_markdown()))
 
         sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_locus(self):
+        locus = "-" if self.locus == None or self.locus == "" else self.locus
+        url = reverse('sermon_details', kwargs={'pk': self.id})
+        sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, locus)
         return sBack
 
     def get_manuscript(self):

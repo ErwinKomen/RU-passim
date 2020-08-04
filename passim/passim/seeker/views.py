@@ -6787,6 +6787,7 @@ class CollAnyEdit(BasicDetails):
     settype = "pd"
     title = "Any collection"
     history_button = True
+    manu = None
     mainitems = []
 
     def add_to_context(self, context, instance):
@@ -6822,7 +6823,7 @@ class CollAnyEdit(BasicDetails):
         context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
-        if instance.settype == "hc" and context['is_app_editor']:
+        if instance.settype == "hc" and context['is_app_editor'] and self.manu == None:
             context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
 
         # Any dataset may optionally be elevated to a historical collection
@@ -6976,7 +6977,6 @@ class CollPublDetails(CollPublEdit):
 class CollHistDetails(CollHistEdit):
     """Like CollHistEdit, but then with html"""
     rtype = "html"
-    manu = None
 
     def custom_init(self, instance):
         if instance.settype != "hc":
@@ -7083,13 +7083,19 @@ class CollHistDetails(CollHistEdit):
 
             # Build the related list
             rel_list =[]
+            equal_list = []
             for item in qs_s:
                 rel_item = []
                 # Determine the matching SSG from the Historical Collection
                 equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
+                # List of SSGs that have been dealt with already
+                if equal != None: equal_list.append(equal.id)
+
+                # S: Order in Manuscript
+                rel_item.append({'value': item.msitem.order, 'initial': 'small'})
 
                 # S: Locus
-                rel_item.append({'value': item.locus})
+                rel_item.append({'value': item.get_locus()})
 
                 # S: TItle
                 rel_item.append({'value': item.title, 'initial': 'small'})
@@ -7100,36 +7106,70 @@ class CollHistDetails(CollHistEdit):
                 else:
                     rel_item.append({'value': "(none)", 'initial': 'small'})
 
-                # S: incipit
-                rel_item.append({'value': item.get_incipit_markdown(), 'initial': 'small'})
-
-                # SSG: incipit
+                ratio = 0.0
                 if equal:
-                    rel_item.append({'value': equal.get_incipit_markdown(), 'initial': 'small'})
+                    # S: incipit + explicit compared
+                    s_equal, ratio_equal = equal.get_incexp_match()
+                    comparison, ratio = item.get_incexp_match(s_equal)
+                    rel_item.append({'value': comparison, 'initial': 'small'})
+
+                    # SSG: incipit + explicit compared
+                    s_sermon, ratio_sermon = item.get_incexp_match()
+                    comparison, ratio2 = equal.get_incexp_match(s_sermon)
+                    rel_item.append({'value': comparison, 'initial': 'small'})
                 else:
+                    # S: incipit + explicit compared
+                    s_sermon, ratio_sermon = item.get_incexp_match()
+                    rel_item.append({'value': s_sermon, 'initial': 'small'})
+
+                    # SSG: incipit + explicit compared
                     rel_item.append({'value': "", 'initial': 'small'})
 
-                # S: explicit
-                rel_item.append({'value': item.get_explicit_markdown(), 'initial': 'small'})
-
-                # SSG: explicit
-                if equal:
-                    rel_item.append({'value': equal.get_explicit_markdown(), 'initial': 'small'})
-                else:
-                    rel_item.append({'value': "", 'initial': 'small'})
+                # Ratio of equalness
+                rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
 
                 rel_list.append(rel_item)
+
+            # Check if there are any SSGs in the collection that have not been dealt with yet
+            qs_ssg = instance.collections_super.exclude(id__in=equal_list)
+            for item in qs_ssg:
+                rel_item = []
+                equal = item
+                # S: Order in Manuscript
+                rel_item.append({'value': "-", 'initial': 'small'})
+
+                # S: Locus
+                rel_item.append({'value': "-"})
+
+                # S: TItle
+                rel_item.append({'value': "-", 'initial': 'small'})
+
+                # SSG: passim code
+                rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
+
+                # S: incipit + explicit compared
+                ratio = 0.0
+                rel_item.append({'value': "", 'initial': 'small'})
+
+                # SSG: incipit + explicit compared
+                s_equal, ratio_equal = equal.get_incexp_match()
+                rel_item.append({'value': s_equal, 'initial': 'small'})
+
+                # Ratio of equalness
+                rel_item.append({'value': ratio, 'initial': 'small'})
+
+                rel_list.append(rel_item)
+
 
             # Add the related list
             sermons['rel_list'] = rel_list
 
             # Set the columns
-            sermons['columns'] = ['Locus', 'Title', 
+            sermons['columns'] = ['Order', 'Locus', 'Title', 
                                   '<span title="Super sermon gold">ssg</span>',
-                                  '<span title="Incipit of sermon manifestation">inc. s</span>', 
-                                  '<span title="Incipit of SSG">inc. ssg</span>', 
-                                  '<span title="Explicit of sermon manifestation">exp. s</span>', 
-                                  '<span title="Explicit of SSG">exp. ssg</span>']
+                                  '<span title="Incipit + explicit of sermon manifestation">inc/exp. s</span>', 
+                                  '<span title="Incipit + explicit of super sermon gold (SSG)">inc/exp. ssg</span>',
+                                  '<span title="Comparison ratio between inc/exp of S and SSG">ratio</span>']
             # Add to related objects
             related_objects.append(sermons)
 

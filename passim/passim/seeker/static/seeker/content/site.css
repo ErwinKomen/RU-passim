@@ -1504,3 +1504,8 @@ input:checked + .slider:before {
     background-color: darkslateblue;
     color: yellow;
 }
+
+span.overlap {
+    background-color: lightyellow;
+    color: darkblue;
+}
