@@ -8066,6 +8066,11 @@ class ManuscriptEdit(BasicDetails):
             lbuttons = []
             # Action depends on template/not
             if not istemplate:
+                # Add a button so that the user can import sermons + hierarchy from an existing template
+                lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                             open="import_from_template", label="Import from template..."))
+
+                # Add a button so that the user can turn this manuscript into a `Template`
                 lbuttons.append(dict(title="Create template from this manuscript", 
                              submit="create_new_template", label="Create template..."))
             # Some buttons are needed anyway...
@@ -8077,6 +8082,8 @@ class ManuscriptEdit(BasicDetails):
             for item in lbuttons:
                 if 'submit' in item:
                     ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                elif 'open' in item:
+                    ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
                 else:
                     ref = " href='{}'".format(item['href'])
                 lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {}>".format(item['title'], ref))
@@ -8086,6 +8093,7 @@ class ManuscriptEdit(BasicDetails):
             if not istemplate:
                 local_context = dict(manubase=instance.id)
                 lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+                lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)

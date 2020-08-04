@@ -1,0 +1,9 @@
+<div class="collapse row" id="import_from_template">
+  <div class="col-md-4 col-md-offset-8">
+    Hallo importeerder!
+    <form id="import_from_template" action="/template/details/" method="post">
+      {% csrf_token %}
+      <input type="text" name="manubase" value="{{manubase}}">
+    </form>
+  </div>
+</div>
