@@ -377,6 +377,18 @@ class LitrefManWidget(ModelSelect2MultipleWidget):
         return LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class LitrefColWidget(ModelSelect2MultipleWidget):
+    model = LitrefCol
+    search_fields = [ 'reference__full__icontains' ]
+
+    def label_from_instance(self, obj):
+        # The label only gives the SHORT version!!
+        return obj.get_short()
+
+    def get_queryset(self):
+        return LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
+
+
 class LocationWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains']
@@ -1303,6 +1315,8 @@ class CollectionForm(PassimModelForm):
                 widget=CollOneWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+    litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=LitrefColWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["collections"]
 
     class Meta:
@@ -1356,6 +1370,8 @@ class CollectionForm(PassimModelForm):
             self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
+        self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
+
         if prefix == "any":
             all_collections = Collection.objects.all().order_by('name')
             self.fields['collist'].queryset = all_collections
@@ -1395,6 +1411,7 @@ class CollectionForm(PassimModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+            self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
 
 
 class SermonDescrSignatureForm(forms.ModelForm):
@@ -2340,6 +2357,51 @@ class ManuscriptProvForm(forms.ModelForm):
                     # self.fields['location_ta'].initial = instance.provenance.location.name
                     # Make sure the location is set to the correct number
                     self.fields['location'].initial = instance.provenance.location.id
+
+
+class CollectionLitrefForm(forms.ModelForm):
+    oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
+    # ORIGINAL:
+    litref = forms.CharField(required=False)
+    litref_ta = forms.CharField(label=_("Reference"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching litrefs input-sm', 'placeholder': 'Reference...',  'style': 'width: 100%;'}))
+    typeaheads = ["litrefs"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = LitrefCol
+        fields = ['reference', 'collection', 'pages']
+        widgets={'pages':     forms.TextInput(attrs={'placeholder': 'Page range...', 'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CollectionLitrefForm, self).__init__(*args, **kwargs)
+        self.fields['reference'].required = False
+        self.fields['litref'].required = False
+        self.fields['litref_ta'].required = False
+        # EK: Added for Sermon Gold new approach 
+        self.fields['newpages'].required = False
+        self.fields['oneref'].required = False
+        self.fields['oneref'].queryset = Litref.objects.exclude(full="").order_by('full')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial reference should be added
+            if instance.reference != None:
+                self.fields['litref_ta'].initial = instance.reference.get_full()
+
+    def clean(self):
+        cleaned_data = super(CollectionLitrefForm, self).clean()
+        litref = cleaned_data.get("litref")
+        oneref = cleaned_data.get("oneref")
+        reference = cleaned_data.get("reference")
+        if reference == None and (litref == None or litref == "") and (oneref == None or oneref == ""):
+            raise forms.ValidationError("Cannot find the reference. Make sure to select it. If it is not available, add it in Zotero and import it in Passim")
 
 
 class ManuscriptLitrefForm(forms.ModelForm):

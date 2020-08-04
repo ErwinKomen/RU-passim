@@ -64,14 +64,16 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
                                 ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
                                 LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
                                 ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
-                                SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, \
+                                SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
                                 SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
-    ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, ProvenanceMan, Provenance, Daterange, \
-    Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefSG, EdirefSG, Report, SermonDescrGold, Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
+    ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
+    ProvenanceMan, Provenance, Daterange, \
+    Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
+    Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
@@ -6790,6 +6792,16 @@ class CollAnyEdit(BasicDetails):
     manu = None
     mainitems = []
 
+    ClitFormSet = inlineformset_factory(Collection, LitrefCol,
+                                         form = CollectionLitrefForm, min_num=0,
+                                         fk_name = "collection",
+                                         extra=0, can_delete=True, can_order=False)
+
+    formset_objects = [{'formsetClass': ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'}]
+
+    stype_edi_fields = ['name', 'owner', 'readonly', 'type', 'settype', 'descrip', 'url', 'path', 'scope', 
+                        'LitrefMan', 'litlist']
+    
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -6809,7 +6821,7 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append(
             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
-        # Optionally add Type
+        # Always add Type
         context['mainitems'].append(
             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
 
@@ -6823,8 +6835,19 @@ class CollAnyEdit(BasicDetails):
         context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
-        if instance.settype == "hc" and context['is_app_editor'] and self.manu == None:
-            context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
+        if instance.settype == "hc" and context['is_app_editor']:
+            # If 'manu' is set, then this procedure is called from 'collhist_compare'
+            if self.manu == None:
+                context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
+        # Historical collections may have literature references
+        if instance.settype == "hc":
+            oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
+            if context['is_app_editor']:
+                oLitref['multiple'] = True
+                oLitref['field_list'] = 'litlist'
+                oLitref['fso'] = self.formset_objects[0]
+                oLitref['template_selection'] = 'ru.passim.litref_template'
+            context['mainitems'].append(oLitref)        
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
@@ -6833,6 +6856,9 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append(
                 {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
                 )
+
+        # Signal that we have select2
+        context['has_select2'] = True
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
@@ -6864,6 +6890,34 @@ class CollAnyEdit(BasicDetails):
         # Return the context we have made
         return context    
     
+    def process_formset(self, prefix, request, formset):
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+
+                if prefix == "clit":
+                    # Literature reference processing
+                    newpages = cleaned.get("newpages")
+                    # Also get the litref
+                    oneref = cleaned.get("oneref")
+                    if oneref:
+                        litref = cleaned['oneref']
+                        # Check if all is in order
+                        if litref:
+                            form.instance.reference = litref
+                            if newpages:
+                                form.instance.pages = newpages
+                    # Note: it will get saved with form.save()
+
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
     def before_save(self, form, instance):
         if form != None:
             # Search the user profile
@@ -6879,6 +6933,22 @@ class CollAnyEdit(BasicDetails):
                 msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
                 return False, msg
         return True, ""
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'literature'
+            litlist = form.cleaned_data['litlist']
+            adapt_m2m(LitrefCol, instance, "collection", litlist, "reference", extra=['pages'], related_is_through = True)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
 
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""

@@ -5207,8 +5207,14 @@ class Collection(models.Model):
     #     E.g: private, team, global - default is 'private'
     scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv",
                             max_length=5)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
     created = models.DateTimeField(default=get_current_datetime)
+
+    # [0-n] Many-to-many: keywords per SermonGold
+    litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
+
     
     def __str__(self):
         return self.name
@@ -5250,6 +5256,18 @@ class Collection(models.Model):
         """Return an appropriate name or label"""
 
         return self.name
+
+    def get_litrefs_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for litref in self.collection_litrefcols.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_created(self):
         """REturn the creation date in a readable form"""
@@ -6551,6 +6569,38 @@ class LitrefSG(models.Model):
         if self.sermon_gold_id and self.reference_id:
             # Do the saving initially
             response = super(LitrefSG, self).save(force_insert, force_update, using, update_fields)
+        # Then return the response: should be "None"
+        return response
+
+    def get_short(self):
+        short = ""
+        if self.reference:
+            short = self.reference.get_short()
+            if self.pages and self.pages != "":
+                short = "{}, pp {}".format(short, self.pages)
+        return short
+
+    def get_short_markdown(self):
+        short = self.get_short()
+        return adapt_markdown(short, lowercase=False)
+
+
+class LitrefCol(models.Model):
+    """The link between a literature item and a Collection (usually a HC)"""
+    
+    # [1] The literature item
+    reference = models.ForeignKey(Litref, related_name="reference_litrefcols")
+    # [1] The SermonGold to which the literature item refers
+    collection = models.ForeignKey(Collection, related_name = "collection_litrefcols")
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Double check the ESSENTIALS (pages may be empty)
+        if self.collection_id and self.reference_id:
+            # Do the saving initially
+            response = super(LitrefCol, self).save(force_insert, force_update, using, update_fields)
         # Then return the response: should be "None"
         return response
 
