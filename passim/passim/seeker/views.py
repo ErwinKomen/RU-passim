@@ -7084,6 +7084,7 @@ class CollHistDetails(CollHistEdit):
             # Build the related list
             rel_list =[]
             equal_list = []
+            index = 1
             for item in qs_s:
                 rel_item = []
                 # Determine the matching SSG from the Historical Collection
@@ -7092,7 +7093,8 @@ class CollHistDetails(CollHistEdit):
                 if equal != None: equal_list.append(equal.id)
 
                 # S: Order in Manuscript
-                rel_item.append({'value': item.msitem.order, 'initial': 'small'})
+                rel_item.append({'value': index, 'initial': 'small'})
+                index += 1
 
                 # S: Locus
                 rel_item.append({'value': item.get_locus()})
