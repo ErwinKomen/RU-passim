@@ -1107,6 +1107,8 @@ class BasicDetails(DetailView):
         # Get the current context
         context = super(BasicDetails, self).get_context_data(**kwargs)
 
+        oErr = ErrHandle()
+
         # Check this user: is he allowed to UPLOAD data?
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
@@ -1182,79 +1184,84 @@ class BasicDetails(DetailView):
                 prefix  = formsetObj['prefix']
                 formset = None
                 form_kwargs = self.get_form_kwargs(prefix)
-                if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
-                    # Only process actual changes!!
-                    if self.request.method == "POST" and self.request.POST:
 
-                        #if self.add:
-                        #    # Saving a NEW item
-                        #    if 'initial' in formsetObj:
-                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
-                        #    else:
-                        #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                        #else:
-                        #    # Get a formset including any stuff from POST
-                        #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                # Double check to see if information on this formset is available or not
+                formsetObj['has_forms'] = (self.qd.get("{}-TOTAL_FORMS", None) != None)
+                if formsetObj['has_forms']:
 
-                        # Get a formset including any stuff from POST
-                        formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
-                        # Process this formset
-                        self.process_formset(prefix, self.request, formset)
+                    if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
+                        # Only process actual changes!!
+                        if self.request.method == "POST" and self.request.POST:
+
+                            #if self.add:
+                            #    # Saving a NEW item
+                            #    if 'initial' in formsetObj:
+                            #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
+                            #    else:
+                            #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
+                            #else:
+                            #    # Get a formset including any stuff from POST
+                            #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+
+                            # Get a formset including any stuff from POST
+                            formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                            # Process this formset
+                            self.process_formset(prefix, self.request, formset)
                         
-                        # Process all the correct forms in the formset
-                        for subform in formset:
-                            if subform.is_valid():
-                                # DO the actual saving
-                                subform.save()
+                            # Process all the correct forms in the formset
+                            for subform in formset:
+                                if subform.is_valid():
+                                    # DO the actual saving
+                                    subform.save()
 
-                                # Log the SAVE action
-                                details = {'id': instance.id}
-                                details["savetype"] = "add" # if bNew else "change"
-                                details['model'] = subform.instance.__class__.__name__
-                                if subform.changed_data != None and len(subform.changed_data) > 0:
-                                    details['changes'] = action_model_changes(subform, subform.instance)
-                                self.action_add(instance, details, "add")
+                                    # Log the SAVE action
+                                    details = {'id': instance.id}
+                                    details["savetype"] = "add" # if bNew else "change"
+                                    details['model'] = subform.instance.__class__.__name__
+                                    if subform.changed_data != None and len(subform.changed_data) > 0:
+                                        details['changes'] = action_model_changes(subform, subform.instance)
+                                    self.action_add(instance, details, "add")
 
-                                # Signal that the *FORM* needs refreshing, because the formset changed
-                                bFormsetChanged = True
+                                    # Signal that the *FORM* needs refreshing, because the formset changed
+                                    bFormsetChanged = True
+                            if formset.is_valid():
+                                # Load an explicitly empty formset
+                                formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                            else:
+                                # Retain the original formset, that now contains the error specifications per form
+                                # But: do *NOT* add an additional form to it
+                                pass
 
-                        if formset.is_valid():
-                            # Load an explicitly empty formset
-                            formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
                         else:
-                            # Retain the original formset, that now contains the error specifications per form
-                            # But: do *NOT* add an additional form to it
-                            pass
-
+                            # All other cases: Load an explicitly empty formset
+                            formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
                     else:
-                        # All other cases: Load an explicitly empty formset
-                        formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
-                else:
-                    # show the data belonging to the current [obj]
-                    qs = self.get_formset_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                    else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, self.request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
-                # Get any possible typeahead parameters
-                lst_formset_ta = getattr(formset.form, "typeaheads", None)
-                if lst_formset_ta != None:
-                    for item in lst_formset_ta:
-                        self.lst_typeahead.append(item)
+                        # show the data belonging to the current [obj]
+                        qs = self.get_formset_queryset(prefix)
+                        if qs == None:
+                            formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                        else:
+                            formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                    # Process all the forms in the formset
+                    ordered_forms = self.process_formset(prefix, self.request, formset)
+                    if ordered_forms:
+                        context[prefix + "_ordered"] = ordered_forms
+                    # Store the instance
+                    formsetObj['formsetinstance'] = formset
+                    # Add the formset to the context
+                    context[prefix + "_formset"] = formset
+                    # Get any possible typeahead parameters
+                    lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                    if lst_formset_ta != None:
+                        for item in lst_formset_ta:
+                            self.lst_typeahead.append(item)
 
             # Essential formset information
             for formsetObj in self.formset_objects:
-                prefix = formsetObj['prefix']
-                if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
-                if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
+                if formsetObj['has_forms']:
+                    prefix = formsetObj['prefix']
+                    if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
+                    if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
 
             # Check if the formset made any changes to the form
             if bFormsetChanged:

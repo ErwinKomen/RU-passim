@@ -5909,6 +5909,27 @@ class SermonDescr(models.Model):
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         return sBack
 
+    def get_hcs_plain(self, username = None):
+        """Get all the historical collections associated with this sermon"""
+        lHtml = []
+        # Get all the SSG's linked to this manifestation
+        qs_ssg = self.equalgolds.all().values('id')
+        # qs_hc = self.collections.all()
+        lstQ = []
+        lstQ.append(Q(settype="hc"))
+        lstQ.append(Q(collections_super__id__in=qs_ssg))
+        qs_hc = Collection.objects.filter(*lstQ )
+        # qs_hc = Collection.objects.filter(settype="hc", collections_super__id__in=qs_ssg)
+        # TODO: filter on (a) public only or (b) private but from the current user
+        for col in qs_hc:
+            # Determine where clicking should lead to
+            url = reverse('collhist_details', kwargs={'pk': col.id})
+            # Create a display for this topic
+            lHtml.append('<span class="badge signature ot"><a href="{}" >{}</a></span>'.format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_incexp_match(self, sMatch=""):
         html = []
         dots = "..." if self.incipit else ""

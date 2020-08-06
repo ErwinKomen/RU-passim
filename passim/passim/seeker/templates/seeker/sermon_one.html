@@ -73,6 +73,9 @@
                   <a href="{% url 'sermon_details' msitem.sermon.id %}" class="sermon">
                     <span>{% include 'seeker/sermon_view.html' with sermon=msitem.sermon %}</span>
                   </a>
+                  <span class="sermon">
+                    <span class="manusermo hc hidden">{{msitem.sermon.get_hcs_plain|safe}}</span>
+                  </span>
                 {% elif msitem.shead %}
                   <span class="shead" {% if is_app_editor %}contenteditable="true"
                           oninput="ru.passim.seeker.sermon_change(this);"
