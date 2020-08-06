@@ -1156,6 +1156,7 @@ var ru = (function ($, ru) {
             err = "#little_err_msg",
             elTr = null,
             elUserDetails = "#add_to_details",
+            elAfterDetails = "#after_details",
             elView = null,
             elEdit = null;
 
@@ -1235,6 +1236,7 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").removeClass("hidden");
               // Hide afterdetails
               $(elUserDetails).addClass("hidden");
+              $(elAfterDetails).addClass("hidden");
               // Make sure typeahead works here
               ru.basic.init_typeahead();
               break;
@@ -1502,6 +1504,7 @@ var ru = (function ($, ru) {
                     $(elTr).find(".waiting").addClass("hidden");
                     // If we get here, switch on afterdetails again
                     $(elUserDetails).removeClass("hidden");
+                    $(elAfterDetails).removeClass("hidden");
                     // Perform init again
                     ru.basic.init_events();
                   }
@@ -1525,6 +1528,7 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").addClass("hidden");
               // If we get here, switch on afterdetails again
               $(elUserDetails).removeClass("hidden");
+              $(elAfterDetails).removeClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?

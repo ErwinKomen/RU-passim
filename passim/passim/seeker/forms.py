@@ -672,6 +672,22 @@ class SuperOneWidget(ModelSelect2Widget):
         return EqualGold.objects.filter(moved__isnull=True).order_by('code', 'id').distinct()
 
 
+class TemplateOneWidget(ModelSelect2Widget):
+    model = Template
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.profile.user.username)
+        return sLabel
+
+    def get_queryset(self):
+        #username = self.attrs.pop('username', '')
+        #team_group = self.attrs.pop('team_group', '')
+        return Template.objects.all().order_by('name').distinct()
+
+
+
+
 
 # ================= FORMS =======================================
 
@@ -2746,6 +2762,21 @@ class ManuscriptForm(PassimModelForm):
             msg = oErr.get_error_message()
             oErr.DoError("manuscriptForm")
         return None
+
+
+class TemplateImportForm(forms.Form):
+    """Allow choosing a template to copy sermons into an existing manuscript"""
+
+    manu_id  = forms.CharField(required=False,
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Manuscript id...',  'style': 'width: 100%;'}))
+    template = ModelChoiceField(queryset=None, required=False, 
+               widget=TemplateOneWidget(attrs={'data-placeholder': 'Select a template...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(TemplateImportForm, self).__init__(*args, **kwargs)
+        # Set the list of templates
+        self.fields['template'].queryset = Template.objects.all().order_by('name', 'profile__user__username').distinct()
 
 
 class TemplateForm(PassimModelForm):

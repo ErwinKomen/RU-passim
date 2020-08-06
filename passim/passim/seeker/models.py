@@ -3126,6 +3126,81 @@ class Manuscript(models.Model):
         # Return the new object
         return obj
 
+    def import_template(self, template):
+        """Import the information in [template] into the manuscript [self]"""
+
+        # Get the source manuscript
+        manu_src = template.manu
+
+        # Copy the sermons from [manu_src] into [self]
+        # NOTE: only if there are no sermons in [self] yet!!!!
+        if self.manuitems.count() == 0:
+            self.load_sermons_from(manu_src, mtype="man")
+
+        # Return myself again
+        return self
+
+    def load_sermons_from(self, manu_src, mtype = "tem"):
+        """Copy sermons from [manu_src] into myself"""
+
+        # Indicate what the destination manuscript object is
+        manu_dst = self
+        repair = ['parent', 'firstchild', 'next']
+
+        # copy all the sermons...
+        msitems = []
+        with transaction.atomic():
+            # Walk over all MsItem stuff
+            for msitem in manu_src.manuitems.all().order_by('order'):
+                dst = msitem
+                src_id = msitem.id
+                dst.pk = None
+                dst.manu = manu_dst     # This sets the destination's FK for the manuscript
+                                        # Does this leave the original unchanged? I hope so...:)
+                dst.save()
+                src = MsItem.objects.filter(id=src_id).first()
+                msitems.append(dict(src=src, dst=dst))
+
+        # Repair all the relationships from sermon to sermon
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
+                for relation in repair:
+                    src_rel = getattr(src, relation)
+                    if src_rel and src_rel.order:
+                        # Retrieve the target MsItem from the [manu_dst] by looking for the order number!!
+                        relation_target = manu_dst.manuitems.filter(order=src_rel.order).first()
+                        # Correct the MsItem's [dst] field now
+                        setattr(dst, relation, relation_target)
+                        dst.save()
+                # Copy and save a SermonDescr if needed
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # COpy it
+                    sermon_dst = sermon_src
+                    sermon_dst.pk = None
+                    sermon_dst.msitem = dst
+                    sermon_dst.mtype = mtype   # Change the type
+                    sermon_dst.stype = "imp"   # Imported
+                    sermon_dst.save()
+        # Walk the msitems again, and make sure SSG-links are copied!!
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # Make sure we also have the destination
+                    sermon_dst = dst.itemsermons.first()
+                    # Walk the SSG links tied with sermon_src
+                    for eq in sermon_src.equalgolds.all():
+                        # Add it to the destination sermon
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+        # Return okay
+        return True
+
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
         
@@ -6733,6 +6808,8 @@ class Template(models.Model):
     profile = models.ForeignKey(Profile, null=True, on_delete=models.CASCADE, related_name="profiletemplates")
     # [0-1] A template may have an additional description
     description = models.TextField("Description", null=True, blank=True)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
     # [1] Every template links to a `Manuscript` that has `mtype` set to `tem` (=template)
     manu = models.ForeignKey(Manuscript, null=True, on_delete=models.CASCADE, related_name="manutemplates")
 

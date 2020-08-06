@@ -57,15 +57,15 @@ from reportlab.rl_config import defaultPageSize
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-                                AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-                                SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
-                                SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
-                                SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
-                                ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-                                LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
-                                ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
-                                SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
-                                SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm
+    AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
+    SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
+    SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
+    SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
+    ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
+    LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
+    ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
+    SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
+    SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm, TemplateImportForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -6514,17 +6514,17 @@ class TemplateEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
-    def get_manuscripts(self, instance):
-        # find the shelfmark
-        lManu = []
-        for obj in instance.manuscripts_templates.all():
-            # Add the shelfmark of this one
-            manu = obj.manuscript
-            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-            shelfmark = manu.idno[:20]
-            lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-        sBack = ", ".join(lManu)
-        return sBack
+    #def get_manuscripts(self, instance):
+    #    # find the shelfmark
+    #    lManu = []
+    #    for obj in instance.manuscripts_templates.all():
+    #        # Add the shelfmark of this one
+    #        manu = obj.manuscript
+    #        url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+    #        shelfmark = manu.idno[:20]
+    #        lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+    #    sBack = ", ".join(lManu)
+    #    return sBack
 
 
 class TemplateDetails(TemplateEdit):
@@ -6560,6 +6560,31 @@ class TemplateApply(TemplateDetails):
         manu_new = manu_template.get_template_copy("man")
         # Re-direct to this manuscript
         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_new.id})
+        return None
+
+
+class TemplateImport(TemplateDetails):
+    """Import manuscript sermons from a template"""
+
+    initRedirect = True
+
+    def initializations(self, request, pk):
+        # Get the parameters
+        self.qd = request.POST
+        self.object = None
+        manu_id = self.qd.get("manu_id", "")
+        if manu_id != "":
+            instance = Manuscript.objects.filter(id=manu_id).first()
+        # The default redirectpage is just this manuscript
+        self.redirectpage = reverse("manuscript_details", kwargs = {'pk': instance.id})
+        # Get the template to be used as import
+        template_id = self.qd.get("template", "")
+        if template_id != "":
+            template = Template.objects.filter(id=template_id).first()
+            if template != None:
+                self.object = template
+                # Import this template into the manuscript
+                instance.import_template(template)
         return None
 
 
@@ -8064,11 +8089,14 @@ class ManuscriptEdit(BasicDetails):
         if context['is_app_editor']:
             lhtml = []
             lbuttons = []
+            template_import_button = "import_template_button"
+            has_sermons = (instance.manuitems.count() > 0)
             # Action depends on template/not
             if not istemplate:
                 # Add a button so that the user can import sermons + hierarchy from an existing template
-                lbuttons.append(dict(title="Import sermon manifestations from a template", 
-                             open="import_from_template", label="Import from template..."))
+                if not has_sermons:
+                    lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                                id=template_import_button, open="import_from_template", label="Import from template..."))
 
                 # Add a button so that the user can turn this manuscript into a `Template`
                 lbuttons.append(dict(title="Create template from this manuscript", 
@@ -8080,19 +8108,27 @@ class ManuscriptEdit(BasicDetails):
             # Build the HTML on the basis of the above
             lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
             for item in lbuttons:
+                idfield = ""
                 if 'submit' in item:
                     ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
                 elif 'open' in item:
                     ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
                 else:
                     ref = " href='{}'".format(item['href'])
-                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {}>".format(item['title'], ref))
+                if 'id' in item:
+                    idfield = " id='{}'".format(item['id'])
+                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
                 lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
             lhtml.append("</div></div>")
 
             if not istemplate:
+                # Add HTML to allow for the *creation* of a template from this manuscript
                 local_context = dict(manubase=instance.id)
                 lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+
+                # Add HTML to allow the user to choose sermons from a template
+                local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
+                local_context['import_button'] = template_import_button
                 lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
             # Store the after_details in the context

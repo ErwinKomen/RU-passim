@@ -921,6 +921,7 @@ class BasicDetails(DetailView):
     do_not_save = False
     no_delete = False
     newRedirect = False     # Redirect the page name to a correct one after creating
+    initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
     redirectpage = ""       # Where to redirect to
     add = False             # Are we adding a new record or editing an existing one?
@@ -988,6 +989,11 @@ class BasicDetails(DetailView):
         self.initializations(request, pk)
         # Make sure only POSTS get through that are authorized
         if request.user.is_authenticated:
+            # Check for initredirect
+            if self.initRedirect and self.redirectpage != "":
+                # Redirect to this page
+                return redirect(self.redirectpage)
+            # Get the context and perform some standard matters
             context = self.get_context_data(object=self.object)
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:

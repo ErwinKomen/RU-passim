@@ -73,6 +73,7 @@ urlpatterns = [
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
     url(r'^manuscript/hierarchy(?:/(?P<pk>\d+))?/$', ManuscriptHierarchy.as_view(), name='manuscript_hierarchy'),
+
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
     url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),
     url(r'^manuscript/litset(?:/(?P<pk>\d+))?/$', ManuscriptLitset.as_view(), name='manu_litset'),
@@ -189,6 +190,7 @@ urlpatterns = [
     url(r'^template/details(?:/(?P<pk>\d+))?/$', TemplateDetails.as_view(), name='template_details'),
     url(r'^template/edit(?:/(?P<pk>\d+))?/$', TemplateEdit.as_view(), name='template_edit'),
     url(r'^template/apply(?:/(?P<pk>\d+))?/$', TemplateApply.as_view(), name='template_apply'),
+    url(r'^template/import/$', TemplateImport.as_view(), name='template_import'),
 
     url(r'^gold/list', SermonGoldListView.as_view(), name='gold_list'),
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
