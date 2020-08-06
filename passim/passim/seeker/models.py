@@ -5909,7 +5909,7 @@ class SermonDescr(models.Model):
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         return sBack
 
-    def get_hcs_plain(self, username = None):
+    def get_hcs_plain(self, username = None, team_group=None):
         """Get all the historical collections associated with this sermon"""
         lHtml = []
         # Get all the SSG's linked to this manifestation
@@ -5918,8 +5918,11 @@ class SermonDescr(models.Model):
         lstQ = []
         lstQ.append(Q(settype="hc"))
         lstQ.append(Q(collections_super__id__in=qs_ssg))
-        qs_hc = Collection.objects.filter(*lstQ )
-        # qs_hc = Collection.objects.filter(settype="hc", collections_super__id__in=qs_ssg)
+        
+        if username == None or team_group == None:
+            qs_hc = Collection.objects.filter(*lstQ )
+        else:
+            qs_hc = Collection.get_scoped_queryset("super", username, team_group, settype="hc").filter(collections_super__id__in=qs_ssg)
         # TODO: filter on (a) public only or (b) private but from the current user
         for col in qs_hc:
             # Determine where clicking should lead to

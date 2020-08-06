@@ -8311,16 +8311,20 @@ class ManuscriptDetails(ManuscriptEdit):
         # Construct the hierarchical list
         sermon_list = []
         maxdepth = 0
-        build_htable = False
+        #build_htable = False
 
         method = "msitem"   # "sermondescr"
+
+        # Need to know who this user (profile) is
+        username = self.request.user.username
+        team_group = app_editor
 
         if instance != None:
             # Create a well sorted list of sermons
             if method == "msitem":
                 qs = instance.manuitems.filter(order__gte=0).order_by('order')
-            else:
-                qs = instance.manusermons.filter(order__gte=0).order_by('order')
+            #else:
+            #    qs = instance.manusermons.filter(order__gte=0).order_by('order')
             prev_level = 0
             for idx, sermon in enumerate(qs):
                 # Need this first, because it also REPAIRS possible parent errors
@@ -8331,8 +8335,8 @@ class ManuscriptDetails(ManuscriptEdit):
                 if parent:
                     if method == "msitem":
                         qs_siblings = instance.manuitems.filter(parent=parent).order_by('order')
-                    else:
-                        qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
+                    #else:
+                    #    qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
                     if sermon.id == qs_siblings.first().id:
                         firstchild = True
 
@@ -8345,9 +8349,9 @@ class ManuscriptDetails(ManuscriptEdit):
                     oSermon['sermon'] = sermon.itemsermons.first()
                     # And we add a reference to the SermonHead object
                     oSermon['shead'] = sermon.itemheads.first()
-                else:
-                    # 'sermon' is the SermonDescr instance
-                    oSermon['obj'] = sermon
+                #else:
+                #    # 'sermon' is the SermonDescr instance
+                #    oSermon['obj'] = sermon
                 oSermon['nodeid'] = sermon.order + 1
                 oSermon['number'] = idx + 1
                 oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
@@ -8358,8 +8362,12 @@ class ManuscriptDetails(ManuscriptEdit):
                 # Is this one a parent of others?
                 if method == "msitem":
                     oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
-                else:
-                    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
+                #else:
+                #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
+
+                # Add the user-dependent list of associated collections to this sermon descriptor
+                oSermon['hclist'] = oSermon['sermon'].get_hcs_plain(username, team_group)
+
                 sermon_list.append(oSermon)
                 # Bookkeeping
                 if level > maxdepth: maxdepth = level
@@ -8369,28 +8377,28 @@ class ManuscriptDetails(ManuscriptEdit):
                 oSermon['cols'] = maxdepth - oSermon['level'] + 1
                 if oSermon['group']: oSermon['cols'] -= 1
 
-            # Alternative method: create a hierarchical object of sermons
-            if method != "msitem" and build_htable:
-                lSermon = []
-                for sermon in qs:
-                    # Create sermon object
-                    oSermon = sermon_object(sermon)
-                    # Add it to the list
-                    lSermon.append(oSermon)
-                    # Immediately attach it to the correct parent
-                    parent_id = oSermon['parent']
-                    if parent_id:
-                        oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
-                        if oParent:
-                            oParent['child'].append(oSermon)
-                # Retain the top sermon
-                oSermon = lSermon[0]
-                # Remove the list
-                lSermon = []
+            ## Alternative method: create a hierarchical object of sermons
+            #if method != "msitem" and build_htable:
+            #    lSermon = []
+            #    for sermon in qs:
+            #        # Create sermon object
+            #        oSermon = sermon_object(sermon)
+            #        # Add it to the list
+            #        lSermon.append(oSermon)
+            #        # Immediately attach it to the correct parent
+            #        parent_id = oSermon['parent']
+            #        if parent_id:
+            #            oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
+            #            if oParent:
+            #                oParent['child'].append(oSermon)
+            #    # Retain the top sermon
+            #    oSermon = lSermon[0]
+            #    # Remove the list
+            #    lSermon = []
 
-                # DEBUGGING: show what we have
-                sSermon = json.dumps(oSermon)
-                context['sermon_htable'] = sSermon
+            #    # DEBUGGING: show what we have
+            #    sSermon = json.dumps(oSermon)
+            #    context['sermon_htable'] = sSermon
 
         # Add instances to the list, noting their childof and order
         context['sermon_list'] = sermon_list
