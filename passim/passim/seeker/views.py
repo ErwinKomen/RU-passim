@@ -7575,10 +7575,95 @@ class CollectionListView(BasicList):
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
                 self.order_heads.append({'name': 'Manuscript', 'order': '', 'type': 'str', 'custom': 'manuscript'})
-            self.filters = [ {"name": "Collection", "id": "filter_collection", "enabled": False}]
+            self.filters = [ 
+                {"name": "Collection",             "id": "filter_collection",  "enabled": False},
+                {"name": "Super sermon gold...",   "id": "filter_super",    "enabled": False, "head_id": "none"},
+                {"name": "Sermon...",              "id": "filter_sermo",    "enabled": False, "head_id": "none"},
+                {"name": "Manuscript...",          "id": "filter_manu",     "enabled": False, "head_id": "none"},
+                # Section SSG
+                {"name": "Author",          "id": "filter_ssgauthor",       "enabled": False, "head_id": "filter_super"},
+                {"name": "Incipit",         "id": "filter_ssgincipit",      "enabled": False, "head_id": "filter_super"},
+                {"name": "Explicit",        "id": "filter_ssgexplicit",     "enabled": False, "head_id": "filter_super"},
+                {"name": "Passim code",     "id": "filter_ssgcode",         "enabled": False, "head_id": "filter_super"},
+                {"name": "Number",          "id": "filter_ssgnumber",       "enabled": False, "head_id": "filter_super"},
+                {"name": "Gryson/Clavis",   "id": "filter_ssgsignature",    "enabled": False, "head_id": "filter_super"},
+                {"name": "Keyword",         "id": "filter_ssgkeyword",      "enabled": False, "head_id": "filter_super"},
+                {"name": "Status",          "id": "filter_ssgstype",        "enabled": False, "head_id": "filter_super"},
+                # Section S
+                {"name": "Gryson or Clavis","id": "filter_sermosignature",  "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Author",          "id": "filter_sermoauthor",     "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Incipit",         "id": "filter_sermoincipit",    "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Explicit",        "id": "filter_sermoexplicit",   "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Keyword",         "id": "filter_sermokeyword",    "enabled": False, "head_id": "filter_sermo"}, 
+                {"name": "Feast",           "id": "filter_sermofeast",      "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Note",            "id": "filter_sermonote",       "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Status",          "id": "filter_sermostype",      "enabled": False, "head_id": "filter_sermo"},
+                # Section M
+                {"name": "Shelfmark",       "id": "filter_manuid",          "enabled": False, "head_id": "filter_manu"},
+                {"name": "Country",         "id": "filter_manucountry",     "enabled": False, "head_id": "filter_manu"},
+                {"name": "City",            "id": "filter_manucity",        "enabled": False, "head_id": "filter_manu"},
+                {"name": "Library",         "id": "filter_manulibrary",     "enabled": False, "head_id": "filter_manu"},
+                {"name": "Origin",          "id": "filter_manuorigin",      "enabled": False, "head_id": "filter_manu"},
+                {"name": "Provenance",      "id": "filter_manuprovenance",  "enabled": False, "head_id": "filter_manu"},
+                {"name": "Date range",      "id": "filter_manudaterange",   "enabled": False, "head_id": "filter_manu"},
+                {"name": "Keyword",         "id": "filter_manukeyword",     "enabled": False, "head_id": "filter_manu"},
+                {"name": "Status",          "id": "filter_manustype",       "enabled": False, "head_id": "filter_manu"},
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+                # Section SSG
+                {'section': 'super', 'filterlist': [
+                    {'filter': 'ssgauthor',    'fkfield': 'super_col__super__author',            
+                     'keyS': 'ssgauthorname', 'keyFk': 'name', 'keyList': 'ssgauthorlist', 'infield': 'id', 'external': 'gold-authorname' },
+                    {'filter': 'ssgincipit',   'dbfield': 'super_col__super__srchincipit',   'keyS': 'ssgincipit'},
+                    {'filter': 'ssgexplicit',  'dbfield': 'super_col__super__srchexplicit',  'keyS': 'ssgexplicit'},
+                    {'filter': 'ssgcode',      'fkfield': 'super_col__super',              
+                     'keyS': 'ssgcode', 'keyList': 'ssgpassimlist', 'infield': 'id'},
+                    {'filter': 'ssgnumber',    'dbfield': 'super_col__super__number',       'keyS': 'ssgnumber'},
+                    {'filter': 'ssgsignature', 'fkfield': 'super_col__super__equal_goldsermons__goldsignatures', 
+                     'keyS': 'ssgsignature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'ssgsiglist', 'infield': 'code' },
+                    {'filter': 'ssgkeyword',   'fkfield': 'super_col__super__keywords',          
+                     'keyFk': 'name', 'keyList': 'ssgkwlist', 'infield': 'id'},
+                    {'filter': 'ssgstype',     'dbfield': 'super_col__super__stype',             
+                     'keyList': 'ssgstypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+                    ]},
+                # Section S
+                {'section': 'sermo', 'filterlist': [
+                    {'filter': 'sermoincipit',       'dbfield': 'super_col__super__equalgold_sermons__srchincipit',   'keyS': 'sermoincipit'},
+                    {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
+                    {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},
+                    {'filter': 'sermofeast',         'dbfield': 'super_col__super__equalgold_sermons__feast',         'keyS': 'sermofeast'},
+                    {'filter': 'sermonote',          'dbfield': 'super_col__super__equalgold_sermons__additional',    'keyS': 'sermonote'},
+                    {'filter': 'sermoauthor',        'fkfield': 'super_col__super__equalgold_sermons__author',            
+                     'keyS': 'sermoauthorname', 'keyFk': 'name', 'keyList': 'sermoauthorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+                    {'filter': 'sermosignature',     
+                     'fkfield': 'super_col__super__equalgold_sermons__signatures|super_col__super__equalgold_sermons__goldsermons__goldsignatures',        
+                     'keyS': 'sermosignature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'sermosiglist', 'infield': 'code' },
+                    {'filter': 'sermokeyword',       'fkfield': 'super_col__super__equalgold_sermons__keywords',          
+                     'keyFk': 'name', 'keyList': 'sermokwlist', 'infield': 'id' }, 
+                    {'filter': 'sermostype',         'dbfield': 'super_col__super__equalgold_sermons__stype',             
+                     'keyList': 'sermostypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }                    ]},
+                # Section M
+                {'section': 'manu', 'filterlist': [
+                    {'filter': 'manuid',        'fkfield': 'super_col__super__equalgold_sermons__msitem__manu',                   
+                     'keyS': 'manuidno',    'keyFk': "idno", 'keyList': 'manuidlist', 'infield': 'id'},
+                    {'filter': 'manulibrary',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__library',                
+                     'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
+                    {'filter': 'manuprovenance',    'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__provenances__location',  
+                     'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+                    {'filter': 'manuorigin',        'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__origin',                 
+                     'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+                    {'filter': 'manukeyword',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__keywords',               
+                     'keyFk': 'name', 'keyList': 'manukwlist', 'infield': 'name' },
+                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__yearstart__gte',         
+                     'keyS': 'date_from'},
+                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__yearfinish__lte',        
+                     'keyS': 'date_until'},
+                    {'filter': 'manustype',         'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__stype',                  
+                     'keyList': 'manustypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
+                    ]},
+                # Section Other
                 {'section': 'other', 'filterlist': [
                     {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },

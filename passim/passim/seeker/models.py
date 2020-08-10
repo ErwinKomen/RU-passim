@@ -5622,7 +5622,7 @@ class SermonDescr(models.Model):
     goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
 
     # [0-n] Link to one or more SSG (equalgold)
-    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual")
+    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual", related_name="equalgold_sermons")
 
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
