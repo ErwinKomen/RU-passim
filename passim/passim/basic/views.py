@@ -739,8 +739,10 @@ class BasicList(ListView):
                     options = head['options']
                     if 'delete' in options:
                         fobj['delete'] = True
-                    fobj['styles'] = "width: {}px;".format(50 * len(options))
-                    classes.append("tdnowrap")
+                    else:
+                        fobj['styles'] = "min-width: {}px;".format(50 * len(options))
+                        if not 'allowwrap' in head or not head['allowwrap']:
+                            classes.append("tdnowrap")
                 else:
                     fobj['styles'] = "width: 100px;"
                     if not 'allowwrap' in head or not head['allowwrap']:

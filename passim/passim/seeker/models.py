@@ -4021,7 +4021,7 @@ class EqualGold(models.Model):
                         self.code = passim_code
 
             # (Re) calculate the number of associated historical collections (for *all* users!!)
-            self.hccount = self.collections.filter(settype="hc").count()
+            self.hccount = self.collections.filter(settype="hc", scope='publ').count()
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -4125,7 +4125,7 @@ class EqualGold(models.Model):
 
     def get_hclist_markdown(self):
         html = []
-        for hc in self.collections.filter(settype="hc").order_by('name').distinct():
+        for hc in self.collections.filter(settype="hc", scope='publ').order_by('name').distinct():
             url = reverse('collhist_details', kwargs={'pk': hc.id})
             html.append("<span class='collection clickable'><a href='{}'>{}</a></span>".format(url,hc.name))
         sBack = ", ".join(html)
