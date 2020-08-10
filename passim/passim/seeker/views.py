@@ -7566,11 +7566,13 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', 'created', '']
+            self.order_cols = ['name', '', 'ssgauthornum', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                {'name': 'Created',                 'order': 'o=2', 'type': 'str', 'custom': 'created'}
+                {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors'},
+                {'name': 'Author count',            'order': 'o=3', 'type': 'int', 'custom': 'authcount'},
+                {'name': 'Created',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
             ]  
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
@@ -7771,6 +7773,10 @@ class CollectionListView(BasicList):
             sBack = get_crpp_date(instance.created)
         elif custom == "owner":
             sBack = instance.owner.user.username
+        elif custom == "authors":
+            sBack = instance.get_authors_markdown()
+        elif custom == "authcount":
+            sBack = "{}".format(instance.ssgauthornum)
         elif custom == "manuscript":
             html = []
             url = reverse('collhist_manu', kwargs={'pk': instance.id})

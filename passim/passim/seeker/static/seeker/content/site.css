@@ -1509,3 +1509,7 @@ span.overlap {
     background-color: lightyellow;
     color: darkblue;
 }
+
+.authorname {
+    color: darkgreen; font-size: small;
+}

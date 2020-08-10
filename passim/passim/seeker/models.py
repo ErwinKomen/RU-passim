@@ -5289,6 +5289,9 @@ class Collection(models.Model):
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
     created = models.DateTimeField(default=get_current_datetime)
 
+    # [0-1] Number of SSG authors -- if this is a settype='hc'
+    ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
+
     # [0-n] Many-to-many: keywords per SermonGold
     litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
 
@@ -5296,10 +5299,15 @@ class Collection(models.Model):
     def __str__(self):
         return self.name
 
-    def get_readonly_display(self):
-        response = "yes" if self.readonly else "no"
-        return response
-        
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Double check the number of authors, if this is settype HC
+        if self.settype == "hc":
+            ssg_id = self.super_col.all().values('super__id')
+            authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).count()
+            self.ssgauthornum = authornum
+        respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
+        return respons
+
     def freqsermo(self):
         """Frequency in manifestation sermons"""
         freq = self.collections_sermon.all().count()
@@ -5320,6 +5328,20 @@ class Collection(models.Model):
         freq = self.collections_super.all().count()
         return freq
 
+    def get_authors_markdown(self):
+        html = []
+        if self.settype == "hc":
+            ssg_id = self.super_col.all().values('super__id')
+            for author in Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('name').distinct():
+                dots = "" if len(author.name) < 20 else "..."
+                html.append("<span class='authorname' title='{}'>{}{}</span>".format(author.name, author.name[:20], dots))
+        sBack = ", ".join(html)
+        return sBack
+
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
+        
     def get_elevate(self):
         html = []
         url = reverse("collhist_elevate", kwargs={'pk': self.id})
