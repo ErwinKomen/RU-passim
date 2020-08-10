@@ -5303,7 +5303,7 @@ class Collection(models.Model):
         # Double check the number of authors, if this is settype HC
         if self.settype == "hc":
             ssg_id = self.super_col.all().values('super__id')
-            authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).count()
+            authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
             self.ssgauthornum = authornum
         respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
         return respons

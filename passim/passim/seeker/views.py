@@ -7569,8 +7569,8 @@ class CollectionListView(BasicList):
             self.order_cols = ['name', '', 'ssgauthornum', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
-                {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors'},
+                {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
+                {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
                 {'name': 'Author count',            'order': 'o=3', 'type': 'int', 'custom': 'authcount'},
                 {'name': 'Created',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
             ]  

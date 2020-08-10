@@ -743,7 +743,8 @@ class BasicList(ListView):
                     classes.append("tdnowrap")
                 else:
                     fobj['styles'] = "width: 100px;"
-                    classes.append("tdnowrap")
+                    if not 'allowwrap' in head or not head['allowwrap']:
+                        classes.append("tdnowrap")
                 if 'align' in head and head['align'] != "":
                     fobj['align'] = head['align'] 
                 fobj['classes'] = " ".join(classes)
