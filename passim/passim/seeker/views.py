@@ -10218,7 +10218,7 @@ class EqualGoldListView(BasicList):
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
     # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'sgcount', 'hccount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -10226,14 +10226,18 @@ class EqualGoldListView(BasicList):
         # Issue #212: remove sermon number from listview
         # {'name': 'Number',                  'order': 'o=2', 'type': 'int', 'custom': 'number', 'linkdetails': True},
 
-        {'name': 'Code',                    'order': 'o=3', 'type': 'str', 'custom': 'code',   'linkdetails': True},
-        {'name': 'Gryson/Clavis',           'order': 'o=4', 'type': 'str', 'custom': 'sig',
+        {'name': 'Code',                    'order': 'o=2', 'type': 'str', 'custom': 'code',   'linkdetails': True},
+        {'name': 'Gryson/Clavis',           'order': 'o=3', 'type': 'str', 'custom': 'sig', 'allowwrap': True, 'options': "abcd",
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
-        {'name': 'Incipit ... Explicit',    'order': 'o=5', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
+        {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
+        {'name': 'HC', 'title': "Historical collections associated with this Super Sermon Gold", 
+         'order': '', 'allowwrap': True, 'type': 'str', 'custom': 'hclist'},
         {'name': 'Size',                    'order': 'o=6'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
-        {'name': 'Status',                  'order': 'o=7',   'type': 'str', 'custom': 'status'}
+        {'name': 'HCs',                    'order': 'o=7'   , 'type': 'int', 'custom': 'hccount',
+         'title': "Number of historical collections associated with this Super Sermon Gold"},
+        {'name': 'Status',                  'order': 'o=8',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -10320,6 +10324,16 @@ class EqualGoldListView(BasicList):
                     obj.save()
             Information.set_kvalue("s_to_ssg_link", "done")
 
+        if Information.get_kvalue("hccount") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                for ssg in EqualGold.objects.all():
+                    hccount = ssg.collections.filter(settype="hc").count()
+                    if hccount != ssg.hccount:
+                        ssg.hccount = hccount
+                        ssg.save()
+            Information.set_kvalue("hccount", "done")
+
         return None
     
     def add_to_context(self, context, initial):
@@ -10356,6 +10370,10 @@ class EqualGoldListView(BasicList):
             # iSize = instance.equal_goldsermons.all().count()
             iSize = instance.sgcount
             html.append("{}".format(iSize))
+        elif custom == "hccount":
+            html.append("{}".format(instance.hccount))
+        elif custom == "hclist":
+            html.append(instance.get_hclist_markdown())
         elif custom == "code":
             sCode = "-" if instance.code  == None else instance.code
             html.append("{}".format(sCode))

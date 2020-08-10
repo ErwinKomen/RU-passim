@@ -3976,6 +3976,8 @@ class EqualGold(models.Model):
     sgcount = models.IntegerField("Equality set size", default=0)
     # [1] The first signature
     firstsig = models.CharField("Code", max_length=LONG_STRING, blank=True, null=True)
+    # [1] The number of associated Historical Collections
+    hccount = models.IntegerField("Historical Collection count", default=0)
 
     # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
@@ -4017,6 +4019,9 @@ class EqualGold(models.Model):
                     if not self.code or self.code != passim_code:
                         # Now save myself with the new code
                         self.code = passim_code
+
+            # (Re) calculate the number of associated historical collections (for *all* users!!)
+            self.hccount = self.collections.filter(settype="hc").count()
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -4116,6 +4121,14 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         elif incexp_type == "search":
             sBack = adapt_markdown(self.srchexplicit)
+        return sBack
+
+    def get_hclist_markdown(self):
+        html = []
+        for hc in self.collections.filter(settype="hc").order_by('name').distinct():
+            url = reverse('collhist_details', kwargs={'pk': hc.id})
+            html.append("<span class='collection clickable'><a href='{}'>{}</a></span>".format(url,hc.name))
+        sBack = ", ".join(html)
         return sBack
 
     def get_incexp_match(self, sMatch=""):
