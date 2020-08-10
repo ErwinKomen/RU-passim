@@ -1187,7 +1187,8 @@ class BasicDetails(DetailView):
 
                 # Double check to see if information on this formset is available or not
                 formsetObj['has_forms'] = (self.qd.get("{}-TOTAL_FORMS", None) != None)
-                if formsetObj['has_forms']:
+                bypass = True
+                if bypass or formsetObj['has_forms']:
 
                     if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                         # Only process actual changes!!

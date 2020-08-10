@@ -8366,7 +8366,7 @@ class ManuscriptDetails(ManuscriptEdit):
                 #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
 
                 # Add the user-dependent list of associated collections to this sermon descriptor
-                oSermon['hclist'] = oSermon['sermon'].get_hcs_plain(username, team_group)
+                oSermon['hclist'] = [] if oSermon['sermon'] == None else oSermon['sermon'].get_hcs_plain(username, team_group)
 
                 sermon_list.append(oSermon)
                 # Bookkeeping

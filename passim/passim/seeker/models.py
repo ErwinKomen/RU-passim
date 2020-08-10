@@ -2683,6 +2683,8 @@ class Manuscript(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
@@ -5604,6 +5606,8 @@ class SermonDescr(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+    # [1] And a date: the date of saving this sermon
+    created = models.DateTimeField(default=get_current_datetime)
 
     # [1] Every SermonDescr may be a manifestation (default) or a template (optional)
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
