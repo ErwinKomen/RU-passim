@@ -2685,6 +2685,7 @@ class Manuscript(models.Model):
     snote = models.TextField("Status note(s)", default="[]")
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
@@ -2711,6 +2712,12 @@ class Manuscript(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def adapt_hierarchy():
         bResult = True
@@ -5302,6 +5309,7 @@ class Collection(models.Model):
     snote = models.TextField("Status note(s)", default="[]")
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
     created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
 
     # [0-1] Number of SSG authors -- if this is a settype='hc'
     ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
@@ -5319,6 +5327,8 @@ class Collection(models.Model):
             ssg_id = self.super_col.all().values('super__id')
             authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
             self.ssgauthornum = authornum
+        # Adapt the save date
+        self.saved = get_current_datetime()
         respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
         return respons
 
@@ -6909,3 +6919,51 @@ class Template(models.Model):
             # Combine response
             sBack = "\n".join(html)
         return sBack
+
+
+class CollOverlap(models.Model):
+    """Used to calculate the overlap between (historical) collections and manuscripts"""
+
+    # [1] Every CollOverlap belongs to someone
+    profile = models.ForeignKey(Profile, null=True, on_delete=models.CASCADE, related_name="profile_colloverlaps")
+    # [1] The overlap is with one Collection
+    collection = models.ForeignKey(Collection, null=True, on_delete=models.CASCADE, related_name="collection_colloverlaps")
+    # [1] Every CollOverlap links to a `Manuscript`
+    manuscript = models.ForeignKey(Manuscript, null=True, on_delete=models.CASCADE, related_name="manu_colloverlaps")
+    # [1] The percentage overlap
+    overlap = models.IntegerField("Overlap percentage", default=0)
+    # [1] And a date: the date of saving this report
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def get_overlap(profile, collection, manuscript):
+        """Calculate and set the overlap between collection and manuscript"""
+
+        obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
+        if obj == None:
+            obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
+        # Get the ids of the SSGs in the collection
+        coll_list = [ collection ]
+        ssg_coll = EqualGold.objects.filter(collections__in=coll_list).values('id')
+        if len(ssg_coll) == 0:
+            ptc = 0
+        else:
+            # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
+            ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
+            # Now calculate the overlap
+            count = 0
+            for item in ssg_coll:
+                if item in ssg_manu: count += 1
+            ptc = 100 * count // len(ssg_coll)
+        # Check if there is a change in percentage
+        if ptc != obj.overlap:
+            # Set the percentage
+            obj.overlap = ptc
+            obj.save()
+        return ptc
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(CollOverlap, self).save(force_insert, force_update, using, update_fields)
+        return response

@@ -835,6 +835,7 @@ class SearchManuForm(PassimModelForm):
                                                        'class': 'searching'}))
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
+    collist_hist =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -849,6 +850,8 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False, 
                 widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    overlap     = forms.IntegerField(label=_("percentage overlap"), required=False,
+                widget=NumberInput(attrs={'placeholder': 'Overlap at least...', 'type': 'range', 'min': '1', 'max': '100', 'value': '10', 'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -889,24 +892,23 @@ class SearchManuForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
 
             # Set the widgets correctly
-            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'pd',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
+            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
+            self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
-            #self.fields['collist_m'].queryset = Collection.objects.filter(type='manu').order_by('name')
-            #self.fields['collist_s'].queryset = Collection.objects.filter(type='sermo').order_by('name')
-            #self.fields['collist_sg'].queryset = Collection.objects.filter(type='gold').order_by('name')
-            #self.fields['collist_ssg'].queryset = Collection.objects.filter(type='super').order_by('name')
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "manu"
@@ -1953,7 +1955,7 @@ class SuperSermonGoldForm(PassimModelForm):
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'settype': 'hc',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True

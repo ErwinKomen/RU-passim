@@ -211,7 +211,8 @@
                               <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
                                 <table style="width: 100%;">
                                   <tr class="form-row">
-                                    <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
+                                    <td style="min-width: 130px;" valign="top" 
+                                        {% if filter.title %}title="{{filter.title}}"{% endif %}>{{filter.name}}</td>
                                     <td style="width: 100%;">
                                       {% for fitem in filter.fitems %}
                                         {% if fitem.dbfield %}<span class="keyword-key hidden">{{fitem.dbfield}}</span>{% endif %}

@@ -71,7 +71,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
@@ -5818,10 +5818,10 @@ class SermonDetails(SermonEdit):
 
         # Double check for the presence of manu and order
         if instance.msitem and instance.msitem.order < 0:
-            # Calculate how many sermons there are
-            sermon_count = instance.msitem.manu.get_sermon_count()
+            # Calculate how many MSITEMS (!) there are
+            msitem_count = instance.msitem.manu.manuitems.all().count()
             # Adapt the MsItem order
-            msitem.order = sermon_count
+            msitem.order = msitem_count
             msitem.save()
             # Find out which is the one PRECEDING me (if any) at the HIGHEST level
             prec_list = instance.msitem.manu.manuitems.filter(parent__isnull=True, order__gt=msitem.order)
@@ -6514,18 +6514,6 @@ class TemplateEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
-    #def get_manuscripts(self, instance):
-    #    # find the shelfmark
-    #    lManu = []
-    #    for obj in instance.manuscripts_templates.all():
-    #        # Add the shelfmark of this one
-    #        manu = obj.manuscript
-    #        url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-    #        shelfmark = manu.idno[:20]
-    #        lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-    #    sBack = ", ".join(lManu)
-    #    return sBack
-
 
 class TemplateDetails(TemplateEdit):
     """Like Template Edit, but then html output"""
@@ -7121,7 +7109,11 @@ class CollHistDetails(CollHistEdit):
                 manuscripts = dict(title="Manuscripts with sermons connected to this collection", prefix="manu")
 
             # Get the manuscripts linked to these SSGs
-            qs_manu = Manuscript.objects.filter(manuitems__itemsermons__sermondescr_super__super__id__in=qs_ssg).order_by(
+            lstQ = []
+            # lstQ.append(Q(manuitems__itemsermons__sermondescr_super__super__id__in=qs_ssg))
+            lstQ.append(Q(manuitems__itemsermons__equalgolds__collections=instance))
+            lstQ.append(Q(mtype="man"))
+            qs_manu = Manuscript.objects.filter(*lstQ).order_by(
                 'id').distinct().order_by('lcity__name', 'library__name', 'idno')
 
             rel_list =[]
@@ -8700,13 +8692,15 @@ class ManuscriptListView(BasicList):
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
-        {"name": "Collection...",   "id": "filter_collection",       "enabled": False, "head_id": "none"},
-        {"name": "Gryson or Clavis","id": "filter_signature",        "enabled": False, "head_id": "filter_sermon"},
-        {"name": "Manuscript",      "id": "filter_collection_manu",  "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon",          "id": "filter_collection_sermo", "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon Gold",     "id": "filter_collection_gold",  "enabled": False, "head_id": "filter_collection"},
-        {"name": "Super sermon gold","id": "filter_collection_super","enabled": False, "head_id": "filter_collection"},
-        {"name": "Project",         "id": "filter_project",          "enabled": False, "head_id": "filter_other"},
+        {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
+        {"name": "Gryson or Clavis",        "id": "filter_signature",           "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
+        {"name": "HC overlap",              "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Sermon Gold",         "id": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "Project",                 "id": "filter_project",             "enabled": False, "head_id": "filter_other"},
       ]
 
     searches = [
@@ -8724,10 +8718,21 @@ class ManuscriptListView(BasicList):
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
-            {'filter': 'collection_manu',  'fkfield': 'collections',                            'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
-            {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__goldsermons__equal__collections', 'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
+            # === Historical Collection ===
+            {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
+            {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
+             'title': 'Percentage overlap between the Historical Collection SSGs and the SSGs referred to in the manuscripts'},
+            # === Personal Dataset ===
+            {'filter': 'collection_manu',  'fkfield': 'collections',                            
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
+            {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               
+             'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
+            {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
+             'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__goldsermons__equal__collections', 
+             'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
+            # ===================
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -8812,10 +8817,10 @@ class ManuscriptListView(BasicList):
             html.append("{}".format(instance.get_sermon_count()))
         elif custom == "from":
             for item in instance.manuscript_dateranges.all():
-                html.append("<div>{}</div".format(item.yearstart))
+                html.append("<div>{}</div>".format(item.yearstart))
         elif custom == "until":
             for item in instance.manuscript_dateranges.all():
-                html.append("<div>{}</div".format(item.yearfinish))
+                html.append("<div>{}</div>".format(item.yearfinish))
         elif custom == "status":
             # html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
             html.append(instance.get_stype_light())
@@ -8835,6 +8840,7 @@ class ManuscriptListView(BasicList):
         lstExclude=None
         qAlternative = None
 
+        prjlist = None
         # Check if a list of keywords is given
         if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
             # Get the list
@@ -8855,6 +8861,39 @@ class ManuscriptListView(BasicList):
                 prj_default = qs.first()
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
+                prjlist = qs
+        # Check if an overlap percentage is specified
+        if 'overlap' in fields and fields['overlap'] != None:
+            # Get the overlap
+            overlap = fields.get('overlap', "0")
+            # Use an overt truth 
+            fields['overlap'] = Q(mtype="man")
+            if 'collist_hist' in fields and fields['collist_hist'] != None:
+                coll_list = fields['collist_hist']
+                if len(coll_list) > 0:
+                    # Yes, overlap specified
+                    if isinstance(overlap, int):
+                        # Make sure the string is interpreted as an integer
+                        overlap = int(overlap)
+                        # Now add a Q expression
+                        fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+
+                        # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+                
+                        # (1) Possible manuscripts only filter on: mtype=man, prjlist
+                        lstQ = []
+                        if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                        lstQ.append(Q(mtype="man"))
+                        lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
+                        manu_list = Manuscript.objects.filter(*lstQ)
+
+                        # We also need to have the profile
+                        profile = Profile.get_user_profile(self.request.user.username)
+                        # Now calculate the overlap for all
+                        with transaction.atomic():
+                            for coll in coll_list:
+                                for manu in manu_list:
+                                    ptc = CollOverlap.get_overlap(profile, coll, manu)
         # Make sure we only show manifestations
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative

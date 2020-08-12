@@ -1171,27 +1171,24 @@ class BasicDetails(DetailView):
         # Get the instance
         instance = self.object
 
-        # Prepare form
-        frm = self.prepare_form(instance, context, initial)
+        try:
+            # Prepare form
+            frm = self.prepare_form(instance, context, initial)
 
-        if frm:
+            if frm:
 
-            if instance == None:
-                instance = frm.instance
-                self.object = instance
+                if instance == None:
+                    instance = frm.instance
+                    self.object = instance
 
-            # Walk all the formset objects
-            bFormsetChanged = False
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                formset = None
-                form_kwargs = self.get_form_kwargs(prefix)
-
-                # Double check to see if information on this formset is available or not
-                formsetObj['has_forms'] = (self.qd.get("{}-TOTAL_FORMS", None) != None)
-                bypass = True
-                if bypass or formsetObj['has_forms']:
+                # Walk all the formset objects
+                bFormsetChanged = False
+                for formsetObj in self.formset_objects:
+                    formsetClass = formsetObj['formsetClass']
+                    prefix  = formsetObj['prefix']
+                    formset = None
+                    form_kwargs = self.get_form_kwargs(prefix)
+                    formsetObj['may_evaluate'] = True
 
                     if 'noinit' in formsetObj and formsetObj['noinit'] and not self.add:
                         # Only process actual changes!!
@@ -1207,34 +1204,39 @@ class BasicDetails(DetailView):
                             #    # Get a formset including any stuff from POST
                             #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
 
-                            # Get a formset including any stuff from POST
-                            formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
-                            # Process this formset
-                            self.process_formset(prefix, self.request, formset)
+                            # Double check to see if information on this formset is available or not
+                            formsetObj['may_evaluate'] = (self.qd.get("{}-TOTAL_FORMS".format(prefix), None) != None)
+                            bypass = False
+                            if bypass or formsetObj['may_evaluate']:
+
+                                # Get a formset including any stuff from POST
+                                formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
+                                # Process this formset
+                                self.process_formset(prefix, self.request, formset)
                         
-                            # Process all the correct forms in the formset
-                            for subform in formset:
-                                if subform.is_valid():
-                                    # DO the actual saving
-                                    subform.save()
+                                # Process all the correct forms in the formset
+                                for subform in formset:
+                                    if subform.is_valid():
+                                        # DO the actual saving
+                                        subform.save()
 
-                                    # Log the SAVE action
-                                    details = {'id': instance.id}
-                                    details["savetype"] = "add" # if bNew else "change"
-                                    details['model'] = subform.instance.__class__.__name__
-                                    if subform.changed_data != None and len(subform.changed_data) > 0:
-                                        details['changes'] = action_model_changes(subform, subform.instance)
-                                    self.action_add(instance, details, "add")
+                                        # Log the SAVE action
+                                        details = {'id': instance.id}
+                                        details["savetype"] = "add" # if bNew else "change"
+                                        details['model'] = subform.instance.__class__.__name__
+                                        if subform.changed_data != None and len(subform.changed_data) > 0:
+                                            details['changes'] = action_model_changes(subform, subform.instance)
+                                        self.action_add(instance, details, "add")
 
-                                    # Signal that the *FORM* needs refreshing, because the formset changed
-                                    bFormsetChanged = True
-                            if formset.is_valid():
-                                # Load an explicitly empty formset
-                                formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
-                            else:
-                                # Retain the original formset, that now contains the error specifications per form
-                                # But: do *NOT* add an additional form to it
-                                pass
+                                        # Signal that the *FORM* needs refreshing, because the formset changed
+                                        bFormsetChanged = True
+                                if formset.is_valid():
+                                    # Load an explicitly empty formset
+                                    formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
+                                else:
+                                    # Retain the original formset, that now contains the error specifications per form
+                                    # But: do *NOT* add an additional form to it
+                                    pass
 
                         else:
                             # All other cases: Load an explicitly empty formset
@@ -1246,106 +1248,112 @@ class BasicDetails(DetailView):
                             formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
                         else:
                             formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                    # Process all the forms in the formset
-                    ordered_forms = self.process_formset(prefix, self.request, formset)
-                    if ordered_forms:
-                        context[prefix + "_ordered"] = ordered_forms
-                    # Store the instance
-                    formsetObj['formsetinstance'] = formset
-                    # Add the formset to the context
-                    context[prefix + "_formset"] = formset
-                    # Get any possible typeahead parameters
-                    lst_formset_ta = getattr(formset.form, "typeaheads", None)
-                    if lst_formset_ta != None:
-                        for item in lst_formset_ta:
-                            self.lst_typeahead.append(item)
 
-            # Essential formset information
-            for formsetObj in self.formset_objects:
-                if formsetObj['has_forms']:
+                    # Only continue if we have a formset
+                    if formset != None:
+                        # Process all the forms in the formset
+                        ordered_forms = self.process_formset(prefix, self.request, formset)
+                        if ordered_forms:
+                            context[prefix + "_ordered"] = ordered_forms
+                        # Store the instance
+                        formsetObj['formsetinstance'] = formset
+                        # Add the formset to the context
+                        context[prefix + "_formset"] = formset
+                        # Get any possible typeahead parameters
+                        lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                        if lst_formset_ta != None:
+                            for item in lst_formset_ta:
+                                self.lst_typeahead.append(item)
+
+                # Essential formset information
+                for formsetObj in self.formset_objects:
+                    #if formsetObj['may_evaluate']:
                     prefix = formsetObj['prefix']
                     if 'fields' in formsetObj: context["{}_fields".format(prefix)] = formsetObj['fields']
                     if 'linkfield' in formsetObj: context["{}_linkfield".format(prefix)] = formsetObj['linkfield']
 
-            # Check if the formset made any changes to the form
-            if bFormsetChanged:
-                # OLD: 
-                frm = self.prepare_form(instance, context)
+                # Check if the formset made any changes to the form
+                if bFormsetChanged:
+                    # OLD: 
+                    frm = self.prepare_form(instance, context)
 
-            # Put the form and the formset in the context
-            context['{}Form'.format(self.prefix)] = frm
-            context['basic_form'] = frm
-            context['instance'] = instance
-            context['options'] = json.dumps({"isnew": (instance == None)})
+                # Put the form and the formset in the context
+                context['{}Form'.format(self.prefix)] = frm
+                context['basic_form'] = frm
+                context['instance'] = instance
+                context['options'] = json.dumps({"isnew": (instance == None)})
 
-            # Possibly define the admin detailsview
-            if instance:
-                admindetails = "admin:seeker_{}_change".format(classname)
-                try:
-                    context['admindetails'] = reverse(admindetails, args=[instance.id])
-                except:
-                    pass
-            context['modelname'] = self.model._meta.object_name
-            context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
+                # Possibly define the admin detailsview
+                if instance:
+                    admindetails = "admin:seeker_{}_change".format(classname)
+                    try:
+                        context['admindetails'] = reverse(admindetails, args=[instance.id])
+                    except:
+                        pass
+                context['modelname'] = self.model._meta.object_name
+                context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
 
-            # Make sure we have a url for editing
-            if instance and instance.id:
-                # There is a details and edit url
-                context['editview'] = reverse("{}_edit".format(basic_name), kwargs={'pk': instance.id})
-                context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
-            # Make sure we have an url for new
-            context['addview'] = reverse("{}_details".format(basic_name))
+                # Make sure we have a url for editing
+                if instance and instance.id:
+                    # There is a details and edit url
+                    context['editview'] = reverse("{}_edit".format(basic_name), kwargs={'pk': instance.id})
+                    context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
+                # Make sure we have an url for new
+                context['addview'] = reverse("{}_details".format(basic_name))
 
-        # Determine breadcrumbs and previous page
-        if self.is_basic:
-            title = self.title if self.title != "" else basic_name
-            if self.rtype == "json":
-                # This is the EditView
-                context['breadcrumbs'] = get_breadcrumbs(self.request, "{} edit".format(title), False)
-                prevpage = reverse('home')
-                context['prevpage'] = prevpage
-            else:
-                # This is DetailsView
-                # Process this visit and get the new breadcrumbs object
-                prevpage = context['listview']
-                context['prevpage'] = prevpage
-                crumbs = []
-                crumbs.append([title, prevpage])
-                current_name = title if instance else "{} (new)".format(title)
-                context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-
-        # Possibly add to context by the calling function
-        if instance.id:
-            context = self.add_to_context(context, instance)
-            if self.history_button:
-                # Retrieve history
-                context['history_contents'] = self.get_history(instance)
-
-        # fill in the form values
-        if frm and 'mainitems' in context:
-            for mobj in context['mainitems']:
-                # Check for possible form field information
-                if 'field_key' in mobj: 
-                    mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
-                    mobj['field_key'] = frm[mobj['field_key']]
-                if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
-                if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
-                if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
-
-                # Calculate view-mode versus any-mode
-                #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
-                if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
-                    mobj['allowing'] = "edit"
+            # Determine breadcrumbs and previous page
+            if self.is_basic:
+                title = self.title if self.title != "" else basic_name
+                if self.rtype == "json":
+                    # This is the EditView
+                    context['breadcrumbs'] = get_breadcrumbs(self.request, "{} edit".format(title), False)
+                    prevpage = reverse('home')
+                    context['prevpage'] = prevpage
                 else:
-                    mobj['allowing'] = "view"
-                if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
-                    mobj['allowing_key_list'] = "edit"
-                else:
-                    mobj['allowing_key_list'] = "view"
+                    # This is DetailsView
+                    # Process this visit and get the new breadcrumbs object
+                    prevpage = context['listview']
+                    context['prevpage'] = prevpage
+                    crumbs = []
+                    crumbs.append([title, prevpage])
+                    current_name = title if instance else "{} (new)".format(title)
+                    context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
-        # Define where to go to after deletion
-        if 'afterdelurl' not in context or context['afterdelurl'] == "":
-            context['afterdelurl'] = get_previous_page(self.request)
+            # Possibly add to context by the calling function
+            if instance.id:
+                context = self.add_to_context(context, instance)
+                if self.history_button:
+                    # Retrieve history
+                    context['history_contents'] = self.get_history(instance)
+
+            # fill in the form values
+            if frm and 'mainitems' in context:
+                for mobj in context['mainitems']:
+                    # Check for possible form field information
+                    if 'field_key' in mobj: 
+                        mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
+                        mobj['field_key'] = frm[mobj['field_key']]
+                    if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
+                    if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+                    if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
+
+                    # Calculate view-mode versus any-mode
+                    #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
+                    if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                        mobj['allowing'] = "edit"
+                    else:
+                        mobj['allowing'] = "view"
+                    if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                        mobj['allowing_key_list'] = "edit"
+                    else:
+                        mobj['allowing_key_list'] = "view"
+
+            # Define where to go to after deletion
+            if 'afterdelurl' not in context or context['afterdelurl'] == "":
+                context['afterdelurl'] = get_previous_page(self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasicDetails, get_context_data")
 
         # Return the calculated context
         return context
