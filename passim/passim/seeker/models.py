@@ -4021,7 +4021,8 @@ class EqualGold(models.Model):
                         self.code = passim_code
 
             # (Re) calculate the number of associated historical collections (for *all* users!!)
-            self.hccount = self.collections.filter(settype="hc", scope='publ').count()
+            if self.id != None:
+                self.hccount = self.collections.filter(settype="hc", scope='publ').count()
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
