@@ -6986,11 +6986,12 @@ class CollAnyEdit(BasicDetails):
             form.instance.type = self.prefix
 
             # Check out the name, if this is not in use elsewhere
-            name = form.instance.name
-            if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
-                # The name is already in use, so refuse it.
-                msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
-                return False, msg
+            if instance.id != None:
+                name = form.instance.name
+                if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
+                    # The name is already in use, so refuse it.
+                    msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
+                    return False, msg
         return True, ""
 
     def after_save(self, form, instance):
@@ -7074,15 +7075,16 @@ class CollPrivDetails(CollPrivEdit):
     rtype = "html"
 
     def custom_init(self, instance):
-        # Check if someone acts as if this is a public dataset, whil it is not
-        if instance.settype == "pd":
-            # Determine what kind of dataset/collection this is
-            if instance.owner != Profile.get_user_profile(self.request.user.username):
-                # It is a public dataset after all!
-                self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
-        elif instance.settype == "hc":
-            # This is a historical collection
-            self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        if instance != None:
+            # Check if someone acts as if this is a public dataset, whil it is not
+            if instance.settype == "pd":
+                # Determine what kind of dataset/collection this is
+                if instance.owner != Profile.get_user_profile(self.request.user.username):
+                    # It is a public dataset after all!
+                    self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+            elif instance.settype == "hc":
+                # This is a historical collection
+                self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
         return None
 
 
@@ -7550,7 +7552,8 @@ class CollectionListView(BasicList):
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
         elif self.prefix == "priv":
-            self.new_button = False
+            self.new_button = True
+            self.titlesg = "Personal Dataset"
             self.plural_name = "My Datasets"
             self.sg_name = "My Dataset"  
             self.order_cols = ['type', 'name', 'created', '']

@@ -3055,9 +3055,9 @@ class SourceEditForm(forms.ModelForm):
         self.fields['url'].required = False
         self.fields['code'].required = False
         self.fields['profile_ta'].required = False
+        # Set the initial value for the profile
         self.fields['profile'].required = False
         self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
-        # Set the initial value for the profile
 
 
 class AuthorEditForm(forms.ModelForm):
