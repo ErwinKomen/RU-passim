@@ -445,11 +445,12 @@ class OriginOneWidget(ModelSelect2Widget):
 
     def label_from_instance(self, obj):
         # sLabel = "{} ({})".format(obj.name, obj.loctype)
-        sLabel = obj.name
+        sLoc = "" if obj.location == None else " ({})".format(obj.location.get_loc_name())
+        sLabel = "{}{}".format(obj.name, sLoc)
         return sLabel
 
     def get_queryset(self):
-        return Location.objects.all().order_by('name').distinct()
+        return Origin.objects.all().order_by('name').distinct()
 
 
 class ProjectOneWidget(ModelSelect2Widget):
@@ -2622,7 +2623,7 @@ class OriginForm(forms.ModelForm):
         model = Origin
         fields = ['name', 'location', 'note']
         widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
-                 'location': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
                  'note':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'placeholder': 'Note on this origin...', 'style': 'height: 40px; width: 100%;'})
                  }
 

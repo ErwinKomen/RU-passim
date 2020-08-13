@@ -1936,6 +1936,14 @@ class Origin(models.Model):
         # Return what we found or created
         return hit
 
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
 
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""

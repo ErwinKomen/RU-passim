@@ -5359,72 +5359,113 @@ class OriginListView(BasicList):
         return sBack, sTitle
 
 
-class OriginDetailsView(PassimDetails):
-    model = Origin
-    mForm = OriginForm
-    template_name = 'seeker/origin_details.html'
-    prefix = 'org'
-    prefix_type = "simple"
-    title = "OriginDetails"
-    rtype = "html"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('origin_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('origin_details', kwargs={'pk': instance.id})
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('origin_list')
-        crumbs = []
-        crumbs.append(['Origins', prevpage])
-        current_name = "Origin details"
-        if instance:
-            current_name = "Origin [{}]".format(instance.name)
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-        return context
-
-
-class OriginEdit(BasicPart):
+class OriginEdit(BasicDetails):
     """The details of one origin"""
 
-    MainModel = Origin
-    template_name = 'seeker/origin_edit.html'  
-    title = "Origin" 
-    afternewurl = ""
-    # One form is attached to this 
+    model = Origin
+    mForm = OriginForm
     prefix = "org"
-    form_objects = [{'form': OriginForm, 'prefix': prefix, 'readonly': False}]
+    title = "Origin" 
+    rtype = "json"
+    basic_name = "origin"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
 
-    def before_save(self, prefix, request, instance = None, form = None):
-        bNeedSaving = False
-        if prefix == "org":
-            pass
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",             'value': instance.name,         'field_key': "name"},
+            {'type': 'line',  'label': "Origin note:",      'value': instance.note,         'field_key': 'note'},
+            {'type': 'plain', 'label': "Origin location:",  'value': instance.get_location(),   'field_key': "location"}
+            ]
 
-        return bNeedSaving
+        # Signal that we have select2
+        context['has_select2'] = True
 
-    def add_to_context(self, context):
-
-        # Get the instance
-        instance = self.obj
-
-        if instance != None:
-            pass
-
-        afternew =  reverse('origin_list')
-        if 'afternewurl' in self.qd:
-            afternew = self.qd['afternewurl']
-        context['afternewurl'] = afternew
-        context['afterdelurl'] = reverse('origin_list')
-
+        # Return the context we have made
         return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class OriginDetails(OriginEdit):
+    """Like Origin Edit, but then html output"""
+    rtype = "html"
+
+
+#class OriginDetailsView(PassimDetails):
+#    model = Origin
+#    mForm = OriginForm
+#    template_name = 'seeker/origin_details.html'
+#    prefix = 'org'
+#    prefix_type = "simple"
+#    title = "OriginDetails"
+#    rtype = "html"
+
+#    def after_new(self, form, instance):
+#        """Action to be performed after adding a new item"""
+
+#        self.afternewurl = reverse('origin_list')
+#        if instance != None:
+#            # Make sure we do a page redirect
+#            self.newRedirect = True
+#            self.redirectpage = reverse('origin_details', kwargs={'pk': instance.id})
+#        return True, "" 
+
+#    def add_to_context(self, context, instance):
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+#        # Process this visit and get the new breadcrumbs object
+#        prevpage = reverse('origin_list')
+#        crumbs = []
+#        crumbs.append(['Origins', prevpage])
+#        current_name = "Origin details"
+#        if instance:
+#            current_name = "Origin [{}]".format(instance.name)
+#        context['prevpage'] = prevpage
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+#        return context
+
+
+#class OriginEdit_ORG(BasicPart):
+#    """The details of one origin"""
+
+#    MainModel = Origin
+#    template_name = 'seeker/origin_edit.html'  
+#    title = "Origin" 
+#    afternewurl = ""
+#    # One form is attached to this 
+#    prefix = "org"
+#    form_objects = [{'form': OriginForm, 'prefix': prefix, 'readonly': False}]
+
+#    def before_save(self, prefix, request, instance = None, form = None):
+#        bNeedSaving = False
+#        if prefix == "org":
+#            pass
+
+#        return bNeedSaving
+
+#    def add_to_context(self, context):
+
+#        # Get the instance
+#        instance = self.obj
+
+#        if instance != None:
+#            pass
+
+#        afternew =  reverse('origin_list')
+#        if 'afternewurl' in self.qd:
+#            afternew = self.qd['afternewurl']
+#        context['afternewurl'] = afternew
+#        context['afterdelurl'] = reverse('origin_list')
+
+#        return context
 
 
 class SermonEdit(BasicDetails):
@@ -6379,7 +6420,7 @@ class ProvenanceEdit(BasicDetails):
     model = Provenance
     mForm = ProvenanceForm
     prefix = 'prov'
-    title = "ProvenanceEdit"
+    title = "Provenance"
     rtype = "json"
     history_button = True
     mainitems = []
@@ -8135,7 +8176,6 @@ class ManuscriptEdit(BasicDetails):
             {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
             {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
             {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-            {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origone'},
             {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
              'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
             {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
@@ -8155,6 +8195,7 @@ class ManuscriptEdit(BasicDetails):
                     'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                 {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                     'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
+                {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origone'},
                 {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
                     'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
                 {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
