@@ -5523,6 +5523,11 @@ class SermonEdit(BasicDetails):
             if istemplate:
                 # Need a smaller array of formset objects
                 self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
+
+            # Indicate where to go to after deleting
+            if instance != None and instance.msitem != None and instance.msitem.manu != None:
+                self.afterdelurl = reverse('manuscript_details', kwargs={'pk': instance.msitem.manu.id})
+
         return None
            
     def add_to_context(self, context, instance):
@@ -5809,7 +5814,7 @@ class SermonDetails(SermonEdit):
         """Add to the existing context"""
 
         # Start by executing the standard handling
-        super(SermonDetails, self).add_to_context(context, instance)
+        context = super(SermonDetails, self).add_to_context(context, instance)
 
         # Are we copying information?? (only allowed if we are the app_editor)
         if 'supercopy' in self.qd and context['is_app_editor']:
@@ -6498,7 +6503,7 @@ class ProvenanceListView(BasicList):
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'name',      'dbfield': 'name', 'keyS': 'name'},
-            {'filter': 'location',  'dbfield': 'name', 'keyS': 'location_ta', 'keyList': 'locationlist', 'infield': 'name' },
+            {'filter': 'location',  'fkfield': 'location', 'keyS': 'location_ta', 'keyId': 'location', 'keyFk': "name", 'keyList': 'locationlist', 'infield': 'id' },
             {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
             ]}
         ]
@@ -6525,6 +6530,12 @@ class ProvenanceListView(BasicList):
             if instance.note:
                 sBack = instance.note[:40]
         return sBack, sTitle
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+        x = fields
+        return fields, lstExclude, qAlternative
 
 
 class TemplateEdit(BasicDetails):
@@ -8220,7 +8231,7 @@ class ManuscriptEdit(BasicDetails):
                     'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                 {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                     'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
+                {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
                 {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
                     'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
                 {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
@@ -8834,6 +8845,14 @@ class ManuscriptListView(BasicList):
             MsItem.objects.filter(id__in=del_id).delete()
             # Success
             Information.set_kvalue("msitemcleanup", "done")
+
+        #sh_done = Information.get_kvalue("orphansclean")
+        #if sh_done == None or sh_done == "":
+        #    # Walk all manuscripts
+        #    for manu in Manuscript.objects.all():
+        #        manu.remove_orphans()
+        #    Information.set_kvalue("orphansclean", "done")
+
         return None
 
     def add_to_context(self, context, initial):

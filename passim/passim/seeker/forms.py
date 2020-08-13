@@ -1234,9 +1234,9 @@ class ProvenanceForm(forms.ModelForm):
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                            widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
+                widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:

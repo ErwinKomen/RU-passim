@@ -3002,6 +3002,20 @@ class Manuscript(models.Model):
                 sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
         return sBack
 
+    def get_origin_markdown(self):
+        sBack = "-"
+        if self.origin:
+            # Just take the bare name of the origin
+            sBack = self.origin.name
+            if self.origin.location:
+                # Add the actual location if it is known
+                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+            # Get the url to it
+            url = reverse('origin_details', kwargs={'pk': self.origin.id})
+            # Adapt what we return
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
+        return sBack
+
     def get_project(self):
         sBack = "-" if self.project == None else self.project.name
         return sBack
@@ -3217,6 +3231,31 @@ class Manuscript(models.Model):
                         SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
         # Return okay
         return True
+
+    def order_calculate(self):
+        """Re-calculate the order of the MsItem stuff"""
+
+        # Give them new order numbers
+        order = 1
+        with transaction.atomic():
+            for msitem in self.manuitems.all().order_by('order'):
+                if msitem.order != order:
+                    msitem.order = order
+                    msitem.save()
+                order += 1
+        return True
+
+    #def remove_orphans(self):
+    #    """Remove orphan msitems"""
+
+    #    lst_remove = []
+    #    for msitem in self.manuitems.all():
+    #        # Check if this is an orphan
+    #        if msitem.sermonitems.count() == 0 and msitem.sermonhead.count() == 0:
+    #            lst_remove.append(msitem.id)
+    #    # Now remove them
+    #    MsItem.objects.filter(id__in=lst_remove).delete()
+    #    return True
 
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
@@ -5598,6 +5637,17 @@ class MsItem(models.Model):
                 node = node.parent
         return depth
 
+    def delete(self, using = None, keep_parents = False):
+        # Keep track of manuscript
+        manu = self.manu
+        # Perform deletion
+        response = super(MsItem, self).delete(using, keep_parents)
+        # Re-calculate order
+        if manu != None:
+            manu.order_calculate()
+        # REturn delete response
+        return response
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""
@@ -5752,6 +5802,14 @@ class SermonDescr(models.Model):
             msg = oErr.get_error_message()
             bOkay = False
         return bOkay, msg
+
+    def delete(self, using = None, keep_parents = False):
+        # First remove my msitem, if I have one
+        if self.msitem != None:
+            self.msitem.delete()
+        # Regular delete operation
+        response = super(SermonDescr, self).delete(using, keep_parents)
+        return response
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""

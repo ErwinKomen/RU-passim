@@ -929,6 +929,7 @@ class BasicDetails(DetailView):
     new_button = False
     do_not_save = False
     no_delete = False
+    afterdelurl = None
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
@@ -1161,8 +1162,11 @@ class BasicDetails(DetailView):
         context['new_button'] = self.new_button
         context['add_text'] = self.add_text
 
-        if self.is_basic:
-            context['afterdelurl'] = context['listview']
+        if self.is_basic and context.get('afterdelurl') == None :
+            if self.afterdelurl != None:
+                context['afterdelurl'] = self.afterdelurl
+            else:
+                context['afterdelurl'] = context['listview']
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
