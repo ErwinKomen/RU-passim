@@ -882,22 +882,24 @@ var ru = (function ($, ru) {
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
 
-          // Treat the input range elements
-          $("input[type='range']").each(function (idx, value) {
-            var slider = $(this),
-                elTd = $(this).closest("td"),
-                name = "",
-                rangevalue = "";
+          //// Treat the input range elements
+          //$("input[type='range']").each(function (idx, value) {
+          //  var slider = $(this),
+          //      elTd = $(this).closest("td"),
+          //      name = "",
+          //      rangevalue = "";
 
-            // Possibly add an element
-            if ($(elTd).find(".basic-range-input").length < $(elTd).find("input[type='range']").length) {
-              // Get the current range value
-              rangevalue = $(slider).val();
-              // Add this element
-              name = $(slider)[0].name + "_value";
-              $(slider).after("<span>Value: <span class='basic-range-input'>"+rangevalue+"</span></span>");
-            }
-          });
+          //  // Possibly add an element
+          //  if ($(elTd).find(".basic-range-input").length < $(elTd).find("input[type='range']").length) {
+          //    // Get the current range value
+          //    rangevalue = $(slider).val();
+          //    // Add this element
+          //    name = $(slider)[0].name + "_value";
+          //    $(slider).after("<span>Value: <span class='basic-range-input'>" + rangevalue + "</span></span>");
+          //    // Set the range value to UNDEFINED for the moment
+          //    $(slider)[0].value = undefined;
+          //  }
+          //});
           // Make sure we catch changes
           $("input[type='range']").on("change", function (evt) {
             var el = $(this),
@@ -905,6 +907,9 @@ var ru = (function ($, ru) {
             // get the value element
             elvalue = $(el).closest("td").find(".basic-range-input").first();
             $(elvalue).html(this.value);
+            // Get the tet element
+            elvalue = $(el).closest("td").find("input[type='text']").first();
+            $(elvalue)[0].value = this.value;
           });
           $(".basic-range-input")
 

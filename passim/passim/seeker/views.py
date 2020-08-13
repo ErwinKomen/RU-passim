@@ -4136,6 +4136,14 @@ class BasicPart(View):
         else:
             self.qd = request.GET
 
+        # Immediately take care of the rangeslider stuff
+        lst_remove = []
+        dictionary = {}
+        for k,v in self.qd.items():
+            if "-rangeslider" not in k: 
+                dictionary[k] = v
+        self.qd = dictionary
+
         # Check for action
         if 'action' in self.qd:
             self.action = self.qd['action']
@@ -6483,9 +6491,16 @@ class ProvenanceListView(BasicList):
         {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
         {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
         ]
-    filters = [
-        ]
+    filters = [ {"name": "Name",        "id": "filter_name",    "enabled": False},
+                {"name": "Location",    "id": "filter_location","enabled": False},
+                {"name": "Manuscript",  "id": "filter_manuid",  "enabled": False},
+               ]
     searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name',      'dbfield': 'name', 'keyS': 'name'},
+            {'filter': 'location',  'dbfield': 'name', 'keyS': 'location_ta', 'keyList': 'locationlist', 'infield': 'name' },
+            {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            ]}
         ]
 
     def get_field_value(self, instance, custom):
@@ -7086,6 +7101,13 @@ class CollPrivDetails(CollPrivEdit):
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
         return None
+
+    def add_to_context(self, context, instance):
+        context = super(CollPrivDetails, self).add_to_context(context, instance)
+        if instance != None and instance.id != None:
+            # Add a button + text
+            context['after_details'] = render_to_string("seeker/collpriv.html", context, self.request)
+        return context
 
 
 class CollPublDetails(CollPublEdit):
@@ -7823,61 +7845,61 @@ class CollectionListView(BasicList):
         return sBack, sTitle
 
 
-class CollectionEdit(PassimDetails):
-    """The details of one collection"""
+#class CollectionEdit(PassimDetails):
+#    """The details of one collection"""
  
-    model = Collection
-    mForm = CollectionForm
-    template_name = 'seeker/collection_edit.html'
-    template_post = 'seeker/collection_edit.html'
-    prefix = 'col'
-    title = "CollectionEdit"
-    afternewurl = ""
-    rtype = "json"
+#    model = Collection
+#    mForm = CollectionForm
+#    template_name = 'seeker/collection_edit.html'
+#    template_post = 'seeker/collection_edit.html'
+#    prefix = 'col'
+#    title = "CollectionEdit"
+#    afternewurl = ""
+#    rtype = "json"
 
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
+#    def after_new(self, form, instance):
+#        """Action to be performed after adding a new item"""
 
-        self.afternewurl = reverse('collection_list')
-        return True, "" 
+#        self.afternewurl = reverse('collection_list')
+#        return True, "" 
         
-    def add_to_context(self, context, instance):
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('collection_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Collections', reverse('collection_list')])
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
-        context['afterdelurl'] = reverse('collection_list')
+#    def add_to_context(self, context, instance):
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+#        # Process this visit and get the new breadcrumbs object
+#        prevpage = reverse('collection_list')
+#        context['prevpage'] = prevpage
+#        crumbs = []
+#        crumbs.append(['Collections', reverse('collection_list')])
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
+#        context['afterdelurl'] = reverse('collection_list')
        
-        return context
+#        return context
 
-    def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-        return True, ""
+#    def before_save(self, form, instance):
+#        if form != None:
+#            # Search the user profile
+#            profile = Profile.get_user_profile(self.request.user.username)
+#            form.instance.owner = profile
+#        return True, ""
 
 
-class CollectionDetails(CollectionEdit):
-    """The editing of one collection"""
+#class CollectionDetails(CollectionEdit):
+#    """The editing of one collection"""
 
-    template_name = 'seeker/collection_details.html'
-    template_post = 'seeker/collection_details.html'
-    title = "CollectionDetails"
-    rtype = "html"  # GET provides a HTML form straight away
+#    template_name = 'seeker/collection_details.html'
+#    template_post = 'seeker/collection_details.html'
+#    title = "CollectionDetails"
+#    rtype = "html"  # GET provides a HTML form straight away
 
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
+#    def after_new(self, form, instance):
+#        """Action to be performed after adding a new item"""
 
-        self.afternewurl = reverse('collection_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('collection_details', kwargs={'pk': instance.id})
-        return True, "" 
+#        self.afternewurl = reverse('collection_list')
+#        if instance != None:
+#            # Make sure we do a page redirect
+#            self.newRedirect = True
+#            self.redirectpage = reverse('collection_details', kwargs={'pk': instance.id})
+#        return True, "" 
 
 
 class CollectionSermset(BasicPart):
@@ -8198,7 +8220,7 @@ class ManuscriptEdit(BasicDetails):
                     'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                 {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                     'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origone'},
+                {'type': 'plain', 'label': "Origin:",       'value': instance.get_origin(),         'field_key': 'origin'},
                 {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
                     'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
                 {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 

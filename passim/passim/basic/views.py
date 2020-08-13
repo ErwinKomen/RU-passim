@@ -791,6 +791,12 @@ class BasicList(ListView):
         get = get.copy()
         self.qd = get
 
+        # Immediately take care of the rangeslider stuff
+        lst_remove = []
+        for k,v in self.qd.items():
+            if "-rangeslider" in k: lst_remove.append(k)
+        for item in lst_remove: self.qd.pop(item)
+
         username=self.request.user.username
         team_group=app_editor
 

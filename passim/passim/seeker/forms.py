@@ -10,6 +10,7 @@ from django.forms.widgets import *
 from django.db.models import F
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
+from passim.basic.widgets import RangeSlider
 
 def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bUseAbbr=False, exclude=None):
     if (obj.fields != None and sFieldName in obj.fields):
@@ -501,13 +502,17 @@ class ProvenanceWidget(ModelSelect2MultipleWidget):
     model = Provenance
     search_fields = [ 'name__icontains' ]
     addonly = False
+    manu = None
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
         if self.addonly:
-            qs = Provenance.objects.none()
+            if self.manu == None:
+                qs = Provenance.objects.none()
+            else:
+                qs = self.manu.provenances.all()
         else:
             qs = Provenance.objects.all().order_by('name').distinct()
         return qs        
@@ -851,8 +856,11 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False, 
                 widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
-    overlap     = forms.IntegerField(label=_("percentage overlap"), required=False,
-                widget=NumberInput(attrs={'placeholder': 'Overlap at least...', 'type': 'range', 'min': '1', 'max': '100', 'value': '10', 'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
+    #overlap_org     = forms.IntegerField(label=_("percentage overlap"), required=False,
+    #            widget=NumberInput(attrs={'placeholder': 'Overlap at least...', 'type': 'range', 'min': '1', 'max': '100', # 'value': '10', 
+    #                                      'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
+    overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
+                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
@@ -1223,6 +1231,14 @@ class UserKeywordForm(forms.ModelForm):
 class ProvenanceForm(forms.ModelForm):
     """Provenance list"""
 
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    locationlist = ModelMultipleChoiceField(queryset=None, required=False,
+                            widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -1242,6 +1258,10 @@ class ProvenanceForm(forms.ModelForm):
         self.fields['name'].required = False
         self.fields['location'].required = False
         self.fields['note'].required = False
+        self.fields['location'].required = False
+        self.fields['location_ta'].required = False
+        self.fields['locationlist'].queryset = Location.objects.all().order_by('loctype__level', 'name')
+        self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
 
         # Get the instance
         if 'instance' in kwargs:
@@ -2754,7 +2774,7 @@ class ManuscriptForm(PassimModelForm):
                  #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
                  #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}),
-                 'origin':      forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'origin':      OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -2846,6 +2866,8 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
                 self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
+
+                self.fields['provlist'].widget.manu = instance
 
         except:
             msg = oErr.get_error_message()
