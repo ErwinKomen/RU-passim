@@ -8836,22 +8836,23 @@ class ManuscriptListView(BasicList):
         # Check if MsItem cleanup is needed
         sh_done = Information.get_kvalue("msitemcleanup")
         if sh_done == None or sh_done == "":
-            # Perform adaptations
-            del_id = []
-            qs = MsItem.objects.annotate(num_heads=Count('itemheads')).annotate(num_sermons=Count('itemsermons'))
-            for obj in qs.filter(num_heads=0, num_sermons=0):
-                del_id.append(obj.id)
-            # Remove them
-            MsItem.objects.filter(id__in=del_id).delete()
-            # Success
-            Information.set_kvalue("msitemcleanup", "done")
+            method = "UseAdaptations"
+            method = "RemoveOrphans"
 
-        #sh_done = Information.get_kvalue("orphansclean")
-        #if sh_done == None or sh_done == "":
-        #    # Walk all manuscripts
-        #    for manu in Manuscript.objects.all():
-        #        manu.remove_orphans()
-        #    Information.set_kvalue("orphansclean", "done")
+            if method == "RemoveOrphans":
+                # Walk all manuscripts
+                for manu in Manuscript.objects.all():
+                    manu.remove_orphans()
+            elif method == "UseAdaptations":
+                # Perform adaptations
+                del_id = []
+                qs = MsItem.objects.annotate(num_heads=Count('itemheads')).annotate(num_sermons=Count('itemsermons'))
+                for obj in qs.filter(num_heads=0, num_sermons=0):
+                    del_id.append(obj.id)
+                # Remove them
+                MsItem.objects.filter(id__in=del_id).delete()
+                # Success
+                Information.set_kvalue("msitemcleanup", "done")
 
         return None
 

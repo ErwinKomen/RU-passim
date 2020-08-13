@@ -3245,17 +3245,17 @@ class Manuscript(models.Model):
                 order += 1
         return True
 
-    #def remove_orphans(self):
-    #    """Remove orphan msitems"""
+    def remove_orphans(self):
+        """Remove orphan msitems"""
 
-    #    lst_remove = []
-    #    for msitem in self.manuitems.all():
-    #        # Check if this is an orphan
-    #        if msitem.sermonitems.count() == 0 and msitem.sermonhead.count() == 0:
-    #            lst_remove.append(msitem.id)
-    #    # Now remove them
-    #    MsItem.objects.filter(id__in=lst_remove).delete()
-    #    return True
+        lst_remove = []
+        for msitem in self.manuitems.all():
+            # Check if this is an orphan
+            if msitem.sermonitems.count() == 0 and msitem.sermonhead.count() == 0:
+                lst_remove.append(msitem.id)
+        # Now remove them
+        MsItem.objects.filter(id__in=lst_remove).delete()
+        return True
 
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
