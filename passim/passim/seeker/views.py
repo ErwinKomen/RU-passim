@@ -8208,7 +8208,8 @@ class ManuscriptEdit(BasicDetails):
         mainitems_main = [
             {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
             {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
-            {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity'},
+            {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
+             'title': 'City, village or abbey (monastery) of the library'},
             {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
             {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
             {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
@@ -11090,7 +11091,7 @@ class LibraryDetailsView(PassimDetails):
         return context
 
 
-class LibraryEdit(BasicPart):
+class LibraryEdit_ORG(BasicPart):
     """The details of one library"""
 
     MainModel = Library
@@ -11136,6 +11137,67 @@ class LibraryEdit(BasicPart):
         context['afternewurl'] = afternew
 
         return context
+
+
+class LibraryEdit(BasicDetails):
+    model = Library
+    mForm = LibraryForm
+    prefix = 'lib'
+    prefix_type = "simple"
+    title = "LibraryDetails"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",                 'value': instance.name,                     'field_key': "name"},
+            {'type': 'plain', 'label': "Library type:",         'value': instance.get_libtype_display(),    'field_key': 'libtype'},
+            {'type': 'plain', 'label': "CNRS library id:",      'value': instance.idLibrEtab,               'field_key': "idLibrEtab"},
+            {'type': 'plain', 'label': "Library location:",     "value": instance.get_location(),           'field_key': "location"},
+            {'type': 'plain', 'label': "City of library:",      "value": instance.get_city_name()},
+            {'type': 'plain', 'label': "Country of library: ",  "value": instance.get_country_name()}
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        bNeedSaving = False
+        # Check whether the location has changed
+        if 'location' in form.changed_data:
+            # Get the new location
+            location = form.cleaned_data['location']
+            if location != None:
+                # Get the hierarchy including myself
+                hierarchy = location.hierarchy()
+                for item in hierarchy:
+                    if item.loctype.name == "city":
+                        instance.lcity = item
+                        bNeedSaving = True
+                    elif item.loctype.name == "country":
+                        instance.lcountry = item
+                        bNeedSaving = True
+
+        return True, ""
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+    
+
+class LibraryDetails(LibraryEdit):
+    """Just the full HTML version of the edit"""
+    rtype = "html"
 
 
 class AuthorListDownload(BasicPart):

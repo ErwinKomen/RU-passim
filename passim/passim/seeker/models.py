@@ -1721,8 +1721,7 @@ class Library(models.Model):
     # [1] Name of the library
     name = models.CharField("Library", max_length=LONG_STRING)
     # [1] Has this library been bracketed?
-    libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), 
-                            max_length=5)
+    libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), max_length=5)
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
     city = models.ForeignKey(City, null=True, related_name="city_libraries")
@@ -1753,6 +1752,13 @@ class Library(models.Model):
             hit.save()
 
         return hit
+
+    def get_location(self):
+        """Get the location of the library to show in details view"""
+        sBack = "-"
+        if self.location != None:
+            sBack = self.location.get_loc_name()
+        return sBack
 
     def get_city(self):
         """Given the library, get the city from the location"""
@@ -2889,8 +2895,9 @@ class Manuscript(models.Model):
     def get_city(self):
         if self.lcity:
             city = self.lcity.name
-            if self.library and self.library.lcity.id != self.lcity.id:
-                city = self.library.lcity.name
+            if self.library and self.library.lcity.id != self.lcity.id and self.library.location != None:
+                # OLD: city = self.library.lcity.name
+                city = self.library.location.get_loc_name()
         elif self.library:
             city = self.library.lcity.name
         else:

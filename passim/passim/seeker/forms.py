@@ -86,6 +86,21 @@ class CityOneWidget(ModelSelect2Widget):
         return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
 
 
+class CityMonasteryOneWidget(ModelSelect2Widget):
+    model = Location
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {'lcity': 'lcity_manuscripts'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        level = 8   # Level 8 is city, lower than that is village, library, monastery
+        #loc_id = LocationType.objects.filter(Q(name="city")|Q(name="village")|Q(name="monastery")).first()
+        #return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
+        return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+
+
 class CodeWidget(ModelSelect2MultipleWidget):
     # PASSIM codes defined in EqualGold instances
     model = EqualGold
@@ -321,6 +336,17 @@ class KeywordOneWidget(ModelSelect2Widget):
         else:
             qs = Keyword.objects.exclude(visibility="edi").order_by('name').distinct()
         return qs
+
+
+class LibtypeWidget(ModelSelect2Widget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=LIBRARY_TYPE).order_by("english_name")
 
 
 class LitrefWidget(ModelSelect2Widget):
@@ -2668,6 +2694,8 @@ class OriginForm(forms.ModelForm):
 
 
 class LibraryForm(forms.ModelForm):
+    #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+    #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     typeaheads = ["locations"]
@@ -2678,10 +2706,10 @@ class LibraryForm(forms.ModelForm):
         model = Library
         fields = ['name', 'libtype', 'idLibrEtab', 'location', 'lcity', 'lcountry']
         widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
-                 'location': forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'lcountry': forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'libtype':  forms.Select()
+                 'libtype':  forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -2692,6 +2720,7 @@ class LibraryForm(forms.ModelForm):
         self.fields['libtype'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
+        self.fields['location'].queryset = Location.objects.all().order_by('name')
         self.fields['lcity'].required = False
         self.fields['lcountry'].required = False
         # Get the instance
@@ -2768,7 +2797,7 @@ class ManuscriptForm(PassimModelForm):
         fields = ['name', 'library', 'lcity', 'lcountry', 'idno', # 'yearstart', 'yearfinish', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'lcity':       CityOneWidget(attrs={'data-placeholder': 'Select a city...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),

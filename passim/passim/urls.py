@@ -89,7 +89,7 @@ urlpatterns = [
     url(r'^origin/edit(?:/(?P<pk>\d+))?/$', OriginEdit.as_view(), name='origin_edit'),
 
     url(r'^library/list', LibraryListView.as_view(), name='library_list'),
-    url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetailsView.as_view(), name='library_details'),
+    url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetails.as_view(), name='library_details'),
     url(r'^library/edit(?:/(?P<pk>\d+))?/$', LibraryEdit.as_view(), name='library_edit'),
 
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
