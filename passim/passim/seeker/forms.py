@@ -1555,9 +1555,14 @@ class CollectionForm(PassimModelForm):
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
             
 
-            # Set the initial type
-            self.fields['type'].initial = type
-            self.initial['type'] = type
+            # Set the initial type - provided it fits
+            if self.initial.get("type", "") == "":
+                self.fields['type'].initial = type
+                self.initial['type'] = type
+            else:
+                # Make sure to retain its value
+                self.fields['type'].initial = self.initial.get("type", "")
+
         self.fields['ownlist'].queryset = Profile.objects.all()
         # Get the instance
         if 'instance' in kwargs:

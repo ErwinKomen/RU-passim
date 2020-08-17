@@ -1505,6 +1505,11 @@ class Location(models.Model):
     # [1] Link to the location type of this location
     loctype = models.ForeignKey(LocationType)
 
+    # [1] Every Library has a status to keep track of who edited it
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
@@ -1728,6 +1733,11 @@ class Library(models.Model):
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
 
+    # [1] Every Library has a status to keep track of who edited it
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+
     # [0-1] Location, as specific as possible, but optional in the end
     location = models.ForeignKey(Location, null=True, related_name="location_libraries")
     # [0-1] City according to the 'Location' specification
@@ -1737,6 +1747,12 @@ class Library(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Possibly change lcity, lcountry
+        obj = self.get_city(False)
+        obj = self.get_country(False)
+        return super(Library, self).save(force_insert, force_update, using, update_fields)
 
     def get_library(sId, sLibrary, bBracketed, country, city):
         iId = int(sId)
@@ -1760,14 +1776,23 @@ class Library(models.Model):
             sBack = self.location.get_loc_name()
         return sBack
 
-    def get_city(self):
+    def get_location_markdown(self):
+        """Get the location of the library to show in details view"""
+        sBack = "-"
+        if self.location != None:
+            name = self.location.get_loc_name()
+            url = reverse('location_details', kwargs={'pk': self.location.id})
+            sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, name)
+        return sBack
+
+    def get_city(self, save_changes = True):
         """Given the library, get the city from the location"""
 
         obj = None
         if self.lcity != None:
             obj = self.lcity
         elif self.location != None:
-            if self.location.loctype and self.location.loctype.name == "city":
+            if self.location.loctype != None and self.location.loctype.name == "city":
                 obj = self.location
             else:
                 # Look at all the related locations - above and below
@@ -1776,36 +1801,43 @@ class Library(models.Model):
                     if item.loctype.name == "city":
                         obj = item
                         break
+                if obj == None:
+                    # Look at the first location 'above' me
+                    item = self.location.contained_locrelations.first()
+                    if item.container.loctype.name != "country":
+                        obj = item.container
             # Store this
             self.lcity = obj
-            self.save()
+            if save_changes:
+                self.save()
         return obj
 
     def get_city_name(self):
         obj = self.get_city()
         return "" if obj == None else obj.name
 
-    def get_country(self):
+    def get_country(self, save_changes = True):
         """Given the library, get the country from the location"""
 
         obj = None
         if self.lcountry != None:
             obj = self.lcountry
         elif self.location != None:
-            if self.location.loctype and self.location.loctype.name == "country":
+            if self.location.loctype != None and self.location.loctype.name == "country":
                 obj = self.location
             else:
-                # If this is a city, look upwards
-                if self.location.loctype.name == "city":
-                    qs = self.location.contained_locrelations.all()
-                    for item in qs:
-                        container = item.container
+                # Look upwards
+                qs = self.location.contained_locrelations.all()
+                for item in qs:
+                    container = item.container
+                    if container != None:
                         if container.loctype.name == "country":
                             obj = container
                             break
             # Store this
             self.lcountry = obj
-            self.save()
+            if save_changes:
+                self.save()
         return obj
 
     def get_country_name(self):
@@ -2893,15 +2925,19 @@ class Manuscript(models.Model):
         return ", ".join(lhtml)
 
     def get_city(self):
-        if self.lcity:
-            city = self.lcity.name
-            if self.library and self.library.lcity.id != self.lcity.id and self.library.location != None:
-                # OLD: city = self.library.lcity.name
-                city = self.library.location.get_loc_name()
-        elif self.library:
-            city = self.library.lcity.name
-        else:
-            city = "-"
+        city = "-"
+        oErr = ErrHandle()
+        try:
+            if self.lcity:
+                city = self.lcity.name
+                if self.library and self.library.lcity != None and self.library.lcity.id != self.lcity.id and self.library.location != None:
+                    # OLD: city = self.library.lcity.name
+                    city = self.library.location.get_loc_name()
+            elif self.library != None and self.library.lcity != None:
+                city = self.library.lcity.name
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_city")
         return city
 
     def get_collections_markdown(self, username, team_group, settype = None):
@@ -2916,14 +2952,18 @@ class Manuscript(models.Model):
         return sBack
 
     def get_country(self):
-        if self.lcountry:
-            country = self.lcountry.name
-            if self.library and self.library.lcountry.id != self.lcountry.id:
+        country = "-"
+        oErr = ErrHandle()
+        try:
+            if self.lcountry:
+                country = self.lcountry.name
+                if self.library != None and self.library.lcountry != None and self.library.lcountry.id != self.lcountry.id:
+                    country = self.library.lcountry.name
+            elif self.library != None and self.library.lcountry != None:
                 country = self.library.lcountry.name
-        elif self.library:
-            country = self.library.lcountry.name
-        else:
-            country = "-"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_country")
         return country
 
     def get_date_markdown(self):
@@ -2986,6 +3026,14 @@ class Manuscript(models.Model):
         else:
             lib = "-"
         return lib
+
+    def get_library_markdown(self):
+        sBack = "-"
+        if self.library != None:
+            lib = self.library.name
+            url = reverse('library_details', kwargs={'pk': self.library.id})
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, lib)
+        return sBack
 
     def get_litrefs_markdown(self):
         lHtml = []

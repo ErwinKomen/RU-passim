@@ -974,6 +974,7 @@ def search_generic(s_view, cls, form, qd):
     oErr = ErrHandle()
     bFilter = False
     genForm = None
+    oFields = {}
     try:
         bHasFormset = (len(qd) > 0)
 
@@ -6870,6 +6871,7 @@ class CollAnyEdit(BasicDetails):
     title = "Any collection"
     history_button = True
     manu = None
+    datasettype = ""
     mainitems = []
 
     ClitFormSet = inlineformset_factory(Collection, LitrefCol,
@@ -6885,6 +6887,8 @@ class CollAnyEdit(BasicDetails):
     def custom_init(self, instance):
         if instance != None and instance.settype == "hc":
             self.formset_objects.append({'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
+        if instance != None:
+            self.datasettype = instance.type
         return None
     
     def add_to_context(self, context, instance):
@@ -6906,7 +6910,7 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append(
             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
-        # Always add Type
+        # Always add Type, but its value may not be changed
         context['mainitems'].append(
             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
 
@@ -7009,7 +7013,19 @@ class CollAnyEdit(BasicDetails):
             profile = Profile.get_user_profile(self.request.user.username)
             form.instance.owner = profile
             # The collection type is now a parameter
-            form.instance.type = self.prefix
+            type = form.cleaned_data.get("type", "")
+            if type == "":
+                if self.prefix == "hist":
+                    form.instance.type = "super"
+                elif self.prefix == "publ":
+                    form.instance.type = self.datasettype
+                elif self.prefix == "priv":
+                    type = self.qd.get("datasettype", "")
+                    if type == "": type = self.datasettype
+                    if type == "": type = "super"
+                    form.instance.type = type
+                else:
+                    form.instance.type = self.prefix
 
             # Check out the name, if this is not in use elsewhere
             if instance.id != None:
@@ -7585,7 +7601,7 @@ class CollectionListView(BasicList):
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
         elif self.prefix == "priv":
-            self.new_button = True
+            self.new_button = False
             self.titlesg = "Personal Dataset"
             self.plural_name = "My Datasets"
             self.sg_name = "My Dataset"  
@@ -7742,6 +7758,11 @@ class CollectionListView(BasicList):
                     {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
                 ]
         return None
+
+    def add_to_context(self, context, initial):
+        if self.prefix == "priv":
+            context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
+        return context
 
     def get_own_list(self):
         # Get the user
@@ -8192,108 +8213,113 @@ class ManuscriptEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Need to know who this user (profile) is
-        profile = Profile.get_user_profile(self.request.user.username)
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
 
-        istemplate = (instance.mtype == "tem")
+            istemplate = (instance.mtype == "tem")
 
-        # Define the main items to show and edit
-        context['mainitems'] = []
-        # Possibly add the Template identifier
-        if istemplate:
-            context['mainitems'].append(
-                {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
-                )
-        # Get the main items
-        mainitems_main = [
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
-            {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
-            {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
-             'title': 'City, village or abbey (monastery) of the library'},
-            {'type': 'plain', 'label': "Library:",      'value': instance.get_library(),        'field_key': 'library'},
-            {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
-            {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-            {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-             'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
-            {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
-            {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
-            {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-            {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}
-            ]
-        for item in mainitems_main: context['mainitems'].append(item)
-        if not istemplate:
-            username = profile.user.username
-            team_group = app_editor
-            mainitems_m2m = [
-                {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                    'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
-                {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
-                    'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
-                {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
-                    'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
-                {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
-                    'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+            # Define the main items to show and edit
+            context['mainitems'] = []
+            # Possibly add the Template identifier
+            if istemplate:
+                context['mainitems'].append(
+                    {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
+                    )
+            # Get the main items
+            mainitems_main = [
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
+                {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
+                {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
+                 'title': 'City, village or abbey (monastery) of the library'},
+                {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
+                {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
+                {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
+                {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
+                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
+                {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
+                {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
+                {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
+                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}
                 ]
-            for item in mainitems_m2m: context['mainitems'].append(item)
-
-        # Signal that we have select2
-        context['has_select2'] = True
-
-        # Specify that the manuscript info should appear at the right
-        title_right = '<span style="font-size: xx-small">{}</span>'.format(instance.get_full_name())
-        context['title_right'] = title_right
-
-        if context['is_app_editor']:
-            lhtml = []
-            lbuttons = []
-            template_import_button = "import_template_button"
-            has_sermons = (instance.manuitems.count() > 0)
-            # Action depends on template/not
+            for item in mainitems_main: context['mainitems'].append(item)
             if not istemplate:
-                # Add a button so that the user can import sermons + hierarchy from an existing template
-                if not has_sermons:
-                    lbuttons.append(dict(title="Import sermon manifestations from a template", 
-                                id=template_import_button, open="import_from_template", label="Import from template..."))
+                username = profile.user.username
+                team_group = app_editor
+                mainitems_m2m = [
+                    {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
+                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                     'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                        'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
+                    {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
+                        'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
+                    {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                    {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
+                        'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
+                    {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
+                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+                    ]
+                for item in mainitems_m2m: context['mainitems'].append(item)
 
-                # Add a button so that the user can turn this manuscript into a `Template`
-                lbuttons.append(dict(title="Create template from this manuscript", 
-                             submit="create_new_template", label="Create template..."))
-            # Some buttons are needed anyway...
-            lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
-            lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
+            # Signal that we have select2
+            context['has_select2'] = True
 
-            # Build the HTML on the basis of the above
-            lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
-            for item in lbuttons:
-                idfield = ""
-                if 'submit' in item:
-                    ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
-                elif 'open' in item:
-                    ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
-                else:
-                    ref = " href='{}'".format(item['href'])
-                if 'id' in item:
-                    idfield = " id='{}'".format(item['id'])
-                lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
-                lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
-            lhtml.append("</div></div>")
+            # Specify that the manuscript info should appear at the right
+            title_right = '<span style="font-size: xx-small">{}</span>'.format(instance.get_full_name())
+            context['title_right'] = title_right
 
-            if not istemplate:
-                # Add HTML to allow for the *creation* of a template from this manuscript
-                local_context = dict(manubase=instance.id)
-                lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+            if context['is_app_editor']:
+                lhtml = []
+                lbuttons = []
+                template_import_button = "import_template_button"
+                has_sermons = (instance.manuitems.count() > 0)
+                # Action depends on template/not
+                if not istemplate:
+                    # Add a button so that the user can import sermons + hierarchy from an existing template
+                    if not has_sermons:
+                        lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                                    id=template_import_button, open="import_from_template", label="Import from template..."))
 
-                # Add HTML to allow the user to choose sermons from a template
-                local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
-                local_context['import_button'] = template_import_button
-                lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
+                    # Add a button so that the user can turn this manuscript into a `Template`
+                    lbuttons.append(dict(title="Create template from this manuscript", 
+                                 submit="create_new_template", label="Create template..."))
+                # Some buttons are needed anyway...
+                lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
+                lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
 
-            # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)
+                # Build the HTML on the basis of the above
+                lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+                for item in lbuttons:
+                    idfield = ""
+                    if 'submit' in item:
+                        ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                    elif 'open' in item:
+                        ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                    else:
+                        ref = " href='{}'".format(item['href'])
+                    if 'id' in item:
+                        idfield = " id='{}'".format(item['id'])
+                    lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
+                    lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
+                lhtml.append("</div></div>")
+
+                if not istemplate:
+                    # Add HTML to allow for the *creation* of a template from this manuscript
+                    local_context = dict(manubase=instance.id)
+                    lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+
+                    # Add HTML to allow the user to choose sermons from a template
+                    local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
+                    local_context['import_button'] = template_import_button
+                    lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
+
+                # Store the after_details in the context
+                context['after_details'] = "\n".join(lhtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptEdit/add_to_context")
 
         # Return the context we have made
         return context
@@ -8463,110 +8489,92 @@ class ManuscriptDetails(ManuscriptEdit):
         # Start by executing the standard handling
         super(ManuscriptDetails, self).add_to_context(context, instance)
 
-        # Additional sections
-        context['sections'] = []
+        oErr = ErrHandle()
+        try:
+            # Additional sections
+            context['sections'] = []
 
-        # Lists of related objects
-        context['related_objects'] = []
+            # Lists of related objects
+            context['related_objects'] = []
 
-        # Construct the hierarchical list
-        sermon_list = []
-        maxdepth = 0
-        #build_htable = False
+            # Construct the hierarchical list
+            sermon_list = []
+            maxdepth = 0
+            #build_htable = False
 
-        method = "msitem"   # "sermondescr"
+            method = "msitem"   # "sermondescr"
 
-        # Need to know who this user (profile) is
-        username = self.request.user.username
-        team_group = app_editor
+            # Need to know who this user (profile) is
+            username = self.request.user.username
+            team_group = app_editor
 
-        if instance != None:
-            # Create a well sorted list of sermons
-            if method == "msitem":
-                qs = instance.manuitems.filter(order__gte=0).order_by('order')
-            #else:
-            #    qs = instance.manusermons.filter(order__gte=0).order_by('order')
-            prev_level = 0
-            for idx, sermon in enumerate(qs):
-                # Need this first, because it also REPAIRS possible parent errors
-                level = sermon.getdepth()
+            if instance != None:
+                # Create a well sorted list of sermons
+                if method == "msitem":
+                    qs = instance.manuitems.filter(order__gte=0).order_by('order')
+                #else:
+                #    qs = instance.manusermons.filter(order__gte=0).order_by('order')
+                prev_level = 0
+                for idx, sermon in enumerate(qs):
+                    # Need this first, because it also REPAIRS possible parent errors
+                    level = sermon.getdepth()
 
-                parent = sermon.parent
-                firstchild = False
-                if parent:
+                    parent = sermon.parent
+                    firstchild = False
+                    if parent:
+                        if method == "msitem":
+                            qs_siblings = instance.manuitems.filter(parent=parent).order_by('order')
+                        #else:
+                        #    qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
+                        if sermon.id == qs_siblings.first().id:
+                            firstchild = True
+
+                    # Only then continue!
+                    oSermon = {}
                     if method == "msitem":
-                        qs_siblings = instance.manuitems.filter(parent=parent).order_by('order')
+                        # The 'obj' always is the MsItem itself
+                        oSermon['obj'] = sermon
+                        # Now we need to add a reference to the actual SermonDescr object
+                        oSermon['sermon'] = sermon.itemsermons.first()
+                        # And we add a reference to the SermonHead object
+                        oSermon['shead'] = sermon.itemheads.first()
                     #else:
-                    #    qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
-                    if sermon.id == qs_siblings.first().id:
-                        firstchild = True
+                    #    # 'sermon' is the SermonDescr instance
+                    #    oSermon['obj'] = sermon
+                    oSermon['nodeid'] = sermon.order + 1
+                    oSermon['number'] = idx + 1
+                    oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                    oSermon['level'] = level
+                    oSermon['pre'] = (level-1) * 20
+                    # If this is a new level, indicate it
+                    oSermon['group'] = firstchild   # (sermon.firstchild != None)
+                    # Is this one a parent of others?
+                    if method == "msitem":
+                        oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
+                    #else:
+                    #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
 
-                # Only then continue!
-                oSermon = {}
-                if method == "msitem":
-                    # The 'obj' always is the MsItem itself
-                    oSermon['obj'] = sermon
-                    # Now we need to add a reference to the actual SermonDescr object
-                    oSermon['sermon'] = sermon.itemsermons.first()
-                    # And we add a reference to the SermonHead object
-                    oSermon['shead'] = sermon.itemheads.first()
-                #else:
-                #    # 'sermon' is the SermonDescr instance
-                #    oSermon['obj'] = sermon
-                oSermon['nodeid'] = sermon.order + 1
-                oSermon['number'] = idx + 1
-                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                oSermon['level'] = level
-                oSermon['pre'] = (level-1) * 20
-                # If this is a new level, indicate it
-                oSermon['group'] = firstchild   # (sermon.firstchild != None)
-                # Is this one a parent of others?
-                if method == "msitem":
-                    oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
-                #else:
-                #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
+                    # Add the user-dependent list of associated collections to this sermon descriptor
+                    oSermon['hclist'] = [] if oSermon['sermon'] == None else oSermon['sermon'].get_hcs_plain(username, team_group)
 
-                # Add the user-dependent list of associated collections to this sermon descriptor
-                oSermon['hclist'] = [] if oSermon['sermon'] == None else oSermon['sermon'].get_hcs_plain(username, team_group)
+                    sermon_list.append(oSermon)
+                    # Bookkeeping
+                    if level > maxdepth: maxdepth = level
+                    prev_level = level
+                # Review them all and fill in the colspan
+                for oSermon in sermon_list:
+                    oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                    if oSermon['group']: oSermon['cols'] -= 1
 
-                sermon_list.append(oSermon)
-                # Bookkeeping
-                if level > maxdepth: maxdepth = level
-                prev_level = level
-            # Review them all and fill in the colspan
-            for oSermon in sermon_list:
-                oSermon['cols'] = maxdepth - oSermon['level'] + 1
-                if oSermon['group']: oSermon['cols'] -= 1
+            # Add instances to the list, noting their childof and order
+            context['sermon_list'] = sermon_list
+            context['sermon_count'] = len(sermon_list)
 
-            ## Alternative method: create a hierarchical object of sermons
-            #if method != "msitem" and build_htable:
-            #    lSermon = []
-            #    for sermon in qs:
-            #        # Create sermon object
-            #        oSermon = sermon_object(sermon)
-            #        # Add it to the list
-            #        lSermon.append(oSermon)
-            #        # Immediately attach it to the correct parent
-            #        parent_id = oSermon['parent']
-            #        if parent_id:
-            #            oParent = next((x for x in lSermon if x['id'] == oSermon['parent'] ), None)
-            #            if oParent:
-            #                oParent['child'].append(oSermon)
-            #    # Retain the top sermon
-            #    oSermon = lSermon[0]
-            #    # Remove the list
-            #    lSermon = []
-
-            #    # DEBUGGING: show what we have
-            #    sSermon = json.dumps(oSermon)
-            #    context['sermon_htable'] = sSermon
-
-        # Add instances to the list, noting their childof and order
-        context['sermon_list'] = sermon_list
-        context['sermon_count'] = len(sermon_list)
-
-        # Add the list of sermons
-        context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
+            # Add the list of sermons
+            context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptDetails/add_to_context")
 
         # Return the context we have made
         return context
@@ -11148,6 +11156,7 @@ class LibraryEdit(BasicDetails):
     rtype = "json"
     history_button = True
     mainitems = []
+    stype_edi_fields = ['idLibrEtab', 'name', 'libtype', 'location', 'lcity', 'lcountry']
     
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -11157,7 +11166,7 @@ class LibraryEdit(BasicDetails):
             {'type': 'plain', 'label': "Name:",                 'value': instance.name,                     'field_key': "name"},
             {'type': 'plain', 'label': "Library type:",         'value': instance.get_libtype_display(),    'field_key': 'libtype'},
             {'type': 'plain', 'label': "CNRS library id:",      'value': instance.idLibrEtab,               'field_key': "idLibrEtab"},
-            {'type': 'plain', 'label': "Library location:",     "value": instance.get_location(),           'field_key': "location"},
+            {'type': 'plain', 'label': "Library location:",     "value": instance.get_location_markdown(),  'field_key': "location"},
             {'type': 'plain', 'label': "City of library:",      "value": instance.get_city_name()},
             {'type': 'plain', 'label': "Country of library: ",  "value": instance.get_country_name()}
             ]

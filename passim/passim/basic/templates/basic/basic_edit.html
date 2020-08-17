@@ -156,6 +156,8 @@
                     {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
                       <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
                       <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
+                    {% elif 'key_hide' in mainitem %}
+                      <div class="hidden">{{mainitem.field_key}}</div>
                     {% elif 'field_key' in mainitem %}
                       <div class="edit-mode hidden">{{mainitem.field_key}}</div>
                     {% elif 'field_list' in mainitem %}
