@@ -162,35 +162,53 @@ class CollOneWidget(ModelSelect2Widget):
     model = Collection
     search_fields = [ 'name__icontains' ]
     type = None
+    settype = "pd"
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
+        username = self.attrs.pop('username', '')
+        team_group = self.attrs.pop('team_group', '')
         if self.type:
-            return Collection.objects.filter(type=self.type).order_by('name').distinct()
+            qs = Collection.get_scoped_queryset(self.type, username, team_group, settype=self.settype)
         else:
-            return Collection.objects.filter().order_by('name').distinct()
+            qs = Collection.get_scoped_queryset(None, username, team_group, settype=self.settype)
+        #lstQ = []
+        #if self.type != None: lstQ.append(Q(type=self.type))
+        #if self.settype != None: lstQ.append(Q(settype=self.settype))
+        #return Collection.objects.filter(*lstQ).order_by('name').distinct()
+        return qs
 
 
 class CollOneGoldWidget(CollOneWidget):
     """Like CollOne, but then for: SermonGold"""
     type = "gold"
+    settype = "pd"
 
 
 class CollOneManuWidget(CollOneWidget):
     """Like CollOne, but then for: Manuscript"""
     type = "manu"
+    settype = "pd"
 
 
 class CollOneSermoWidget(CollOneWidget):
     """Like CollOne, but then for: Sermon"""
     type = "sermo"
+    settype = "pd"
 
 
 class CollOneSuperWidget(CollOneWidget):
     """Like CollOne, but then for: EqualGold = super sermon gold"""
     type = "super"
+    settype = "pd"
+
+
+class CollOneHistWidget(CollOneWidget):
+    """Like CollOne, but then for: EqualGold = super sermon gold"""
+    type = "super"
+    settype = "hc"
 
 
 class CountryOneWidget(ModelSelect2Widget):
@@ -880,8 +898,8 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    collone     = ModelChoiceField(queryset=None, required=False, 
-                widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False) #, 
+                # widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     #overlap_org     = forms.IntegerField(label=_("percentage overlap"), required=False,
     #            widget=NumberInput(attrs={'placeholder': 'Overlap at least...', 'type': 'range', 'min': '1', 'max': '100', # 'value': '10', 
     #                                      'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
@@ -937,6 +955,8 @@ class SearchManuForm(PassimModelForm):
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collone'].widget = CollOneManuWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
@@ -947,7 +967,8 @@ class SearchManuForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "manu"
-            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
 
             # Get the instance
             if 'instance' in kwargs:
@@ -1028,8 +1049,8 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    collone     = ModelChoiceField(queryset=None, required=False, 
-                widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False) #, 
+                # widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -1128,6 +1149,8 @@ class SermonForm(PassimModelForm):
                         'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple super sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collone'].widget = CollOneSermoWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
@@ -1137,7 +1160,8 @@ class SermonForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "sermo"
-            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
 
             # For searching/listing
             self.fields['mtype'].initial = "man"
@@ -1376,8 +1400,8 @@ class CollectionForm(PassimModelForm):
                 widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-    collone     = ModelChoiceField(queryset=None, required=False, 
-                widget=CollOneWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False)   #, 
+                #widget=CollOneWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1749,8 +1773,8 @@ class SermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    collone     = ModelChoiceField(queryset=None, required=False, 
-                widget=CollOneGoldWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False) #, 
+                # widget=CollOneGoldWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits"]
 
     class Meta:
@@ -1803,6 +1827,8 @@ class SermonGoldForm(PassimModelForm):
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collone'].widget = CollOneGoldWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group, userplus):
                 self.fields['kwlist'].widget.is_team = True
@@ -1819,7 +1845,8 @@ class SermonGoldForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "gold"
-            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
         
             # Get the instance
             if 'instance' in kwargs:
@@ -1955,8 +1982,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    collone     = ModelChoiceField(queryset=None, required=False, 
-                widget=CollOneSuperWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False) #, 
+                # widget=CollOneSuperWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
 
     class Meta:
@@ -2008,6 +2035,8 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'settype': 'hc',
                         'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collone'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
@@ -2025,7 +2054,8 @@ class SuperSermonGoldForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
-            self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
+            self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
         
            # Get the instance
             if 'instance' in kwargs:

@@ -783,11 +783,13 @@ class BasicList(ListView):
     def adapt_search(self, fields):
         return fields, None, None
   
-    def get_queryset(self):
+    def get_queryset(self, request = None):
         self.initializations()
 
+        if request == None: request = self.request
         # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        # get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = request.GET if request.method == "GET" else request.POST
         get = get.copy()
         self.qd = get
 
@@ -797,7 +799,8 @@ class BasicList(ListView):
             if "-rangeslider" in k: lst_remove.append(k)
         for item in lst_remove: self.qd.pop(item)
 
-        username=self.request.user.username
+        # username=self.request.user.username
+        username=request.user.username
         team_group=app_editor
 
         self.bFilter = False

@@ -203,11 +203,15 @@ def get_help(field):
 
     return help_text
 
-def get_crpp_date(dtThis):
+def get_crpp_date(dtThis, readable=False):
     """Convert datetime to string"""
 
-    # Model: yyyy-MM-dd'T'HH:mm:ss
-    sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
+    if readable:
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%d/%B/%Y (%H:%M)")
+    else:
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
     return sDate
 
 def get_now_time():

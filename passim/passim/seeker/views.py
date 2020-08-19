@@ -79,7 +79,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 from passim.reader.views import reader_uploads
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails
+from passim.basic.views import BasicList, BasicDetails, make_search_list
 
 
 # Some constants that can be used
@@ -383,168 +383,168 @@ def has_obj_value(field, obj):
     response = (field != None and field in obj and obj[field] != None)
     return response
 
-def make_search_list(filters, oFields, search_list, qd):
-    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
+#def make_search_list(filters, oFields, search_list, qd):
+#    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
-    def enable_filter(filter_id, head_id=None):
-        for item in filters:
-            if filter_id in item['id']:
-                item['enabled'] = True
-                # Break from my loop
-                break
-        # Check if this one has a head
-        if head_id != None and head_id != "":
-            for item in filters:
-                if head_id in item['id']:
-                    item['enabled'] = True
-                    # Break from this sub-loop
-                    break
-        return True
+#    def enable_filter(filter_id, head_id=None):
+#        for item in filters:
+#            if filter_id in item['id']:
+#                item['enabled'] = True
+#                # Break from my loop
+#                break
+#        # Check if this one has a head
+#        if head_id != None and head_id != "":
+#            for item in filters:
+#                if head_id in item['id']:
+#                    item['enabled'] = True
+#                    # Break from this sub-loop
+#                    break
+#        return True
 
-    def get_value(obj, field, default=None):
-        if field in obj:
-            sBack = obj[field]
-        else:
-            sBack = default
-        return sBack
+#    def get_value(obj, field, default=None):
+#        if field in obj:
+#            sBack = obj[field]
+#        else:
+#            sBack = default
+#        return sBack
 
-    oErr = ErrHandle()
+#    oErr = ErrHandle()
 
-    try:
-        # (1) Create default lstQ
-        lstQ = []
+#    try:
+#        # (1) Create default lstQ
+#        lstQ = []
 
-        # (2) Reset the filters in the list we get
-        for item in filters: item['enabled'] = False
+#        # (2) Reset the filters in the list we get
+#        for item in filters: item['enabled'] = False
     
-        # (3) Walk all sections
-        for part in search_list:
-            head_id = get_value(part, 'section')
+#        # (3) Walk all sections
+#        for part in search_list:
+#            head_id = get_value(part, 'section')
 
-            # (4) Walk the list of defined searches
-            for search_item in part['filterlist']:
-                keyS = get_value(search_item, "keyS")
-                keyId = get_value(search_item, "keyId")
-                keyFk = get_value(search_item, "keyFk")
-                keyList = get_value(search_item, "keyList")
-                infield = get_value(search_item, "infield")
-                dbfield = get_value(search_item, "dbfield")
-                fkfield = get_value(search_item, "fkfield")
-                keyType = get_value(search_item, "keyType")
-                filter_type = get_value(search_item, "filter")
-                s_q = ""
-                arFkField = []
-                if fkfield != None:
-                    arFkField = fkfield.split("|")
+#            # (4) Walk the list of defined searches
+#            for search_item in part['filterlist']:
+#                keyS = get_value(search_item, "keyS")
+#                keyId = get_value(search_item, "keyId")
+#                keyFk = get_value(search_item, "keyFk")
+#                keyList = get_value(search_item, "keyList")
+#                infield = get_value(search_item, "infield")
+#                dbfield = get_value(search_item, "dbfield")
+#                fkfield = get_value(search_item, "fkfield")
+#                keyType = get_value(search_item, "keyType")
+#                filter_type = get_value(search_item, "filter")
+#                s_q = ""
+#                arFkField = []
+#                if fkfield != None:
+#                    arFkField = fkfield.split("|")
                
-                # Main differentiation: fkfield or dbfield
-                if fkfield:
-                    # Check for keyS
-                    if has_string_value(keyS, oFields):
-                        # Check for ID field
-                        if has_string_value(keyId, oFields):
-                            val = oFields[keyId]
-                            if not isinstance(val, int): 
-                                try:
-                                    val = val.id
-                                except:
-                                    pass
-                            enable_filter(filter_type, head_id)
-                            s_q = Q(**{"{}__id".format(fkfield): val})
-                        elif has_obj_value(fkfield, oFields):
-                            val = oFields[fkfield]
-                            enable_filter(filter_type, head_id)
-                            s_q = Q(**{fkfield: val})
-                        else:
-                            val = oFields[keyS]
-                            enable_filter(filter_type, head_id)
-                            # We are dealing with a foreign key (or multiple)
-                            if len(arFkField) > 1:
-                                iStop = 1
-                            # we are dealing with a foreign key, so we should use keyFk
-                            s_q = None
-                            for fkfield in arFkField:
-                                if "*" in val:
-                                    val = adapt_search(val)
-                                    s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
-                                else:
-                                    s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
-                                if s_q == None:
-                                    s_q = s_q_add
-                                else:
-                                    s_q |= s_q_add
-                    elif has_obj_value(fkfield, oFields):
-                        val = oFields[fkfield]
-                        enable_filter(filter_type, head_id)
-                        s_q = Q(**{fkfield: val})
-                        external = get_value(search_item, "external")
-                        if has_string_value(external, oFields):
-                            qd[external] = getattr(val, "name")
-                elif dbfield:
-                    # We are dealing with a plain direct field for the model
-                    # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
-                    # Check for keyS
-                    if has_string_value(keyS, oFields):
-                        # Check for ID field
-                        if has_string_value(keyId, oFields):
-                            val = oFields[keyId]
-                            enable_filter(filter_type, head_id)
-                            s_q = Q(**{"{}__id".format(dbfield): val})
-                        elif has_obj_value(keyFk, oFields):
-                            val = oFields[keyFk]
-                            enable_filter(filter_type, head_id)
-                            s_q = Q(**{dbfield: val})
-                        else:
-                            val = oFields[keyS]
-                            enable_filter(filter_type, head_id)
-                            if isinstance(val, int):
-                                s_q = Q(**{"{}".format(dbfield): val})
-                            elif "*" in val:
-                                val = adapt_search(val)
-                                s_q = Q(**{"{}__iregex".format(dbfield): val})
-                            else:
-                                s_q = Q(**{"{}__iexact".format(dbfield): val})
-                    elif keyType == "has":
-                        # Check the count for the db field
-                        val = oFields[filter_type]
-                        if val == "yes" or val == "no":
-                            enable_filter(filter_type, head_id)
-                            if val == "yes":
-                                s_q = Q(**{"{}__gt".format(dbfield): 0})
-                            else:
-                                s_q = Q(**{"{}".format(dbfield): 0})
+#                # Main differentiation: fkfield or dbfield
+#                if fkfield:
+#                    # Check for keyS
+#                    if has_string_value(keyS, oFields):
+#                        # Check for ID field
+#                        if has_string_value(keyId, oFields):
+#                            val = oFields[keyId]
+#                            if not isinstance(val, int): 
+#                                try:
+#                                    val = val.id
+#                                except:
+#                                    pass
+#                            enable_filter(filter_type, head_id)
+#                            s_q = Q(**{"{}__id".format(fkfield): val})
+#                        elif has_obj_value(fkfield, oFields):
+#                            val = oFields[fkfield]
+#                            enable_filter(filter_type, head_id)
+#                            s_q = Q(**{fkfield: val})
+#                        else:
+#                            val = oFields[keyS]
+#                            enable_filter(filter_type, head_id)
+#                            # We are dealing with a foreign key (or multiple)
+#                            if len(arFkField) > 1:
+#                                iStop = 1
+#                            # we are dealing with a foreign key, so we should use keyFk
+#                            s_q = None
+#                            for fkfield in arFkField:
+#                                if "*" in val:
+#                                    val = adapt_search(val)
+#                                    s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
+#                                else:
+#                                    s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
+#                                if s_q == None:
+#                                    s_q = s_q_add
+#                                else:
+#                                    s_q |= s_q_add
+#                    elif has_obj_value(fkfield, oFields):
+#                        val = oFields[fkfield]
+#                        enable_filter(filter_type, head_id)
+#                        s_q = Q(**{fkfield: val})
+#                        external = get_value(search_item, "external")
+#                        if has_string_value(external, oFields):
+#                            qd[external] = getattr(val, "name")
+#                elif dbfield:
+#                    # We are dealing with a plain direct field for the model
+#                    # OR: it is also possible we are dealing with a m2m field -- that gets the same treatment
+#                    # Check for keyS
+#                    if has_string_value(keyS, oFields):
+#                        # Check for ID field
+#                        if has_string_value(keyId, oFields):
+#                            val = oFields[keyId]
+#                            enable_filter(filter_type, head_id)
+#                            s_q = Q(**{"{}__id".format(dbfield): val})
+#                        elif has_obj_value(keyFk, oFields):
+#                            val = oFields[keyFk]
+#                            enable_filter(filter_type, head_id)
+#                            s_q = Q(**{dbfield: val})
+#                        else:
+#                            val = oFields[keyS]
+#                            enable_filter(filter_type, head_id)
+#                            if isinstance(val, int):
+#                                s_q = Q(**{"{}".format(dbfield): val})
+#                            elif "*" in val:
+#                                val = adapt_search(val)
+#                                s_q = Q(**{"{}__iregex".format(dbfield): val})
+#                            else:
+#                                s_q = Q(**{"{}__iexact".format(dbfield): val})
+#                    elif keyType == "has":
+#                        # Check the count for the db field
+#                        val = oFields[filter_type]
+#                        if val == "yes" or val == "no":
+#                            enable_filter(filter_type, head_id)
+#                            if val == "yes":
+#                                s_q = Q(**{"{}__gt".format(dbfield): 0})
+#                            else:
+#                                s_q = Q(**{"{}".format(dbfield): 0})
 
-                # Check for list of specific signatures
-                if has_list_value(keyList, oFields):
-                    s_q_lst = ""
-                    enable_filter(filter_type, head_id)
-                    code_list = [getattr(x, infield) for x in oFields[keyList]]
-                    if fkfield:
-                        # Now we need to look at the id's
-                        if len(arFkField) > 1:
-                            # THere are more foreign keys: combine in logical or
-                            s_q_lst = ""
-                            for fkfield in arFkField:
-                                if s_q_lst == "":
-                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                                else:
-                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                        else:
-                            # Just one foreign key
-                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                    elif dbfield:
-                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
-                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
+#                # Check for list of specific signatures
+#                if has_list_value(keyList, oFields):
+#                    s_q_lst = ""
+#                    enable_filter(filter_type, head_id)
+#                    code_list = [getattr(x, infield) for x in oFields[keyList]]
+#                    if fkfield:
+#                        # Now we need to look at the id's
+#                        if len(arFkField) > 1:
+#                            # THere are more foreign keys: combine in logical or
+#                            s_q_lst = ""
+#                            for fkfield in arFkField:
+#                                if s_q_lst == "":
+#                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+#                                else:
+#                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+#                        else:
+#                            # Just one foreign key
+#                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+#                    elif dbfield:
+#                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
+#                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
 
-                # Possibly add the result to the list
-                if s_q != "": lstQ.append(s_q)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("make_search_list")
-        lstQ = []
+#                # Possibly add the result to the list
+#                if s_q != "": lstQ.append(s_q)
+#    except:
+#        msg = oErr.get_error_message()
+#        oErr.DoError("make_search_list")
+#        lstQ = []
 
-    # Return what we have created
-    return filters, lstQ, qd
+#    # Return what we have created
+#    return filters, lstQ, qd
 
 def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
@@ -967,7 +967,7 @@ def sync_progress(request):
     # Return this response
     return JsonResponse(data)
 
-def search_generic(s_view, cls, form, qd):
+def search_generic(s_view, cls, form, qd, username=None, team_group=None):
     """Generic queryset generation for searching"""
 
     qs = None
@@ -984,16 +984,32 @@ def search_generic(s_view, cls, form, qd):
             prefix = s_view.prefix
             filters = s_view.filters
             searches = s_view.searches
+            lstExclude = []
 
-            genForm = form(qd, prefix=prefix)
+            if s_view.use_team_group:
+                genForm = form(qd, prefix=prefix, username=username, team_group=team_group)
+            else:
+                genForm = form(qd, prefix=prefix)
 
             if genForm.is_valid():
 
                 # Process the criteria from this form 
                 oFields = genForm.cleaned_data
 
+                # Adapt the search for empty passim codes
+                if 'codetype' in oFields:
+                    codetype = oFields['codetype']
+                    if codetype == "non":
+                        lstExclude = []
+                        lstExclude.append(Q(equal__isnull=False))
+                    elif codetype == "spe":
+                        lstExclude = []
+                        lstExclude.append(Q(equal__isnull=True))
+                    # Reset the codetype
+                    oFields['codetype'] = ""   
+                                 
                 # Create the search based on the specification in searches
-                filters, lstQ, qd = make_search_list(filters, oFields, searches, qd)
+                filters, lstQ, qd, lstExclude = make_search_list(filters, oFields, searches, qd, lstExclude)
 
                 # Calculate the final qs
                 if len(lstQ) == 0:
@@ -1006,8 +1022,8 @@ def search_generic(s_view, cls, form, qd):
             else:
                 # TODO: communicate the error to the user???
 
-                # Just show everything
-                qs = cls.objects.all().distinct()
+                # Just show NOTHING
+                qs = cls.objects.none()
 
         else:
             # Just show everything
@@ -4133,17 +4149,21 @@ class BasicPart(View):
         self.add = object_id is None
         # Get the parameters
         if request.POST:
-            self.qd = request.POST
+            self.qd = request.POST.copy()
         else:
-            self.qd = request.GET
+            self.qd = request.GET.copy()
 
         # Immediately take care of the rangeslider stuff
         lst_remove = []
-        dictionary = {}
         for k,v in self.qd.items():
-            if "-rangeslider" not in k: 
-                dictionary[k] = v
-        self.qd = dictionary
+            if "-rangeslider" in k: lst_remove.append(k)
+        for item in lst_remove: self.qd.pop(item)
+        #lst_remove = []
+        #dictionary = {}
+        #for k,v in self.qd.items():
+        #    if "-rangeslider" not in k: 
+        #        dictionary[k] = v
+        #self.qd = dictionary
 
         # Check for action
         if 'action' in self.qd:
@@ -7132,7 +7152,16 @@ class CollPrivDetails(CollPrivEdit):
     def add_to_context(self, context, instance):
         context = super(CollPrivDetails, self).add_to_context(context, instance)
         if instance != None and instance.id != None:
+            name_choice = dict(
+                manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
+                sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
+                gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
+                super=dict(sg_name="Super sermon gold", pl_name="Super sermons gold")
+                )
             # Add a button + text
+            context['datasettype'] = instance.type
+            context['sg_name'] = name_choice[instance.type]['sg_name']
+            context['pl_name'] = name_choice[instance.type]['pl_name']
             context['after_details'] = render_to_string("seeker/collpriv.html", context, self.request)
         return context
 
@@ -7605,12 +7634,14 @@ class CollectionListView(BasicList):
             self.titlesg = "Personal Dataset"
             self.plural_name = "My Datasets"
             self.sg_name = "My Dataset"  
-            self.order_cols = ['type', 'name', 'created', '']
+            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
-                {'name': 'Dataset',     'order': 'o=3', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                {'name': 'Created',     'order': 'o=4', 'type': 'str', 'custom': 'created'},
+                {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                {'name': 'Scope',       'order': 'o=3', 'type': 'str', 'custom': 'scope'},
+                {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
+                {'name': 'Created',     'order': 'o=5', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
             self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False}]
@@ -7860,7 +7891,7 @@ class CollectionListView(BasicList):
         elif custom == "scope":
             sBack = instance.get_scope_display()
         elif custom == "created":
-            sBack = get_crpp_date(instance.created)
+            sBack = get_crpp_date(instance.created, True)
         elif custom == "owner":
             sBack = instance.owner.user.username
         elif custom == "authors":
@@ -11687,48 +11718,57 @@ class BasketUpdate(BasicPart):
         else:
             return context
 
+        username=self.request.user.username
+        team_group=app_editor
+
+        # Note: only operations in either of these two lists will be executed
+        lst_basket_target = ["create", "add", "remove", "reset"]
+        lst_basket_source = ["collcreate", "colladd"]
+
         # Get our profile
         profile = Profile.get_user_profile(self.request.user.username)
         if profile != None:
 
             # Get the queryset
-            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd)
+            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
+                    
+            if operation in lst_basket_target:
 
-            kwargs = {'profile': profile}
+                kwargs = {'profile': profile}
 
-            # Action depends on the operation specified
-            if qs and operation == "create":
-                # Remove anything there
-                self.clsBasket.objects.filter(profile=profile).delete()
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        kwargs[self.s_field] = item
-                        self.clsBasket.objects.create(**kwargs)
-                # Process history
-                profile.history(operation, self.colltype, oFields)
-            elif qs and operation == "add":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        kwargs[self.s_field] = item
-                        self.clsBasket.objects.create(**kwargs)
-                # Process history
-                profile.history(operation, self.colltype, oFields)
-            elif qs and operation == "remove":
-                # Add
-                with transaction.atomic():
-                    for item in qs:
-                        kwargs[self.s_field] = item
-                        self.clsBasket.objects.filter(**kwargs).delete()
-                # Process history
-                profile.history(operation, self.colltype, oFields)
-            elif operation == "reset":
-                # Remove everything from our basket
-                self.clsBasket.objects.filter(profile=profile).delete()
-                # Reset the history for this one
-                profile.history(operation, self.colltype)
-            elif qs and (operation == "collcreate" or operation == "colladd"):
+                # Action depends on the operation specified
+                if qs and operation == "create":
+                    # Remove anything there
+                    self.clsBasket.objects.filter(profile=profile).delete()
+                    # Add
+                    with transaction.atomic():
+                        for item in qs:
+                            kwargs[self.s_field] = item
+                            self.clsBasket.objects.create(**kwargs)
+                    # Process history
+                    profile.history(operation, self.colltype, oFields)
+                elif qs and operation == "add":
+                    # Add
+                    with transaction.atomic():
+                        for item in qs:
+                            kwargs[self.s_field] = item
+                            self.clsBasket.objects.create(**kwargs)
+                    # Process history
+                    profile.history(operation, self.colltype, oFields)
+                elif qs and operation == "remove":
+                    # Add
+                    with transaction.atomic():
+                        for item in qs:
+                            kwargs[self.s_field] = item
+                            self.clsBasket.objects.filter(**kwargs).delete()
+                    # Process history
+                    profile.history(operation, self.colltype, oFields)
+                elif operation == "reset":
+                    # Remove everything from our basket
+                    self.clsBasket.objects.filter(profile=profile).delete()
+                    # Reset the history for this one
+                    profile.history(operation, self.colltype)
+            elif operation in lst_basket_source:
                 # Queryset: the basket contents
                 qs = self.clsBasket.objects.filter(profile=profile)
 
@@ -11740,9 +11780,10 @@ class BasketUpdate(BasicPart):
                 bChanged = False
                 if operation == "collcreate":
                     # Save the current basket as a collection that needs to receive a name
+                    # Note: this assumes [scope='priv'] default
                     coll = Collection.objects.create(path=history, settype="pd",
-                                                     descrip="Created from a {} listview basket".format(self.colltype), 
-                                                     owner=profile, type=self.colltype)
+                            descrip="Created from a {} listview basket".format(self.colltype), 
+                            owner=profile, type=self.colltype)
                     # Assign it a name based on its ID number and the owner
                     name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)
                     coll.name = name
@@ -11781,8 +11822,17 @@ class BasketUpdate(BasicPart):
                         # self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
                         self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
                     else:
-                        # We are adding
-                        collurl = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
+                        # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
+                        if coll.settype == "pd":
+                            if coll.scope == "publ":
+                                # Public dataset
+                                urltype = "publ"
+                            else:
+                                # Team or Priv
+                                urltype = "priv"
+                        elif coll.settype == "hc":
+                            urltype = "hist"
+                        collurl = reverse('coll{}_details'.format(urltype), kwargs={'pk': coll.id})
                         collname = coll.name
                         context['data'] = dict(collurl=collurl, collname=collname)
                         # Have changes been made?
