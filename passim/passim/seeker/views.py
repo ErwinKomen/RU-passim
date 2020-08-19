@@ -7491,80 +7491,6 @@ class CollSuperDetails(CollSuperEdit):
     rtype = "html"
 
 
-class CollGoldEditORG(BasicDetails):
-    """Gold: SermonGold collections """
-
-    model = Collection
-    mForm = CollectionForm
-    prefix = "gold"
-    basic_name_prefix = "coll"
-    rtype = "json"
-    title = "Gold collection"
-    mainitems = []
-
-    def add_to_context(self, context, instance):
-          """Add to the existing context"""
-
-          # Define the main items to show and edit
-          context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:",        'value': instance.name,             'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip,          'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:",         'value': instance.url,              'field_key': 'url'},
-             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly,         'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display, 'field_key': 'type'},
-             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
-             ]
-          # Return the context we have made
-          return context    
-    
-    def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # Also make sure that the correct type (=prefix) gets established
-            form.instance.type = self.prefix
-        return True, ""
-
-
-class CollSuperEditORG(BasicDetails):
-    """Super: EqualGold collections = super sermon gold """
-
-    model = Collection
-    mForm = CollectionForm
-    prefix = "super"
-    basic_name_prefix = "coll"
-    rtype = "json"
-    title = "Super collection"
-    mainitems = []
-
-    def add_to_context(self, context, instance):
-          """Add to the existing context"""
-
-          # Define the main items to show and edit
-          context['mainitems'] = [
-             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
-             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'},
-             {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'},
-             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'},
-             {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display},
-             {'type': 'plain', 'label': "Created:",     'value': instance.get_created}
-             ]
-          # Return the context we have made
-          return context    
-    
-    def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # Also make sure that the correct type (=prefix) gets established
-            form.instance.type = self.prefix
-        return True, ""
-
-
 class CollectionListView(BasicList):
     """Search and list collections"""
 
@@ -7906,64 +7832,7 @@ class CollectionListView(BasicList):
             html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
             sBack = "\n".join(html)
         return sBack, sTitle
-
-
-#class CollectionEdit(PassimDetails):
-#    """The details of one collection"""
- 
-#    model = Collection
-#    mForm = CollectionForm
-#    template_name = 'seeker/collection_edit.html'
-#    template_post = 'seeker/collection_edit.html'
-#    prefix = 'col'
-#    title = "CollectionEdit"
-#    afternewurl = ""
-#    rtype = "json"
-
-#    def after_new(self, form, instance):
-#        """Action to be performed after adding a new item"""
-
-#        self.afternewurl = reverse('collection_list')
-#        return True, "" 
-        
-#    def add_to_context(self, context, instance):
-#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-#        # Process this visit and get the new breadcrumbs object
-#        prevpage = reverse('collection_list')
-#        context['prevpage'] = prevpage
-#        crumbs = []
-#        crumbs.append(['Collections', reverse('collection_list')])
-#        context['breadcrumbs'] = get_breadcrumbs(self.request, "Collection details", True, crumbs)
-#        context['afterdelurl'] = reverse('collection_list')
-       
-#        return context
-
-#    def before_save(self, form, instance):
-#        if form != None:
-#            # Search the user profile
-#            profile = Profile.get_user_profile(self.request.user.username)
-#            form.instance.owner = profile
-#        return True, ""
-
-
-#class CollectionDetails(CollectionEdit):
-#    """The editing of one collection"""
-
-#    template_name = 'seeker/collection_details.html'
-#    template_post = 'seeker/collection_details.html'
-#    title = "CollectionDetails"
-#    rtype = "html"  # GET provides a HTML form straight away
-
-#    def after_new(self, form, instance):
-#        """Action to be performed after adding a new item"""
-
-#        self.afternewurl = reverse('collection_list')
-#        if instance != None:
-#            # Make sure we do a page redirect
-#            self.newRedirect = True
-#            self.redirectpage = reverse('collection_details', kwargs={'pk': instance.id})
-#        return True, "" 
-
+    
 
 class CollectionSermset(BasicPart):
     """The set of sermons from the collection"""
