@@ -6939,9 +6939,25 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append(
             {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
 
+        # This is only for private PDs:
+        if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
+            name_choice = dict(
+                manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
+                sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
+                gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
+                super=dict(sg_name="Super sermon gold", pl_name="Super sermons gold")
+                )
+            # Add a button + text
+            context['datasettype'] = instance.type
+            context['sg_name'] = name_choice[instance.type]['sg_name']
+            context['pl_name'] = name_choice[instance.type]['pl_name']
+            context['size'] = instance.get_size_markdown()
+            size_value = render_to_string("seeker/collpriv.html", context, self.request)
+        else:
+            size_value = instance.get_size_markdown()
         # Always add Created and Size
         context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
-        context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': instance.get_size_markdown})
+        context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': size_value})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
         if instance.settype == "hc" and context['is_app_editor']:
@@ -7132,8 +7148,12 @@ class CollAnyDetails(CollAnyEdit):
     rtype = "html"
 
 
-class CollPrivDetails(CollPrivEdit):
+class CollPrivDetails(CollAnyEdit):
     """Like CollPrivEdit, but then with html"""
+
+    prefix = "priv"
+    basic_name = "collpriv"
+    title = "My Dataset"
     rtype = "html"
 
     def custom_init(self, instance):
@@ -7150,25 +7170,117 @@ class CollPrivDetails(CollPrivEdit):
         return None
 
     def add_to_context(self, context, instance):
+        # Perform the standard initializations:
         context = super(CollPrivDetails, self).add_to_context(context, instance)
-        if instance != None and instance.id != None:
-            name_choice = dict(
-                manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
-                sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
-                gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
-                super=dict(sg_name="Super sermon gold", pl_name="Super sermons gold")
-                )
-            # Add a button + text
-            context['datasettype'] = instance.type
-            context['sg_name'] = name_choice[instance.type]['sg_name']
-            context['pl_name'] = name_choice[instance.type]['pl_name']
-            context['after_details'] = render_to_string("seeker/collpriv.html", context, self.request)
+
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None):
+            oAdd = dict(value=value)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            rel_item.append(oAdd)
+            return True
+
+        # All PDs: show the content
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+
+        # Action depends on instance.type: M/S/SG/SSG
+        if instance.type == "manu":
+            # Get all non-template manuscripts part of this PD
+            manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
+            if resizable:
+                manuscripts['gridclass'] = "resizable"
+
+            lstQ.append(Q(collections=instance))
+            lstQ.append(Q(mtype="man"))
+            qs_manu = Manuscript.objects.filter(*lstQ).order_by(
+                'id').distinct().order_by('lcity__name', 'library__name', 'idno')
+
+            for item in qs_manu:
+                rel_item = []
+
+                # S: Order in Manuscript
+                add_one_item(rel_item, index, False, align="right")
+                index += 1
+
+                # Shelfmark = IDNO
+                manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
+                # manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                # Name as CITY - LIBRARY - IDNO + Name
+                # manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
+                manu_name = "{}, {}, <span class='signature'>{}</span>".format(item.get_city(), item.get_library(), item.idno)
+                add_one_item(rel_item, manu_name, False, title=item.idno, main=True, 
+                             link=reverse('manuscript_details', kwargs={'pk': item.id}))
+
+                # Just the name of the manuscript
+                add_one_item(rel_item, item.name, resizable)
+
+                # Origin
+                or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+                add_one_item(rel_item, or_prov, resizable, title="Origin (if known), followed by provenances (between brackets)")
+
+                # date range
+                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                add_one_item(rel_item, daterange, resizable, align="right")
+
+                # Number of sermons in this manuscript
+                sermo_number = item.get_sermon_count()
+                add_one_item(rel_item, sermo_number, resizable, align="right")
+
+                # Actions that can be performed on this item
+                html = []
+                html.append("<span class='blinded'><a href='#' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
+                html.append("<a href='#'><span class='glyphicon glyphicon-arrow-down'></span></a>")
+                html.append("<a href='#'><span class='glyphicon glyphicon-remove'></span></a>")
+                html.append("&nbsp;</span>")
+                sHtml = "\n".join(html)
+                add_one_item(rel_item, sHtml)
+
+                # Add this Manu line to the list
+                rel_list.append(rel_item)
+
+            manuscripts['rel_list'] = rel_list
+
+            sort_start = '<span class="sortable"><span class="fa fa-sort"></span>&nbsp;'
+            sort_end = '</span>'
+            manuscripts['columns'] = [
+                'Order',
+                '{}<span title="City/Library/Shelfmark">Shelfmark</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Name">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Sermons in this manuscript">sermons</span>{}'.format(sort_start, sort_end),
+                ''
+                ]
+            related_objects.append(manuscripts)
+
+        elif instance.type == "sermo":
+            pass
+
+        elif instance.type == "gold":
+            pass
+
+        elif instance.type == "super":
+            pass
+
+        context['related_objects'] = related_objects
+
+        # REturn the total context
         return context
 
 
-class CollPublDetails(CollPublEdit):
-    """Like CollPublEdit, but then with html"""
-    rtype = "html"
+class CollPublDetails(CollPrivDetails):
+    """Like CollPrivDetails, but then with public"""
+
+    prefix = "publ"
+    basic_name = "collpubl"
+    title = "Public Dataset"
 
     def custom_init(self, instance):
         # Check if someone acts as if this is a public dataset, whil it is not

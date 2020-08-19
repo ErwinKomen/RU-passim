@@ -4,6 +4,7 @@
 {% block scripts %}
     {% load staticfiles %}
     <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
 {% endblock %}
 
@@ -152,7 +153,15 @@
                             <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                           {% endif %}
                           {% for col in related.columns %}
-                            <th class="tdnowrap">{{col|safe}}</th>
+                            <th class="tdnowrap">
+                              {% if col.sortable %}
+                                <span class="sortable">
+                                  <span class="glyphicon glyphicon-sort"></span>
+                                </span>
+                              {% else %}
+                              {% endif %}
+                              {{col|safe}}
+                            </th>
                           {% endfor %}
                         </tr>
                       </thead>

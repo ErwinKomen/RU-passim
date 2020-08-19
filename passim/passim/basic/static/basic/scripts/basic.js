@@ -119,6 +119,7 @@ var ru = (function ($, ru) {
         var row = null,
             cols = null,
             div = null,
+            eltarget = null,
             tableHeight = 0;
 
         try {
@@ -138,8 +139,15 @@ var ru = (function ($, ru) {
             cols[i].style.position = 'relative';
             cols[i].style.cursor = 'pointer';
             private_methods.setListeners(div);
-            // Add a click event listener to the <th> column
-            cols[i].addEventListener('click', private_methods.toggle_column); 
+            // Need to add an event, but where?
+            if ($(cols[i]).find("span.sortable").length > 0) {
+              // We need to be able to sort
+              eltarget = $(cols[i]).find("span.sortable").find("span").last();
+              $(eltarget)[0].addEventListener('click', private_methods.toggle_column);
+            } else {
+              // Add a click event listener to the <th> column
+              cols[i].addEventListener('click', private_methods.toggle_column);
+            }
           }
 
         } catch (ex) {
@@ -912,6 +920,11 @@ var ru = (function ($, ru) {
             $(elvalue)[0].value = this.value;
           });
           $(".basic-range-input")
+
+          // Look for .blinded
+          $("td .blinded").each(function (idx, value) {
+            $(this).closest("td").addClass("hidehover");
+          });
 
           // No closing of certain dropdown elements on clicking
           /*

@@ -1,3 +1,11 @@
 ﻿body
 {
 }
+
+.blinded {
+    opacity: 0.0;
+}
+
+.hidehover:hover .blinded {
+    opacity: 1.0;
+}
