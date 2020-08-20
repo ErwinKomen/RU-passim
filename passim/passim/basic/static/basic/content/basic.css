@@ -14,9 +14,20 @@
     color: red;
 }
 
-.apart {
-    background-color: darkblue;
-    border-radius: 3px;
-    padding: 2px 2px;
+.ruler_white {
+    background-color: white;
 }
 
+.ruler_black {
+    /* background-color: black; */
+    border: 1px solid black !important;
+}
+
+.ruler_show {
+    height: 12px;
+    border: 1px dashed black !important;
+}
+
+td.ruler {
+    padding: 0px !important;
+}

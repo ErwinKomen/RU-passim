@@ -7170,13 +7170,14 @@ class CollPrivDetails(CollAnyEdit):
         # Perform the standard initializations:
         context = super(CollPrivDetails, self).add_to_context(context, instance)
 
-        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None):
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
             oAdd = dict(value=value)
             if resizable: oAdd['initial'] = 'small'
             if title != None: oAdd['title'] = title
             if align != None: oAdd['align'] = align
             if link != None: oAdd['link'] = link
             if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
             rel_item.append(oAdd)
             return True
 
@@ -7193,7 +7194,7 @@ class CollPrivDetails(CollAnyEdit):
         if instance.type == "manu":
             # Get all non-template manuscripts part of this PD
             manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
-            if resizable: manuscripts['gridclass'] = "resizable"
+            if resizable: manuscripts['gridclass'] = "resizable dragdrop"
 
             lstQ.append(Q(collections=instance))
             lstQ.append(Q(mtype="man"))
@@ -7204,7 +7205,7 @@ class CollPrivDetails(CollAnyEdit):
                 rel_item = []
 
                 # S: Order in Manuscript
-                add_one_item(rel_item, index, False, align="right")
+                add_one_item(rel_item, index, False, align="right", draggable=True)
                 index += 1
 
                 # Shelfmark = IDNO

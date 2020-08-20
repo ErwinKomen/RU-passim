@@ -1766,6 +1766,159 @@ var ru = (function ($, ru) {
         }
       },
 
+      related_drag: function (ev) {
+        var elTree = null,
+            divId = "",
+            sermonid = "";
+        try {
+          elTree = $(ev.target).closest(".tree");
+          sermonid = $(elTree).attr("sermonid");
+          divId = $(elTree).attr("id");
+
+          ev.dataTransfer.setData("text", divId);
+        } catch (ex) {
+          private_methods.errMsg("related_drag", ex);
+        }
+      },
+
+      related_dragenter: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          ev.preventDefault();
+          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
+            //$(ev.target).addClass("dragover");
+            $(ev.target).addClass("ruler_black");
+            $(ev.target).removeClass("ruler_white");
+            // make row larger
+            $(ev.target).parent().addClass("ruler_show");
+          } else {
+            $(ev.target).closest("td").addClass("dragover");
+            $(ev.target).addClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_dragenter", ex);
+        }
+      },
+
+      related_dragleave: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          elTree = $(ev.target).closest("table");
+          $(elTree).find(".dragover").removeClass("dragover");
+          $(elTree).find(".ruler").removeClass("ruler_black");
+          $(elTree).find(".ruler").addClass("ruler_white");
+          $(elTree).find(".ruler_show").removeClass("ruler_show");
+        } catch (ex) {
+          private_methods.errMsg("related_dragleave", ex);
+        }
+      },
+
+      related_drop: function (ev) {
+        var elTree = null,
+            divSrcId = "",
+            divDstId = "",
+            divHierarchy = "#sermon_hierarchy_element",
+            divSrc = null,
+            divDst = null,
+            bChanged = false,
+            level = 0,
+            target_under_source = false,
+            type = "under",
+            sermonid = "";
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          // Figure out what the source and destination is
+          elTree = $(ev.target).closest(".tree");
+          divSrcId = ev.dataTransfer.getData("text");
+          divDstId = $(elTree).attr("id");
+
+          // Reset the class of the drop element
+          $(elTree).find(".dragover").removeClass("dragover");
+          $(elTree).find(".ruler").removeClass("ruler_black");
+          $(elTree).find(".ruler").addClass("ruler_white");
+          $(elTree).find(".ruler_show").removeClass("ruler_show");
+
+          // Find the actual source div
+          if (divSrcId === "sermon_new") {
+            // Create a new element
+            divSrc = $(divHierarchy).clone(true);
+            // Adapt the @id field
+            loc_newSermonNumber += 1;
+            divSrcId = "sermon_new_" + loc_newSermonNumber;
+            $(divSrc).attr("id", divSrcId);
+            // Make a good @sermonid field to be sent to the caller
+            $(divSrc).attr("sermonid", "new_" + loc_newSermonNumber);
+            // Set the text for 'tussenkopje'
+            $(divSrc).find(".sermon-new-head").first().html('<div id="id_shead-' + loc_newSermonNumber + '" name="shead-' +
+              loc_newSermonNumber + '" contenteditable="true">(Structural element)</div>');
+            // Add a sermon number
+            $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
+            // Make sure the new element becomes visible
+            $(divSrc).removeClass("hidden");
+          } else {
+            divSrc = $("#sermon_tree").find("#" + divSrcId);
+          }
+          // The destination - that is me myself
+          divDst = elTree;
+
+          // Do we need to put the source "under" the destination or "before" it?
+          if ($(ev.target).hasClass("ruler")) {
+            type = "before";
+          }
+
+          // Action now depends on the type
+          switch (type) {
+            case "under":   // Put src under div dst
+              // check for target under source -- that is not allowed
+              target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
+
+              // Check if the target is okay to go to
+              if (divSrcId !== divDstId && !target_under_source) {
+
+                // Move source *UNDER* the destination
+                divDst.append(divSrc);
+                // Get my dst level
+                level = parseInt($(divDst).attr("level"), 10);
+                level += 1;
+                $(divSrc).attr("level", level.toString());
+
+                // Check if my parent already has a plus sign showing
+                $(divDst).children("table").find(".sermonbutton").html('<span class="glyphicon glyphicon-plus"></span>');
+                $(divDst).children("table").find(".sermonbutton").attr("onclick", "ru.passim.seeker.sermon_level(this);");
+
+                // Signal we have changed
+                bChanged = true;
+              } else {
+                console.log("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+              }
+              break;
+            case "before":  // Put src before div dst
+              // Validate
+              if (divSrcId === divDstId) {
+                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
+              } else {
+                // Move source *BEFORE* the destination
+                divSrc.insertBefore(divDst);
+                // Adapt my level to the one before me
+                $(divSrc).attr("level", $(divDst).attr("level"));
+                // SIgnal change
+                bChanged = true;
+              }
+              break;
+          }
+
+          // What if change happened?
+          if (bChanged) {
+            // Show the SAVE and RESTORE buttons
+            $("#sermon_tree").find(".edit-mode").removeClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_drop", ex);
+        }
+      },
+
       /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
