@@ -689,13 +689,25 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
      
         # (1) Find all the manuscripts in this XML document (use ecodex) 
         # This is the highest "c" level, there is at least one level "c" lower
-        manu_list = xmldoc.findall(".//dsc/c")
+        # Latin12 (1-3), 14 etc.
+        manu_list = xmldoc.findall(".//dsc/c/")
+        
         for manu in manu_list:
             # if 
-
-
+            x = str(manu.getchildren())
+            y = manu.getchildren()
+            z = manu.attrib
+            
+            for letter in y:
+                new_list = y.findall(".")    
+                for new in new_list:
+                    a = new.getchildren()
 
             pass
+
+
+            # if 
+          
             # Process all XML elements of this manuscript TH: op dit moment zit er nog niks in
             # What are the elements? Title first 
             # Moet je dan de lijst met id's gebruiken?
