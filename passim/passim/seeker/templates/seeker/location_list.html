@@ -1,4 +1,4 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 {% load i18n %}
 
 {% block breadcrumbs %}
@@ -77,7 +77,7 @@
         <form>
           <h3>
             <span title="Locations used for Origin and Provenance">Locations</span>
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <span id="add_author" class="pull-right">
                 {% csrf_token %}
                 <a class="btn btn-xs jumbo-3" role="button" href="{% url 'location_details' %}" >

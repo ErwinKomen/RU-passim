@@ -119,6 +119,7 @@ var ru = (function ($, ru) {
         var row = null,
             cols = null,
             div = null,
+            eltarget = null,
             tableHeight = 0;
 
         try {
@@ -138,8 +139,15 @@ var ru = (function ($, ru) {
             cols[i].style.position = 'relative';
             cols[i].style.cursor = 'pointer';
             private_methods.setListeners(div);
-            // Add a click event listener to the <th> column
-            cols[i].addEventListener('click', private_methods.toggle_column); 
+            // Need to add an event, but where?
+            if ($(cols[i]).find("span.sortable").length > 0) {
+              // We need to be able to sort
+              eltarget = $(cols[i]).find("span.sortable").find("span").last();
+              $(eltarget)[0].addEventListener('click', private_methods.toggle_column);
+            } else {
+              // Add a click event listener to the <th> column
+              cols[i].addEventListener('click', private_methods.toggle_column);
+            }
           }
 
         } catch (ex) {
@@ -882,18 +890,41 @@ var ru = (function ($, ru) {
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
 
-          // No closing of certain dropdown elements on clicking
-          /*
-          $(".dropdown-toggle").on({
-            "click": function (event) {
-              var evtarget = $(event.target);
-              if ($(evtarget).closest(".nocloseonclick").length) {
-                $(this).data("closable", false);
-              } else {
-                $(this).data("closable", true);
-              }
-            }
-          });*/
+          //// Treat the input range elements
+          //$("input[type='range']").each(function (idx, value) {
+          //  var slider = $(this),
+          //      elTd = $(this).closest("td"),
+          //      name = "",
+          //      rangevalue = "";
+
+          //  // Possibly add an element
+          //  if ($(elTd).find(".basic-range-input").length < $(elTd).find("input[type='range']").length) {
+          //    // Get the current range value
+          //    rangevalue = $(slider).val();
+          //    // Add this element
+          //    name = $(slider)[0].name + "_value";
+          //    $(slider).after("<span>Value: <span class='basic-range-input'>" + rangevalue + "</span></span>");
+          //    // Set the range value to UNDEFINED for the moment
+          //    $(slider)[0].value = undefined;
+          //  }
+          //});
+          // Make sure we catch changes
+          $("input[type='range']").on("change", function (evt) {
+            var el = $(this),
+                elvalue = null;
+            // get the value element
+            elvalue = $(el).closest("td").find(".basic-range-input").first();
+            $(elvalue).html(this.value);
+            // Get the tet element
+            elvalue = $(el).closest("td").find("input[type='text']").first();
+            $(elvalue)[0].value = this.value;
+          });
+          $(".basic-range-input")
+
+          // Look for .blinded
+          $("td .blinded").each(function (idx, value) {
+            $(this).closest("td").addClass("hidehover");
+          });
 
           // Make modal draggable
           $(".modal-header, modal-dragpoint").on("mousedown", function (mousedownEvt) {
@@ -1156,6 +1187,7 @@ var ru = (function ($, ru) {
             err = "#little_err_msg",
             elTr = null,
             elUserDetails = "#add_to_details",
+            elAfterDetails = "#after_details",
             elView = null,
             elEdit = null;
 
@@ -1235,6 +1267,7 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").removeClass("hidden");
               // Hide afterdetails
               $(elUserDetails).addClass("hidden");
+              $(elAfterDetails).addClass("hidden");
               // Make sure typeahead works here
               ru.basic.init_typeahead();
               break;
@@ -1424,88 +1457,96 @@ var ru = (function ($, ru) {
               // Either POST the request
               if (bOkay) {
                 // Get the data into a list of k-v pairs
-                data = $(frm).serializeArray();
+                // data = $(frm).serializeArray();
+                data = new FormData($(frm)[0]);
                 // Adapt the value for the [library] based on the [id] 
                 // Try to save the form data: send a POST
-                $.post(targeturl, data, function (response) {
-                  // Action depends on the response
-                  if (response === undefined || response === null || !("status" in response)) {
-                    private_methods.errMsg("No status returned");
-                  } else {
-                    switch (response.status) {
-                      case "error":
-                        // Indicate there is an error
-                        bOkay = false;
-                        // Show the error in an appropriate place
-                        if ("msg" in response) {
-                          if (typeof response['msg'] === "object") {
+                //$.post(targeturl, data,
+                $.ajax({
+                  url: targeturl, type: 'post', data: data,
+                  contentType: false, processData: false,
+                  success: function (response) {
+                    // Action depends on the response
+                    if (response === undefined || response === null || !("status" in response)) {
+                      private_methods.errMsg("No status returned");
+                    } else {
+                      switch (response.status) {
+                        case "error":
+                          // Indicate there is an error
+                          bOkay = false;
+                          // Show the error in an appropriate place
+                          if ("msg" in response) {
+                            if (typeof response['msg'] === "object") {
+                              lHtml = [];
+                              lHtml.push("Errors:");
+                              $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                              $(err).html(lHtml.join("<br />"));
+                            } else {
+                              $(err).html("Error: " + response['msg']);
+                            }
+                          } else if ("errors" in response) {
+                            lHtml = [];
+                            lHtml.push("<h4>Errors</h4>");
+                            for (i = 0; i < response['errors'].length; i++) {
+                              $.each(response['errors'][i], function (key, value) {
+                                lHtml.push("<b>" + key + "</b>: </i>" + value + "</i>");
+                              });
+                            }
+                            $(err).html(lHtml.join("<br />"));
+                          } else if ("error_list" in response) {
                             lHtml = [];
                             lHtml.push("Errors:");
-                            $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                            $.each(response['error_list'], function (key, value) { lHtml.push(key + ": " + value); });
                             $(err).html(lHtml.join("<br />"));
                           } else {
-                            $(err).html("Error: " + response['msg']);
+                            $(err).html("<code>There is an error</code>");
                           }
-                        } else if ("errors" in response) {
-                          lHtml = [];
-                          lHtml.push("<h4>Errors</h4>");
-                          for (i = 0; i < response['errors'].length; i++) {
-                            $.each(response['errors'][i], function (key, value) {
-                              lHtml.push("<b>" + key + "</b>: </i>" + value + "</i>");
-                            });
+                          break;
+                        case "ready":
+                        case "ok":
+                          // First check for afterurl
+                          if (afterurl !== undefined && afterurl !== "") {
+                            // Make sure we go to the afterurl
+                            window.location = afterurl;
                           }
-                          $(err).html(lHtml.join("<br />"));
-                        } else if ("error_list" in response) {
-                          lHtml = [];
-                          lHtml.push("Errors:");
-                          $.each(response['error_list'], function (key, value) { lHtml.push(key + ": " + value); });
-                          $(err).html(lHtml.join("<br />"));
-                        } else {
-                          $(err).html("<code>There is an error</code>");
-                        }
-                        break;
-                      case "ready":
-                      case "ok":
-                        // First check for afterurl
-                        if (afterurl !== undefined && afterurl !== "") {
-                          // Make sure we go to the afterurl
-                          window.location = afterurl;
-                        }
-                        if ("html" in response) {
-                          // Show the HTML in the targetid
-                          $(targetid).html(response['html']);
-                          // Signal globally that something has been saved
-                          loc_bManuSaved = true;
-                          // If an 'afternewurl' is specified, go there
-                          if ('afternewurl' in response && response['afternewurl'] !== "") {
-                            window.location = response['afternewurl'];
-                            bReloading = true;
+                          if ("html" in response) {
+                            // Show the HTML in the targetid
+                            $(targetid).html(response['html']);
+                            // Signal globally that something has been saved
+                            loc_bManuSaved = true;
+                            // If an 'afternewurl' is specified, go there
+                            if ('afternewurl' in response && response['afternewurl'] !== "") {
+                              window.location = response['afternewurl'];
+                              bReloading = true;
+                            } else {
+                              // nothing else yet
+                            }
                           } else {
-                            // nothing else yet
+                            // Send a message
+                            $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
                           }
-                        } else {
-                          // Send a message
-                          $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
-                        }
-                        break;
-                      default:
-                        // Something went wrong -- show the page or not?
-                        $(err).html("The status returned is unknown: " + response.status);
-                        break;
+                          break;
+                        default:
+                          // Something went wrong -- show the page or not?
+                          $(err).html("The status returned is unknown: " + response.status);
+                          break;
+                      }
+                    }
+                    if (!bReloading && bOkay) {
+                      // Return to view mode
+                      $(elTr).find(".view-mode").removeClass("hidden");
+                      $(elTr).find(".edit-mode").addClass("hidden");
+                      // Hide waiting symbol
+                      $(elTr).find(".waiting").addClass("hidden");
+                      // If we get here, switch on afterdetails again
+                      $(elUserDetails).removeClass("hidden");
+                      $(elAfterDetails).removeClass("hidden");
+                      // Perform init again
+                      ru.basic.init_events();
                     }
                   }
-                  if (!bReloading && bOkay) {
-                    // Return to view mode
-                    $(elTr).find(".view-mode").removeClass("hidden");
-                    $(elTr).find(".edit-mode").addClass("hidden");
-                    // Hide waiting symbol
-                    $(elTr).find(".waiting").addClass("hidden");
-                    // If we get here, switch on afterdetails again
-                    $(elUserDetails).removeClass("hidden");
-                    // Perform init again
-                    ru.basic.init_events();
                   }
-                });
+                );
               } else {
                 // Or else stop waiting - with error message above
                 $(elTr).find(".waiting").addClass("hidden");
@@ -1525,6 +1566,7 @@ var ru = (function ($, ru) {
               $(elTr).find(".edit-mode").addClass("hidden");
               // If we get here, switch on afterdetails again
               $(elUserDetails).removeClass("hidden");
+              $(elAfterDetails).removeClass("hidden");
               break;
             case "delete":
               // Do we have an afterurl?
@@ -1721,6 +1763,159 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("post_download", ex);
+        }
+      },
+
+      related_drag: function (ev) {
+        var elTree = null,
+            divId = "",
+            sermonid = "";
+        try {
+          elTree = $(ev.target).closest(".tree");
+          sermonid = $(elTree).attr("sermonid");
+          divId = $(elTree).attr("id");
+
+          ev.dataTransfer.setData("text", divId);
+        } catch (ex) {
+          private_methods.errMsg("related_drag", ex);
+        }
+      },
+
+      related_dragenter: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          ev.preventDefault();
+          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
+            //$(ev.target).addClass("dragover");
+            $(ev.target).addClass("ruler_black");
+            $(ev.target).removeClass("ruler_white");
+            // make row larger
+            $(ev.target).parent().addClass("ruler_show");
+          } else {
+            $(ev.target).closest("td").addClass("dragover");
+            $(ev.target).addClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_dragenter", ex);
+        }
+      },
+
+      related_dragleave: function (ev) {
+        var elTree = null, sermonid = "";
+        try {
+          elTree = $(ev.target).closest("table");
+          $(elTree).find(".dragover").removeClass("dragover");
+          $(elTree).find(".ruler").removeClass("ruler_black");
+          $(elTree).find(".ruler").addClass("ruler_white");
+          $(elTree).find(".ruler_show").removeClass("ruler_show");
+        } catch (ex) {
+          private_methods.errMsg("related_dragleave", ex);
+        }
+      },
+
+      related_drop: function (ev) {
+        var elTree = null,
+            divSrcId = "",
+            divDstId = "",
+            divHierarchy = "#sermon_hierarchy_element",
+            divSrc = null,
+            divDst = null,
+            bChanged = false,
+            level = 0,
+            target_under_source = false,
+            type = "under",
+            sermonid = "";
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          // Figure out what the source and destination is
+          elTree = $(ev.target).closest(".tree");
+          divSrcId = ev.dataTransfer.getData("text");
+          divDstId = $(elTree).attr("id");
+
+          // Reset the class of the drop element
+          $(elTree).find(".dragover").removeClass("dragover");
+          $(elTree).find(".ruler").removeClass("ruler_black");
+          $(elTree).find(".ruler").addClass("ruler_white");
+          $(elTree).find(".ruler_show").removeClass("ruler_show");
+
+          // Find the actual source div
+          if (divSrcId === "sermon_new") {
+            // Create a new element
+            divSrc = $(divHierarchy).clone(true);
+            // Adapt the @id field
+            loc_newSermonNumber += 1;
+            divSrcId = "sermon_new_" + loc_newSermonNumber;
+            $(divSrc).attr("id", divSrcId);
+            // Make a good @sermonid field to be sent to the caller
+            $(divSrc).attr("sermonid", "new_" + loc_newSermonNumber);
+            // Set the text for 'tussenkopje'
+            $(divSrc).find(".sermon-new-head").first().html('<div id="id_shead-' + loc_newSermonNumber + '" name="shead-' +
+              loc_newSermonNumber + '" contenteditable="true">(Structural element)</div>');
+            // Add a sermon number
+            $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
+            // Make sure the new element becomes visible
+            $(divSrc).removeClass("hidden");
+          } else {
+            divSrc = $("#sermon_tree").find("#" + divSrcId);
+          }
+          // The destination - that is me myself
+          divDst = elTree;
+
+          // Do we need to put the source "under" the destination or "before" it?
+          if ($(ev.target).hasClass("ruler")) {
+            type = "before";
+          }
+
+          // Action now depends on the type
+          switch (type) {
+            case "under":   // Put src under div dst
+              // check for target under source -- that is not allowed
+              target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
+
+              // Check if the target is okay to go to
+              if (divSrcId !== divDstId && !target_under_source) {
+
+                // Move source *UNDER* the destination
+                divDst.append(divSrc);
+                // Get my dst level
+                level = parseInt($(divDst).attr("level"), 10);
+                level += 1;
+                $(divSrc).attr("level", level.toString());
+
+                // Check if my parent already has a plus sign showing
+                $(divDst).children("table").find(".sermonbutton").html('<span class="glyphicon glyphicon-plus"></span>');
+                $(divDst).children("table").find(".sermonbutton").attr("onclick", "ru.passim.seeker.sermon_level(this);");
+
+                // Signal we have changed
+                bChanged = true;
+              } else {
+                console.log("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
+              }
+              break;
+            case "before":  // Put src before div dst
+              // Validate
+              if (divSrcId === divDstId) {
+                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
+              } else {
+                // Move source *BEFORE* the destination
+                divSrc.insertBefore(divDst);
+                // Adapt my level to the one before me
+                $(divSrc).attr("level", $(divDst).attr("level"));
+                // SIgnal change
+                bChanged = true;
+              }
+              break;
+          }
+
+          // What if change happened?
+          if (bChanged) {
+            // Show the SAVE and RESTORE buttons
+            $("#sermon_tree").find(".edit-mode").removeClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_drop", ex);
         }
       },
 

@@ -23,6 +23,7 @@
       <form id="create_new_sermon" action="{% url 'sermon_details' %}" method="post" >
         {% csrf_token %}
         <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
+        <input type="text" name="sermo-mtype" value="{{manuForm.instance.mtype}}" />
       </form>
     </div>
 
@@ -80,6 +81,8 @@
                           onclick="ru.passim.seeker.manusermo(this, 'kw-auto');">Keywords A</span>
                     <span type="button" class="btn jumbo-1" title="Kewords manually attached to this sermon"
                           onclick="ru.passim.seeker.manusermo(this, 'kw-manual');">Keywords M</span>
+                    <span type="button" class="btn jumbo-1" title="Historical Collection(s) associated with this sermon manifestation"
+                          onclick="ru.passim.seeker.manusermo(this, 'hc');">HC</span>
                   </span>
 
                 </th>
@@ -162,9 +165,9 @@
 
                 <!-- The sermon itself -->
                 <td valign="top" class="td clickable" style="width: 100%;">
-                  <span draggable="false" targeturl="">
-                    <span class="sermon-new-head">(tussenkopje)</span>
-                  </span>
+                  <div class="sermon-new-head" draggable="false" targeturl="">
+                    <!-- THis is where the structural elements (contenteditable) will appear -->
+                  </div>
                 </td>
               </tr>
             </tbody>

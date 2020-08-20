@@ -4,6 +4,7 @@
 {% block scripts %}
     {% load staticfiles %}
     <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
 {% endblock %}
 
@@ -80,7 +81,7 @@
 
             {% if after_details %}
               <!-- Optionally more after the details view -->
-              <div id="after_details">{{after_details|safe}}</div>
+              <div id="after_details" >{{after_details|safe}}</div>
             {% endif %}
 
             {% if sections and sections|length > 1 %}
@@ -145,43 +146,64 @@
                     <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
                   {% else %}
                     <!-- List of related items -->
-                    <table class="func-view compact-simple {{related.gridclass}}" style="width: 100%;">
+                    <table class="func-view compact-simple {{related.gridclass}}" 
+                           style="width: 100%;">
                       <thead>
                         <tr>
                           {% if related.use_counter %}
                             <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                           {% endif %}
                           {% for col in related.columns %}
-                            <th class="tdnowrap">{{col|safe}}</th>
+                            <th class="tdnowrap">
+                              {% if col.sortable %}
+                                <span class="sortable">
+                                  <span class="glyphicon glyphicon-sort"></span>
+                                </span>
+                              {% else %}
+                              {% endif %}
+                              {{col|safe}}
+                            </th>
                           {% endfor %}
                         </tr>
                       </thead>
                       <tbody>
                         {% for relrow in related.rel_list %}
-                        <tr class="form-row">
-                          <!-- Counter-->
-                          {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+                          {% if 'dragdrop' in related.gridclass %}
+                            <!-- Horizontal ruler that can be expanded -->
+                            <tr style="font-size: 1px;" class="">
+                              <td class="ruler ruler_white"
+                                  ondragover="ru.basic.related_dragenter(event);" ondragenter="ru.basic.related_dragenter(event);" 
+                                  ondragleave="ru.basic.related_dragleave(event);" ondrop="ru.basic.related_drop(event);" ></td>
+                              <td class="ruler" colspan="{{related.columns|length|add:'-1'}}" style="background-color: white;"></td>
+                            </tr>
+                          {% endif %}
 
-                          <!-- Remaining cells -->
-                          {% for relcol in relrow %}
-                            <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                                class="tdnowrap {% if relcol.link %}clickable{% endif %}"
-                                {% if relcol.align %}align="{{relcol.align}}"{% endif %}
-                                style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
-                                >
-                              {% if relcol.value %}
-                                {% if relcol.link %}
-                                  <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
-                                {% else %}
-                                  {{relcol.value|safe}}
+                          <tr class="form-row">
+                            <!-- Counter-->
+                            {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+
+                            <!-- Remaining cells -->
+                            {% for relcol in relrow %}
+                              <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
+                                  class="tdnowrap {% if relcol.link %}clickable{% endif %} 
+                                         {% if relcol.draggable %}draggable{% endif %}"
+                                  {% if relcol.align %}align="{{relcol.align}}"{% endif %}
+                                  {% if relcol.draggable %}draggable="true"{% endif %}
+                                  style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
+                                  >
+                                {% if relcol.value %}
+                                  {% if relcol.link %}
+                                    <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                                  {% else %}
+                                    {{relcol.value|safe}}
+                                  {% endif %}
                                 {% endif %}
-                              {% endif %}
-                            </td>
-                          {% endfor %}
+                              </td>
+                            {% endfor %}
 
-                          <!-- Possible delete cell -->
+                            <!-- Possible delete cell -->
 
-                        </tr>
+                          </tr>
                         {% endfor %}
 
                         {% if related.editable and is_app_editor %}

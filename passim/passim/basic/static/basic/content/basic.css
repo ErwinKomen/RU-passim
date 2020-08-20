@@ -1,3 +1,33 @@
 ﻿body
 {
 }
+
+.blinded {
+    opacity: 0.0;
+}
+
+.hidehover:hover .blinded {
+    opacity: 1.0;
+}
+
+.sortshow:hover {
+    color: red;
+}
+
+.ruler_white {
+    background-color: white;
+}
+
+.ruler_black {
+    /* background-color: black; */
+    border: 1px solid black !important;
+}
+
+.ruler_show {
+    height: 12px;
+    border: 1px dashed black !important;
+}
+
+td.ruler {
+    padding: 0px !important;
+}

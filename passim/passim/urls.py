@@ -73,6 +73,7 @@ urlpatterns = [
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
     url(r'^manuscript/hierarchy(?:/(?P<pk>\d+))?/$', ManuscriptHierarchy.as_view(), name='manuscript_hierarchy'),
+
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
     url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),
     url(r'^manuscript/litset(?:/(?P<pk>\d+))?/$', ManuscriptLitset.as_view(), name='manu_litset'),
@@ -84,11 +85,11 @@ urlpatterns = [
     url(r'^location/relset(?:/(?P<pk>\d+))?/$', LocationRelset.as_view(), name='loc_relset'),
 
     url(r'^origin/list', OriginListView.as_view(), name='origin_list'),
-    url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetailsView.as_view(), name='origin_details'),
+    url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetails.as_view(), name='origin_details'),
     url(r'^origin/edit(?:/(?P<pk>\d+))?/$', OriginEdit.as_view(), name='origin_edit'),
 
     url(r'^library/list', LibraryListView.as_view(), name='library_list'),
-    url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetailsView.as_view(), name='library_details'),
+    url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetails.as_view(), name='library_details'),
     url(r'^library/edit(?:/(?P<pk>\d+))?/$', LibraryEdit.as_view(), name='library_edit'),
 
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
@@ -108,25 +109,37 @@ urlpatterns = [
     url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
     url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
 
+    url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'),
+    url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),
+    url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
     url(r'^collection/any/list', CollectionListView.as_view(prefix="any"), name='collany_list'),
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
     url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
     url(r'^collection/gold/list', CollectionListView.as_view(prefix="gold"), name='collgold_list'),
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
 
+    url(r'^dataset/private/details(?:/(?P<pk>\d+))?/$', CollPrivDetails.as_view(), name='collpriv_details'),
+    url(r'^dataset/public/details(?:/(?P<pk>\d+))?/$', CollPublDetails.as_view(), name='collpubl_details'),
+    url(r'^collection/hist/details(?:/(?P<pk>\d+))?/$', CollHistDetails.as_view(), name='collhist_details'),
     url(r'^collection/any/details(?:/(?P<pk>\d+))?/$', CollAnyDetails.as_view(), name='collany_details'),
     url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
     url(r'^collection/manu/details(?:/(?P<pk>\d+))?/$', CollManuDetails.as_view(), name='collmanu_details'),
     url(r'^collection/gold/details(?:/(?P<pk>\d+))?/$', CollGoldDetails.as_view(), name='collgold_details'),
     url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
 
+    url(r'^dataset/private/edit(?:/(?P<pk>\d+))?/$', CollPrivEdit.as_view(), name='collpriv_edit'),
+    url(r'^dataset/public/edit(?:/(?P<pk>\d+))?/$', CollPublEdit.as_view(), name='collpubl_edit'),
+    url(r'^collection/hist/edit(?:/(?P<pk>\d+))?/$', CollHistEdit.as_view(), name='collhist_edit'),
     url(r'^collection/any/edit(?:/(?P<pk>\d+))?/$', CollAnyEdit.as_view(), name='collany_edit'),
     url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),
     url(r'^collection/manu/edit(?:/(?P<pk>\d+))?/$', CollManuEdit.as_view(), name='collmanu_edit'),
     url(r'^collection/gold/edit(?:/(?P<pk>\d+))?/$', CollGoldEdit.as_view(), name='collgold_edit'),
     url(r'^collection/super/edit(?:/(?P<pk>\d+))?/$', CollSuperEdit.as_view(), name='collsuper_edit'),
     
-    # url(r'^collection/sermset(?:/(?P<pk>\d+))?/$', CollectionSermset.as_view(), name='collection_sermset'),
+    url(r'^dataset/elevate(?:/(?P<pk>\d+))?/$', CollHistElevate.as_view(), name='collhist_elevate'),
+    url(r'^collection/hist/manuscript(?:/(?P<pk>\d+))?/$', CollHistManu.as_view(), name='collhist_manu'),
+    url(r'^collection/hist/template(?:/(?P<pk>\d+))?/$', CollHistTemp.as_view(), name='collhist_temp'),
+    url(r'^collection/hist/compare(?:/(?P<pk>\d+))?/$', CollHistCompare.as_view(), name='collhist_compare'),
     
     url(r'^basket/sermo/update', BasketUpdate.as_view(), name='basket_update'),
     url(r'^basket/sermo/show', BasketView.as_view(), name='basket_show'),
@@ -172,6 +185,12 @@ urlpatterns = [
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
+
+    url(r'^template/list', TemplateListView.as_view(), name='template_list'),
+    url(r'^template/details(?:/(?P<pk>\d+))?/$', TemplateDetails.as_view(), name='template_details'),
+    url(r'^template/edit(?:/(?P<pk>\d+))?/$', TemplateEdit.as_view(), name='template_edit'),
+    url(r'^template/apply(?:/(?P<pk>\d+))?/$', TemplateApply.as_view(), name='template_apply'),
+    url(r'^template/import/$', TemplateImport.as_view(), name='template_import'),
 
     url(r'^gold/list', SermonGoldListView.as_view(), name='gold_list'),
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),

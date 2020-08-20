@@ -23,6 +23,7 @@ import time
 import fnmatch
 import csv
 import math
+from difflib import SequenceMatcher
 from io import StringIO
 from pyzotero import zotero
 
@@ -38,11 +39,13 @@ PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
 COLLECTION_TYPE = "seeker.coltype" 
+SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+MANIFESTATION_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
@@ -200,11 +203,15 @@ def get_help(field):
 
     return help_text
 
-def get_crpp_date(dtThis):
+def get_crpp_date(dtThis, readable=False):
     """Convert datetime to string"""
 
-    # Model: yyyy-MM-dd'T'HH:mm:ss
-    sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
+    if readable:
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%d/%B/%Y (%H:%M)")
+    else:
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
     return sDate
 
 def get_now_time():
@@ -296,6 +303,31 @@ def get_stype_light(stype):
 
     # Return what we made
     return sBack
+
+def get_overlap(sBack, sMatch):
+    # Yes, we are matching!!
+    s = SequenceMatcher(lambda x: x == " ", sBack, sMatch)
+    pos = 0
+    html = []
+    ratio = 0.0
+    for block in s.get_matching_blocks():
+        pos_a = block[0]
+        size = block[2]
+        if size > 0:
+            # Add plain previous part (if it is there)
+            if pos_a > pos:
+                html.append(sBack[pos : pos_a - 1])
+            # Add the overlapping part of the string
+            html.append("<span class='overlap'>{}</span>".format(sBack[pos_a : pos_a + size]))
+            # Adapt position
+            pos = pos_a + size
+    ratio = s.ratio()
+    # THe last plain part (if any)
+    if pos < len(sBack) - 1:
+        html.append(sBack[pos : len(sBack) - 1 ])
+    # Calculate the sBack
+    sBack = "".join(html)
+    return sBack, ratio
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1477,6 +1509,11 @@ class Location(models.Model):
     # [1] Link to the location type of this location
     loctype = models.ForeignKey(LocationType)
 
+    # [1] Every Library has a status to keep track of who edited it
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
@@ -1693,13 +1730,17 @@ class Library(models.Model):
     # [1] Name of the library
     name = models.CharField("Library", max_length=LONG_STRING)
     # [1] Has this library been bracketed?
-    libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), 
-                            max_length=5)
+    libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), max_length=5)
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
     city = models.ForeignKey(City, null=True, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
+
+    # [1] Every Library has a status to keep track of who edited it
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
 
     # [0-1] Location, as specific as possible, but optional in the end
     location = models.ForeignKey(Location, null=True, related_name="location_libraries")
@@ -1710,6 +1751,12 @@ class Library(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Possibly change lcity, lcountry
+        obj = self.get_city(False)
+        obj = self.get_country(False)
+        return super(Library, self).save(force_insert, force_update, using, update_fields)
 
     def get_library(sId, sLibrary, bBracketed, country, city):
         iId = int(sId)
@@ -1726,14 +1773,30 @@ class Library(models.Model):
 
         return hit
 
-    def get_city(self):
+    def get_location(self):
+        """Get the location of the library to show in details view"""
+        sBack = "-"
+        if self.location != None:
+            sBack = self.location.get_loc_name()
+        return sBack
+
+    def get_location_markdown(self):
+        """Get the location of the library to show in details view"""
+        sBack = "-"
+        if self.location != None:
+            name = self.location.get_loc_name()
+            url = reverse('location_details', kwargs={'pk': self.location.id})
+            sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, name)
+        return sBack
+
+    def get_city(self, save_changes = True):
         """Given the library, get the city from the location"""
 
         obj = None
         if self.lcity != None:
             obj = self.lcity
         elif self.location != None:
-            if self.location.loctype and self.location.loctype.name == "city":
+            if self.location.loctype != None and self.location.loctype.name == "city":
                 obj = self.location
             else:
                 # Look at all the related locations - above and below
@@ -1742,36 +1805,43 @@ class Library(models.Model):
                     if item.loctype.name == "city":
                         obj = item
                         break
+                if obj == None:
+                    # Look at the first location 'above' me
+                    item = self.location.contained_locrelations.first()
+                    if item.container.loctype.name != "country":
+                        obj = item.container
             # Store this
             self.lcity = obj
-            self.save()
+            if save_changes:
+                self.save()
         return obj
 
     def get_city_name(self):
         obj = self.get_city()
         return "" if obj == None else obj.name
 
-    def get_country(self):
+    def get_country(self, save_changes = True):
         """Given the library, get the country from the location"""
 
         obj = None
         if self.lcountry != None:
             obj = self.lcountry
         elif self.location != None:
-            if self.location.loctype and self.location.loctype.name == "country":
+            if self.location.loctype != None and self.location.loctype.name == "country":
                 obj = self.location
             else:
-                # If this is a city, look upwards
-                if self.location.loctype.name == "city":
-                    qs = self.location.contained_locrelations.all()
-                    for item in qs:
-                        container = item.container
+                # Look upwards
+                qs = self.location.contained_locrelations.all()
+                for item in qs:
+                    container = item.container
+                    if container != None:
                         if container.loctype.name == "country":
                             obj = container
                             break
             # Store this
             self.lcountry = obj
-            self.save()
+            if save_changes:
+                self.save()
         return obj
 
     def get_country_name(self):
@@ -1908,6 +1978,14 @@ class Origin(models.Model):
         # Return what we found or created
         return hit
 
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
 
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
@@ -2029,6 +2107,8 @@ class Litref(models.Model):
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
             for grp_num in range( total_groups):
+                # Show where we are
+                oErr.Status("Sync zotero {}/{}".format(grp_num, total_groups))
                 # Calculate the umber to start from
                 start = grp_num * group_size
                 # Fetch these publications
@@ -2146,13 +2226,14 @@ class Litref(models.Model):
                     
                     # Fourth step: make short reference for book 
                     elif itemType == "book":
+
                         if extra == "": 
                             if short_title == "": 
                                 # If the books is not an edition/catalogue and there is no short title
                                 if authors !="":
                                     result = "{} ({})".format(authors, year)
                                 # If there are only editors  
-                                    if editors != "": 
+                                elif editors != "": 
                                         result = "{} ({})".format(editors, year)
                             # If there is a short title
                             elif short_title != "": 
@@ -2525,6 +2606,14 @@ class Project(models.Model):
             sName = "(unnamed)"
         return sName
 
+    def get_default(username):
+        """Determine the default project for this user"""
+
+        obj = Project.objects.filter(name__iexact = "passim").first()
+        if obj == None:
+            obj = Project.objects.all().first()
+        return obj
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # First do the normal saving
         response = super(Project, self).save(force_insert, force_update, using, update_fields)
@@ -2644,6 +2733,12 @@ class Manuscript(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    # [1] Every manuscript may be a manifestation (default) or a template (optional)
+    mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
@@ -2667,6 +2762,12 @@ class Manuscript(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def adapt_hierarchy():
         bResult = True
@@ -2828,34 +2929,45 @@ class Manuscript(models.Model):
         return ", ".join(lhtml)
 
     def get_city(self):
-        if self.lcity:
-            city = self.lcity.name
-            if self.library and self.library.lcity.id != self.lcity.id:
+        city = "-"
+        oErr = ErrHandle()
+        try:
+            if self.lcity:
+                city = self.lcity.name
+                if self.library and self.library.lcity != None and self.library.lcity.id != self.lcity.id and self.library.location != None:
+                    # OLD: city = self.library.lcity.name
+                    city = self.library.location.get_loc_name()
+            elif self.library != None and self.library.lcity != None:
                 city = self.library.lcity.name
-        elif self.library:
-            city = self.library.lcity.name
-        else:
-            city = "-"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_city")
         return city
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group, settype = None):
 
         lHtml = []
-        for obj in self.collections.all().order_by('name'):
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), obj.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('manu', username, team_group, settype = settype).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
 
     def get_country(self):
-        if self.lcountry:
-            country = self.lcountry.name
-            if self.library and self.library.lcountry.id != self.lcountry.id:
+        country = "-"
+        oErr = ErrHandle()
+        try:
+            if self.lcountry:
+                country = self.lcountry.name
+                if self.library != None and self.library.lcountry != None and self.library.lcountry.id != self.lcountry.id:
+                    country = self.library.lcountry.name
+            elif self.library != None and self.library.lcountry != None:
                 country = self.library.lcountry.name
-        elif self.library:
-            country = self.library.lcountry.name
-        else:
-            country = "-"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_country")
         return country
 
     def get_date_markdown(self):
@@ -2919,6 +3031,14 @@ class Manuscript(models.Model):
             lib = "-"
         return lib
 
+    def get_library_markdown(self):
+        sBack = "-"
+        if self.library != None:
+            lib = self.library.name
+            url = reverse('library_details', kwargs={'pk': self.library.id})
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, lib)
+        return sBack
+
     def get_litrefs_markdown(self):
         lHtml = []
         # Visit all literature references
@@ -2939,6 +3059,20 @@ class Manuscript(models.Model):
             if self.origin.location:
                 # Add the actual location if it is known
                 sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+        return sBack
+
+    def get_origin_markdown(self):
+        sBack = "-"
+        if self.origin:
+            # Just take the bare name of the origin
+            sBack = self.origin.name
+            if self.origin.location:
+                # Add the actual location if it is known
+                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+            # Get the url to it
+            url = reverse('origin_details', kwargs={'pk': self.origin.id})
+            # Adapt what we return
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
     def get_project(self):
@@ -2976,7 +3110,211 @@ class Manuscript(models.Model):
         return count
 
     def get_stype_light(self):
-        return get_stype_light(self.stype)
+        sBack = get_stype_light(self.stype)
+        return sBack
+
+    def get_ssg_count(self, compare_link=False, collection = None):
+        # Get a list of all SSGs related to [self]
+        ssg_list_num = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=self).order_by('id').distinct().count()
+        if compare_link:
+            url = "{}?manu={}".format(reverse("collhist_compare", kwargs={'pk': collection.id}), self.id)
+            sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, ssg_list_num)
+        else:
+            sBack = "<span>{}</span>".format(ssg_list_num)
+        # Return the combined information
+        return sBack
+
+    def get_ssg_markdown(self):
+        # Get a list of all SSGs related to [self]
+        ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=self).order_by('id').distinct().order_by('code')
+        html = []
+        for ssg in ssg_list:
+            url = reverse('equalgold_details', kwargs={'pk': ssg.id})
+            code = ssg.code if ssg.code else "(ssg_{})".format(ssg.id)
+            # Add a link to this SSG in the list
+            html.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
+        sBack = ", ".join(html)
+        # Return the combined information
+        return sBack
+
+    def get_template_link(self, profile):
+        sBack = ""
+        # Check if I am a template
+        if self.mtype == "tem":
+            # add a clear TEMPLATE indicator with a link to the actual template
+            template = Template.objects.filter(manu=self, profile=profile).first()
+            if template:
+                url = reverse('template_details', kwargs={'pk': template.id})
+                sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
+        return sBack
+
+    def get_template_copy(self, mtype = "tem"):
+        """Create a 'template' copy of myself"""
+
+        repair = ['parent', 'firstchild', 'next']
+        # Get a link to myself and save it to create a new instance
+        # See: https://docs.djangoproject.com/en/2.2/topics/db/queries/#copying-model-instances
+        obj = self
+        manu_id = self.id
+        obj.pk = None
+        obj.mtype = mtype   # Change the type
+        obj.stype = "imp"   # Imported
+        obj.save()
+        manu_src = Manuscript.objects.filter(id=manu_id).first()
+        # Note: this doesn't copy relations that are not part of Manuscript proper
+        
+        # copy all the sermons...
+        msitems = []
+        with transaction.atomic():
+            # Walk over all MsItem stuff
+            for msitem in manu_src.manuitems.all().order_by('order'):
+                dst = msitem
+                src_id = msitem.id
+                dst.pk = None
+                dst.manu = obj  # This sets the destination's FK for the manuscript
+                                # Does this leave the original unchanged? I hope so...:)
+                dst.save()
+                src = MsItem.objects.filter(id=src_id).first()
+                msitems.append(dict(src=src, dst=dst))
+
+        # Repair all the relationships from sermon to sermon
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
+                for relation in repair:
+                    src_rel = getattr(src, relation)
+                    if src_rel and src_rel.order:
+                        setattr(dst, relation, obj.manuitems.filter(order=src_rel.order).first())
+                        dst.save()
+                # Copy and save a SermonDescr if needed
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # COpy it
+                    sermon_dst = sermon_src
+                    sermon_dst.pk = None
+                    sermon_dst.msitem = dst
+                    sermon_dst.mtype = mtype   # Change the type
+                    sermon_dst.stype = "imp"   # Imported
+                    sermon_dst.save()
+        # Walk the msitems again, and make sure SSG-links are copied!!
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # Make sure we also have the destination
+                    sermon_dst = dst.itemsermons.first()
+                    # Walk the SSG links tied with sermon_src
+                    for eq in sermon_src.equalgolds.all():
+                        # Add it to the destination sermon
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+
+
+        # Return the new object
+        return obj
+
+    def import_template(self, template):
+        """Import the information in [template] into the manuscript [self]"""
+
+        # Get the source manuscript
+        manu_src = template.manu
+
+        # Copy the sermons from [manu_src] into [self]
+        # NOTE: only if there are no sermons in [self] yet!!!!
+        if self.manuitems.count() == 0:
+            self.load_sermons_from(manu_src, mtype="man")
+
+        # Return myself again
+        return self
+
+    def load_sermons_from(self, manu_src, mtype = "tem"):
+        """Copy sermons from [manu_src] into myself"""
+
+        # Indicate what the destination manuscript object is
+        manu_dst = self
+        repair = ['parent', 'firstchild', 'next']
+
+        # copy all the sermons...
+        msitems = []
+        with transaction.atomic():
+            # Walk over all MsItem stuff
+            for msitem in manu_src.manuitems.all().order_by('order'):
+                dst = msitem
+                src_id = msitem.id
+                dst.pk = None
+                dst.manu = manu_dst     # This sets the destination's FK for the manuscript
+                                        # Does this leave the original unchanged? I hope so...:)
+                dst.save()
+                src = MsItem.objects.filter(id=src_id).first()
+                msitems.append(dict(src=src, dst=dst))
+
+        # Repair all the relationships from sermon to sermon
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
+                for relation in repair:
+                    src_rel = getattr(src, relation)
+                    if src_rel and src_rel.order:
+                        # Retrieve the target MsItem from the [manu_dst] by looking for the order number!!
+                        relation_target = manu_dst.manuitems.filter(order=src_rel.order).first()
+                        # Correct the MsItem's [dst] field now
+                        setattr(dst, relation, relation_target)
+                        dst.save()
+                # Copy and save a SermonDescr if needed
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # COpy it
+                    sermon_dst = sermon_src
+                    sermon_dst.pk = None
+                    sermon_dst.msitem = dst
+                    sermon_dst.mtype = mtype   # Change the type
+                    sermon_dst.stype = "imp"   # Imported
+                    sermon_dst.save()
+        # Walk the msitems again, and make sure SSG-links are copied!!
+        with transaction.atomic():
+            for msitem in msitems:
+                src = msitem['src']
+                dst = msitem['dst']  
+                sermon_src = src.itemsermons.first()
+                if sermon_src != None:
+                    # Make sure we also have the destination
+                    sermon_dst = dst.itemsermons.first()
+                    # Walk the SSG links tied with sermon_src
+                    for eq in sermon_src.equalgolds.all():
+                        # Add it to the destination sermon
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+        # Return okay
+        return True
+
+    def order_calculate(self):
+        """Re-calculate the order of the MsItem stuff"""
+
+        # Give them new order numbers
+        order = 1
+        with transaction.atomic():
+            for msitem in self.manuitems.all().order_by('order'):
+                if msitem.order != order:
+                    msitem.order = order
+                    msitem.save()
+                order += 1
+        return True
+
+    def remove_orphans(self):
+        """Remove orphan msitems"""
+
+        lst_remove = []
+        for msitem in self.manuitems.all():
+            # Check if this is an orphan
+            if msitem.sermonitems.count() == 0 and msitem.sermonhead.count() == 0:
+                lst_remove.append(msitem.id)
+        # Now remove them
+        MsItem.objects.filter(id__in=lst_remove).delete()
+        return True
 
     def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
         """Import an XML from e-codices with manuscript data and add it to the DB
@@ -3751,6 +4089,8 @@ class EqualGold(models.Model):
     sgcount = models.IntegerField("Equality set size", default=0)
     # [1] The first signature
     firstsig = models.CharField("Code", max_length=LONG_STRING, blank=True, null=True)
+    # [1] The number of associated Historical Collections
+    hccount = models.IntegerField("Historical Collection count", default=0)
 
     # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
@@ -3792,6 +4132,10 @@ class EqualGold(models.Model):
                     if not self.code or self.code != passim_code:
                         # Now save myself with the new code
                         self.code = passim_code
+
+            # (Re) calculate the number of associated historical collections (for *all* users!!)
+            if self.id != None:
+                self.hccount = self.collections.filter(settype="hc", scope='publ').count()
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -3852,12 +4196,14 @@ class EqualGold(models.Model):
         org.save()
         return org
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group, settype = None):
 
         lHtml = []
-        for obj in self.collections.all().order_by('name'):
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), obj.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, obj.name))
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('super', username, team_group, settype = settype).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
+            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
 
@@ -3878,26 +4224,48 @@ class EqualGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_explicit_markdown(self, add_search = False):
+    def get_explicit_markdown(self, incexp_type = "actual"):
         """Get the contents of the explicit field using markdown"""
 
-        if add_search:
+        if incexp_type == "both":
             parsed = adapt_markdown(self.explicit)
             search = self.srchexplicit
             sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
-        else:
+        elif incexp_type == "actual":
             sBack = adapt_markdown(self.explicit)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchexplicit)
         return sBack
 
-    def get_incipit_markdown(self, add_search = False):
+    def get_hclist_markdown(self):
+        html = []
+        for hc in self.collections.filter(settype="hc", scope='publ').order_by('name').distinct():
+            url = reverse('collhist_details', kwargs={'pk': hc.id})
+            html.append("<span class='collection clickable'><a href='{}'>{}</a></span>".format(url,hc.name))
+        sBack = ", ".join(html)
+        return sBack
+
+    def get_incexp_match(self, sMatch=""):
+        html = []
+        dots = "..." if self.incipit else ""
+        sBack = "{}{}{}".format(self.srchincipit, dots, self.srchexplicit)
+        ratio = 0.0
+        # Are we matching with something?
+        if sMatch != "":
+            sBack, ratio = get_overlap(sBack, sMatch)
+        return sBack, ratio
+
+    def get_incipit_markdown(self, incexp_type = "actual"):
         """Get the contents of the incipit field using markdown"""
         # Perform
-        if add_search:
+        if incexp_type == "both":
             parsed = adapt_markdown(self.incipit)
             search = self.srchincipit
             sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
-        else:
+        elif incexp_type == "actual":
             sBack = adapt_markdown(self.incipit)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchincipit)
         return sBack
 
     def get_keywords_markdown(self):
@@ -3944,7 +4312,7 @@ class EqualGold(models.Model):
         if self.author:
             lHtml.append("(by {}) ".format(self.author.name))
         else:
-            lHtml.append("(by Unknwon Author) ")
+            lHtml.append("(by Unknown Author) ")
 
         if do_incexpl:
             # Treat incipit
@@ -4020,6 +4388,16 @@ class EqualGold(models.Model):
         first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
         if first != None:
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
+        return sBack
+
+    def get_passimcode_markdown(self):
+        lHtml = []
+        # Add the PASSIM code
+        code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
+        url = reverse('equalgold_details', kwargs={'pk': self.id})
+        sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, code)
+        #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+        #sBack = " ".join(lHtml)
         return sBack
 
     def get_short(self):
@@ -4319,10 +4697,12 @@ class SermonGold(models.Model):
         """Get the contents of the bibliography field using markdown"""
         return adapt_markdown(self.bibliography, False)
 
-    def get_collections_markdown(self):
+    def get_collections_markdown(self, username, team_group, settype = None):
         lHtml = []
         # Visit all collections
-        for col in self.collections.all().order_by('name'):
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('gold', username, team_group, settype = settype).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             # Determine where clicking should lead to
             url = "{}?gold-collist_sg={}".format(reverse('gold_list'), col.id)
             # Create a display for this topic
@@ -5019,6 +5399,8 @@ class Collection(models.Model):
     # [1] Each "Collection" has only 1 type    
     type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
                             max_length=5)
+    # [1] Each "collection" has a settype: pd (personal dataset) versus hc (historical collection)
+    settype = models.CharField("Set type", choices=build_abbr_list(SET_TYPE), max_length=5, default="pd")
     # [0-1] Each collection can have one description
     descrip = models.CharField("Description", null=True, blank=True, max_length=LONG_STRING)
     # [0-1] Link to a description or bibliography (url) 
@@ -5029,16 +5411,33 @@ class Collection(models.Model):
     #     E.g: private, team, global - default is 'private'
     scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv",
                             max_length=5)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
     # [1] Each collection has only 1 date/timestamp that shows when the collection was created
     created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    # [0-1] Number of SSG authors -- if this is a settype='hc'
+    ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
+
+    # [0-n] Many-to-many: keywords per SermonGold
+    litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
+
     
     def __str__(self):
         return self.name
 
-    def get_readonly_display(self):
-        response = "yes" if self.readonly else "no"
-        return response
-        
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Double check the number of authors, if this is settype HC
+        if self.settype == "hc":
+            ssg_id = self.super_col.all().values('super__id')
+            authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
+            self.ssgauthornum = authornum
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
+        return respons
+
     def freqsermo(self):
         """Frequency in manifestation sermons"""
         freq = self.collections_sermon.all().count()
@@ -5059,16 +5458,67 @@ class Collection(models.Model):
         freq = self.collections_super.all().count()
         return freq
 
+    def get_authors_markdown(self):
+        html = []
+        if self.settype == "hc":
+            ssg_id = self.super_col.all().values('super__id')
+            for author in Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('name').distinct():
+                dots = "" if len(author.name) < 20 else "..."
+                html.append("<span class='authorname' title='{}'>{}{}</span>".format(author.name, author.name[:20], dots))
+        sBack = ", ".join(html)
+        return sBack
+
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
+        
+    def get_elevate(self):
+        html = []
+        url = reverse("collhist_elevate", kwargs={'pk': self.id})
+        html.append("<a class='btn btn-xs jumbo-1' href='{}'>Elevate".format(url))
+        html.append("<span class='glyphicon glyphicon-share-alt'></span></a>")
+        html.append("<span>Turn this dataset into a historical collection</span>")
+        sBack = "\n".join(html)
+        return sBack
+
     def get_label(self):
         """Return an appropriate name or label"""
 
         return self.name
+
+    def get_litrefs_markdown(self):
+        lHtml = []
+        # Visit all literature references
+        for litref in self.collection_litrefcols.all().order_by('reference__short'):
+            # Determine where clicking should lead to
+            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+            # Create a display for this item
+            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_created(self):
         """REturn the creation date in a readable form"""
 
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
+
+    def get_manuscript_link(self):
+        """Return a piece of HTML with the manuscript link for the user"""
+
+        sBack = ""
+        html = []
+        if self.settype == "hc":
+            # Creation of a new template based on this historical collection:
+            url = reverse('collhist_temp', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a template based on this historical collection'><span class='badge signature ot'>Create a Template based on this historical collection</span></a>".format(url))
+            # Creation of a new manuscript based on this historical collection:
+            url = reverse('collhist_manu', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a manuscript based on this historical collection'><span class='badge signature gr'>Create a Manuscript based on this historical collection</span></a>".format(url))
+            # Combine response
+            sBack = "\n".join(html)
+        return sBack
 
     def get_size_markdown(self):
         """Count the items that belong to me, depending on my type
@@ -5093,22 +5543,32 @@ class Collection(models.Model):
         elif self.type == "super":
             size = self.freqsuper()
             # Determine where clicking should lead to
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+            if self.settype == "hc":
+                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
+            else:
+                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
         if size > 0:
             # Create a display for this topic
             lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_scoped_queryset(type, username, team_group):
+    def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
 
         # Initialisations
-        non_private = ['publ', 'team']
+        if scope == None or scope == "":
+            non_private = ['publ', 'team']
+        elif scope == "priv":
+            non_private = ['team']
+        if settype == None or settype == "":
+            settype="pd"
         oErr = ErrHandle()
         try:
             # Validate
-            if username and team_group and username != "" and team_group != "":
+            if scope == "publ":
+                filter = Q(scope="publ")
+            elif username and team_group and username != "" and team_group != "":
                 # First filter on owner
                 owner = Profile.get_user_profile(username)
                 filter = Q(owner=owner)
@@ -5121,6 +5581,10 @@ class Collection(models.Model):
                         filter = ( filter & Q(type=type)) | ( Q(scope__in=non_private) & Q(type=type) )
                     else:
                         filter = ( filter ) | ( Q(scope__in=non_private)  )
+                elif scope == "priv":
+                    # THis is a general user: may only see the public ones
+                    if type:
+                        filter = ( filter & Q(type=type))
                 else:
                     # THis is a general user: may only see the public ones
                     if type:
@@ -5129,6 +5593,8 @@ class Collection(models.Model):
                         filter = ( filter ) | ( Q(scope="publ")  )
             else:
                 filter = Q(type=type)
+            # Make sure the settype is consistent
+            filter = ( filter ) & Q(settype=settype)
             # Apply the filter
             qs = Collection.objects.filter(filter)
         except:
@@ -5137,6 +5603,65 @@ class Collection(models.Model):
             qs = Collection.objects.all()
         # REturn the result
         return qs
+
+    def get_template_copy(self, username, mtype):
+        """Create a manuscript + sermons based on the SSGs in this collection"""
+
+        # Double check to see that this is a SSG collection
+        if self.settype != "hc" or self.type != "super":
+            # THis is not the correct starting point
+            return None
+
+        # Now we know that we're okay...
+        project = Project.get_default(username)
+        profile = Profile.get_user_profile(username)
+        source = SourceInfo.objects.create(
+            code="Copy of Historical Collection [{}] (id={})".format(self.name, self.id), 
+            collector=username, 
+            profile=profile)
+
+        # Create an empty Manuscript
+        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
+        
+        # Create all the sermons based on the SSGs
+        msitems = []
+        with transaction.atomic():
+            order = 1
+            for ssg in self.collections_super.all():
+                # Create a MsItem
+                msitem = MsItem.objects.create(manu=manu, order=order)
+                order += 1
+                # Add it to the list
+                msitems.append(msitem)
+                # Create a S based on this SSG
+                sermon = SermonDescr.objects.create(
+                    manu=manu, msitem=msitem, author=ssg.author, 
+                    incipit=ssg.incipit, srchincipit=ssg.srchincipit,
+                    explicit=ssg.explicit, srchexplicit=ssg.srchexplicit,
+                    stype="imp", mtype=mtype)
+                # Create a link from the S to this SSG
+                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, super=ssg, linktype=LINK_UNSPECIFIED)
+
+        # Now walk and repair the links
+        with transaction.atomic():
+            size = len(msitems)
+            for idx, msitem in enumerate(msitems):
+                # Check if this is not the last one
+                if idx < size-1:
+                    msitem.next = msitems[idx+1]
+                    msitem.save()
+
+        # Okay, do we need to just make a manuscript, or a template?
+        if mtype == "tem":
+            # Create a template based on this new manuscript
+            obj = Template.objects.create(manu=manu, profile=profile, name="Template_{}_{}".format(profile.user.username, manu.id),
+                                          description="Created from Historical Collection [{}] (id={})".format(self.name, self.id))
+        else:
+            # Just a manuscript is okay
+            obj = manu
+
+        # Return the manuscript or the template that has been created
+        return obj
 
 
 class MsItem(models.Model):
@@ -5171,12 +5696,26 @@ class MsItem(models.Model):
                 node = node.parent
         return depth
 
+    def delete(self, using = None, keep_parents = False):
+        # Keep track of manuscript
+        manu = self.manu
+        # Perform deletion
+        response = super(MsItem, self).delete(using, keep_parents)
+        # Re-calculate order
+        if manu != None:
+            manu.order_calculate()
+        # REturn delete response
+        return response
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""
 
     # [0-1] Optional location of this sermon on the manuscript
     locus = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
+
+    # [0-1] The title of this structural element to be shown
+    title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] Every SermonHead belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
@@ -5230,6 +5769,11 @@ class SermonDescr(models.Model):
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+    # [1] And a date: the date of saving this sermon
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # [1] Every SermonDescr may be a manifestation (default) or a template (optional)
+    mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
     # ================ MANYTOMANY relations ============================
 
@@ -5241,7 +5785,7 @@ class SermonDescr(models.Model):
     goldsermons = models.ManyToManyField(SermonGold, through="SermonDescrGold")
 
     # [0-n] Link to one or more SSG (equalgold)
-    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual")
+    equalgolds = models.ManyToManyField(EqualGold, through="SermonDescrEqual", related_name="equalgold_sermons")
 
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionSerm", related_name="collections_sermon")
@@ -5318,6 +5862,14 @@ class SermonDescr(models.Model):
             bOkay = False
         return bOkay, msg
 
+    def delete(self, using = None, keep_parents = False):
+        # First remove my msitem, if I have one
+        if self.msitem != None:
+            self.msitem.delete()
+        # Regular delete operation
+        response = super(SermonDescr, self).delete(using, keep_parents)
+        return response
+
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
@@ -5380,11 +5932,36 @@ class SermonDescr(models.Model):
         # Combine all of this
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
         return sBack
-    
-    def get_collections_markdown(self):
+
+    def get_collection_link(self, settype):
         lHtml = []
-        # Visit all collections
-        for col in self.collections.all().order_by('name'):
+        lstQ = []
+        # Get all the SSG to which I link
+        lstQ.append(Q(super_col__super__in=self.equalgolds.all()))
+        lstQ.append(Q(settype=settype))
+        # Make sure we restrict ourselves to the *public* datasets
+        lstQ.append(Q(scope="publ"))
+        # Get the collections in which these SSGs are
+        collections = Collection.objects.filter(*lstQ).order_by('name')
+        # Visit all datasets/collections linked to me via the SSGs
+        for col in collections:
+            # Determine where clicking should lead to
+            # url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
+            if settype == "hc":
+                url = reverse("collhist_details", kwargs={'pk': col.id})
+            else:
+                url = reverse("collpubl_details", kwargs={'pk': col.id})
+            # Create a display for this topic
+            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+    
+    def get_collections_markdown(self, username, team_group, settype = None):
+        lHtml = []
+        # Visit all collections that I have access to
+        mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group, settype = settype).values('id')
+        for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
             # Determine where clicking should lead to
             url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
             # Create a display for this topic
@@ -5400,8 +5977,8 @@ class SermonDescr(models.Model):
         ssg_list = []
 
         # Visit all linked SSG items
-        # for linked in SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL):
-        for linked in SermonDescrEqual.objects.filter(sermon=self):
+        #    but make sure to exclude the template sermons
+        for linked in SermonDescrEqual.objects.filter(sermon=self).exclude(sermon__mtype="tem"):
             # Add this SSG
             ssg_list.append(linked.super.id)
 
@@ -5428,15 +6005,11 @@ class SermonDescr(models.Model):
         """Get the contents of the explicit field using markdown"""
         return adapt_markdown(self.explicit)
 
-    def get_postscriptum_markdown(self):
-        """Get the contents of the postscriptum field using markdown"""
-        return adapt_markdown(self.postscriptum)
-
     def get_eqsetcount(self):
         """Get the number of SSGs this sermon is part of"""
 
         # Visit all linked SSG items
-        # ssg_count = SermonDescrEqual.objects.filter(sermon=self, linktype=LINK_EQUAL).count()
+        #    NOTE: do not filter out mtype=tem
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
@@ -5449,9 +6022,10 @@ class SermonDescr(models.Model):
         lSig = []
         ssg_list = []
 
-        # Visit all linked SSG items
-        for linked in self.sermondescr_super.all():
-            ssg_list.append(linked.id)
+        # Get all linked SSG items
+        #for linked in self.sermondescr_super.all():
+        #    ssg_list.append(linked.id)
+        ssg_list = self.equalgolds.all().values('id')
 
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
@@ -5463,16 +6037,16 @@ class SermonDescr(models.Model):
             manual_list = []
             for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
                 if sig.gsig:
-                    gold_id_list.append(sig.gsig.id)
+                    gold_id_list.append(sig.gsig.gold.id)
                 else:
                     manual_list.append(sig.id)
             # (a) Show the gold signatures
-            for sig in Signature.objects.filter(id__in=gold_id_list).order_by('-editype', 'code'):
+            for sig in Signature.objects.filter(gold__id__in=gold_id_list).order_by('-editype', 'code'):
                 # Determine where clicking should lead to
                 url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
                 # Check if this is an automatic code
-                auto = "" if sig.id in auto_list else "view-mode"
-                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype,auto, url,sig.code))
+                auto = "" if sig.gold.id in auto_list else "view-mode"
+                lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype, auto, url,sig.code))
             # (b) Show the manual ones
             for sig in self.sermonsignatures.filter(id__in=manual_list).order_by('-editype', 'code'):
                 # Create a display for this topic - without URL
@@ -5509,6 +6083,40 @@ class SermonDescr(models.Model):
         if len(lHtml) > 0:
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         return sBack
+
+    def get_hcs_plain(self, username = None, team_group=None):
+        """Get all the historical collections associated with this sermon"""
+        lHtml = []
+        # Get all the SSG's linked to this manifestation
+        qs_ssg = self.equalgolds.all().values('id')
+        # qs_hc = self.collections.all()
+        lstQ = []
+        lstQ.append(Q(settype="hc"))
+        lstQ.append(Q(collections_super__id__in=qs_ssg))
+        
+        if username == None or team_group == None:
+            qs_hc = Collection.objects.filter(*lstQ )
+        else:
+            qs_hc = Collection.get_scoped_queryset("super", username, team_group, settype="hc").filter(collections_super__id__in=qs_ssg)
+        # TODO: filter on (a) public only or (b) private but from the current user
+        for col in qs_hc:
+            # Determine where clicking should lead to
+            url = reverse('collhist_details', kwargs={'pk': col.id})
+            # Create a display for this topic
+            lHtml.append('<span class="badge signature ot"><a href="{}" >{}</a></span>'.format(url,col.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_incexp_match(self, sMatch=""):
+        html = []
+        dots = "..." if self.incipit else ""
+        sBack = "{}{}{}".format(self.srchincipit, dots, self.srchexplicit)
+        ratio = 0.0
+        # Are we matching with something?
+        if sMatch != "":
+            sBack, ratio = get_overlap(sBack, sMatch)
+        return sBack, ratio
 
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
@@ -5564,7 +6172,8 @@ class SermonDescr(models.Model):
 
         lHtml = []
         # Get all the SSGs to which I link with equality
-        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        ssg_id = self.equalgolds.all().values("id")
         # Get all keywords attached to these SGs
         qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
         # Visit all keywords
@@ -5582,7 +6191,8 @@ class SermonDescr(models.Model):
 
         lHtml = []
         # Get all the SSGs to which I link with equality
-        ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        # ssg_id = EqualGold.objects.filter(sermondescr_super__sermon=self, sermondescr_super__linktype=LINK_EQUAL).values("id")
+        ssg_id = self.equalgolds.all().values("id")
         # Get all keywords attached to these SGs
         qs = Keyword.objects.filter(equal_kw__equal__id__in=ssg_id).order_by("name").distinct()
         # Visit all keywords
@@ -5600,7 +6210,7 @@ class SermonDescr(models.Model):
         # (1) First the litrefs from the manuscript: 
         # manu = self.manu
         # lref_list = []
-        for item in LitrefMan.objects.filter(manuscript=self.manu).order_by('reference__short', 'pages'):
+        for item in LitrefMan.objects.filter(manuscript=self.get_manuscript()).order_by('reference__short', 'pages'):
             # Determine where clicking should lead to
             url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
             # Create a display for this item
@@ -5623,10 +6233,19 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_locus(self):
+        locus = "-" if self.locus == None or self.locus == "" else self.locus
+        url = reverse('sermon_details', kwargs={'pk': self.id})
+        sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, locus)
+        return sBack
+
     def get_manuscript(self):
         """Get the manuscript that links to this sermondescr"""
 
-        return obj.manu
+        manu = None
+        if self.msitem and self.msitem.manu:
+            manu = self.msitem.manu
+        return manu
 
     def get_note_markdown(self):
         """Get the contents of the note field using markdown"""
@@ -5642,6 +6261,10 @@ class SermonDescr(models.Model):
             url = reverse('equalgold_details', kwargs={'pk': equal.id})
             sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, equal.code)
         return sBack
+
+    def get_postscriptum_markdown(self):
+        """Get the contents of the postscriptum field using markdown"""
+        return adapt_markdown(self.postscriptum)
 
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""
@@ -5689,7 +6312,19 @@ class SermonDescr(models.Model):
         return sBack
 
     def get_stype_light(self):
-        return get_stype_light(self.stype)
+        sBack = get_stype_light(self.stype)
+        return sBack
+
+    def get_template_link(self, profile):
+        sBack = ""
+        # Check if I am a template
+        if self.mtype == "tem":
+            # add a clear TEMPLATE indicator with a link to the actual template
+            template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            if template:
+                url = reverse('template_details', kwargs={'pk': template.id})
+                sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
+        return sBack
 
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
@@ -5756,9 +6391,10 @@ class SermonDescr(models.Model):
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
             bNeedSave = True
-        if bNeedSave: self.siglist = json.dumps(lSign)
-        # Do the saving initially
-        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        # Make sure to save the siglist too
+        if bNeedSave: 
+            self.siglist = json.dumps(lSign)
+            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
     def signature_string(self):
@@ -5779,10 +6415,9 @@ class SermonDescr(models.Model):
 
         lSign = []
 
-        # Get the automatic signatures
-        ssg_list = []
-        for linked in self.sermondescr_super.all():
-            ssg_list.append(linked.id)
+        # Get all linked SSG items
+        ssg_list = self.equalgolds.all().values('id')
+
         # Get a list of all the SG that are in these equality sets
         gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
         # Get an ordered set of signatures
@@ -5934,7 +6569,7 @@ class SermonDescrEqual(models.Model):
         """Get a list of links that are unique in terms of combination [ssg] [linktype]"""
 
         # We're not really giving unique ones
-        uniques = SermonDescrEqual.objects.order_by('linktype', 'sermon__author__name', 'sermon__siglist')
+        uniques = SermonDescrEqual.objects.exclude(sermon__mtype="tem").order_by('linktype', 'sermon__author__name', 'sermon__siglist')
         return uniques
 
 
@@ -6224,6 +6859,38 @@ class LitrefSG(models.Model):
         return adapt_markdown(short, lowercase=False)
 
 
+class LitrefCol(models.Model):
+    """The link between a literature item and a Collection (usually a HC)"""
+    
+    # [1] The literature item
+    reference = models.ForeignKey(Litref, related_name="reference_litrefcols")
+    # [1] The SermonGold to which the literature item refers
+    collection = models.ForeignKey(Collection, related_name = "collection_litrefcols")
+    # [0-1] The first and last page of the reference
+    pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        # Double check the ESSENTIALS (pages may be empty)
+        if self.collection_id and self.reference_id:
+            # Do the saving initially
+            response = super(LitrefCol, self).save(force_insert, force_update, using, update_fields)
+        # Then return the response: should be "None"
+        return response
+
+    def get_short(self):
+        short = ""
+        if self.reference:
+            short = self.reference.get_short()
+            if self.pages and self.pages != "":
+                short = "{}, pp {}".format(short, self.pages)
+        return short
+
+    def get_short_markdown(self):
+        short = self.get_short()
+        return adapt_markdown(short, lowercase=False)
+
+
 class EdirefSG(models.Model):
     """The link between an edition item and a SermonGold"""
 
@@ -6330,3 +6997,98 @@ class CollectionSuper(models.Model):
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "super_col")
 
+
+class Template(models.Model):
+    """A template to construct a manuscript"""
+
+    # [1] Every template must be named
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Every template belongs to someone
+    profile = models.ForeignKey(Profile, null=True, on_delete=models.CASCADE, related_name="profiletemplates")
+    # [0-1] A template may have an additional description
+    description = models.TextField("Description", null=True, blank=True)
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+    # [1] Every template links to a `Manuscript` that has `mtype` set to `tem` (=template)
+    manu = models.ForeignKey(Manuscript, null=True, on_delete=models.CASCADE, related_name="manutemplates")
+
+    def __str__(self):
+        return self.name
+
+    def get_count(self):
+        """Count the number of sermons under me"""
+
+        num = 0
+        if self.manu:
+            num = self.manu.get_sermon_count()
+        return num
+
+    def get_username(self):
+        username = ""
+        if self.profile and self.profile.user:
+            username = self.profile.user.username
+        return username
+
+    def get_manuscript_link(self):
+        """Return a piece of HTML with the manuscript link for the user"""
+
+        sBack = ""
+        html = []
+        if self.manu:
+            # Navigation to a manuscript template
+            url = reverse('manuscript_details', kwargs={'pk': self.manu.id})
+            html.append("<a href='{}' title='Go to the manuscript template'><span class='badge signature ot'>Open the Manuscript</span></a>".format(url))
+            # Creation of a new manuscript based on this template:
+            url = reverse('template_apply', kwargs={'pk': self.id})
+            html.append("<a href='{}' title='Create a manuscript based on this template'><span class='badge signature gr'>Create a new Manuscript based on this template</span></a>".format(url))
+            # Combine response
+            sBack = "\n".join(html)
+        return sBack
+
+
+class CollOverlap(models.Model):
+    """Used to calculate the overlap between (historical) collections and manuscripts"""
+
+    # [1] Every CollOverlap belongs to someone
+    profile = models.ForeignKey(Profile, null=True, on_delete=models.CASCADE, related_name="profile_colloverlaps")
+    # [1] The overlap is with one Collection
+    collection = models.ForeignKey(Collection, null=True, on_delete=models.CASCADE, related_name="collection_colloverlaps")
+    # [1] Every CollOverlap links to a `Manuscript`
+    manuscript = models.ForeignKey(Manuscript, null=True, on_delete=models.CASCADE, related_name="manu_colloverlaps")
+    # [1] The percentage overlap
+    overlap = models.IntegerField("Overlap percentage", default=0)
+    # [1] And a date: the date of saving this report
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def get_overlap(profile, collection, manuscript):
+        """Calculate and set the overlap between collection and manuscript"""
+
+        obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
+        if obj == None:
+            obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
+        # Get the ids of the SSGs in the collection
+        coll_list = [ collection ]
+        ssg_coll = EqualGold.objects.filter(collections__in=coll_list).values('id')
+        if len(ssg_coll) == 0:
+            ptc = 0
+        else:
+            # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
+            ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
+            # Now calculate the overlap
+            count = 0
+            for item in ssg_coll:
+                if item in ssg_manu: count += 1
+            ptc = 100 * count // len(ssg_coll)
+        # Check if there is a change in percentage
+        if ptc != obj.overlap:
+            # Set the percentage
+            obj.overlap = ptc
+            obj.save()
+        return ptc
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(CollOverlap, self).save(force_insert, force_update, using, update_fields)
+        return response

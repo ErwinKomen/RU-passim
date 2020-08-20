@@ -68,7 +68,7 @@ table tbody tr:hover {
   cursor: pointer;*/
   /*  */
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, th div a.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, span.clickable:hover, th div a.clickable:hover {
   cursor: pointer;
 }
 table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbody tr td span.clickable:hover, th div a.clickable:hover {
@@ -1493,4 +1493,23 @@ input:checked + .slider:before {
 
 .columnSelector:hover {
     border-right: 2px solid blue;
+}
+
+.template_notice {
+    width: 50%;
+    background-color: darkolivegreen;
+    color: white;
+}
+.template_notice:hover {
+    background-color: darkslateblue;
+    color: yellow;
+}
+
+span.overlap {
+    background-color: lightyellow;
+    color: darkblue;
+}
+
+.authorname {
+    color: darkgreen; font-size: small;
 }

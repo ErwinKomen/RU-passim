@@ -1,11 +1,11 @@
-﻿{% load i18n %}
+{% load i18n %}
 
 <!-- Source information -->
 <form>
   {% csrf_token %}
     <table class="location-details">
       <!-- Row to indicate editing, if possible -->
-      {% if is_passim_editor %}
+      {% if is_app_editor %}
         <tr>
           <td colspan="2"  class="ms editable table">
             <!-- Provide the necessary buttons: edit, cancel and save -->
@@ -42,7 +42,7 @@
         <td class="hoverable" valign="top"  style="min-width: 150px;">Name</td>
         <td  style="width: 100%;">
           <div class="view-mode">{{locForm.name.value}}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{locForm.name}}</div>
           {% endif %}
         </td>
@@ -51,7 +51,7 @@
         <td class="hoverable" valign="top" >Location type</td>
         <td>
           <div class="view-mode">{% if locForm.instance.loctype %}{{locForm.instance.loctype.name}}{% else %}-{% endif %}</div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{locForm.loctype}}</div>
           {% endif %}
         </td>
@@ -65,7 +65,7 @@
               <span class="badge loctype-{{loc.loctype.name}}" title="{{loc.loctype.name}}">{{loc.name}}</span>
             {% endfor %}
           </div>
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="edit-mode hidden">{{locForm.locationlist}}</div>
           {% endif %}
         </td>
