@@ -6053,9 +6053,6 @@ class SermonListView(BasicList):
             html.append("<span style='color: blue;'>{}</span>".format(dots))
             html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "manuscript":
-                          #<a href="{% url 'manuscript_details' sermon.manu.id %}" class="nostyle">
-                          #  <span  style="font-size: small;">{{sermon.manu.idno|truncatechars:20}}</span>
-                          #</a>
             manu = instance.get_manuscript()
             html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
                 reverse('manuscript_details', kwargs={'pk': manu.id}),
@@ -7189,13 +7186,14 @@ class CollPrivDetails(CollAnyEdit):
         rel_list =[]
         resizable = True
         index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
 
         # Action depends on instance.type: M/S/SG/SSG
         if instance.type == "manu":
             # Get all non-template manuscripts part of this PD
             manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
-            if resizable:
-                manuscripts['gridclass'] = "resizable"
+            if resizable: manuscripts['gridclass'] = "resizable"
 
             lstQ.append(Q(collections=instance))
             lstQ.append(Q(mtype="man"))
@@ -7210,45 +7208,30 @@ class CollPrivDetails(CollAnyEdit):
                 index += 1
 
                 # Shelfmark = IDNO
-                manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
-                # manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
-                # Name as CITY - LIBRARY - IDNO + Name
-                # manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
-                manu_name = "{}, {}, <span class='signature'>{}</span>".format(item.get_city(), item.get_library(), item.idno)
-                add_one_item(rel_item, manu_name, False, title=item.idno, main=True, 
+                add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
                              link=reverse('manuscript_details', kwargs={'pk': item.id}))
 
                 # Just the name of the manuscript
-                add_one_item(rel_item, item.name, resizable)
+                add_one_item(rel_item, self.get_field_value("manu", item, "name"), resizable)
 
                 # Origin
-                or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
-                add_one_item(rel_item, or_prov, resizable, title="Origin (if known), followed by provenances (between brackets)")
+                add_one_item(rel_item, self.get_field_value("manu", item, "orgprov"), False, 
+                             title="Origin (if known), followed by provenances (between brackets)")
 
                 # date range
-                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                add_one_item(rel_item, daterange, resizable, align="right")
+                add_one_item(rel_item, self.get_field_value("manu", item, "daterange"), False, align="right")
 
                 # Number of sermons in this manuscript
-                sermo_number = item.get_sermon_count()
-                add_one_item(rel_item, sermo_number, resizable, align="right")
+                add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), False, align="right")
 
                 # Actions that can be performed on this item
-                html = []
-                html.append("<span class='blinded'><a href='#' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
-                html.append("<a href='#'><span class='glyphicon glyphicon-arrow-down'></span></a>")
-                html.append("<a href='#'><span class='glyphicon glyphicon-remove'></span></a>")
-                html.append("&nbsp;</span>")
-                sHtml = "\n".join(html)
-                add_one_item(rel_item, sHtml)
+                add_one_item(rel_item, self.get_actions())
 
-                # Add this Manu line to the list
+                # Add this line to the list
                 rel_list.append(rel_item)
 
             manuscripts['rel_list'] = rel_list
 
-            sort_start = '<span class="sortable"><span class="fa fa-sort"></span>&nbsp;'
-            sort_end = '</span>'
             manuscripts['columns'] = [
                 'Order',
                 '{}<span title="City/Library/Shelfmark">Shelfmark</span>{}'.format(sort_start, sort_end), 
@@ -7261,18 +7244,186 @@ class CollPrivDetails(CollAnyEdit):
             related_objects.append(manuscripts)
 
         elif instance.type == "sermo":
-            pass
+            # Get all sermons that are part of this PD
+            sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
+            if resizable: sermons['gridclass'] = "resizable"
+
+            qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
+                'author__name', 'siglist', 'srchincipit', 'srchexplicit')
+
+            # Walk these collection sermons
+            for item in qs_sermo:
+                rel_item = []
+
+                # S: Order in Manuscript
+                add_one_item(rel_item, index, False, align="right")
+                index += 1
+
+                # S: Author
+                add_one_item(rel_item, self.get_field_value("sermo", item, "author"), False, main=True)
+
+                # S: Signature
+                add_one_item(rel_item, self.get_field_value("sermo", item, "signature"), False)
+
+                # S: Inc+Expl
+                add_one_item(rel_item, self.get_field_value("sermo", item, "incexpl"), False)
+
+                # S: Manuscript
+                add_one_item(rel_item, self.get_field_value("sermo", item, "manuscript"), False)
+
+                # S: Locus
+                add_one_item(rel_item, item.locus, False)
+
+                # Actions that can be performed on this item
+                add_one_item(rel_item, self.get_actions())
+
+                # Add this line to the list
+                rel_list.append(rel_item)
+            
+            sermons['rel_list'] = rel_list
+            sermons['columns'] = [
+                'Order',
+                '{}<span title="Attributed author">Author</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Manuscript shelfmark">Manuscript</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Location within the manuscript">Locus</span>{}'.format(sort_start, sort_end),
+                ''
+                ]
+            related_objects.append(sermons)
 
         elif instance.type == "gold":
-            pass
+            # Get all sermons that are part of this PD
+            goldsermons = dict(title="Gold sermons within this dataset", prefix="sermo")
+            if resizable: goldsermons['gridclass'] = "resizable"
+
+            qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
+                'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
+
+            # Walk these collection sermons
+            for item in qs_sermo:
+                rel_item = []
+
+                # G: Order in Manuscript
+                add_one_item(rel_item, index, False, align="right")
+                index += 1
+
+                # G: Author
+                add_one_item(rel_item, self.get_field_value("gold", item, "author"), False,main=True)
+
+                # G: Signature
+                add_one_item(rel_item, self.get_field_value("gold", item, "signature"), False)
+
+                # G: Passim code
+                add_one_item(rel_item, self.get_field_value("gold", item, "code"), False)
+
+                # G: Inc/Expl
+                add_one_item(rel_item, self.get_field_value("gold", item, "incexpl"), False)
+
+                # G: Editions
+                add_one_item(rel_item, self.get_field_value("gold", item, "edition"), False)
+
+                # Actions that can be performed on this item
+                add_one_item(rel_item, self.get_actions())
+
+                # Add this line to the list
+                rel_list.append(rel_item)
+            
+            goldsermons['rel_list'] = rel_list
+            goldsermons['columns'] = [
+                'Order',
+                '{}<span title="Associated author">Author</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Editions where this Gold Sermon is described">Editions</span>{}'.format(sort_start, sort_end), 
+                ''
+                ]
+            related_objects.append(goldsermons)
 
         elif instance.type == "super":
-            pass
+            # Get all sermons that are part of this PD
+            supers = dict(title="Super sermons gold within this dataset", prefix="sermo")
+            if resizable: supers['gridclass'] = "resizable"
+
+            qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
+                'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
+
+            # Walk these collection sermons
+            for item in qs_sermo:
+                rel_item = []
+
+                # SSG: Order in Manuscript
+                add_one_item(rel_item, index, False, align="right")
+                index += 1
+
+                # SSG: Author
+                add_one_item(rel_item, self.get_field_value("super", item, "author"), False, main=True)
+
+                # SSG: Passim code
+                add_one_item(rel_item, self.get_field_value("super", item, "code"), False)
+
+                # SSG: Gryson/Clavis = signature
+                add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
+
+                # SSG: Inc/Expl
+                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), False)
+
+                # SSG: Size (number of SG in equality set)
+                add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
+
+                # Actions that can be performed on this item
+                add_one_item(rel_item, self.get_actions())
+
+                # Add this line to the list
+                rel_list.append(rel_item)
+            
+            supers['rel_list'] = rel_list
+            supers['columns'] = [
+                'Order',
+                '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start, sort_end), 
+                ''
+                ]
+            related_objects.append(supers)
 
         context['related_objects'] = related_objects
 
         # REturn the total context
         return context
+
+    def get_actions(self):
+        html = []
+        html.append("<span class='blinded'><a href='#' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
+        html.append("<a href='#'><span class='glyphicon glyphicon-arrow-down'></span></a>")
+        html.append("<a href='#'><span class='glyphicon glyphicon-remove'></span></a>")
+        html.append("&nbsp;</span>")
+        sHtml = "\n".join(html)
+        return sHtml
+
+    def get_field_value(self, type, instance, custom):
+        sBack = ""
+        if type == "manu":
+            if custom == "shelfmark":
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+            elif custom == "name":
+                sBack = instance.name
+            elif custom == "origprov":
+                sBack = "{} ({})".format(instance.get_origin(), instance.get_provenance_markdown())
+            elif custom == "daterange":
+                sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
+            elif custom == "sermons":
+                sBack = instance.get_sermon_count()
+        elif type == "sermo":
+            sBack, sTitle = SermonListView.get_field_value(None, instance, custom)
+        elif type == "gold":
+            sBack, sTitle = SermonGoldListView.get_field_value(None, instance, custom)
+        elif type == "super":
+            sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
+        return sBack
 
 
 class CollPublDetails(CollPrivDetails):

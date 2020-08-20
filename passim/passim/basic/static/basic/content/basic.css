@@ -9,3 +9,14 @@
 .hidehover:hover .blinded {
     opacity: 1.0;
 }
+
+.sortshow:hover {
+    color: red;
+}
+
+.apart {
+    background-color: darkblue;
+    border-radius: 3px;
+    padding: 2px 2px;
+}
+

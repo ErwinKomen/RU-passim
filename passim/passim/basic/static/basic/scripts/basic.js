@@ -926,19 +926,6 @@ var ru = (function ($, ru) {
             $(this).closest("td").addClass("hidehover");
           });
 
-          // No closing of certain dropdown elements on clicking
-          /*
-          $(".dropdown-toggle").on({
-            "click": function (event) {
-              var evtarget = $(event.target);
-              if ($(evtarget).closest(".nocloseonclick").length) {
-                $(this).data("closable", false);
-              } else {
-                $(this).data("closable", true);
-              }
-            }
-          });*/
-
           // Make modal draggable
           $(".modal-header, modal-dragpoint").on("mousedown", function (mousedownEvt) {
             var $draggable = $(this),
