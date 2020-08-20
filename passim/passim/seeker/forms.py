@@ -1316,8 +1316,7 @@ class ProvenanceForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
-
-
+            
 
 class ProfileForm(forms.ModelForm):
     """Profile list and details"""
