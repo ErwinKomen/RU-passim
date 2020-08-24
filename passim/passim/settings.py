@@ -103,7 +103,8 @@ INSTALLED_APPS = [
     'django_select2',
     'passim.basic',
     'passim.reader',
-    'passim.seeker'
+    'passim.seeker',
+    'passim.enrich'
 ]
 
 MIDDLEWARE_CLASSES = [

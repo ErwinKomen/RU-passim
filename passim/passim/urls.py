@@ -13,6 +13,7 @@ import passim.seeker.views
 import passim.reader.views
 from passim.seeker.views import *
 from passim.reader.views import *
+from passim.enrich.views import *
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -249,6 +250,12 @@ urlpatterns = [
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     # =============================================================================================
+
+    # ============== ENRICH STUFF =================================================
+    url(r'^enrich/unit/list', TestunitListView.as_view(), name='testunit_list'),
+    url(r'^enrich/unit/details(?:/(?P<pk>\d+))?/$', TestunitDetails.as_view(), name='testunit_details'),
+    url(r'^enrich/unit/edit(?:/(?P<pk>\d+))?/$', TestunitEdit.as_view(), name='testunit_edit'),
+    url(r'^enrich/unit/run', TestunitRunView.as_view(), name='testunit_run'),
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),
