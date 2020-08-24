@@ -691,17 +691,22 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
      
         # (1) Find all the manuscripts in this XML document (use ecodex) 
         # This is the highest "c" level, there is at least one level "c" lower
-        # Latin12 (1-3), 14 etc.
+        # Latin 12 (1-3), 14 etc. Maar werkt dit wel? manu_list heeft niet zoveel results
+        #
         manu_list = xmldoc.findall(".//dsc/c/")
         
+        # Go through list of manu's highest level, example: <did>, <custodhist>, <bibliography>, <scope content>, 
+        # <bibliography>, <control access> (3x), <c> (with the sub manuscripts!)
         for manu in manu_list:
-            # if 
-            x = str(manu.getchildren())
-            y = manu.getchildren()
-            z = manu.attrib
-            
+            # x are the underlying tags of the above mentioned tags, for instance <did> with: <unitid> (3x),
+            # <unittitle>, <physdesc>, <langmaterial> and <unitdate>
+            x = str(manu.getchildren()) #  wat doet "str"?
+            y = manu.getchildren() # is dit okay? wat is het verschil?
+            z = manu.attrib 
+            print(z)
+            # Find the manuscripts within the manuscripts? 
             for letter in y:
-                new_list = y.findall(".")    
+                new_list = y.findall('.')   # hier gaat het niet goed  
                 for new in new_list:
                     a = new.getchildren()
 
