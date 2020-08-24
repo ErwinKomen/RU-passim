@@ -27,11 +27,11 @@ from datetime import datetime
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.models import Information
-from passim.enrich.models import Sentence, Speaker, Testunit, Participant
-from passim.enrich.forms import TestunitForm
+from passim.enrich.models import Sentence, Speaker, Testunit, Participant, Testset
+from passim.enrich.forms import TestunitForm, TestsetForm
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails, make_search_list
+from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
 
 # Global debugging 
 bDebug = False
@@ -41,67 +41,109 @@ def enrich_experiment():
 
     sBack = "Experiment has started"
     oErr = ErrHandle()
+    cnt_speakers = 78   # Number of speakers
+    cnt_sentences = 48  # Number of sentences
+    cnt_conditions = 2  # Number of ntype conditions
+    cnt_groupsize = 6   # Number of speakers in one group
+    cnt_round = 4       # Number of rounds of testsets to be created
+
+    # How many testunit items are needed per combination of SpeakerGroup + Ntype?
+    cnt_pertestset = cnt_sentences // (cnt_conditions + 12 // cnt_groupsize )
     try:
         # Remove all previous participant-testunit combinations
         with transaction.atomic():
-            for obj in Participant.objects.all():
-                obj.participant_testunits.clear()
-        sBack = "Previous participant-testunit combinations have been removed"
+            for obj in Testset.objects.all():
+                obj.testset_testunits.clear()
+        sBack = "Previous testset-testunit combinations have been removed"
 
-        # Create 13 sets of 6 speakers
-        speaker_six = []
-        spk = [x.id for x in Speaker.objects.all()]
-        random.shuffle(spk)
-        for spk_idx in range(13):
-            start = spk_idx * 6
-            end = start + 6
-            oSet = spk[start:end]
-            speaker_six.append(oSet)
+        # Create testset for each round
+        for round in range(cnt_round):
 
-        # Create 78 (!) speaker sets of 12 speakers
-        lst_combi = [x for x in it.combinations(speaker_six, 2)]
-        speaker_twelve = []
-        for item in lst_combi: speaker_twelve.append(item[0] + item[1])
-        # Note: speaker_twelve now contains 78 different sets of 12 speakers
+            # Create test-sets: each testset must contain cnt_sentences 
+            testsets = []
+            for i in range(cnt_speakers * cnt_conditions): testsets.append([])
 
-        # Iterate over the speaker_twelve sets
-        pms = []
-        for speaker_ids in speaker_twelve:
-            condition_sets = {}
-            # Iterate over the two conditions
-            for ntype in ['n', 'p']:
-                # Get all the tunits for this combination of speaker/ntype
-                qs = Testunit.objects.filter(speaker__id__in=speaker_ids, ntype=ntype)
-                # Walk them and increment their count
-                tunits = []
-                with transaction.atomic():
-                    for obj in qs:
-                        obj.count = obj.count + 1
-                        tunits.append(obj.id)
+            # Create sets of [cnt_groupsize] speakers
+            speaker_group = []
+            cnt_speakergroup = cnt_speakers // cnt_groupsize
+            spk = [x.id for x in Speaker.objects.all()]
+            random.shuffle(spk)
+            for spk_idx in range(cnt_speakergroup):
+                start = spk_idx * cnt_groupsize
+                end = start + cnt_groupsize
+                oSet = spk[start:end]
+                speaker_group.append(oSet)
 
-                # Create lists of tunit ids
-                tunits = [x.id for x in qs]
-                random.shuffle(tunits)
-                condition_sets[ntype] = tunits
-            # Create 24 lists of 48 tunits
-            for idx in range(24):
-                start = idx * 24
-                end = start + 24
-                # Get 24 'n' and 24 'p'
-                oSet = condition_sets['p'][start:end] + condition_sets['p'][start:end]
-                random.shuffle(oSet)
-                pms.append(oSet)
-        # We now have 156 sets of 48 tunits
-        iStop = 1
-        x = len(pms)
+            # Create speakergroup-pn-sets
+            idx_testset = 0
+            for sg_id, speaker_ids in enumerate(speaker_group):
+                for ntype in ['n', 'p']:
+                    # Get all the tunits for this combination of speaker/ntype
+                    qs = Testunit.objects.filter(speaker__id__in=speaker_ids, ntype=ntype)
+
+                    # ========== DEBUG ===========
+                    #if qs.count() != 288:
+                    #    iStop = 1
+                    # ============================
+
+                    # Walk them and increment their count
+                    tunits = []
+                    with transaction.atomic():
+                        for obj in qs:
+                            obj.count = obj.count + 1
+                            tunits.append(obj.id)
+
+                    # Create one list of tunit ids
+                    tunits = [x.id for x in qs]
+                    random.shuffle(tunits)
+
+                    # Divide this combination of SpeakerGroup + Ntype over the testsets
+                    idx_chunk = 0
+                    while idx_chunk + cnt_pertestset <= len(tunits):
+                        # copy a chunk to the next testset
+                        testset = testsets[idx_testset]
+                        for idx in range(cnt_pertestset):
+                            # ========== DEBUG ===========
+                            # oErr.Status("adding tunit item {} of {}".format(idx_chunk+idx, qs.count()))
+                            # ============================
+
+                            testset.append( tunits[idx_chunk + idx])
+                        # Go to the next testset
+                        idx_testset += 1
+                        if idx_testset >= len(testsets): 
+                            idx_testset = 0
+
+                        # Next chunk 
+                        idx_chunk += cnt_pertestset
+
+            # Shuffle each testset
+            for testset in testsets:
+                random.shuffle(testset)
+ 
+            # We now have 156 sets of 48 tunits: these are the testsets for this particular round
+            with transaction.atomic():
+                for idx, testset in enumerate(testsets):
+                    # Get the testset object for this round
+                    tsobj = Testset.get_testset(round+1, idx+1)
+
+                    # ========== DEBUG ===========
+                    # oErr.Status("round {} testset {}".format(round+1, idx+1))
+                    # ============================
+
+                    # Add testsets to this particular round
+                    qs = Testunit.objects.filter(id__in=testset)
+                    for tunit in qs:
+                        tunit.testsets.add(tsobj)
 
         # Set the message
+        sBack = "Created {} testset rounds".format(cnt_round)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("enrich_experiment")
         sBack = msg
 
     return sBack
+
 
 class TestunitEdit(BasicDetails):
     """Details view of Testunit"""
@@ -121,6 +163,7 @@ class TestunitEdit(BasicDetails):
             {'type': 'plain', 'label': "Speaker",       'value': instance.speaker.name},
             {'type': 'plain', 'label': "Sentence:",     'value': instance.sentence.name, },
             {'type': 'plain', 'label': "N-Type:",       'value': instance.get_ntype_display(), },
+            {'type': 'plain', 'label': "Test units:",   'value': instance.get_testsets() }
  
             ]
         # Return the context we have made
@@ -209,3 +252,108 @@ class TestunitRunView(TestunitListView):
     def add_to_context(self, context, initial):
         context['after_details'] = self.report
         return context
+
+
+class TestsetEdit(BasicDetails):
+    """Details view of Testset"""
+
+    model = Testset
+    mForm = TestsetForm
+    prefix = "tset"
+    title = "Test set Edit"
+    rtype = "json"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Round",       'value': instance.round},
+            {'type': 'plain', 'label': "Number:",     'value': instance.number} 
+            ]
+        # Return the context we have made
+        return context
+
+
+class TestsetDetails(TestsetEdit):
+    """Like Testset Edit, but then html output"""
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        # First get the 'standard' context from TestsetEdit
+        context = super(TestsetDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        # Lists of related objects
+        related_objects = []
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        # List of Testunits contained in this testset
+        testunits = dict(title="Test units in this testset", prefix="tunit")
+        if resizable: testunits['gridclass'] = "resizable"
+
+        rel_list =[]
+        for item in instance.testset_testunits.all().order_by('speaker', 'ntype', 'sentence'):
+            url = reverse('testunit_details', kwargs={'pk': item.id})
+            rel_item = []
+
+            # S: Order in Manuscript
+            add_rel_item(rel_item, index, False, align="right")
+            index += 1
+
+            # Speaker
+            add_rel_item(rel_item, item.speaker.name, False, main=True, link=url)
+
+            # Ntype
+            add_rel_item(rel_item, item.get_ntype_display(), False, link=url)
+
+            # Sentence
+            add_rel_item(rel_item, item.sentence.name, False, link=url)
+
+            # Add this line to the list
+            rel_list.append(rel_item)
+
+        testunits['rel_list'] = rel_list
+
+        testunits['columns'] = [
+            '#',
+            '{}<span>Speaker</span>{}'.format(sort_start, sort_end), 
+            '{}<span title="Ntype is either [P]lain or Lomdard [N]oise">Ntype</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Sentence</span>{}'.format(sort_start, sort_end)
+            ]
+        related_objects.append(testunits)
+
+        # Add all related objects to the context
+        context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
+
+
+class TestsetListView(BasicList):
+    """List Testunits"""
+
+    model = Testset
+    listform = TestsetForm
+    prefix = "tset"
+    new_button = False      
+    order_cols = ['round', 'number', 'testset_testunits__count']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Round',     'order': 'o=1', 'type': 'int', 'field': 'round', 'linkdetails': True},
+        {'name': 'Number',    'order': 'o=2', 'type': 'int', 'field': 'number', 'main': True, 'linkdetails': True},
+        {'name': 'Size',      'order': 'o=3', 'type': 'int', 'custom': 'size', 'linkdetails': True}]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "size":
+            sBack = instance.testset_testunits.count()
+
+        return sBack, sTitle
+

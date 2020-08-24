@@ -76,6 +76,7 @@
                           {% endif %}
                           {% if user.is_superuser %}
                             <li><a href="{% url 'testunit_list' %}">Enrich: test units</a></li>
+                            <li><a href="{% url 'testset_list' %}">Enrich: test sets</a></li>
                           {% endif %}
                         </ul>
                       </li>

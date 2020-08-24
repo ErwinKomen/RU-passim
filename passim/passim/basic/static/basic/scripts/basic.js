@@ -229,6 +229,80 @@ var ru = (function ($, ru) {
       },
 
       /** 
+       *  sortshowDo - perform sorting on this <th> column
+       */
+      sortshowDo: function (el) {
+        var elTable = $(el).closest("table"),
+            elTbody = $(elTable).find("tbody").first(),
+            elTh = $(el).closest("th"),
+            rows = null,
+            sDirection = "desc",
+            elDiv = null,
+            colidx = -1;
+
+        try {
+          // Find out which direction is needed
+          if ($(el).hasClass("fa-sort-down")) sDirection = "asc";
+          // restore direction everywhere in headers
+          $(el).closest("tr").find(".fa.sortshow").each(function (idx, elSort) {
+            $(elSort).removeClass("fa-sort-down");
+            $(elSort).removeClass("fa-sort-up");
+            $(elSort).addClass("fa-sort");
+          });
+          switch (sDirection) {
+            case "asc":
+              $(el).removeClass("fa-sort");
+              $(el).addClass("fa-sort-up");
+              break;
+            case "desc":
+              $(el).removeClass("fa-sort");
+              $(el).addClass("fa-sort-down");
+              break;
+          }
+          // Get the colidx
+          elDiv = $(elTh).find("div[colidx]").first();
+          if ($(elDiv).length > 0) {
+            // Get the column index 0-n
+            colidx = parseInt($(elDiv).attr("colidx"), 10);
+
+            private_methods.sortTable(elTable, colidx, sDirection);
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("sortshowDo", ex);
+        }
+      },
+
+      /** 
+       *  sortTable - sort any table on any colum into any direction
+       */
+      sortTable: function (elTable, colidx, direction) {
+        var rows = $(elTable).find('tbody  tr').get();
+
+        rows.sort(function(a, b) {
+
+          var A = $(a).children('td').eq(colidx).text().toUpperCase();
+          var B = $(b).children('td').eq(colidx).text().toUpperCase();
+
+          switch (direction) {
+            case "desc":
+              if (A < B) { return -1; }
+              else if (A > B) { return 1; }
+              else return 0;
+            case "asc":
+              if (A < B) { return 1; }
+              else if (A > B) { return -1; }
+              else return 0;
+          }
+
+        });
+
+        $.each(rows, function(index, row) {
+          $(elTable).children('tbody').append(row);
+        });
+      },
+
+      /** 
        *  toggle_column - show or hide column
        */
       toggle_column: function (e) {
@@ -1083,6 +1157,12 @@ var ru = (function ($, ru) {
           // Resizable table columns
           $("table.resizable").each(function (idx, el) {
             private_methods.resizableGrid(el);
+          });
+
+          // sortable tables
+          $("table th .sortshow").unbind("click").on("click", function (evt) {
+            var el = $(this);
+            private_methods.sortshowDo(el);
           });
 
         } catch (ex) {

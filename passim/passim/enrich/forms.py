@@ -17,3 +17,10 @@ class TestunitForm(forms.ModelForm):
         model = Testunit
         fields = ['speaker', 'sentence', 'ntype']
 
+
+class TestsetForm(forms.ModelForm):
+
+    class Meta:
+        model = Testset
+        fields = ['round', 'number']
+

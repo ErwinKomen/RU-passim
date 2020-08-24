@@ -439,6 +439,18 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     return qs, order_heads, colnum
 
+def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+    oAdd = dict(value=value)
+    if resizable: oAdd['initial'] = 'small'
+    if title != None: oAdd['title'] = title
+    if align != None: oAdd['align'] = align
+    if link != None: oAdd['link'] = link
+    if main != None: oAdd['main'] = main
+    if draggable != None: oAdd['draggable'] = draggable
+    rel_item.append(oAdd)
+    return True
+
+
 
 # The views that are defined by 'basic'
 

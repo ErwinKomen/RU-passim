@@ -1,9 +1,42 @@
 from django.db import models
+from django.urls import reverse
 LONG_STRING=255
 
 NOISE_TYPE = ( ('p', 'Plain'), ('n', 'Lombard noise'))
 
 # Models for ENRICH
+
+class Testset(models.Model):
+    """One testset contains all tunits for one participant"""
+
+    # [1] The round of this testset (there may be 2-4 rounds)
+    round = models.IntegerField("Round", default=0)
+    # [1] The number of this testset 
+    number = models.IntegerField("Number", default=0)
+
+    def __str__(self):
+        return "{}/{}".format(self.round, self.number)
+
+    def get_testset(round, number):
+        """Get the testset object for the particular round"""
+
+        obj = Testset.objects.filter(round=round, number=number).first()
+        if obj == None:
+            obj = Testset.objects.create(round=round, number=number)
+        return obj
+
+    def get_testunits(self):
+        """Show which testunits I have"""
+
+        html = []
+        for tunit in self.testset_testunits.all().order_by('speaker', 'ntype', 'sentence'):
+            url = reverse('testunit_details', kwargs={'pk': tunit.id})
+            name = "spk {}/ntype {}/snt {}".format(tunit.speaker.name, tunit.get_ntype_display(), tunit.sentence.name)
+            html.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, name))
+        # Combine
+        sBack = "\n".join(html)
+        return sBack
+
 
 class Participant(models.Model):
 
@@ -47,9 +80,21 @@ class Testunit(models.Model):
     count = models.IntegerField("Count", default=0)
 
     # Many-to-many
-    participants = models.ManyToManyField(Participant, related_name="participant_testunits")
-
+    testsets = models.ManyToManyField(Testset, related_name="testset_testunits")
 
     def __str__(self):
         sBack = "{}-{}-{}".format(self.speaker.id, self.sentence.id, self.ntype)
         return sBack
+
+    def get_testsets(self):
+        """Show which testsets I am part of"""
+
+        html = []
+        for testset in self.testsets.all().order_by('round', 'number'):
+            url = reverse('testset_details', kwargs={'pk': testset.id})
+            name = "rnd {}/num {}".format(testset.round, testset.number)
+            html.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, name))
+        # Combine
+        sBack = "\n".join(html)
+        return sBack
+
