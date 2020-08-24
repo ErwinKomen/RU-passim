@@ -693,7 +693,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         # This is the highest "c" level, there is at least one level "c" lower
         # Latin 12 (1-3), 14 etc. Maar werkt dit wel? manu_list heeft niet zoveel results
         #
-        manu_list = xmldoc.findall(".//dsc/c/")
+        manu_list = xmldoc.find("//dsc").getchildren()
         
         # Go through list of manu's highest level, example: <did>, <custodhist>, <bibliography>, <scope content>, 
         # <bibliography>, <control access> (3x), <c> (with the sub manuscripts!)
@@ -704,13 +704,56 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             y = manu.getchildren() # is dit okay? wat is het verschil?
             z = manu.attrib 
             print(z)
-            # Find the manuscripts within the manuscripts? 
-            for letter in y:
-                new_list = y.findall('.')   # hier gaat het niet goed  
-                for new in new_list:
-                    a = new.getchildren()
 
-            pass
+            # Get the shelfmark of this manuscript (assuming this level represents a whole manuscript)
+            unitid = manu.find("./did/unitid[@type='cote']")
+            if unitid != None and unitid != "":
+                # THis is the shelfmark
+                manuidno = unitid.text
+
+                # Create a new Manuscript
+                manu_obj = Manuscript.objects.create()
+                manu_obj.idno = manuidno
+
+                # Get the name of the manuscript - if it exists
+                # E.g: <unittitle>Biblia sacra, pars.</unittitle>
+                unittitle = manu.find("./did/unittitle")
+                if unittitle != None and unittitle != "":
+                    manu_obj.name = unittitle.text
+
+                # Try to get the date, e.g:
+                #   <unitdate normal="1101/1200" era="ce" calendar="gregorian">XIIe siècle</unitdate>
+                unitdate = manu.find("./did/unitdate")
+                if unitdate != None and unitdate != "" and 'normal' in unitdate.attrib:
+                    unitdate_normal = unitdate['attrib']
+                    ardate = unitdate_normal.split("/")
+                    if len(ardate) == 1:
+                        manu_obj.yearstart = int(unitdate_normal)
+                        manu_obj.yearfinish = int(unitdate_normal)
+                    else:
+                        manu_obj.yearstart = int(ardate[0])
+                        manu_obj.yearfinish = int(ardate[1])
+
+
+                # Save the results
+                manu_obj.save()
+
+                # Look for external references
+                for extref in manu.findall("./bibliography/bibref/extref"):
+                    url = extref.attrib.get('href')
+                    if url != None:
+                        # Create new ManuscriptExt
+                        mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
+
+            #did = manu.findall("./did/unitid")
+
+            ## Find the manuscripts within the manuscripts? 
+            #for letter in y:
+            #    new_list = y.findall('.')   # hier gaat het niet goed  
+            #    for new in new_list:
+            #        a = new.getchildren()
+
+            #pass
 
 
             # if 
