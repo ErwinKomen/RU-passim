@@ -41,11 +41,20 @@ def enrich_experiment():
 
     sBack = "Experiment has started"
     oErr = ErrHandle()
+
+    # Define the randomization method
+    method = "pergroup"
+    method = "stochastic"
+    method = "quadro"
+
+    # Other initialisations
     cnt_speakers = 78   # Number of speakers
     cnt_sentences = 48  # Number of sentences
     cnt_conditions = 2  # Number of ntype conditions
     cnt_groupsize = 6   # Number of speakers in one group
+    cnt_maxspeaker = 12
     cnt_round = 4       # Number of rounds of testsets to be created
+    cnt_sentpercond = cnt_sentences // cnt_conditions
 
     # How many testunit items are needed per combination of SpeakerGroup + Ntype?
     cnt_pertestset = cnt_sentences // (cnt_conditions + 12 // cnt_groupsize )
@@ -61,79 +70,206 @@ def enrich_experiment():
 
             # Create test-sets: each testset must contain cnt_sentences 
             testsets = []
-            for i in range(cnt_speakers * cnt_conditions): testsets.append([])
 
-            # Create sets of [cnt_groupsize] speakers
-            speaker_group = []
-            cnt_speakergroup = cnt_speakers // cnt_groupsize
-            spk = [x.id for x in Speaker.objects.all()]
-            random.shuffle(spk)
-            for spk_idx in range(cnt_speakergroup):
-                start = spk_idx * cnt_groupsize
-                end = start + cnt_groupsize
-                oSet = spk[start:end]
-                speaker_group.append(oSet)
+            if method == "pergroup":
+                # Simple testsets
+                for i in range(cnt_speakers * cnt_conditions): testsets.append([])
 
-            # Create speakergroup-pn-sets
-            idx_testset = 0
-            for sg_id, speaker_ids in enumerate(speaker_group):
-                for ntype in ['n', 'p']:
-                    # Get all the tunits for this combination of speaker/ntype
-                    qs = Testunit.objects.filter(speaker__id__in=speaker_ids, ntype=ntype)
+                # Create sets of [cnt_groupsize] speakers
+                speaker_group = []
+                cnt_speakergroup = cnt_speakers // cnt_groupsize
+                spk = [x.id for x in Speaker.objects.all()]
+                random.shuffle(spk)
+                for spk_idx in range(cnt_speakergroup):
+                    start = spk_idx * cnt_groupsize
+                    end = start + cnt_groupsize
+                    oSet = spk[start:end]
+                    speaker_group.append(oSet)
 
-                    # ========== DEBUG ===========
-                    #if qs.count() != 288:
-                    #    iStop = 1
-                    # ============================
+                # Create speakergroup-pn-sets
+                idx_testset = 0
+                for sg_id, speaker_ids in enumerate(speaker_group):
+                    for ntype in ['n', 'p']:
+                        # Get all the tunits for this combination of speaker/ntype
+                        qs = Testunit.objects.filter(speaker__id__in=speaker_ids, ntype=ntype)
 
-                    # Walk them and increment their count
-                    tunits = []
-                    with transaction.atomic():
-                        for obj in qs:
-                            obj.count = obj.count + 1
-                            tunits.append(obj.id)
+                        # ========== DEBUG ===========
+                        #if qs.count() != 288:
+                        #    iStop = 1
+                        # ============================
 
-                    # Create one list of tunit ids
-                    tunits = [x.id for x in qs]
-                    random.shuffle(tunits)
+                        # Walk them and increment their count
+                        tunits = []
+                        with transaction.atomic():
+                            for obj in qs:
+                                obj.count = obj.count + 1
+                                tunits.append(obj.id)
 
-                    # Divide this combination of SpeakerGroup + Ntype over the testsets
-                    idx_chunk = 0
-                    while idx_chunk + cnt_pertestset <= len(tunits):
-                        # copy a chunk to the next testset
-                        testset = testsets[idx_testset]
-                        for idx in range(cnt_pertestset):
-                            # ========== DEBUG ===========
-                            # oErr.Status("adding tunit item {} of {}".format(idx_chunk+idx, qs.count()))
-                            # ============================
+                        # Create one list of tunit ids
+                        tunits = [x.id for x in qs]
+                        random.shuffle(tunits)
 
-                            testset.append( tunits[idx_chunk + idx])
-                        # Go to the next testset
-                        idx_testset += 1
-                        if idx_testset >= len(testsets): 
-                            idx_testset = 0
+                        # Divide this combination of SpeakerGroup + Ntype over the testsets
+                        idx_chunk = 0
+                        while idx_chunk + cnt_pertestset <= len(tunits):
+                            # copy a chunk to the next testset
+                            testset = testsets[idx_testset]
+                            for idx in range(cnt_pertestset):
+                                # ========== DEBUG ===========
+                                # oErr.Status("adding tunit item {} of {}".format(idx_chunk+idx, qs.count()))
+                                # ============================
 
-                        # Next chunk 
-                        idx_chunk += cnt_pertestset
+                                testset.append( tunits[idx_chunk + idx])
+                            # Go to the next testset
+                            idx_testset += 1
+                            if idx_testset >= len(testsets): 
+                                idx_testset = 0
 
-            # Shuffle each testset
-            for testset in testsets:
-                random.shuffle(testset)
+                            # Next chunk 
+                            idx_chunk += cnt_pertestset
+
+                # Shuffle each testset
+                for testset in testsets:
+                    random.shuffle(testset)
  
-            # We now have 156 sets of 48 tunits: these are the testsets for this particular round
-            with transaction.atomic():
-                for idx, testset in enumerate(testsets):
-                    # Get the testset object for this round
-                    tsobj = Testset.get_testset(round+1, idx+1)
+                # We now have 156 sets of 48 tunits: these are the testsets for this particular round
+                with transaction.atomic():
+                    for idx, testset in enumerate(testsets):
+                        # Get the testset object for this round
+                        tsobj = Testset.get_testset(round+1, idx+1)
 
+                        # ========== DEBUG ===========
+                        # oErr.Status("round {} testset {}".format(round+1, idx+1))
+                        # ============================
+
+                        # Add testsets to this particular round
+                        qs = Testunit.objects.filter(id__in=testset)
+                        for tunit in qs:
+                            tunit.testsets.add(tsobj)
+
+            elif method == "quadro":
+                # Divide groups of 4 titems of one author over testsets
+
+                # Simple testsets
+                for i in range(cnt_speakers * cnt_conditions): testsets.append([])
+                idx_testset = 0
+
+                # Prepare NP-type
+                nptypes_odd = ['n', 'p']
+                nptypes_even = ['p', 'n']
+
+                # Iterate over random speakers
+                lst_spk = [x.id for x in Speaker.objects.all()]
+                random.shuffle(lst_spk)
+                for idx_spk, spk in enumerate(lst_spk):
+                    # Determine the order of NP type
+                    nptypes = nptypes_odd if idx_spk % 2 == 0 else nptypes_even
+                    for ntype in nptypes:
+                        # Determine the set of speaker-nptype
+                        lst_tunit = [x.id for x in Testunit.objects.filter(speaker__id=spk, ntype=ntype)]
+                        # Shuffle these tunit items
+                        random.shuffle(lst_tunit)
+                        # Copy every four of them in consecutive testsets
+                        number = len(lst_tunit) // 4
+                        for idx in range(number):
+                            start = idx * 4
+                            for add in range(4):
+                                testsets[idx_testset].append(lst_tunit[start+add])
+                            # Go to the next testset
+                            idx_testset += 1
+                            if idx_testset >= len(testsets):
+                                idx_testset = 0
+                        
+                # Shuffle each testset
+                for testset in testsets:
+                    random.shuffle(testset)
+ 
+                # We now have 156 sets of 48 tunits: these are the testsets for this particular round
+                with transaction.atomic():
+                    for idx, testset in enumerate(testsets):
+                        # Get the testset object for this round
+                        tsobj = Testset.get_testset(round+1, idx+1)
+
+                        # ========== DEBUG ===========
+                        oErr.Status("round {} testset {}".format(round+1, idx+1))
+                        # ============================
+
+                        # Add testsets to this particular round
+                        qs = Testunit.objects.filter(id__in=testset)
+                        for tunit in qs:
+                            tunit.testsets.add(tsobj)
+
+            elif method == "stochastic":
+                # Smart testsets
+                for i in range(cnt_speakers * cnt_conditions): 
+                    oSet = dict(items=[], speaker=[], sentence={}, ntype=dict(n=0,p=0))
+                    testsets.append(oSet)
+
+                # Randomize the titems
+                titems = [x for x in Testunit.objects.all()]
+                random.shuffle(titems)
+
+                # Walk all test unitsl
+                for idx, tunit in enumerate(titems):
                     # ========== DEBUG ===========
-                    # oErr.Status("round {} testset {}".format(round+1, idx+1))
+                    if idx % 100 == 0:
+                        oErr.Status("Round {}, Working on tunit={}".format(round+1, idx+1))
                     # ============================
 
-                    # Add testsets to this particular round
-                    qs = Testunit.objects.filter(id__in=testset)
-                    for tunit in qs:
-                        tunit.testsets.add(tsobj)
+                    tunit_id = tunit.id
+                    speaker_id = tunit.speaker.id
+                    sentence_id = tunit.sentence.id
+                    ntype = tunit.ntype
+                    # Find the first testset where this fits
+                    bFound = False
+                    bSentence = False
+                    while not bFound:
+                        for testset in testsets:
+                            speakers = testset['speaker']
+                            if len(speakers) < cnt_maxspeaker or speaker_id in speakers:
+                                # Speakers are okay; get the number of sentence_id occurrances
+                                num_sent_id = testset['sentence'].get(sentence_id, 0)
+                                #sentences = testset['sentence']
+                                #if bSentence or not sentence_id in sentences:
+                                if num_sent_id < 2:
+                                    # Sentences are okay
+                                    ntype_n = testset['ntype']['n']
+                                    ntype_p = testset['ntype']['p']
+                                    if (ntype == "n" and ntype_n < cnt_sentpercond) or (ntype == "p" and ntype_p < cnt_sentpercond):
+                                        # Ntype is okay - add it
+                                        testset['items'].append(tunit_id)
+                                        # Bookkeeping
+                                        if speaker_id not in speakers:
+                                            testset['speaker'].append(speaker_id)
+                                        # if sentence_id not in sentences:
+                                        testset['sentence'][sentence_id] = num_sent_id + 1
+                                        testset['ntype'][ntype] += 1
+                                        bFound = True
+                                        break
+                        if not bFound:
+                            left_n = [x for x in testsets if x['ntype'][ntype] < 24]
+                            left_sp = [x for x in left_n if len(x['speaker']) < 12 or speaker_id in x['speaker'] ]
+                            left_snt = [x for x in left_sp if len(x['sentence']) < 48 or  sentence_id in x['sentence'] ]
+                            bSentence = True
+                # Shuffle each testset
+                for testset in testsets:
+                    random.shuffle(testset['items'])
+ 
+                # We now have 156 sets of 48 tunits: these are the testsets for this particular round
+                with transaction.atomic():
+                    for idx, testset in enumerate(testsets):
+                        # Get the testset object for this round
+                        tsobj = Testset.get_testset(round+1, idx+1)
+
+                        # ========== DEBUG ===========
+                        # oErr.Status("round {} testset {}".format(round+1, idx+1))
+                        # ============================
+
+                        # Add testsets to this particular round
+                        qs = Testunit.objects.filter(id__in=testset['items'])
+                        for tunit in qs:
+                            tunit.testsets.add(tsobj)
+
 
         # Set the message
         sBack = "Created {} testset rounds".format(cnt_round)
@@ -247,6 +383,7 @@ class TestunitRunView(TestunitListView):
 
     def initializations(self):
         self.report = enrich_experiment();
+        self.redirectpage = reverse('testunit_list')
         return None
 
     def add_to_context(self, context, initial):

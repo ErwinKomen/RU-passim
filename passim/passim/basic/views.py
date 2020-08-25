@@ -940,7 +940,7 @@ class BasicDetails(DetailView):
     basic_name_prefix = ""
     basic_add = ""
     add_text = "Add a new"
-    permission = "write"    # Permission can be: (nothing), "read" and "write"
+    permission = "read"     # Permission can be: (nothing), "read" and "write"
     new_button = False
     do_not_save = False
     no_delete = False
