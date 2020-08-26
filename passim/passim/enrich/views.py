@@ -12,6 +12,7 @@ from django.db.models.query import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
@@ -282,6 +283,39 @@ def enrich_experiment():
         sBack = msg
 
     return sBack
+
+@csrf_exempt
+def get_testsets(request):
+    """Get a list of testunits per testset of one round"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        qd = request.GET if request.method == "GET" else request.POST
+        if request.is_ajax():
+            round = qd.get("round", "")
+            lstQ = []
+            lstQ.append(Q(testset__round=round))
+            items = TestsetUnit.objects.filter(*lstQ).order_by("testset__number").values(
+                'testset__round', 'testset__number', 'testunit__speaker__name', 
+                'testunit__sentence__name', 'testunit__ntype')
+            results = []
+            for idx, obj in enumerate(items):
+                number = obj.get('testset__number')           
+                speaker = obj.get('testunit__speaker__name')  
+                sentence = obj.get('testunit__sentence__name')
+                ntype = "Lom" if obj.get('testunit__ntype') == "n" else "Nat"
+                co_json = {'idx': idx+1, 'testset': number, 'speaker': speaker, 'sentence': sentence, 'ntype': ntype }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
 
 
 class TestunitEdit(BasicDetails):
