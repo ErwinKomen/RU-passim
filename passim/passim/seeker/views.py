@@ -6957,6 +6957,7 @@ class CollPrivDetails(CollAnyEdit):
         resizable = True
         index = 1
         sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
         sort_end = '</span>'
 
         # Action depends on instance.type: M/S/SG/SSG
@@ -6964,6 +6965,7 @@ class CollPrivDetails(CollAnyEdit):
             # Get all non-template manuscripts part of this PD
             manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
             if resizable: manuscripts['gridclass'] = "resizable dragdrop"
+            manuscripts['savebuttons'] = self.get_savebuttons(instance)
 
             lstQ.append(Q(collections=instance))
             lstQ.append(Q(mtype="man"))
@@ -7003,12 +7005,12 @@ class CollPrivDetails(CollAnyEdit):
             manuscripts['rel_list'] = rel_list
 
             manuscripts['columns'] = [
-                'Order',
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
                 '{}<span title="City/Library/Shelfmark">Shelfmark</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Name">Name</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Sermons in this manuscript">sermons</span>{}'.format(sort_start, sort_end),
+                '{}<span title="Date range">date</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span title="Sermons in this manuscript">sermons</span>{}'.format(sort_start_int, sort_end),
                 ''
                 ]
             related_objects.append(manuscripts)
@@ -7036,7 +7038,7 @@ class CollPrivDetails(CollAnyEdit):
                 add_one_item(rel_item, self.get_field_value("sermo", item, "signature"), False)
 
                 # S: Inc+Expl
-                add_one_item(rel_item, self.get_field_value("sermo", item, "incexpl"), False)
+                add_one_item(rel_item, self.get_field_value("sermo", item, "incexpl"), resizable)
 
                 # S: Manuscript
                 add_one_item(rel_item, self.get_field_value("sermo", item, "manuscript"), False)
@@ -7052,12 +7054,12 @@ class CollPrivDetails(CollAnyEdit):
             
             sermons['rel_list'] = rel_list
             sermons['columns'] = [
-                'Order',
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
                 '{}<span title="Attributed author">Author</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Manuscript shelfmark">Manuscript</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Location within the manuscript">Locus</span>{}'.format(sort_start, sort_end),
+                '{}<span title="Location within the manuscript">Locus</span>{}'.format(sort_start_int, sort_end),
                 ''
                 ]
             related_objects.append(sermons)
@@ -7088,7 +7090,7 @@ class CollPrivDetails(CollAnyEdit):
                 add_one_item(rel_item, self.get_field_value("gold", item, "code"), False)
 
                 # G: Inc/Expl
-                add_one_item(rel_item, self.get_field_value("gold", item, "incexpl"), False)
+                add_one_item(rel_item, self.get_field_value("gold", item, "incexpl"), resizable)
 
                 # G: Editions
                 add_one_item(rel_item, self.get_field_value("gold", item, "edition"), False)
@@ -7101,7 +7103,7 @@ class CollPrivDetails(CollAnyEdit):
             
             goldsermons['rel_list'] = rel_list
             goldsermons['columns'] = [
-                'Order',
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
                 '{}<span title="Associated author">Author</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
@@ -7137,7 +7139,7 @@ class CollPrivDetails(CollAnyEdit):
                 add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
 
                 # SSG: Inc/Expl
-                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), False)
+                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), resizable)
 
                 # SSG: Size (number of SG in equality set)
                 add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
@@ -7150,12 +7152,12 @@ class CollPrivDetails(CollAnyEdit):
             
             supers['rel_list'] = rel_list
             supers['columns'] = [
-                'Order',
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
                 '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start_int, sort_end), 
                 ''
                 ]
             related_objects.append(supers)
@@ -7167,11 +7169,43 @@ class CollPrivDetails(CollAnyEdit):
 
     def get_actions(self):
         html = []
-        html.append("<span class='blinded'><a href='#' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
-        html.append("<a href='#'><span class='glyphicon glyphicon-arrow-down'></span></a>")
-        html.append("<a href='#'><span class='glyphicon glyphicon-remove'></span></a>")
+        buttons = ['remove']    # This contains all the button names that need to be added
+
+        # Start the whole spane
+        html.append("<span class='blinded'>")
+        
+        # Add components
+        if 'up' in buttons: 
+            html.append("<a class='related-up' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
+        if 'down' in buttons: 
+            html.append("<a class='related-down'><span class='glyphicon glyphicon-arrow-down'></span></a>")
+        if 'remove' in buttons: 
+            html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
+
+        # Finish up the span
         html.append("&nbsp;</span>")
+
+        # COmbine the list into a string
         sHtml = "\n".join(html)
+        # Return out HTML string
+        return sHtml
+
+    def get_savebuttons(self, instance):
+        html = []
+
+        # Canceling: refresh the details view
+        url = reverse('collpriv_details', kwargs={'pk': instance.id})
+        html.append('<a class="btn btn-xs jumbo-1" title="Cancel changes" href="{}">Cancel</a>'.format(url))
+
+        # Saving: adapt the elements
+        html.append('<a class="btn btn-xs jumbo-4" title="Save changes">Save</a>')
+
+        # Saving as: save changes to a new Collection of settype = 'pd' and scope = 'priv'
+        html.append('<a class="btn btn-xs jumbo-4" title="Save revision as a new personal dataset">Save as...</a>')
+
+        # COmbine the list into a string
+        sHtml = "\n".join(html)
+        # Return out HTML string
         return sHtml
 
     def get_field_value(self, type, instance, custom):

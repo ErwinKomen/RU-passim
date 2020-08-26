@@ -139,7 +139,13 @@
             {% for related in related_objects %}
               <div class="row" id="basic_{{related.prefix}}_set">
                 <div class="col-md-12">
-                  <h4>{{related.title}}</h4>
+                  <h4>
+                    <span>{{related.title}}</span>
+                    <span class="hidden related-save pull-right">
+                      <span style="font-size: x-small;"><i>(Changes are not yet saved, and not reflected above)</i></span>
+                      {% if related.savebuttons %}{{related.savebuttons|safe}}{% endif %}
+                    </span>
+                  </h4>
 
                   <!-- Check if there is any contents -->
                   {% if related.rel_list|length == 0 %}
@@ -168,15 +174,6 @@
                       </thead>
                       <tbody>
                         {% for relrow in related.rel_list %}
-                          {% if 'dragdrop' in related.gridclass %}
-                            <!-- Horizontal ruler that can be expanded -->
-                            <tr style="font-size: 1px;" class="">
-                              <td class="ruler ruler_white"
-                                  ondragover="ru.basic.related_dragenter(event);" ondragenter="ru.basic.related_dragenter(event);" 
-                                  ondragleave="ru.basic.related_dragleave(event);" ondrop="ru.basic.related_drop(event);" ></td>
-                              <td class="ruler" colspan="{{related.columns|length|add:'-1'}}" style="background-color: white;"></td>
-                            </tr>
-                          {% endif %}
 
                           <tr class="form-row">
                             <!-- Counter-->
@@ -189,6 +186,11 @@
                                          {% if relcol.draggable %}draggable{% endif %}"
                                   {% if relcol.align %}align="{{relcol.align}}"{% endif %}
                                   {% if relcol.draggable %}draggable="true"{% endif %}
+                                  {% if relcol.draggable %}
+                                    ondragstart="ru.basic.related_drag(event);" 
+                                    ondragover="ru.basic.related_dragover(event);" 
+                                    ondrop="ru.basic.related_drop(event);"
+                                  {% endif %}
                                   style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
                                   >
                                 {% if relcol.value %}

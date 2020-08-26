@@ -31,3 +31,7 @@
 td.ruler {
     padding: 0px !important;
 }
+
+.related-remove {
+    cursor: pointer;
+}
