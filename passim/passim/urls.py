@@ -260,6 +260,7 @@ urlpatterns = [
     url(r'^enrich/set/list', TestsetListView.as_view(), name='testset_list'),
     url(r'^enrich/set/details(?:/(?P<pk>\d+))?/$', TestsetDetails.as_view(), name='testset_details'),
     url(r'^enrich/set/edit(?:/(?P<pk>\d+))?/$', TestsetEdit.as_view(), name='testset_edit'),
+    url(r'^enrich/download', TestsetDownload.as_view(), name='testset_results'),
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),

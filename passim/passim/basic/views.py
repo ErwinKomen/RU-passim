@@ -496,6 +496,7 @@ class BasicList(ListView):
     use_team_group = False
     admin_editable = False
     permission = True
+    redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
     qs = None
@@ -796,7 +797,6 @@ class BasicList(ListView):
         return fields, None, None
   
     def get_queryset(self, request = None):
-        self.initializations()
 
         if request == None: request = self.request
         # Get the parameters passed on with the GET or the POST request
@@ -916,6 +916,18 @@ class BasicList(ListView):
         # Return the resulting filtered and sorted queryset
         self.qs = qs
         return qs
+
+    def get(self, request, *args, **kwargs):
+        # FIrst do my own initializations
+        self.initializations()
+        # Then check if we have a redirect or not
+        if self.redirectpage == "":
+            # We can continue with the normal 'get()'
+            response = super(BasicList, self).get(request, *args, **kwargs)
+        else:
+            response = redirect(self.redirectpage)
+        # REturn the appropriate response
+        return response
 
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)

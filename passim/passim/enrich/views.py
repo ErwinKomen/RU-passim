@@ -18,20 +18,22 @@ from django.views.generic import ListView, View
 
 import json
 import fnmatch
-import os
+import os, csv
 import random
 import itertools as it
+from io import StringIO
 from datetime import datetime
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.models import Information
-from passim.enrich.models import Sentence, Speaker, Testunit, Participant, Testset
+from passim.enrich.models import Sentence, Speaker, Testunit, Participant, Testset, TestsetUnit
 from passim.enrich.forms import TestunitForm, TestsetForm
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.seeker.views import BasicPart
 
 # Global debugging 
 bDebug = False
@@ -197,7 +199,8 @@ def enrich_experiment():
                         # Add testsets to this particular round
                         qs = Testunit.objects.filter(id__in=testset)
                         for tunit in qs:
-                            tunit.testsets.add(tsobj)
+                            # tunit.testsets.add(tsobj)
+                            TestsetUnit.objects.create(testunit=tunit, testset=tsobj)
 
             elif method == "stochastic":
                 # Smart testsets
@@ -485,6 +488,10 @@ class TestsetListView(BasicList):
         {'name': 'Round',     'order': 'o=1', 'type': 'int', 'field': 'round', 'linkdetails': True},
         {'name': 'Number',    'order': 'o=2', 'type': 'int', 'field': 'number', 'main': True, 'linkdetails': True},
         {'name': 'Size',      'order': 'o=3', 'type': 'int', 'custom': 'size', 'linkdetails': True}]
+    downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'testset_results'},
+                 {"label": "csv (tab-separated)", "dtype": "csv", "url": 'testset_results'},
+                 {"label": None},
+                 {"label": "json", "dtype": "json", "url": 'testset_results'}]
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -493,4 +500,71 @@ class TestsetListView(BasicList):
             sBack = instance.testset_testunits.count()
 
         return sBack, sTitle
+
+
+class TestsetDownload(BasicPart):
+    MainModel = Testset
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_queryset(self, prefix):
+
+        # Construct the QS
+        qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
+            'testset__round', 'testset__number', 'testunit__speaker__name', 
+            'testunit__sentence__name', 'testunit__ntype')
+
+        return qs
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop over all round/number combinations (testsets)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = dict(round=round, testset=number, speaker=speaker,
+                    sentence=sentence, ntype=ntype)
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData, indent=2)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = [round, number, speaker, sentence, ntype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
 

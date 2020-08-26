@@ -80,7 +80,7 @@ class Testunit(models.Model):
     count = models.IntegerField("Count", default=0)
 
     # Many-to-many
-    testsets = models.ManyToManyField(Testset, related_name="testset_testunits")
+    testsets = models.ManyToManyField(Testset, related_name="testset_testunits", through="TestsetUnit")
 
     def __str__(self):
         sBack = "{}-{}-{}".format(self.speaker.id, self.sentence.id, self.ntype)
@@ -97,4 +97,13 @@ class Testunit(models.Model):
         # Combine
         sBack = "\n".join(html)
         return sBack
+
+
+class TestsetUnit(models.Model):
+    """This is the 'through' table for combinations of testset/testunit"""
+
+    # [1] Obligatory link to testset
+    testset = models.ForeignKey(Testset, related_name="testsetunits", on_delete=models.CASCADE)
+    # [1] Obligatory link to testunit
+    testunit = models.ForeignKey(Testunit, related_name="testsetunits", on_delete=models.CASCADE)
 
