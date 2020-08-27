@@ -111,6 +111,7 @@ app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
+enrich_editor = "enrich_editor"
 
 
 def treat_bom(sHtml):
@@ -531,6 +532,7 @@ def home(request):
                 'site_url': admin.site.site_url}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
     context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
@@ -6950,6 +6952,13 @@ class CollPrivDetails(CollAnyEdit):
             rel_item.append(oAdd)
             return True
 
+        def check_order(qs):
+            with transaction.atomic():
+                for idx, obj in enumerate(qs):
+                    if obj.order < 0:
+                        obj.order = idx + 1
+                        obj.save()
+
         # All PDs: show the content
         related_objects = []
         lstQ = []
@@ -6967,17 +6976,24 @@ class CollPrivDetails(CollAnyEdit):
             if resizable: manuscripts['gridclass'] = "resizable dragdrop"
             manuscripts['savebuttons'] = self.get_savebuttons(instance)
 
-            lstQ.append(Q(collections=instance))
-            lstQ.append(Q(mtype="man"))
-            qs_manu = Manuscript.objects.filter(*lstQ).order_by(
-                'id').distinct().order_by('lcity__name', 'library__name', 'idno')
+            # Check ordering
+            qs_manu = instance.manuscript_col.all().order_by(
+                    'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
+            check_order(qs_manu)
 
-            for item in qs_manu:
+            #lstQ.append(Q(collections=instance))
+            #lstQ.append(Q(mtype="man"))
+            #qs_manu = Manuscript.objects.filter(*lstQ).order_by(
+            #    'id').distinct().order_by('manuscript_col__order', 'lcity__name', 'library__name', 'idno')
+
+            for obj in qs_manu:
                 rel_item = []
+                item = obj.manuscript
 
                 # S: Order in Manuscript
-                add_one_item(rel_item, index, False, align="right", draggable=True)
-                index += 1
+                #add_one_item(rel_item, index, False, align="right", draggable=True)
+                #index += 1
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
                 # Shelfmark = IDNO
                 add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
@@ -7020,16 +7036,21 @@ class CollPrivDetails(CollAnyEdit):
             sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
             if resizable: sermons['gridclass'] = "resizable"
 
-            qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
-                'author__name', 'siglist', 'srchincipit', 'srchexplicit')
+            #qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
+            #    'sermondescr_col__order', 'author__name', 'siglist', 'srchincipit', 'srchexplicit')
+            qs_sermo = instance.sermondescr_col.all().order_by(
+                    'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
+            check_order(qs_sermo)
 
             # Walk these collection sermons
-            for item in qs_sermo:
+            for obj in qs_sermo:
                 rel_item = []
+                item = obj.sermon
 
-                # S: Order in Manuscript
-                add_one_item(rel_item, index, False, align="right")
-                index += 1
+                # S: Order in Sermon
+                #add_one_item(rel_item, index, False, align="right")
+                #index += 1
+                add_one_item(rel_item, obj.order, False, align="right")
 
                 # S: Author
                 add_one_item(rel_item, self.get_field_value("sermo", item, "author"), False, main=True)
@@ -7069,16 +7090,21 @@ class CollPrivDetails(CollAnyEdit):
             goldsermons = dict(title="Gold sermons within this dataset", prefix="sermo")
             if resizable: goldsermons['gridclass'] = "resizable"
 
-            qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
-                'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
+            #qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
+            #    'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
+            qs_sermo = instance.gold_col.all().order_by(
+                    'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
+            check_order(qs_sermo)
 
             # Walk these collection sermons
-            for item in qs_sermo:
+            for obj in qs_sermo:
                 rel_item = []
+                item = obj.gold
 
-                # G: Order in Manuscript
-                add_one_item(rel_item, index, False, align="right")
-                index += 1
+                # G: Order in Gold
+                #add_one_item(rel_item, index, False, align="right")
+                #index += 1
+                add_one_item(rel_item, obj.order, False, align="right")
 
                 # G: Author
                 add_one_item(rel_item, self.get_field_value("gold", item, "author"), False,main=True)
@@ -7118,16 +7144,22 @@ class CollPrivDetails(CollAnyEdit):
             supers = dict(title="Super sermons gold within this dataset", prefix="sermo")
             if resizable: supers['gridclass'] = "resizable"
 
-            qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
-                'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
+            #qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
+            #    'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
+            qs_sermo = instance.super_col.all().order_by(
+                    'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
+            check_order(qs_sermo)
+
 
             # Walk these collection sermons
-            for item in qs_sermo:
+            for obj in qs_sermo:
                 rel_item = []
+                item = obj.super
 
                 # SSG: Order in Manuscript
-                add_one_item(rel_item, index, False, align="right")
-                index += 1
+                #add_one_item(rel_item, index, False, align="right")
+                #index += 1
+                add_one_item(rel_item, obj.order, False, align="right")
 
                 # SSG: Author
                 add_one_item(rel_item, self.get_field_value("super", item, "author"), False, main=True)

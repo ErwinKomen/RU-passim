@@ -2,7 +2,7 @@ from django.db import models
 from django.urls import reverse
 LONG_STRING=255
 
-NOISE_TYPE = ( ('p', 'Plain'), ('n', 'Lombard noise'))
+NOISE_TYPE = ( ('p', 'Natural'), ('n', 'Lombard noise'))
 
 # Models for ENRICH
 
@@ -52,7 +52,7 @@ class Participant(models.Model):
 class Speaker(models.Model):
 
     # [1] The name of the speaker
-    name = models.CharField("Name", max_length=LONG_STRING)
+    name = models.CharField("Name or number code", max_length=LONG_STRING)
 
     def __str__(self):
         return self.name
@@ -76,7 +76,9 @@ class Testunit(models.Model):
     sentence = models.ForeignKey(Sentence, on_delete=models.CASCADE)
     # [1] ANd it is one variant: 'p' (plain) or 'n' (noise)
     ntype = models.CharField("Noise type type", choices=NOISE_TYPE, max_length=5)
+
     # [0-1] The number of times this testunit has been used by participants
+    #       (This field has not been used yet)
     count = models.IntegerField("Count", default=0)
 
     # Many-to-many
@@ -96,6 +98,33 @@ class Testunit(models.Model):
             html.append("<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, name))
         # Combine
         sBack = "\n".join(html)
+        return sBack
+
+    def get_filename(self):
+        """Construct a filename and return it
+        
+        Documentation says that the directory structure and file names follow the template: 
+
+            ENRICH/Radboud Lombard Corpus_Dutch/1_Lom/1_F1_Lom.wav
+        """
+
+        ntype = "Lom" if self.ntype == "n" else "Nat"
+        # We only return the last part of the filename
+        sBack = "{}_{}_{}.wav".format(self.speaker.name, self.sentence.name, ntype)
+        return sBack
+
+    def get_filename_html(self):
+        """Get the filename in a nice HTML look"""
+
+        filename = self.get_filename()
+        sBack = "<span class='badge signature gr'>{}</span>".format(filename)
+        return sBack
+
+    def get_ntype_html(self):
+
+        ntype = "Lom" if self.ntype == "n" else "Nat"
+        cls = "ot" if self.ntype == "n" else "gr"
+        sBack = "<span class='signature {}'>{}<span>".format(cls,ntype)
         return sBack
 
 

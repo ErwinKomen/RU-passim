@@ -252,6 +252,14 @@ urlpatterns = [
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================
+    url(r'^enrich/speaker/list', SpeakerListView.as_view(), name='speaker_list'),
+    url(r'^enrich/speaker/details(?:/(?P<pk>\d+))?/$', SpeakerDetails.as_view(), name='speaker_details'),
+    url(r'^enrich/speaker/edit(?:/(?P<pk>\d+))?/$', SpeakerEdit.as_view(), name='speaker_edit'),
+
+    url(r'^enrich/sentence/list', SentenceListView.as_view(), name='sentence_list'),
+    url(r'^enrich/sentence/details(?:/(?P<pk>\d+))?/$', SentenceDetails.as_view(), name='sentence_details'),
+    url(r'^enrich/sentence/edit(?:/(?P<pk>\d+))?/$', SentenceEdit.as_view(), name='sentence_edit'),
+
     url(r'^enrich/unit/list', TestunitListView.as_view(), name='testunit_list'),
     url(r'^enrich/unit/details(?:/(?P<pk>\d+))?/$', TestunitDetails.as_view(), name='testunit_details'),
     url(r'^enrich/unit/edit(?:/(?P<pk>\d+))?/$', TestunitEdit.as_view(), name='testunit_edit'),

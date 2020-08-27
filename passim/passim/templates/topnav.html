@@ -81,6 +81,20 @@
                         </ul>
                       </li>
 
+                      {% if is_enrich_editor %}
+                        <li class="dropdown">
+                          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                             aria-haspopup="true" aria-expanded="false">Enrich<span class="caret"></span></a>
+                        
+                         <ul class="dropdown-menu">
+                            <li><a href="{% url 'speaker_list' %}">Speakers</a></li>
+                            <li><a href="{% url 'sentence_list' %}">Sentences</a></li>
+                            <li><a href="{% url 'testunit_list' %}" title="A unit combines speaker/sentence/variety">Test units</a></li>
+                            <li><a href="{% url 'testset_list' %}" title="Four rounds of 156 testsets">Test sets</a></li>
+                          </ul>
+                        </li>
+                      {% endif %}
+
                       {% if is_app_uploader %}
                         <li class="dropdown">
                           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 

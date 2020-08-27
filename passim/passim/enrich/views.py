@@ -30,7 +30,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.models import Information
 from passim.enrich.models import Sentence, Speaker, Testunit, Participant, Testset, TestsetUnit
-from passim.enrich.forms import TestunitForm, TestsetForm
+from passim.enrich.forms import TestunitForm, TestsetForm, SpeakerForm, SentenceForm
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
@@ -38,6 +38,8 @@ from passim.seeker.views import BasicPart
 
 # Global debugging 
 bDebug = False
+
+enrich_editor = "enrich_editor"
 
 def enrich_experiment():
     """RUn a complete experiment"""
@@ -284,6 +286,23 @@ def enrich_experiment():
 
     return sBack
 
+def user_is_ingroup(request, sGroup):
+    # Is this user part of the indicated group?
+    user = User.objects.filter(username=request.user.username).first()
+
+    # Only look at group if the user is known
+    if user == None:
+        glist = []
+    else:
+        glist = [x.name for x in user.groups.all()]
+
+        # Only needed for debugging
+        if bDebug:
+            ErrHandle().Status("User [{}] is in groups: {}".format(user, glist))
+    # Evaluate the list
+    bIsInGroup = (sGroup in glist)
+    return bIsInGroup
+
 @csrf_exempt
 def get_testsets(request):
     """Get a list of testunits per testset of one round"""
@@ -318,6 +337,98 @@ def get_testsets(request):
 
 
 
+class SpeakerEdit(BasicDetails):
+    """Details view of Speaker"""
+
+    model = Speaker
+    mForm = SpeakerForm
+    prefix = "spk"
+    title = "Speaker"
+    rtype = "json"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Id",    'value': instance.id},
+            {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'} 
+            ]
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
+        # Return the context we have made
+        return context
+
+
+class SpeakerDetails(SpeakerEdit):
+    """Like Speaker Edit, but then html output"""
+    rtype = "html"
+
+
+class SpeakerListView(BasicList):
+    """List Speakers"""
+
+    model = Speaker
+    listform = SpeakerForm
+    prefix = "spk"
+    new_button = False              # Don't allow adding new speakers right now     
+    order_cols = ['id', 'name']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Id',      'order': 'o=1', 'type': 'int', 'field': 'id',   'linkdetails': True},
+        {'name': 'Name',    'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True}]
+
+    def add_to_context(self, context, initial):
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
+        return context
+
+
+class SentenceEdit(BasicDetails):
+    """Details view of Sentence"""
+
+    model = Sentence
+    mForm = SentenceForm
+    prefix = "spk"
+    title = "Sentence"
+    rtype = "json"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Id",    'value': instance.id},
+            {'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': 'name'} 
+            ]
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
+        # Return the context we have made
+        return context
+
+
+class SentenceDetails(SentenceEdit):
+    """Like Sentence Edit, but then html output"""
+    rtype = "html"
+
+
+class SentenceListView(BasicList):
+    """List Sentences"""
+
+    model = Sentence
+    listform = SentenceForm
+    prefix = "spk"
+    new_button = False              # Don't allow adding new speakers right now     
+    order_cols = ['id', 'name']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Id',      'order': 'o=1', 'type': 'int', 'field': 'id',   'linkdetails': True},
+        {'name': 'Name',    'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True}]
+
+    def add_to_context(self, context, initial):
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
+        return context
+
+
 class TestunitEdit(BasicDetails):
     """Details view of Testunit"""
 
@@ -335,10 +446,11 @@ class TestunitEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Speaker",       'value': instance.speaker.name},
             {'type': 'plain', 'label': "Sentence:",     'value': instance.sentence.name, },
-            {'type': 'plain', 'label': "N-Type:",       'value': instance.get_ntype_display(), },
-            {'type': 'plain', 'label': "Test units:",   'value': instance.get_testsets() }
- 
+            {'type': 'safe',  'label': "N-Type:",       'value': instance.get_ntype_html(), },
+            {'type': 'plain', 'label': "Test units:",   'value': instance.get_testsets() },
+            {'type': 'safe',  'label': "Filename:",     'value': instance.get_filename_html() } 
             ]
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
         # Return the context we have made
         return context
 
@@ -407,9 +519,7 @@ class TestunitListView(BasicList):
         return sBack, sTitle
 
     def add_to_context(self, context, initial):
-        ## Add a button to start experiment
-        #template_name = "enrich/experiment.html"
-        #context['after_details'] = render_to_string(template_name, context, self.request)
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
         return context
 
 
@@ -446,6 +556,7 @@ class TestsetEdit(BasicDetails):
             {'type': 'plain', 'label': "Round",       'value': instance.round},
             {'type': 'plain', 'label': "Number:",     'value': instance.number} 
             ]
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
         # Return the context we have made
         return context
 
@@ -534,6 +645,10 @@ class TestsetListView(BasicList):
             sBack = instance.testset_testunits.count()
 
         return sBack, sTitle
+
+    def add_to_context(self, context, initial):
+        context['is_enrich_editor'] = user_is_ingroup(self.request, enrich_editor)
+        return context
 
 
 class TestsetDownload(BasicPart):

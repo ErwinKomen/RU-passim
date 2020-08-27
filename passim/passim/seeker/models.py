@@ -6966,36 +6966,48 @@ class NewsItem(models.Model):
 
 
 class CollectionSerm(models.Model):
-    """The link between a collection item and a sermon"""
+    """The link between a collection item and a S (sermon)"""
+
     # [1] The sermon to which the collection item refers
     sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionMan(models.Model):
-    """The link between a collection item and a manuscript"""
+    """The link between a collection item and a M (manuscript)"""
+
     # [1] The manuscript to which the collection item refers
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "manuscript_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionGold(models.Model):
-    """The link between a collection item and a gold sermon"""
+    """The link between a collection item and a SG (gold sermon)"""
+
     # [1] The gold sermon to which the collection item refers
     gold = models.ForeignKey(SermonGold, related_name = "gold_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "gold_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionSuper(models.Model):
-    """The link between a collection item and a gold sermon"""
+    """The link between a collection item and a SSG (super sermon gold)"""
+
     # [1] The gold sermon to which the coll
     # ection item refers
     super = models.ForeignKey(EqualGold, related_name = "super_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "super_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class Template(models.Model):
