@@ -1514,11 +1514,26 @@ class Location(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # We need to know whether a location is part of a particular city or country for 'dependent_fields'
+    # [0-1] City according to the 'Location' specification
+    lcity = models.ForeignKey("self", null=True, related_name="lcity_locations")
+    # [0-1] Library according to the 'Location' specification
+    lcountry = models.ForeignKey("self", null=True, related_name="lcountry_locations")
+
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        if self != None:
+            # Check the values for [lcity] and [lcountry]
+            self.lcountry = self.partof_loctype("country")
+            self.lcity = self.partof_loctype("city")
+        # Regular saving
+        response = super(Location, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def get_loc_name(self):
         lname = "{} ({})".format(self.name, self.loctype)
@@ -1607,6 +1622,17 @@ class Location(models.Model):
     def above(self):
         return self.hierarchy(False)
 
+    def partof_loctype(self, loctype):
+        """See which country (if any) I am part of"""
+
+        lcountry = None
+        lst_above = self.hierarchy(False)
+        for obj in lst_above:
+            if obj.loctype.name == loctype:
+                lcountry = obj
+                break
+        return lcountry
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -1643,6 +1669,14 @@ class LocationRelation(models.Model):
     container = models.ForeignKey(Location, related_name="container_locrelations")
     # [1] Obligatory contained
     contained = models.ForeignKey(Location, related_name="contained_locrelations")
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the regular saving
+        response = super(LocationRelation, self).save(force_insert, force_update, using, update_fields)
+        # Check the [contained] element for [lcity] and [lcountry]
+        self.contained.save()
+        # Return the save response
+        return response
 
 
 class Country(models.Model):

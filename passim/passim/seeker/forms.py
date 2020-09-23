@@ -76,7 +76,7 @@ class AutypeWidget(ModelSelect2Widget):
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity_manuscripts'}
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -89,7 +89,7 @@ class CityOneWidget(ModelSelect2Widget):
 class CityMonasteryOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity_manuscripts'}
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -214,7 +214,8 @@ class CollOneHistWidget(CollOneWidget):
 class CountryOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcountry': 'lcountry_manuscripts'}
+    dependent_fields = {'lcity': 'lcity_locations'}
+    # Note: k = form field, v = model field
 
     def label_from_instance(self, obj):
         return obj.name
@@ -385,7 +386,7 @@ class LitrefWidget(ModelSelect2Widget):
 class LibraryOneWidget(ModelSelect2Widget):
     model = Library
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity', 'lcountry': 'lcountry'}
+    dependent_fields = {} # EG: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -2865,6 +2866,14 @@ class ManuscriptForm(PassimModelForm):
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+
+            # Set the dependent fields for [lcity]
+            if self.prefix != "":
+                self.fields['lcity'].widget.dependent_fields = {
+                    '{}-lcountry'.format(self.prefix): 'lcountry'}
+                self.fields['library'].widget.dependent_fields = {
+                    '{}-lcountry'.format(self.prefix): 'lcountry',
+                    '{}-lcity'.format(self.prefix): 'lcity'}
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True

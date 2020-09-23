@@ -8984,6 +8984,25 @@ class ManuscriptListView(BasicList):
                 # Success
                 Information.set_kvalue("msitemcleanup", "done")
 
+        # Check if adding [lcity] and [lcountry] to locations is needed
+        sh_done = Information.get_kvalue("locationcitycountry")
+        if sh_done == None or sh_done == "":
+            with transaction.atomic():
+                for obj in Location.objects.all():
+                    bNeedSaving = False
+                    lcountry = obj.partof_loctype("country")
+                    lcity = obj.partof_loctype("city")
+                    if obj.lcountry == None and lcountry != None:
+                        obj.lcountry = lcountry
+                        bNeedSaving = True
+                    if obj.lcity == None and lcity != None:
+                        obj.lcity = lcity
+                        bNeedSaving = True
+                    if bNeedSaving:
+                        obj.save()
+            # Success
+            Information.set_kvalue("locationcitycountry", "done")
+
         return None
 
     def add_to_context(self, context, initial):
