@@ -1875,18 +1875,19 @@ var ru = (function ($, ru) {
       },
 
       /**
-       * related_dragover
+       * related_dragenter
        *    Dragging one row over other rows
        * See: https://www.therogerlab.com/how-can-i/javascript/reorder-html-table-rows-using-drag-and-drop.html
        *
        */
-      related_dragover: function (ev) {
+      related_dragenter: function (ev) {
         var row = null,
             children = null;
 
         try {
           // Prevend the default behaviour
           ev.preventDefault();
+          // ev.dataTransfer.dropEffect = 'all';
           // Get the row that is stored
           row = loc_relatedRow;
           // We must be going over a TD with the right class
@@ -1901,29 +1902,33 @@ var ru = (function ($, ru) {
               // Target comes before
               ev.target.parentNode.before(row);
             }
+            // Show that changes can/need to be saved
+            $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
           } 
         } catch (ex) {
-          private_methods.errMsg("related_dragover", ex);
+          private_methods.errMsg("related_dragenter", ex);
         }
       },
 
 
-      /**
-       * related_drop
-       *    Indicate that situation has changed and that changes need to be saved
-       *
-       */
-      related_drop: function (ev) {
+      ///**
+      // * related_drop
+      // *    Indicate that situation has changed and that changes need to be saved
+      // *
+      // */
+      //related_drop: function (ev) {
 
-        try {
-          // Show that changes can/need to be saved
-          $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+      //  try {
+      //    // Prevent default handling
+      //    ev.preventDefault();
+      //    // Show that changes can/need to be saved
+      //    $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
-        } catch (ex) {
-          private_methods.errMsg("related_drop", ex);
-        }
-      },
+      //  } catch (ex) {
+      //    private_methods.errMsg("related_drop", ex);
+      //  }
+      //},
 
       /**
        * related_remove

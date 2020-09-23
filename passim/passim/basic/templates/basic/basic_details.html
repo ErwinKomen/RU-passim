@@ -188,8 +188,7 @@
                                   {% if relcol.draggable %}draggable="true"{% endif %}
                                   {% if relcol.draggable %}
                                     ondragstart="ru.basic.related_drag(event);" 
-                                    ondragover="ru.basic.related_dragover(event);" 
-                                    ondrop="ru.basic.related_drop(event);"
+                                    ondragover="ru.basic.related_dragenter(event);" 
                                   {% endif %}
                                   style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
                                   >
