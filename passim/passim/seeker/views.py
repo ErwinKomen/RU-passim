@@ -10334,14 +10334,17 @@ class EqualGoldDetails(EqualGoldEdit):
         if 'goldcopy' in self.qd and context['is_app_editor']:
             # Get the ID of the gold sermon from which information is to be copied to the SSG
             goldid = self.qd['goldcopy']
+            # Also get the simple value
+            simple = self.qd.get("simple", "f")
             # Get the GOLD SERMON instance
             gold = SermonGold.objects.filter(id=goldid).first()
 
             if gold != None:
                 # Copy all relevant information to the EqualGold obj (which as a SSG)
                 obj = self.object
-                # (1) copy author
-                if gold.author != None: obj.author = gold.author
+                if simple == "f":
+                    # (1) copy author - only if not simple
+                    if gold.author != None: obj.author = gold.author
                 # (2) copy incipit
                 if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
                 # (3) copy explicit
