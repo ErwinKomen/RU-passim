@@ -38,6 +38,7 @@ import csv, re
 import requests
 import demjson
 import openpyxl
+import sqlite3
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -519,6 +520,8 @@ def get_previous_page(request, top=False):
     # Return the path
     return prevpage
 
+# ================= STANDARD views =====================================
+
 def home(request):
     """Renders the home page."""
 
@@ -692,6 +695,8 @@ def nlogin(request):
                     'year':get_current_datetime().year,}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
+
+# ================ OTHER VIEW HELP FUNCTIONS ============================
 
 def sync_entry(request):
     """-"""
@@ -1765,6 +1770,123 @@ def do_ssgmigrate(request):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("ssgmigrate")
+        return reverse('home')
+
+def do_huwa(request):
+    """Analyse Huwa SQLite database"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools_huwa.html'
+        # Define the initial context
+        context =  {'title':    'RU-passim-tools',
+                    'year':     get_current_datetime().year,
+                    'pfx':      APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
+
+        # Only passim uploaders can do this
+        if not context['is_app_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Huwa Analysis"
+
+        count_tbl = 0
+        lst_total = []
+
+        # Connect to the Huwa database
+        huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+        with sqlite3.connect(huwa_db) as db:
+            table_info = {}
+            standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+            cursor = db.cursor()
+            db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+            tables = [x[0] for x in db_results]
+
+            count_tbl = len(tables)
+
+            # Walk all tables
+            for table_name in tables:
+                oInfo = {}
+                # Find out what fields this table has
+                db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                fields = []
+                for field in db_results:
+                    field_name = field[1]
+                    fields.append(field_name)
+
+                    field_info = dict(type=field[2],
+                                      not_null=(field[3] == 1),
+                                      default=field[4])
+                    oInfo[field_name] = field_info
+                oInfo['fields'] = fields
+                oInfo['links'] = []
+                table_info[table_name] = oInfo
+
+            # Close the database again
+            cursor.close()
+
+        # Walk the tables again, looking for foreign keys
+        for table_name in tables:
+            oTable = table_info[table_name]
+            # Check if any fields could be FKs
+            for field in oTable['fields']:
+                oInfo = oTable[field]
+                bFK = False
+                if field in tables and oInfo['type'] == "integer":
+                    bFK = True
+                # Mark that this is a FK to another table
+                oInfo['FK'] = bFK
+                if bFK:
+                    # Add this to the list of "pointing to me" in the other table
+                    table_info[field]['links'].append(table_name)
+
+        # Create list to be returned
+        result_list = []
+
+        # Create a result to be shown
+        for table_name in tables:
+            oTable = table_info[table_name]
+            field_reg = []
+            field_fk = []
+            links = []
+            for field in oTable['fields']:
+                oInfo = oTable[field]
+                if oInfo['FK']:
+                    field_fk.append("<span class='badge signature gr'>{}</span>".format(field))
+                elif not field in standard_fields:
+                    field_reg.append("<code>{}</code>".format(field))
+            field_fk = ", ".join(field_fk)
+            field_reg = ", ".join(field_reg)
+
+            for link in oTable['links']:
+                links.append("<span class='keyword'>{}</span>".format(link))
+            links_to_me = ", ".join(links)
+
+            lst_total = []
+            lst_total.append("<table><thead><tr><th>Field type</th><th>Description</th></tr>")
+            lst_total.append("<tbody>")
+            # Regular fields
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Regular:</td><td valign='top'>{}</td></tr>".format(field_reg))
+            # FK fields
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Foreign Key:</td><td valign='top'>{}</td></tr>".format(field_fk))
+            # Other tables linking to me
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Links to me:</td><td valign='top'>{}</td></tr>".format(links_to_me))
+            lst_total.append("</tbody></table>")
+
+            result_list.append({'part': table_name, 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("huwa")
         return reverse('home')
 
 def get_old_edi(edi):
