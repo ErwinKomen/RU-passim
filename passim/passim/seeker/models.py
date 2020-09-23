@@ -4144,9 +4144,14 @@ class EqualGold(models.Model):
 
         oErr = ErrHandle()
         try:
-            # Adapt the incipit and explicit
-            self.srchincipit = get_searchable(self.incipit)
-            self.srchexplicit = get_searchable(self.explicit)
+            # Adapt the incipit and explicit - if necessary
+            srchincipit = get_searchable(self.incipit)
+            if self.srchincipit != srchincipit:
+                self.srchincipit = srchincipit
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchexplicit != srchexplicit:
+                self.srchexplicit = srchexplicit
+
             # Double check the number and the code
             if self.author:
                 # Get the author number
@@ -4169,7 +4174,9 @@ class EqualGold(models.Model):
 
             # (Re) calculate the number of associated historical collections (for *all* users!!)
             if self.id != None:
-                self.hccount = self.collections.filter(settype="hc", scope='publ').count()
+                hccount = self.collections.filter(settype="hc", scope='publ').count()
+                if hccount != self.hccount:
+                    self.hccount = hccount
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -4552,9 +4559,10 @@ class EqualGold(models.Model):
         # Calculate the first signature
         first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
         if first != None:
-            self.firstsig = first.code
-            # Save changes
-            self.save()
+            firstsig = first.code
+            if self.firstsig != firstsig:
+                # Save changes
+                self.save()
         return True
 
     def set_sgcount(self):
@@ -4642,9 +4650,11 @@ class SermonGold(models.Model):
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist:
+            self.siglist = siglist
+            # And save myself
+            self.save()
 
     def editions(self):
         """Combine all editions into one string: the editions are retrieved from litrefSG"""
