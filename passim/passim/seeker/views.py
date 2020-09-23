@@ -9755,49 +9755,54 @@ class SermonGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Need to know who this user (profile) is
-        profile = Profile.get_user_profile(self.request.user.username)
-        username = profile.user.username
-        team_group = app_editor
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
-             'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
-            {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
-             'title': 'Other Sermons Gold members of the same equality set'},
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
-            {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
-            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
-             'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
-             'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
-            {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
-            {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
-            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
-             'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
-            {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
-             'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
-            {'type': 'plain', 'label': "Personal datasets:",    'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-             'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
-            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
-             'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
-            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-             'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
-            {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
-             'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
-            ]
-        # Notes:
-        # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
+                 'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
+                {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
+                 'title': 'Other Sermons Gold members of the same equality set'},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
+                {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
+                 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+                {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
+                 'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+                {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
+                {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+                 'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
+                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+                 'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
+                {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
+                 'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
+                {'type': 'plain', 'label': "Personal datasets:",    'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                 'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
+                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
+                 'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
+                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                 'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
+                {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
+                 'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
+                ]
+            # Notes:
+            # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
 
-        # TODO: add [sermongold_litset] unobtrusively
+            # TODO: add [sermongold_litset] unobtrusively
 
-        # Signal that we have select2
-        context['has_select2'] = True
+            # Signal that we have select2
+            context['has_select2'] = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonGoldEdit/add_to_context")
 
         # Return the context we have made
         return context

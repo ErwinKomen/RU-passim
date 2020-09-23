@@ -4861,16 +4861,23 @@ class SermonGold(models.Model):
         """Get all the keywords attached to the SSG of which I am part"""
 
         lHtml = []
-        # Get all keywords attached to these SGs
-        qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
-        # Visit all keywords
-        for keyword in qs:
-            # Determine where clicking should lead to
-            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            if self.equal != None:
+                # Get all keywords attached to these SGs
+                qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
+                # Visit all keywords
+                for keyword in qs:
+                    # Determine where clicking should lead to
+                    url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+                    # Create a display for this topic
+                    lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_keywords_ssg_markdown")
         return sBack
 
     def get_label(self, do_incexpl=False):
