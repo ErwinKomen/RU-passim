@@ -5471,7 +5471,7 @@ class Collection(models.Model):
     # [0-1] Number of SSG authors -- if this is a settype='hc'
     ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
 
-    # [0-n] Many-to-many: keywords per SermonGold
+    # [0-n] Many-to-many: references per collection
     litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
 
     
@@ -5519,10 +5519,55 @@ class Collection(models.Model):
         sBack = ", ".join(html)
         return sBack
 
-    def get_readonly_display(self):
-        response = "yes" if self.readonly else "no"
-        return response
-        
+    def get_created(self):
+        """REturn the creation date in a readable form"""
+
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
+    def get_copy(self, owner=None):
+        """Create a copy of myself and return it"""
+
+        oErr = ErrHandle()
+        new_copy = None
+        try:
+            # Create one, copying the existing one
+            new_owner = self.owner if owner == None else owner
+            new_copy = Collection.objects.create(
+                name = self.name, owner=new_owner, readonly=self.readonly,
+                type = self.type, settype = self.settype, descrip = self.descrip,
+                url = self.url, path = self.path, scope=self.scope)
+            # Further action depends on the type we are
+            if self.type == "manu":
+                # Copy manuscripts
+                qs = CollectionMan.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionMan.objects.create(collection=new_copy, manuscript=obj.manuscript, order=obj.order)
+            elif self.type == "sermo":
+                # Copy sermons
+                qs = CollectionSerm.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSerm.objects.create(collection=new_copy, sermon=obj.sermon, order=obj.order)
+            elif self.type == "gold":
+                # Copy gold sermons
+                qs = CollectionGold.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionGold.objects.create(collection=new_copy, gold=obj.gold, order=obj.order)
+            elif self.type == "super":
+                # Copy SSGs
+                qs = CollectionSuper.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSuper.objects.create(collection=new_copy, super=obj.super, order=obj.order)
+
+            # Change the name
+            new_copy.name = "{}_{}".format(new_copy.name, new_copy.id)
+            # Make sure to save it once more to process any changes in the save() function
+            new_copy.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/get_copy")
+        return new_copy
+
     def get_elevate(self):
         html = []
         url = reverse("collhist_elevate", kwargs={'pk': self.id})
@@ -5549,12 +5594,6 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_created(self):
-        """REturn the creation date in a readable form"""
-
-        sDate = self.created.strftime("%d/%b/%Y %H:%M")
-        return sDate
-
     def get_manuscript_link(self):
         """Return a piece of HTML with the manuscript link for the user"""
 
@@ -5571,39 +5610,10 @@ class Collection(models.Model):
             sBack = "\n".join(html)
         return sBack
 
-    def get_size_markdown(self):
-        """Count the items that belong to me, depending on my type
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
         
-        Create a HTML output
-        """
-
-        size = 0
-        lHtml = []
-        if self.type == "sermo":
-            size = self.freqsermo()
-            # Determine where clicking should lead to
-            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
-        elif self.type == "manu":
-            size = self.freqmanu()
-            # Determine where clicking should lead to
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
-        elif self.type == "gold":
-            size = self.freqgold()
-            # Determine where clicking should lead to
-            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
-        elif self.type == "super":
-            size = self.freqsuper()
-            # Determine where clicking should lead to
-            if self.settype == "hc":
-                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
-            else:
-                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
-        if size > 0:
-            # Create a display for this topic
-            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
-        sBack = ", ".join(lHtml)
-        return sBack
-
     def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
 
@@ -5654,6 +5664,39 @@ class Collection(models.Model):
             qs = Collection.objects.all()
         # REturn the result
         return qs
+
+    def get_size_markdown(self):
+        """Count the items that belong to me, depending on my type
+        
+        Create a HTML output
+        """
+
+        size = 0
+        lHtml = []
+        if self.type == "sermo":
+            size = self.freqsermo()
+            # Determine where clicking should lead to
+            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
+        elif self.type == "manu":
+            size = self.freqmanu()
+            # Determine where clicking should lead to
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
+        elif self.type == "gold":
+            size = self.freqgold()
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
+        elif self.type == "super":
+            size = self.freqsuper()
+            # Determine where clicking should lead to
+            if self.settype == "hc":
+                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
+            else:
+                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_template_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""

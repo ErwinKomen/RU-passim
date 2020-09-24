@@ -601,7 +601,7 @@ class TestsetDetails(TestsetEdit):
             add_rel_item(rel_item, item.sentence.name, False, link=url)
 
             # Add this line to the list
-            rel_list.append(rel_item)
+            rel_list.append(dict(id=item.id, cols=rel_item))
 
         testunits['rel_list'] = rel_list
 
