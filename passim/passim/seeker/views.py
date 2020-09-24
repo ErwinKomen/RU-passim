@@ -6934,7 +6934,12 @@ class CollAnyEdit(BasicDetails):
         if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
             context['authenticated'] and context['is_app_editor']:
             context['mainitems'].append(
-                {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
+                {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
+                )
+        # Buttons to switch to a listview of M/S/SG/SSG based on this collection
+        context['mainitems'].append(
+                {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
+                 'title': 'Open a listview that is filtered on this dataset'}
                 )
 
         # Signal that we have select2
@@ -6969,6 +6974,44 @@ class CollAnyEdit(BasicDetails):
           
         # Return the context we have made
         return context    
+
+    def get_listview_buttons(self, instance):
+        """Create an HTML list of buttons for M/S/SG/SSG listviews filtered on this collection"""
+
+        sBack = ""
+        context = {}
+        abbr = None
+        oErr = ErrHandle()
+        try:
+            url_m = reverse("manuscript_list")
+            url_s = reverse("sermon_list")
+            url_sg = reverse("gold_list")
+            url_ssg = reverse("equalgold_list")
+            if instance.type == "manu":
+                # collection of manuscripts
+                abbr = "m"
+            elif instance.type == "sermo":
+                # collection of sermons
+                abbr = "s"
+            elif instance.type == "gold":
+                # collection of gold sermons
+                abbr = "sg"
+            elif instance.type == "super":
+                # collection of SSG
+                abbr = "ssg"
+            if url_m != None and url_s != None and url_sg != None and url_ssg != None and abbr != None:
+                context['url_manu'] = "{}?manu-collist_{}={}".format(url_m, abbr, instance.id)
+                context['url_sermo'] = "{}?sermo-collist_{}={}".format(url_s, abbr, instance.id)
+                context['url_gold'] = "{}?gold-collist_{}={}".format(url_sg, abbr, instance.id)
+                context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+
+                sBack = render_to_string('seeker/coll_buttons.html', context, self.request)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/get_listview_buttons")
+
+        return sBack
     
     def process_formset(self, prefix, request, formset):
         errors = []
