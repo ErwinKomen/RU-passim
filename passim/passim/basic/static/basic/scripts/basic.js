@@ -271,6 +271,9 @@ var ru = (function ($, ru) {
 
             private_methods.sortTable(elTable, colidx, sDirection, sSortType);
 
+            // Show that changes can/need to be saved
+            $(elTable).closest("div").find(".related-save").removeClass("hidden");
+
           }
         } catch (ex) {
           private_methods.errMsg("sortshowDo", ex);
@@ -1177,6 +1180,19 @@ var ru = (function ($, ru) {
           // Add actions to related-remove
           $("table td .related-remove").unbind("click").on("click", ru.basic.related_remove);
 
+          // Prepare related copies
+          $(".related-root").each(function (idx, el) {
+            var elOriginal = $(el).find(".related-original").first(),
+                elCopy = $(el).find(".related-copy").first(),
+                clone;
+
+            if (elOriginal.length > 0 && elCopy.length > 0) {
+              // Copy original to copy
+              $(elCopy).html($(elOriginal).html());
+
+            }
+          });
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
@@ -1859,6 +1875,47 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * related_cancel
+       *    Cancel all sorting, deleting etc done on this related set. 
+       *
+       */
+      related_cancel: function (elStart) {
+        var elRoot = null,
+            elCopy = null,
+            elOriginal = null;
+
+        try {
+          elRoot = $(elStart).closest(".related-root");
+          if (elRoot.length > 0) {
+            elOriginal = $(elRoot).find(".related-original").first();
+            elCopy = $(elRoot).find(".related-copy").first();
+            if (elOriginal.length > 0 && elCopy.length > 0) {
+              // Copy from copy to original
+              $(elOriginal).html($(elCopy).html());
+
+              // Resizable table columns
+              $("table.resizable").each(function (idx, el) {
+                private_methods.resizableGrid(el);
+              });
+
+              // sortable tables
+              $("table th .sortshow").unbind("click").on("click", function (evt) {
+                var el = $(this);
+                private_methods.sortshowDo(el);
+              });
+
+              // Add actions to related-remove
+              $("table td .related-remove").unbind("click").on("click", ru.basic.related_remove);
+
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("related_cancel", ex);
+        }
+      },
+
+      /**
        * related_drag
        *    Starting point of dragging. 
        *    The DOM object of the <tr> as a whole is stored in [loc_relatedRow]
@@ -1875,18 +1932,19 @@ var ru = (function ($, ru) {
       },
 
       /**
-       * related_dragover
+       * related_dragenter
        *    Dragging one row over other rows
        * See: https://www.therogerlab.com/how-can-i/javascript/reorder-html-table-rows-using-drag-and-drop.html
        *
        */
-      related_dragover: function (ev) {
+      related_dragenter: function (ev) {
         var row = null,
             children = null;
 
         try {
           // Prevend the default behaviour
           ev.preventDefault();
+          // ev.dataTransfer.dropEffect = 'all';
           // Get the row that is stored
           row = loc_relatedRow;
           // We must be going over a TD with the right class
@@ -1901,27 +1959,12 @@ var ru = (function ($, ru) {
               // Target comes before
               ev.target.parentNode.before(row);
             }
+            // Show that changes can/need to be saved
+            $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
           } 
         } catch (ex) {
-          private_methods.errMsg("related_dragover", ex);
-        }
-      },
-
-
-      /**
-       * related_drop
-       *    Indicate that situation has changed and that changes need to be saved
-       *
-       */
-      related_drop: function (ev) {
-
-        try {
-          // Show that changes can/need to be saved
-          $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
-
-        } catch (ex) {
-          private_methods.errMsg("related_drop", ex);
+          private_methods.errMsg("related_dragenter", ex);
         }
       },
 
@@ -1943,6 +1986,51 @@ var ru = (function ($, ru) {
           $(elRow).remove();
         } catch (ex) {
           private_methods.errMsg("related_remove", ex);
+        }
+      },
+
+      /**
+       * related_save
+       *    Save the revised related order, including deletions
+       *
+       */
+      related_save: function (elStart, prefix, mode) {
+        var elTable = null,
+            elForm = null,
+            elHlist = null,
+            elSavenew = null,
+            lst_row = [];
+
+        try {
+          elTable = $(elStart).closest(".related-original").find("table tbody").first();
+          if (elTable.length > 0 && prefix !== undefined && mode !== undefined) {
+            // Get all the rows in their current order
+            $(elTable).find("tr.form-row").each(function (idx, el) {
+              lst_row.push($(el).attr("rowid"));
+            });
+            // Get form, hlist, savenew
+            elForm = $("#save_related_" + prefix);
+            elHlist = $("#id_" + prefix + "-hlist");
+            elSavenew = $("#id_" + prefix + "-savenew");
+            // Set the parameters
+            $(elHlist).val(JSON.stringify(lst_row));
+            switch (mode) {
+              case "save":
+                $(elSavenew).val("false");
+                break;
+              case "savenew":
+                $(elSavenew).val("true");
+                break;
+            }
+            // Indicate we are waiting
+            $(elStart).closest(".related-original").find(".waiting").removeClass("hidden");
+
+            // Pass this on as parameter??
+            $(elForm).submit();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("related_save", ex);
         }
       },
 
@@ -2111,6 +2199,7 @@ var ru = (function ($, ru) {
           private_methods.errMsg("search_start", ex);
         }
       },
+
       /**
        * search_ordered_start
        *    Perform a simple 'submit' call to search_start

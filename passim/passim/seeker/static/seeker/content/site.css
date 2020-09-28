@@ -553,17 +553,17 @@ form .panel-heading.row {
 }
 .jumbo-2 {
   background-color: chocolate;
-  color: lavender;
+  color: lavender !important;
   fill: chocolate;
 }
 .jumbo-3 {
   background-color: #355e3b;
-  color: lavender;
+  color: lavender !important;
   fill: #355e3b;
 }
 .jumbo-4 {
   background-color: #ff2400;
-  color: lavender;
+  color: lavender !important;
   fill: #ff2400;
 }
 .jumbo-2 text, .jumbo-3 text, .jumbo-4 text {

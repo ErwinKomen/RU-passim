@@ -38,6 +38,7 @@ import csv, re
 import requests
 import demjson
 import openpyxl
+import sqlite3
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -519,6 +520,8 @@ def get_previous_page(request, top=False):
     # Return the path
     return prevpage
 
+# ================= STANDARD views =====================================
+
 def home(request):
     """Renders the home page."""
 
@@ -692,6 +695,8 @@ def nlogin(request):
                     'year':get_current_datetime().year,}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
+
+# ================ OTHER VIEW HELP FUNCTIONS ============================
 
 def sync_entry(request):
     """-"""
@@ -1765,6 +1770,123 @@ def do_ssgmigrate(request):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("ssgmigrate")
+        return reverse('home')
+
+def do_huwa(request):
+    """Analyse Huwa SQLite database"""
+
+    oErr = ErrHandle()
+    try:
+        assert isinstance(request, HttpRequest)
+        # Specify the template
+        template_name = 'tools_huwa.html'
+        # Define the initial context
+        context =  {'title':    'RU-passim-tools',
+                    'year':     get_current_datetime().year,
+                    'pfx':      APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+        context['is_app_editor'] = user_is_ingroup(request, app_editor)
+
+        # Only passim uploaders can do this
+        if not context['is_app_uploader']: return reverse('home')
+
+        # Indicate the necessary tools sub-part
+        context['tools_part'] = "Huwa Analysis"
+
+        count_tbl = 0
+        lst_total = []
+
+        # Connect to the Huwa database
+        huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+        with sqlite3.connect(huwa_db) as db:
+            table_info = {}
+            standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+            cursor = db.cursor()
+            db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+            tables = [x[0] for x in db_results]
+
+            count_tbl = len(tables)
+
+            # Walk all tables
+            for table_name in tables:
+                oInfo = {}
+                # Find out what fields this table has
+                db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                fields = []
+                for field in db_results:
+                    field_name = field[1]
+                    fields.append(field_name)
+
+                    field_info = dict(type=field[2],
+                                      not_null=(field[3] == 1),
+                                      default=field[4])
+                    oInfo[field_name] = field_info
+                oInfo['fields'] = fields
+                oInfo['links'] = []
+                table_info[table_name] = oInfo
+
+            # Close the database again
+            cursor.close()
+
+        # Walk the tables again, looking for foreign keys
+        for table_name in tables:
+            oTable = table_info[table_name]
+            # Check if any fields could be FKs
+            for field in oTable['fields']:
+                oInfo = oTable[field]
+                bFK = False
+                if field in tables and oInfo['type'] == "integer":
+                    bFK = True
+                # Mark that this is a FK to another table
+                oInfo['FK'] = bFK
+                if bFK:
+                    # Add this to the list of "pointing to me" in the other table
+                    table_info[field]['links'].append(table_name)
+
+        # Create list to be returned
+        result_list = []
+
+        # Create a result to be shown
+        for table_name in tables:
+            oTable = table_info[table_name]
+            field_reg = []
+            field_fk = []
+            links = []
+            for field in oTable['fields']:
+                oInfo = oTable[field]
+                if oInfo['FK']:
+                    field_fk.append("<span class='badge signature gr'>{}</span>".format(field))
+                elif not field in standard_fields:
+                    field_reg.append("<code>{}</code>".format(field))
+            field_fk = ", ".join(field_fk)
+            field_reg = ", ".join(field_reg)
+
+            for link in oTable['links']:
+                links.append("<span class='keyword'>{}</span>".format(link))
+            links_to_me = ", ".join(links)
+
+            lst_total = []
+            lst_total.append("<table><thead><tr><th>Field type</th><th>Description</th></tr>")
+            lst_total.append("<tbody>")
+            # Regular fields
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Regular:</td><td valign='top'>{}</td></tr>".format(field_reg))
+            # FK fields
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Foreign Key:</td><td valign='top'>{}</td></tr>".format(field_fk))
+            # Other tables linking to me
+            lst_total.append("<tr><td valign='top' class='tdnowrap'>Links to me:</td><td valign='top'>{}</td></tr>".format(links_to_me))
+            lst_total.append("</tbody></table>")
+
+            result_list.append({'part': table_name, 'result': "\n".join(lst_total)})
+
+        context['result_list'] = result_list
+    
+        # Render and return the page
+        return render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("huwa")
         return reverse('home')
 
 def get_old_edi(edi):
@@ -6678,6 +6800,71 @@ class CollAnyEdit(BasicDetails):
         if instance != None:
             self.datasettype = instance.type
         return None
+
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+
+        try:
+            arg_hlist = instance.type + "-hlist"
+            arg_savenew = instance.type + "-savenew"
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                # Interpret the savenew parameter
+                savenew = self.qd[arg_savenew]
+
+                # Make sure we are not saving
+                self.do_not_save = True
+                # But that we do a new redirect
+                self.newRedirect = True
+
+                # Action depends on the particular prefix
+                if instance.type == "manu":
+                    # First check if this needs to be a *NEW* collection instance
+                    if savenew == "true":
+                        profile = Profile.get_user_profile(self.request.user.username)
+                        # Yes, we need to copy the existing collection to a new one first
+                        original = instance
+                        instance = original.get_copy(owner=profile)
+
+                    # Change the redirect URL
+                    if self.redirectpage == "":
+                        if instance.settype == "hc": this_type = "hist"
+                        elif instance.scope == "priv": this_type = "priv"
+                        else: this_type = "publ"
+                        self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
+                    else:
+                        self.redirectpage = self.redirectpage.replace(original.id, instance.id)
+
+                    # What we have is the ordered list of Manuscript id's that are part of this collection
+                    with transaction.atomic():
+                        # Make sure the orders are correct
+                        for idx, manu_id in enumerate(hlist):
+                            order = idx + 1
+                            obj = CollectionMan.objects.filter(collection=instance, manuscript__id=manu_id).first()
+                            if obj != None:
+                                if obj.order != order:
+                                    obj.order = order
+                                    obj.save()
+                    # See if any need to be removed
+                    existing_manu_id = [str(x.manuscript.id) for x in CollectionMan.objects.filter(collection=instance)]
+                    delete_id = []
+                    for manu_id in existing_manu_id:
+                        if not manu_id in hlist:
+                            delete_id.append(manu_id)
+                    if len(delete_id)>0:
+                         CollectionMan.objects.filter(collection=instance, manuscript__id__in=delete_id).delete()
+                else:
+                    # Nothing implemented right now
+                    pass
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/check_hlist")
+            return False
     
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -6747,7 +6934,12 @@ class CollAnyEdit(BasicDetails):
         if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
             context['authenticated'] and context['is_app_editor']:
             context['mainitems'].append(
-                {'type': 'safe', 'label': "Historical", 'value': instance.get_elevate()}
+                {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
+                )
+        # Buttons to switch to a listview of M/S/SG/SSG based on this collection
+        context['mainitems'].append(
+                {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
+                 'title': 'Open a listview that is filtered on this dataset'}
                 )
 
         # Signal that we have select2
@@ -6782,6 +6974,44 @@ class CollAnyEdit(BasicDetails):
           
         # Return the context we have made
         return context    
+
+    def get_listview_buttons(self, instance):
+        """Create an HTML list of buttons for M/S/SG/SSG listviews filtered on this collection"""
+
+        sBack = ""
+        context = {}
+        abbr = None
+        oErr = ErrHandle()
+        try:
+            url_m = reverse("manuscript_list")
+            url_s = reverse("sermon_list")
+            url_sg = reverse("gold_list")
+            url_ssg = reverse("equalgold_list")
+            if instance.type == "manu":
+                # collection of manuscripts
+                abbr = "m"
+            elif instance.type == "sermo":
+                # collection of sermons
+                abbr = "s"
+            elif instance.type == "gold":
+                # collection of gold sermons
+                abbr = "sg"
+            elif instance.type == "super":
+                # collection of SSG
+                abbr = "ssg"
+            if url_m != None and url_s != None and url_sg != None and url_ssg != None and abbr != None:
+                context['url_manu'] = "{}?manu-collist_{}={}".format(url_m, abbr, instance.id)
+                context['url_sermo'] = "{}?sermo-collist_{}={}".format(url_s, abbr, instance.id)
+                context['url_gold'] = "{}?gold-collist_{}={}".format(url_sg, abbr, instance.id)
+                context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+
+                sBack = render_to_string('seeker/coll_buttons.html', context, self.request)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/get_listview_buttons")
+
+        return sBack
     
     def process_formset(self, prefix, request, formset):
         errors = []
@@ -6935,6 +7165,8 @@ class CollPrivDetails(CollAnyEdit):
             elif instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+            # Check for hlist saving
+            self.check_hlist(instance)
         return None
 
     def add_to_context(self, context, instance):
@@ -6969,232 +7201,240 @@ class CollPrivDetails(CollAnyEdit):
         sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
         sort_end = '</span>'
 
-        # Action depends on instance.type: M/S/SG/SSG
-        if instance.type == "manu":
-            # Get all non-template manuscripts part of this PD
-            manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
-            if resizable: manuscripts['gridclass'] = "resizable dragdrop"
-            manuscripts['savebuttons'] = self.get_savebuttons(instance)
+        oErr = ErrHandle()
 
-            # Check ordering
-            qs_manu = instance.manuscript_col.all().order_by(
-                    'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
-            check_order(qs_manu)
+        try:
 
-            #lstQ.append(Q(collections=instance))
-            #lstQ.append(Q(mtype="man"))
-            #qs_manu = Manuscript.objects.filter(*lstQ).order_by(
-            #    'id').distinct().order_by('manuscript_col__order', 'lcity__name', 'library__name', 'idno')
+            # Action depends on instance.type: M/S/SG/SSG
+            if instance.type == "manu":
+                # Get all non-template manuscripts part of this PD
+                manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
+                if resizable: manuscripts['gridclass'] = "resizable dragdrop"
+                # manuscripts['savebuttons'] = self.get_savebuttons(instance)
+                manuscripts['savebuttons'] = True
 
-            for obj in qs_manu:
-                rel_item = []
-                item = obj.manuscript
+                # Check ordering
+                qs_manu = instance.manuscript_col.all().order_by(
+                        'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
+                check_order(qs_manu)
 
-                # S: Order in Manuscript
-                #add_one_item(rel_item, index, False, align="right", draggable=True)
-                #index += 1
-                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+                #lstQ.append(Q(collections=instance))
+                #lstQ.append(Q(mtype="man"))
+                #qs_manu = Manuscript.objects.filter(*lstQ).order_by(
+                #    'id').distinct().order_by('manuscript_col__order', 'lcity__name', 'library__name', 'idno')
 
-                # Shelfmark = IDNO
-                add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
-                             link=reverse('manuscript_details', kwargs={'pk': item.id}))
+                for obj in qs_manu:
+                    rel_item = []
+                    item = obj.manuscript
 
-                # Just the name of the manuscript
-                add_one_item(rel_item, self.get_field_value("manu", item, "name"), resizable)
+                    # S: Order in Manuscript
+                    #add_one_item(rel_item, index, False, align="right", draggable=True)
+                    #index += 1
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
-                # Origin
-                add_one_item(rel_item, self.get_field_value("manu", item, "orgprov"), False, 
-                             title="Origin (if known), followed by provenances (between brackets)")
+                    # Shelfmark = IDNO
+                    add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
+                                 link=reverse('manuscript_details', kwargs={'pk': item.id}))
 
-                # date range
-                add_one_item(rel_item, self.get_field_value("manu", item, "daterange"), False, align="right")
+                    # Just the name of the manuscript
+                    add_one_item(rel_item, self.get_field_value("manu", item, "name"), resizable)
 
-                # Number of sermons in this manuscript
-                add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), False, align="right")
+                    # Origin
+                    add_one_item(rel_item, self.get_field_value("manu", item, "orgprov"), False, 
+                                 title="Origin (if known), followed by provenances (between brackets)")
 
-                # Actions that can be performed on this item
-                add_one_item(rel_item, self.get_actions())
+                    # date range
+                    add_one_item(rel_item, self.get_field_value("manu", item, "daterange"), False, align="right")
 
-                # Add this line to the list
-                rel_list.append(rel_item)
+                    # Number of sermons in this manuscript
+                    add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), False, align="right")
 
-            manuscripts['rel_list'] = rel_list
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_actions())
 
-            manuscripts['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="City/Library/Shelfmark">Shelfmark</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Name">Name</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Date range">date</span>{}'.format(sort_start_int, sort_end), 
-                '{}<span title="Sermons in this manuscript">sermons</span>{}'.format(sort_start_int, sort_end),
-                ''
-                ]
-            related_objects.append(manuscripts)
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
 
-        elif instance.type == "sermo":
-            # Get all sermons that are part of this PD
-            sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
-            if resizable: sermons['gridclass'] = "resizable"
+                manuscripts['rel_list'] = rel_list
 
-            #qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
-            #    'sermondescr_col__order', 'author__name', 'siglist', 'srchincipit', 'srchexplicit')
-            qs_sermo = instance.sermondescr_col.all().order_by(
-                    'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
-            check_order(qs_sermo)
+                manuscripts['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="City/Library/Shelfmark">Shelfmark</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Name">Name</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Date range">date</span>{}'.format(sort_start_int, sort_end), 
+                    '{}<span title="Sermons in this manuscript">sermons</span>{}'.format(sort_start_int, sort_end),
+                    ''
+                    ]
+                related_objects.append(manuscripts)
 
-            # Walk these collection sermons
-            for obj in qs_sermo:
-                rel_item = []
-                item = obj.sermon
+            elif instance.type == "sermo":
+                # Get all sermons that are part of this PD
+                sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
+                if resizable: sermons['gridclass'] = "resizable"
 
-                # S: Order in Sermon
-                #add_one_item(rel_item, index, False, align="right")
-                #index += 1
-                add_one_item(rel_item, obj.order, False, align="right")
+                #qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
+                #    'sermondescr_col__order', 'author__name', 'siglist', 'srchincipit', 'srchexplicit')
+                qs_sermo = instance.sermondescr_col.all().order_by(
+                        'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
+                check_order(qs_sermo)
 
-                # S: Author
-                add_one_item(rel_item, self.get_field_value("sermo", item, "author"), False, main=True)
+                # Walk these collection sermons
+                for obj in qs_sermo:
+                    rel_item = []
+                    item = obj.sermon
 
-                # S: Signature
-                add_one_item(rel_item, self.get_field_value("sermo", item, "signature"), False)
+                    # S: Order in Sermon
+                    #add_one_item(rel_item, index, False, align="right")
+                    #index += 1
+                    add_one_item(rel_item, obj.order, False, align="right")
 
-                # S: Inc+Expl
-                add_one_item(rel_item, self.get_field_value("sermo", item, "incexpl"), resizable)
+                    # S: Author
+                    add_one_item(rel_item, self.get_field_value("sermo", item, "author"), False, main=True)
 
-                # S: Manuscript
-                add_one_item(rel_item, self.get_field_value("sermo", item, "manuscript"), False)
+                    # S: Signature
+                    add_one_item(rel_item, self.get_field_value("sermo", item, "signature"), False)
 
-                # S: Locus
-                add_one_item(rel_item, item.locus, False)
+                    # S: Inc+Expl
+                    add_one_item(rel_item, self.get_field_value("sermo", item, "incexpl"), resizable)
 
-                # Actions that can be performed on this item
-                add_one_item(rel_item, self.get_actions())
+                    # S: Manuscript
+                    add_one_item(rel_item, self.get_field_value("sermo", item, "manuscript"), False)
 
-                # Add this line to the list
-                rel_list.append(rel_item)
+                    # S: Locus
+                    add_one_item(rel_item, item.locus, False)
+
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_actions())
+
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
             
-            sermons['rel_list'] = rel_list
-            sermons['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Attributed author">Author</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Manuscript shelfmark">Manuscript</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Location within the manuscript">Locus</span>{}'.format(sort_start_int, sort_end),
-                ''
-                ]
-            related_objects.append(sermons)
+                sermons['rel_list'] = rel_list
+                sermons['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Attributed author">Author</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Manuscript shelfmark">Manuscript</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Location within the manuscript">Locus</span>{}'.format(sort_start_int, sort_end),
+                    ''
+                    ]
+                related_objects.append(sermons)
 
-        elif instance.type == "gold":
-            # Get all sermons that are part of this PD
-            goldsermons = dict(title="Gold sermons within this dataset", prefix="sermo")
-            if resizable: goldsermons['gridclass'] = "resizable"
+            elif instance.type == "gold":
+                # Get all sermons that are part of this PD
+                goldsermons = dict(title="Gold sermons within this dataset", prefix="sermo")
+                if resizable: goldsermons['gridclass'] = "resizable"
 
-            #qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
-            #    'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
-            qs_sermo = instance.gold_col.all().order_by(
-                    'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
-            check_order(qs_sermo)
+                #qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
+                #    'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
+                qs_sermo = instance.gold_col.all().order_by(
+                        'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
+                check_order(qs_sermo)
 
-            # Walk these collection sermons
-            for obj in qs_sermo:
-                rel_item = []
-                item = obj.gold
+                # Walk these collection sermons
+                for obj in qs_sermo:
+                    rel_item = []
+                    item = obj.gold
 
-                # G: Order in Gold
-                #add_one_item(rel_item, index, False, align="right")
-                #index += 1
-                add_one_item(rel_item, obj.order, False, align="right")
+                    # G: Order in Gold
+                    #add_one_item(rel_item, index, False, align="right")
+                    #index += 1
+                    add_one_item(rel_item, obj.order, False, align="right")
 
-                # G: Author
-                add_one_item(rel_item, self.get_field_value("gold", item, "author"), False,main=True)
+                    # G: Author
+                    add_one_item(rel_item, self.get_field_value("gold", item, "author"), False,main=True)
 
-                # G: Signature
-                add_one_item(rel_item, self.get_field_value("gold", item, "signature"), False)
+                    # G: Signature
+                    add_one_item(rel_item, self.get_field_value("gold", item, "signature"), False)
 
-                # G: Passim code
-                add_one_item(rel_item, self.get_field_value("gold", item, "code"), False)
+                    # G: Passim code
+                    add_one_item(rel_item, self.get_field_value("gold", item, "code"), False)
 
-                # G: Inc/Expl
-                add_one_item(rel_item, self.get_field_value("gold", item, "incexpl"), resizable)
+                    # G: Inc/Expl
+                    add_one_item(rel_item, self.get_field_value("gold", item, "incexpl"), resizable)
 
-                # G: Editions
-                add_one_item(rel_item, self.get_field_value("gold", item, "edition"), False)
+                    # G: Editions
+                    add_one_item(rel_item, self.get_field_value("gold", item, "edition"), False)
 
-                # Actions that can be performed on this item
-                add_one_item(rel_item, self.get_actions())
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_actions())
 
-                # Add this line to the list
-                rel_list.append(rel_item)
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
             
-            goldsermons['rel_list'] = rel_list
-            goldsermons['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Associated author">Author</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Editions where this Gold Sermon is described">Editions</span>{}'.format(sort_start, sort_end), 
-                ''
-                ]
-            related_objects.append(goldsermons)
+                goldsermons['rel_list'] = rel_list
+                goldsermons['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Associated author">Author</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Gryson or Clavis code">Signature</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Editions where this Gold Sermon is described">Editions</span>{}'.format(sort_start, sort_end), 
+                    ''
+                    ]
+                related_objects.append(goldsermons)
 
-        elif instance.type == "super":
-            # Get all sermons that are part of this PD
-            supers = dict(title="Super sermons gold within this dataset", prefix="sermo")
-            if resizable: supers['gridclass'] = "resizable"
+            elif instance.type == "super":
+                # Get all sermons that are part of this PD
+                supers = dict(title="Super sermons gold within this dataset", prefix="sermo")
+                if resizable: supers['gridclass'] = "resizable"
 
-            #qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
-            #    'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
-            qs_sermo = instance.super_col.all().order_by(
-                    'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
-            check_order(qs_sermo)
+                #qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
+                #    'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
+                qs_sermo = instance.super_col.all().order_by(
+                        'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
+                check_order(qs_sermo)
 
 
-            # Walk these collection sermons
-            for obj in qs_sermo:
-                rel_item = []
-                item = obj.super
+                # Walk these collection sermons
+                for obj in qs_sermo:
+                    rel_item = []
+                    item = obj.super
 
-                # SSG: Order in Manuscript
-                #add_one_item(rel_item, index, False, align="right")
-                #index += 1
-                add_one_item(rel_item, obj.order, False, align="right")
+                    # SSG: Order in Manuscript
+                    #add_one_item(rel_item, index, False, align="right")
+                    #index += 1
+                    add_one_item(rel_item, obj.order, False, align="right")
 
-                # SSG: Author
-                add_one_item(rel_item, self.get_field_value("super", item, "author"), False, main=True)
+                    # SSG: Author
+                    add_one_item(rel_item, self.get_field_value("super", item, "author"), False, main=True)
 
-                # SSG: Passim code
-                add_one_item(rel_item, self.get_field_value("super", item, "code"), False)
+                    # SSG: Passim code
+                    add_one_item(rel_item, self.get_field_value("super", item, "code"), False)
 
-                # SSG: Gryson/Clavis = signature
-                add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
+                    # SSG: Gryson/Clavis = signature
+                    add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
 
-                # SSG: Inc/Expl
-                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), resizable)
+                    # SSG: Inc/Expl
+                    add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), resizable)
 
-                # SSG: Size (number of SG in equality set)
-                add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
+                    # SSG: Size (number of SG in equality set)
+                    add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
 
-                # Actions that can be performed on this item
-                add_one_item(rel_item, self.get_actions())
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_actions())
 
-                # Add this line to the list
-                rel_list.append(rel_item)
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
             
-            supers['rel_list'] = rel_list
-            supers['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start_int, sort_end), 
-                ''
-                ]
-            related_objects.append(supers)
+                supers['rel_list'] = rel_list
+                supers['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start_int, sort_end), 
+                    ''
+                    ]
+                related_objects.append(supers)
 
-        context['related_objects'] = related_objects
+            context['related_objects'] = related_objects
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollPrivDetails/add_to_context")
 
         # REturn the total context
         return context
@@ -7216,24 +7456,6 @@ class CollPrivDetails(CollAnyEdit):
 
         # Finish up the span
         html.append("&nbsp;</span>")
-
-        # COmbine the list into a string
-        sHtml = "\n".join(html)
-        # Return out HTML string
-        return sHtml
-
-    def get_savebuttons(self, instance):
-        html = []
-
-        # Canceling: refresh the details view
-        url = reverse('collpriv_details', kwargs={'pk': instance.id})
-        html.append('<a class="btn btn-xs jumbo-1" title="Cancel changes" href="{}">Cancel</a>'.format(url))
-
-        # Saving: adapt the elements
-        html.append('<a class="btn btn-xs jumbo-4" title="Save changes">Save</a>')
-
-        # Saving as: save changes to a new Collection of settype = 'pd' and scope = 'priv'
-        html.append('<a class="btn btn-xs jumbo-4" title="Save revision as a new personal dataset">Save as...</a>')
 
         # COmbine the list into a string
         sHtml = "\n".join(html)
@@ -7270,15 +7492,18 @@ class CollPublDetails(CollPrivDetails):
     title = "Public Dataset"
 
     def custom_init(self, instance):
-        # Check if someone acts as if this is a public dataset, whil it is not
-        if instance.settype == "pd":
-            # Determine what kind of dataset/collection this is
-            if instance.owner == Profile.get_user_profile(self.request.user.username):
-                # It is a private dataset after all!
-                self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
-        elif instance.settype == "hc":
-            # This is a historical collection
-            self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+        if instance != None:
+            # Check if someone acts as if this is a public dataset, whil it is not
+            if instance.settype == "pd":
+                # Determine what kind of dataset/collection this is
+                if instance.owner == Profile.get_user_profile(self.request.user.username):
+                    # It is a private dataset after all!
+                    self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+            elif instance.settype == "hc":
+                # This is a historical collection
+                self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+            # Check for hlist saving
+            self.check_hlist(instance)
         return None
 
 
@@ -7376,7 +7601,7 @@ class CollHistDetails(CollHistEdit):
                     rel_item.append({'value': ssg_info, 'align': "right"})
 
                 # Add this Manu line to the list
-                rel_list.append(rel_item)
+                rel_list.append(dict(id=item.id, cols=rel_item))
 
             manuscripts['rel_list'] = rel_list
 
@@ -7475,7 +7700,7 @@ class CollHistDetails(CollHistEdit):
                 # Ratio of equalness
                 rel_item.append({'value': ratio, 'initial': 'small'})
 
-                rel_list.append(rel_item)
+                rel_list.append(dict(id=item.id, cols=rel_item))
 
 
             # Add the related list
@@ -8862,6 +9087,25 @@ class ManuscriptListView(BasicList):
                 # Success
                 Information.set_kvalue("msitemcleanup", "done")
 
+        # Check if adding [lcity] and [lcountry] to locations is needed
+        sh_done = Information.get_kvalue("locationcitycountry")
+        if sh_done == None or sh_done == "":
+            with transaction.atomic():
+                for obj in Location.objects.all():
+                    bNeedSaving = False
+                    lcountry = obj.partof_loctype("country")
+                    lcity = obj.partof_loctype("city")
+                    if obj.lcountry == None and lcountry != None:
+                        obj.lcountry = lcountry
+                        bNeedSaving = True
+                    if obj.lcity == None and lcity != None:
+                        obj.lcity = lcity
+                        bNeedSaving = True
+                    if bNeedSaving:
+                        obj.save()
+            # Success
+            Information.set_kvalue("locationcitycountry", "done")
+
         return None
 
     def add_to_context(self, context, initial):
@@ -9614,49 +9858,54 @@ class SermonGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Need to know who this user (profile) is
-        profile = Profile.get_user_profile(self.request.user.username)
-        username = profile.user.username
-        team_group = app_editor
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
-             'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
-            {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
-             'title': 'Other Sermons Gold members of the same equality set'},
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
-            {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
-            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
-             'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
-             'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
-            {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
-            {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-             'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
-            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-            {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
-             'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
-            {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
-             'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
-            {'type': 'plain', 'label': "Personal datasets:",    'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-             'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
-            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
-             'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
-            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-             'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
-            {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
-             'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
-            ]
-        # Notes:
-        # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'safe', 'label': "Belongs to:",            'value': instance.get_ssg_markdown,   
+                 'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
+                {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
+                 'title': 'Other Sermons Gold members of the same equality set'},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
+                {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
+                 'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
+                {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
+                 'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+                {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
+                {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+                 'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
+                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+                 'title': 'Keywords attached to the Super Sermon Gold of which this Sermon Gold is part'},
+                {'type': 'line', 'label': "Gryson/Clavis codes:",   'value': instance.get_signatures_markdown(),  'unique': True, 
+                 'multiple': True, 'field_list': 'siglist', 'fso': self.formset_objects[0]},
+                {'type': 'plain', 'label': "Personal datasets:",    'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                 'multiple': True, 'field_list': 'collist_sg', 'fso': self.formset_objects[3] },
+                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(), 
+                 'multiple': True, 'field_list': 'edilist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template'},
+                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                 'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
+                {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
+                 'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
+                ]
+            # Notes:
+            # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
 
-        # TODO: add [sermongold_litset] unobtrusively
+            # TODO: add [sermongold_litset] unobtrusively
 
-        # Signal that we have select2
-        context['has_select2'] = True
+            # Signal that we have select2
+            context['has_select2'] = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonGoldEdit/add_to_context")
 
         # Return the context we have made
         return context
@@ -10193,14 +10442,17 @@ class EqualGoldDetails(EqualGoldEdit):
         if 'goldcopy' in self.qd and context['is_app_editor']:
             # Get the ID of the gold sermon from which information is to be copied to the SSG
             goldid = self.qd['goldcopy']
+            # Also get the simple value
+            simple = self.qd.get("simple", "f")
             # Get the GOLD SERMON instance
             gold = SermonGold.objects.filter(id=goldid).first()
 
             if gold != None:
                 # Copy all relevant information to the EqualGold obj (which as a SSG)
                 obj = self.object
-                # (1) copy author
-                if gold.author != None: obj.author = gold.author
+                if simple == "f":
+                    # (1) copy author - only if not simple
+                    if gold.author != None: obj.author = gold.author
                 # (2) copy incipit
                 if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
                 # (3) copy explicit
@@ -10305,7 +10557,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
 
                 # Add this Manu/Sermon line to the list
-                rel_list.append(rel_item)
+                rel_list.append(dict(id=item.id, cols=rel_item))
             manuscripts['rel_list'] = rel_list
 
             if method == "FourColumns":

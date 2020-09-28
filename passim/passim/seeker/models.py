@@ -1550,11 +1550,26 @@ class Location(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # We need to know whether a location is part of a particular city or country for 'dependent_fields'
+    # [0-1] City according to the 'Location' specification
+    lcity = models.ForeignKey("self", null=True, related_name="lcity_locations")
+    # [0-1] Library according to the 'Location' specification
+    lcountry = models.ForeignKey("self", null=True, related_name="lcountry_locations")
+
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        if self != None:
+            # Check the values for [lcity] and [lcountry]
+            self.lcountry = self.partof_loctype("country")
+            self.lcity = self.partof_loctype("city")
+        # Regular saving
+        response = super(Location, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def get_loc_name(self):
         lname = "{} ({})".format(self.name, self.loctype)
@@ -1643,6 +1658,17 @@ class Location(models.Model):
     def above(self):
         return self.hierarchy(False)
 
+    def partof_loctype(self, loctype):
+        """See which country (if any) I am part of"""
+
+        lcountry = None
+        lst_above = self.hierarchy(False)
+        for obj in lst_above:
+            if obj.loctype.name == loctype:
+                lcountry = obj
+                break
+        return lcountry
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -1679,6 +1705,14 @@ class LocationRelation(models.Model):
     container = models.ForeignKey(Location, related_name="container_locrelations")
     # [1] Obligatory contained
     contained = models.ForeignKey(Location, related_name="contained_locrelations")
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the regular saving
+        response = super(LocationRelation, self).save(force_insert, force_update, using, update_fields)
+        # Check the [contained] element for [lcity] and [lcountry]
+        self.contained.save()
+        # Return the save response
+        return response
 
 
 class Country(models.Model):
@@ -4146,9 +4180,14 @@ class EqualGold(models.Model):
 
         oErr = ErrHandle()
         try:
-            # Adapt the incipit and explicit
-            self.srchincipit = get_searchable(self.incipit)
-            self.srchexplicit = get_searchable(self.explicit)
+            # Adapt the incipit and explicit - if necessary
+            srchincipit = get_searchable(self.incipit)
+            if self.srchincipit != srchincipit:
+                self.srchincipit = srchincipit
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchexplicit != srchexplicit:
+                self.srchexplicit = srchexplicit
+
             # Double check the number and the code
             if self.author:
                 # Get the author number
@@ -4171,7 +4210,9 @@ class EqualGold(models.Model):
 
             # (Re) calculate the number of associated historical collections (for *all* users!!)
             if self.id != None:
-                self.hccount = self.collections.filter(settype="hc", scope='publ').count()
+                hccount = self.collections.filter(settype="hc", scope='publ').count()
+                if hccount != self.hccount:
+                    self.hccount = hccount
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -4554,9 +4595,10 @@ class EqualGold(models.Model):
         # Calculate the first signature
         first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
         if first != None:
-            self.firstsig = first.code
-            # Save changes
-            self.save()
+            firstsig = first.code
+            if self.firstsig != firstsig:
+                # Save changes
+                self.save()
         return True
 
     def set_sgcount(self):
@@ -4644,9 +4686,11 @@ class SermonGold(models.Model):
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist:
+            self.siglist = siglist
+            # And save myself
+            self.save()
 
     def editions(self):
         """Combine all editions into one string: the editions are retrieved from litrefSG"""
@@ -4853,16 +4897,23 @@ class SermonGold(models.Model):
         """Get all the keywords attached to the SSG of which I am part"""
 
         lHtml = []
-        # Get all keywords attached to these SGs
-        qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
-        # Visit all keywords
-        for keyword in qs:
-            # Determine where clicking should lead to
-            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            if self.equal != None:
+                # Get all keywords attached to these SGs
+                qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
+                # Visit all keywords
+                for keyword in qs:
+                    # Determine where clicking should lead to
+                    url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+                    # Create a display for this topic
+                    lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_keywords_ssg_markdown")
         return sBack
 
     def get_label(self, do_incexpl=False):
@@ -5456,7 +5507,7 @@ class Collection(models.Model):
     # [0-1] Number of SSG authors -- if this is a settype='hc'
     ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
 
-    # [0-n] Many-to-many: keywords per SermonGold
+    # [0-n] Many-to-many: references per collection
     litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
 
     
@@ -5504,10 +5555,55 @@ class Collection(models.Model):
         sBack = ", ".join(html)
         return sBack
 
-    def get_readonly_display(self):
-        response = "yes" if self.readonly else "no"
-        return response
-        
+    def get_created(self):
+        """REturn the creation date in a readable form"""
+
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
+    def get_copy(self, owner=None):
+        """Create a copy of myself and return it"""
+
+        oErr = ErrHandle()
+        new_copy = None
+        try:
+            # Create one, copying the existing one
+            new_owner = self.owner if owner == None else owner
+            new_copy = Collection.objects.create(
+                name = self.name, owner=new_owner, readonly=self.readonly,
+                type = self.type, settype = self.settype, descrip = self.descrip,
+                url = self.url, path = self.path, scope=self.scope)
+            # Further action depends on the type we are
+            if self.type == "manu":
+                # Copy manuscripts
+                qs = CollectionMan.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionMan.objects.create(collection=new_copy, manuscript=obj.manuscript, order=obj.order)
+            elif self.type == "sermo":
+                # Copy sermons
+                qs = CollectionSerm.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSerm.objects.create(collection=new_copy, sermon=obj.sermon, order=obj.order)
+            elif self.type == "gold":
+                # Copy gold sermons
+                qs = CollectionGold.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionGold.objects.create(collection=new_copy, gold=obj.gold, order=obj.order)
+            elif self.type == "super":
+                # Copy SSGs
+                qs = CollectionSuper.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSuper.objects.create(collection=new_copy, super=obj.super, order=obj.order)
+
+            # Change the name
+            new_copy.name = "{}_{}".format(new_copy.name, new_copy.id)
+            # Make sure to save it once more to process any changes in the save() function
+            new_copy.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/get_copy")
+        return new_copy
+
     def get_elevate(self):
         html = []
         url = reverse("collhist_elevate", kwargs={'pk': self.id})
@@ -5534,12 +5630,6 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_created(self):
-        """REturn the creation date in a readable form"""
-
-        sDate = self.created.strftime("%d/%b/%Y %H:%M")
-        return sDate
-
     def get_manuscript_link(self):
         """Return a piece of HTML with the manuscript link for the user"""
 
@@ -5556,39 +5646,10 @@ class Collection(models.Model):
             sBack = "\n".join(html)
         return sBack
 
-    def get_size_markdown(self):
-        """Count the items that belong to me, depending on my type
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
         
-        Create a HTML output
-        """
-
-        size = 0
-        lHtml = []
-        if self.type == "sermo":
-            size = self.freqsermo()
-            # Determine where clicking should lead to
-            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
-        elif self.type == "manu":
-            size = self.freqmanu()
-            # Determine where clicking should lead to
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
-        elif self.type == "gold":
-            size = self.freqgold()
-            # Determine where clicking should lead to
-            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
-        elif self.type == "super":
-            size = self.freqsuper()
-            # Determine where clicking should lead to
-            if self.settype == "hc":
-                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
-            else:
-                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
-        if size > 0:
-            # Create a display for this topic
-            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
-        sBack = ", ".join(lHtml)
-        return sBack
-
     def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
 
@@ -5639,6 +5700,39 @@ class Collection(models.Model):
             qs = Collection.objects.all()
         # REturn the result
         return qs
+
+    def get_size_markdown(self):
+        """Count the items that belong to me, depending on my type
+        
+        Create a HTML output
+        """
+
+        size = 0
+        lHtml = []
+        if self.type == "sermo":
+            size = self.freqsermo()
+            # Determine where clicking should lead to
+            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
+        elif self.type == "manu":
+            size = self.freqmanu()
+            # Determine where clicking should lead to
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
+        elif self.type == "gold":
+            size = self.freqgold()
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
+        elif self.type == "super":
+            size = self.freqsuper()
+            # Determine where clicking should lead to
+            if self.settype == "hc":
+                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
+            else:
+                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_template_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""
