@@ -36,6 +36,7 @@ STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
 ABBR_LENGTH = 5
+BKCHVS_LENGTH = 9       # BBBCCCVVV
 PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
@@ -1498,10 +1499,26 @@ class Book(models.Model):
     # [1] the numerical identifier of this book, running from 1-66
     idno = models.IntegerField("Identifier", default=-1)
     # [1] The number of chapters in this book
-    chunm = models.IntegerField("Number of chapters", default=-1)
+    chnum = models.IntegerField("Number of chapters", default=-1)
 
     def __str__(self):
         return self.abbr
+
+    def get_abbr(idno):
+        sAbbr = ""
+        # Get the abbreviation, given the IDNO of a book
+        obj = Book.objects.filter(idno=idno).first()
+        if obj != None:
+            sAbbr = obj.abbr
+        return sAbbr
+
+    def get_idno(abbr):
+        idno = -1
+        # Get the abbreviation, given the IDNO of a book
+        obj = Book.objects.filter(abbr=abbr).first()
+        if obj != None:
+            idno = obj.idno
+        return idno
 
 
 class Chapter(models.Model):
@@ -1512,13 +1529,37 @@ class Chapter(models.Model):
     # [1] The chapter number
     number = models.IntegerField("Chapter", default = -1)
     # [1] The number of verses in this chapter
-    verses = models.IntegerField("Verses", default = -1)
+    vsnum = models.IntegerField("Number of verses", default = -1)
 
     def __str__(self):
         sBack = ""
         if self.book != None and self.number > 0:
             sBack = "{} {}".format(self.book.abbr, self.number)
         return sBack
+
+
+class BkChVs():
+    """Helper class to convert to/from bk/ch/vs"""
+
+    book = ""
+    ch = -1
+    vs = -1
+
+    def __init__(self, bkchvs):
+        """Create an object"""
+
+        # Perform the standard initialization
+        response = super(BkChVs, self).__init__()
+        # Disentanble bkchvs
+        if len(bkchvs) == 9:
+            idno = int(bkchvs[0:3])
+            self.ch = int(bkchvs[3:3])
+            selv.vs = int(bkchvs[6:3])
+            # Convert idno into abbreviation
+            self.book = Book.get_abbr(idno)
+
+        # Return the response
+        return response
 
 
 class LocationType(models.Model):
@@ -6567,6 +6608,203 @@ class SermonDescr(models.Model):
         # Get the URL to edit this sermon
         sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
         return sUrl
+
+
+class Range (models.Model):
+    """A range in the bible from one place to another"""
+
+    # [1] The start of the range is bk/ch/vs
+    start = models.CharField("Start", default = "",  max_length=BKCHVS_LENGTH)
+    # [1] The end of the range also in bk/ch/vs
+    einde = models.CharField("Einde", default = "",  max_length=BKCHVS_LENGTH)
+    # [1] Each range is linked to a Sermon
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonranges")
+
+    def __str__(self):
+        sBack = ""
+        if self.start != None and self.einde != None:
+            sBack = self.get_range()
+        return sBack
+
+    def get_range(self):
+        sRange = ""
+        # a range from a bk/ch/vs to a bk/ch/vs
+        start = self.start
+        einde = self.einde
+        if len(start) == 9 and len(einde) == 9:
+            # Derive the bk/ch/vs of start
+            oStart = BkChVs(start)
+            oEinde = BkChVs(einde)
+            if oStart.book == oEinde.book:
+                # Check if they are in the same chapter
+                if oStart.ch == oEinde.ch:
+                    # Same chapter
+                    if oStart.vs == oEinde.vs:
+                        # Just one place
+                        sRange = "{} {}:{}".format(oStart.book, oStart.ch, oStart.vs)
+                    else:
+                        # From vs to vs
+                        sRange = "{} {}:{}-{}".format(oStart.book, oStart.ch, oStart.vs, oEinde.vs)
+                else:
+                    # Between different chapters
+                    if oStart.vs == 0 and oEinde.vs == 0:
+                        # Just two different chapters
+                        sRange = "{} {}-{}".format(oStart.book, oStart.ch, oEinde.ch)
+                    else:
+                        sRange = "{} {}:{}-{}:{}".format(oStart.book, oStart.ch, oStart.vs, oEinde.ch, oEinde.vs)
+            else:
+                # Between books
+                sRange = "{}-{}".format(oStart.book, oEinde.book)
+        # Return the total
+        return sRange
+
+    def parse(self, sRange):
+        """Parse a string into a start/einde range
+        
+        Possibilities:
+            BBB         - One book
+            BBB-DDD     - Range of books
+            BBB C       - One chapter
+            BBB C-C     - Range of chapters
+            BBB C:V     - One verse
+            BBB C:V-V   - Range of verses in one chapter
+            BBB C:V-C:V - Range of verses between chapters
+        """
+
+        SPACES = " \t\n\r"
+        NUMBER = "0123456789"
+        bStatus = True
+        obj = None
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            def skip_spaces():
+                while sRange[pos] in SPACES: pos += 1
+                return None
+
+            def get_number():
+                number = -1
+                pos_start = pos
+                while sRange[pos] in NUMBER: pos += 1
+                # Get the chapter number
+                number = int(sRange[pos_start: pos - pos_start + 1])
+                # Possibly skip following spaces
+                while sRange[pos] in SPACES: pos += 1
+                return number
+
+            def syntax_error():
+                msg = "Cannot interpret at {}: {}".format(pos, sRange)
+                bStatus = False
+
+            # Make sure spaces are dealt with
+            sRange = sRange.strip()
+            # Expecting to read the first book
+            sBook = sRange[0:3]
+            pos = 3
+            idno = Book.get_idno(sBook)
+            if idno < 0:
+                msg = "Cannot find book {}".format(sBook)
+            else:
+                # Skip spaces
+                skip_spaces()
+                # Check what follows now
+                sNext = sRange[pos]
+                if sNext == "-":
+                    # Range of books
+                    pos += 1
+                    # Skip spaces
+                    skip_spaces()
+                    # Get the second book name
+                    if len(sRange) - pos >=3:
+                        sBook2 = sRange[pos:3]
+                        # Create the two ch/bk/vs items
+                        start = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
+                        idno2 = Book.get_idno(sBook2)
+                        if idno2 < 0:
+                            msg = "Cannot identify the second book in: {}".format(sRange)
+                            bStatus = False
+                        else:
+                            einde = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
+                            # There is a start-einde, so add a Range object for this Sermon
+                            obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                    else:
+                        msg = "Expecting book range {}".format(sRange)
+                        bStatus = False
+                elif sNext in NUMBER:
+                    # Chapter number
+                    chapter = get_number()
+                    # Find out what is next
+                    sNext = sRange[pos]
+                    if sNext == "-":
+                        # Possibly skip spaces
+                        skip_spaces()
+                        # Find out what is next
+                        sNext = sRange[pos]
+                        if sNext in NUMBER:
+                            # Range of chapters
+                            chnext = get_number()
+                            # Create the two ch/bk/vs items
+                            start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                            einde = "{}{:0>3d}{:0>3d}".format(idno, chnext, 0)
+                            # There is a start-einde, so add a Range object for this Sermon
+                            obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                        else:
+                            # Syntax error
+                            syntax_error()
+                    elif sNext == ":":
+                        # A verse is following
+                        verse = get_number()
+                        # At least get the start
+                        start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                        # Skip spaces
+                        skip_spaces()
+                        # See what is following
+                        sNext = sRange[pos]
+                        if sNext == "-":
+                            # Expecting a range
+                            skip_spaces()
+                            sNext = sRange[pos]
+                            if sNext in NUMBER:
+                                # Read the number
+                                number = get_number()
+                                # Skip spaces
+                                skip_spaces()
+                                # See what is next
+                                sNext = sRange[pos]
+                                if sNext == ":":
+                                    # Range of verses between chapters
+                                    skip_spaces()
+                                    sNext = sRange[pos]
+                                    if sNext in NUMBER:
+                                        verse = get_number()
+                                        einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
+                                        # Add the BBB C:V-V
+                                        obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                    else:
+                                        syntax_error()
+                                else:
+                                    # The number is a verse
+                                    einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
+                                    # Add the BBB C:V-V
+                                    obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                            else:
+                                syntax_error()
+                        else:
+                            # This was just one single verse
+                            einde = start
+                            # Add the single verse as a Range object for this Sermon
+                            obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                    else:
+                        # Syntax error
+                        syntax_error()
+                else:
+                    # Syntax error
+                    syntax_error()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Range/parse")
+            bStatus = False
+        return bStatus, msg, obj
 
 
 class SermonDescrKeyword(models.Model):
