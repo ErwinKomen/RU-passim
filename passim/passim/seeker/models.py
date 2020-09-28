@@ -35,6 +35,7 @@ from xml.dom import minidom
 STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
+ABBR_LENGTH = 5
 PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
@@ -1022,7 +1023,7 @@ def moveup(instance, tblGeneral, tblUser, ItemType):
     return bOkay
 
 
-
+# =================== HELPER models ===================================
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
 
@@ -1483,6 +1484,41 @@ class Stype(models.Model):
 
     def __str__(self):
         return self.abbr
+
+
+# ==================== Passim/Seeker models =============================
+
+class Book(models.Model):
+    """One book from the Bible"""
+
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] standard three letter abbreviation
+    abbr = models.CharField("Abbreviation", max_length=ABBR_LENGTH)
+    # [1] the numerical identifier of this book, running from 1-66
+    idno = models.IntegerField("Identifier", default=-1)
+    # [1] The number of chapters in this book
+    chunm = models.IntegerField("Number of chapters", default=-1)
+
+    def __str__(self):
+        return self.abbr
+
+
+class Chapter(models.Model):
+    """A chapter in a Bible book"""
+
+    # [1] Each chapter belongs to a book
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookchapters")
+    # [1] The chapter number
+    number = models.IntegerField("Chapter", default = -1)
+    # [1] The number of verses in this chapter
+    verses = models.IntegerField("Verses", default = -1)
+
+    def __str__(self):
+        sBack = ""
+        if self.book != None and self.number > 0:
+            sBack = "{} {}".format(self.book.abbr, self.number)
+        return sBack
 
 
 class LocationType(models.Model):
