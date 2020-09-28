@@ -96,6 +96,26 @@ class NewsItemAdmin(admin.ModelAdmin):
         }
 
 
+class ChapterAdmin(admin.ModelAdmin):
+    fields = ['book', 'number', 'vsnum']
+    list_display = ['book', 'number', 'vsnum']
+
+
+class ChapterInline(admin.TabularInline):
+    model = Chapter
+    fk_name = 'book'
+    extra = 0
+
+
+class BookAdmin(admin.ModelAdmin):
+    list_display = ['name', 'idno', 'abbr', 'chnum']
+    fields = ['name', 'idno', 'abbr', 'chnum']
+    inlines = [ChapterInline]
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
 class VisitAdmin(admin.ModelAdmin):
     """Display and edit Visit moments"""
 
@@ -207,6 +227,8 @@ admin.site.register(LitrefMan)
 admin.site.register(SermonDescr, SermonDescrAdmin)
 admin.site.register(SermonGold)
 admin.site.register(Manuscript, ManuscriptAdmin)
+admin.site.register(Chapter, ChapterAdmin)
+admin.site.register(Book, BookAdmin)
 
 admin.site.register(Report, ReportAdmin)
 
