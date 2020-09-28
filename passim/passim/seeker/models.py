@@ -6755,6 +6755,11 @@ class Range(models.Model):
                     introducer = "cf."
                     pos += 3
                     skip_spaces()
+                elif sRange[0:3] == "or ":
+                    # There is an introducer
+                    introducer = "or"
+                    pos += 3
+                    skip_spaces()
 
                 # Expecting to read the first book
                 sBook = sRange[pos:3]
