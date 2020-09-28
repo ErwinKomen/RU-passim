@@ -5904,6 +5904,15 @@ class SermonListView(BasicList):
                 # Success
                 Information.set_kvalue("nicknames", "done")
 
+        # Check if signature adaptation is needed
+        bref_done = Information.get_kvalue("biblerefs")
+        if bref_done == None or bref_done != "done":
+            # Perform adaptations
+            for sermon in SermonDescr.objects.all():
+                sermon.do_ranges()
+            # Success
+            Information.set_kvalue("biblerefs", "done")
+
         # Make sure to set a basic filter
         self.basic_filter = Q(mtype="man")
         return None

@@ -1547,10 +1547,10 @@ class Book(models.Model):
         if idx >= 0:
             abbr = abbr_to[idx]
 
-            # Get the abbreviation, given the IDNO of a book
-            obj = Book.objects.filter(abbr__iexact=abbr).first()
-            if obj != None:
-                idno = obj.idno
+        # Get the abbreviation, given the IDNO of a book
+        obj = Book.objects.filter(abbr__iexact=abbr).first()
+        if obj != None:
+            idno = obj.idno
         return idno
 
 
@@ -6066,6 +6066,14 @@ class SermonDescr(models.Model):
             bOkay = False
         return bOkay, msg
 
+    def add_range(self, start, einde):
+        """Add a range to this sermon, if it is not there already"""
+
+        obj = Range.objects.filter(sermon=self, start=start, einde=einde).first()
+        if obj == None:
+            obj = Range.objects.create(sermon=self, start=start, einde=einde)
+        return obj
+
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
         if self.msitem != None:
@@ -6073,6 +6081,10 @@ class SermonDescr(models.Model):
         # Regular delete operation
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
+
+    def do_ranges(self):
+        if self.bibleref != None and self.bibleref != "":
+            Range.parse(self, self.bibleref)
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
@@ -6696,7 +6708,7 @@ class Range(models.Model):
         # Return the total
         return sRange
 
-    def parse(self, sRange):
+    def parse(sermon, sRange):
         """Parse a string into a start/einde range
         
         Possibilities:
@@ -6715,30 +6727,31 @@ class Range(models.Model):
         introducer = ""
         obj = None
         msg = ""
+        pos = -1
         oErr = ErrHandle()
         try:
-            def skip_spaces():
+            def skip_spaces(pos):
                 length = len(sRange)
                 while pos < length and sRange[pos] in SPACES: pos += 1
-                return None
+                return pos
 
-            def is_end():
+            def is_end(pos):
                 pos_last = len(sRange)-1
                 bFinish = (pos > pos_last)
                 return bFinish
 
-            def get_number():
+            def get_number(pos):
                 number = -1
                 pos_start = pos
                 length = len(sRange)
                 while pos < length and sRange[pos] in NUMBER: pos += 1
                 # Get the chapter number
-                number = int(sRange[pos_start: pos - pos_start + 1])
+                number = int(sRange[pos_start: pos]) # - pos_start + 1])
                 # Possibly skip following spaces
                 while pos < length and sRange[pos] in SPACES: pos += 1
-                return number
+                return pos, number
 
-            def syntax_error():
+            def syntax_error(pos):
                 msg = "Cannot interpret at {}: {}".format(pos, sRange)
                 bStatus = False
 
@@ -6746,6 +6759,14 @@ class Range(models.Model):
             arRange = sRange.split(";")
 
             for sRange in arRange:
+                # Initializations
+                introducer = ""
+                additional = ""
+                obj = None
+                idno = -1
+
+                if bStatus == False: break
+
                 # Make sure spaces are dealt with
                 sRange = sRange.strip()
                 pos = 0
@@ -6754,39 +6775,47 @@ class Range(models.Model):
                     # There is an introducer
                     introducer = "cf."
                     pos += 3
-                    skip_spaces()
+                    pos = skip_spaces(pos)
                 elif sRange[0:3] == "or ":
                     # There is an introducer
                     introducer = "or"
                     pos += 3
-                    skip_spaces()
+                    pos = skip_spaces(pos)
 
                 # Expecting to read the first book
-                sBook = sRange[pos:3]
-                pos = 3
+                #sBook = sRange[pos:3]
+                #pos = 3
 
-                idno = Book.get_idno(sBook)
+                
+                # if idno < 0:
+                # Check for possible book in BOOK_NAMES
+                for item in BOOK_NAMES:
+                    length = len(item['name'])
+                    if item['name'] == sRange[pos:length]:
+                        # We have the book abbreviation
+                        abbr = item['abbr']
+                        idno = Book.get_idno(abbr)
+                        break;
                 if idno < 0:
-                    # Check for possible book in BOOK_NAMES
-                    for item in BOOK_NAMES:
-                        length = len(item['name'])
-                        if item['name'] == sRange[pos:length]:
-                            # We have the book abbreviation
-                            abbr = item['abbr']
-                            idno = Book.get_idno(abbr)
-                            break;
+                    sBook = sRange[pos:3]
+                    idno = Book.get_idno(sBook)
+                    length = len(sBook)
+
+
                 if idno < 0:
                     msg = "Cannot find book {}".format(sBook)
+                    bStatus = False
                 else:
+                    pos += length
                     # Skip spaces
-                    skip_spaces()
+                    pos = skip_spaces(pos)
                     # Check what follows now
                     sNext = sRange[pos]
                     if sNext == "-":
                         # Range of books
                         pos += 1
                         # Skip spaces
-                        skip_spaces()
+                        pos = skip_spaces(pos)
                         # Get the second book name
                         if len(sRange) - pos >=3:
                             sBook2 = sRange[pos:3]
@@ -6799,86 +6828,102 @@ class Range(models.Model):
                             else:
                                 einde = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
                                 # There is a start-einde, so add a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
                         else:
                             msg = "Expecting book range {}".format(sRange)
                             bStatus = False
                     elif sNext in NUMBER:
                         # Chapter number
-                        chapter = get_number()
+                        pos, chapter = get_number(pos)
                         # Find out what is next
                         sNext = sRange[pos]
                         if sNext == "-":
                             # Possibly skip spaces
-                            skip_spaces()
+                            pos = skip_spaces(pos)
                             # Find out what is next
                             sNext = sRange[pos]
                             if sNext in NUMBER:
                                 # Range of chapters
-                                chnext = get_number()
+                                pos, chnext = get_number(pos)
                                 # Create the two ch/bk/vs items
                                 start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
                                 einde = "{}{:0>3d}{:0>3d}".format(idno, chnext, 0)
                                 # There is a start-einde, so add a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
                             else:
                                 # Syntax error
-                                syntax_error()
+                                syntax_error(pos)
                         elif sNext == ":":
+                            pos += 1
                             # A verse is following
-                            verse = get_number()
+                            pos, verse = get_number(pos)
                             # At least get the start
-                            start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                            start = "{:0>3d}{:0>3d}{:0>3d}".format(idno, chapter, 0)
                             # Skip spaces
-                            skip_spaces()
-                            # See what is following
-                            sNext = sRange[pos]
-                            if sNext == "-":
-                                # Expecting a range
-                                skip_spaces()
-                                sNext = sRange[pos]
-                                if sNext in NUMBER:
-                                    # Read the number
-                                    number = get_number()
-                                    # Skip spaces
-                                    skip_spaces()
-                                    # See what is next
-                                    sNext = sRange[pos]
-                                    if sNext == ":":
-                                        # Range of verses between chapters
-                                        skip_spaces()
-                                        sNext = sRange[pos]
-                                        if sNext in NUMBER:
-                                            verse = get_number()
-                                            einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
-                                            # Add the BBB C:V-V
-                                            obj = Range.objects.create(start=start, einde=einde, sermon=self)
-                                        else:
-                                            syntax_error()
-                                    else:
-                                        # The number is a verse
-                                        einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
-                                        # Add the BBB C:V-V
-                                        obj = Range.objects.create(start=start, einde=einde, sermon=self)
-                                else:
-                                    syntax_error()
-                            else:
-                                # This was just one single verse
+                            pos = skip_spaces(pos)
+                            if is_end(pos):
+                                # Simple bk/ch/vs
                                 einde = start
                                 # Add the single verse as a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
+                            else:
+                                # See what is following
+                                sNext = sRange[pos]
+                                if sNext == "-":
+                                    pos += 1
+                                    # Expecting a range
+                                    pos = skip_spaces(pos)
+                                    sNext = sRange[pos]
+                                    if sNext in NUMBER:
+                                        # Read the number
+                                        pos, number = get_number(pos)
+                                        # Skip spaces
+                                        pos = skip_spaces(pos)
+                                        # See what is next
+                                        sNext = sRange[pos]
+                                        if sNext == ":":
+                                            pos += 1
+                                            # Range of verses between chapters
+                                            pos = skip_spaces(pos)
+                                            sNext = sRange[pos]
+                                            if sNext in NUMBER:
+                                                pos, verse = get_number(pos)
+                                                einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
+                                                # Add the BBB C:V-V
+                                                obj = sermon.add_range(start, einde)
+                                            else:
+                                                syntax_error(pos)
+                                        else:
+                                            # The number is a verse
+                                            einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
+                                            # Add the BBB C:V-V
+                                            obj = sermon.add_range(start, einde)
+                                    else:
+                                        syntax_error(pos)
+                                else:
+                                    # This was just one single verse
+                                    einde = start
+                                    # Add the single verse as a Range object for this Sermon
+                                    obj = sermon.add_range(start, einde)
                         else:
                             # Syntax error
-                            syntax_error()
+                            syntax_error(pos)
                     else:
                         # Syntax error
-                        syntax_error()
-                # Should we continue?
-                if bStatus and not is_end():
+                        syntax_error(pos)
+                bNeedSaving = False
+                # Is there any remark following?
+                if bStatus and not is_end(pos):
                     # Is there more stuff?
-                    sNext = sRange[pos]
-                    if sNext in ",;":
-                        # There is more following
+                    additional = sRange[pos:].strip()
+                    if obj != None:
+                        obj.added = sRemark
+                        bNeedSaving = True
+                if introducer != "":
+                    obj.intro = introducer
+                    bNeedSaving = True
+                if bNeedSaving:
+                    obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Range/parse")
