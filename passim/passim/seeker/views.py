@@ -10234,6 +10234,9 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
 
+            # Issue #295: the [number] (number within author) must be there, though hidden, not editable
+            {'type': 'plain', 'label': "Number:",        'value': instance.number, 'field_key': 'number', 'empty': 'hide'},
+
             # Issue #212: remove this sermon number
             # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
             # 'title': 'This is the automatically assigned sermon number for this particular author' },
@@ -10727,6 +10730,12 @@ class EqualGoldListView(BasicList):
                         ssg.hccount = hccount
                         ssg.save()
             Information.set_kvalue("hccount", "done")
+
+        #if Information.get_kvalue("ssg_number") != "done":
+        #    with transaction.atomic():
+        #        for obj in EqualGold.objects.all():
+        #            obj.save()
+        #    Information.set_kvalue("ssg_number", "done")
 
         return None
     

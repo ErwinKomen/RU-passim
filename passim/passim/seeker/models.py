@@ -4273,9 +4273,17 @@ class EqualGold(models.Model):
                 else:
                     # There is an author--is this different than the author we used to have?
 
-                    if not self.number:
-                        # Check the highest sermon number for this author
-                        self.number = EqualGold.sermon_number(self.author)
+                    if self.number == None:
+                        # This may be a mistake: see if there is a code already
+                        if self.code != None and "PASSIM" in self.code:
+                            # There already is a code: get the number from here
+                            arPart = re.split("\s|\.", self.code)
+                            if len(arPart) == 3 and arPart[0] == "PASSIM":
+                                # Get the author number
+                                self.number = int(arPart[2])
+                        if self.number == None:
+                            # Check the highest sermon number for this author
+                            self.number = EqualGold.sermon_number(self.author)
                     # Now we have both an author and a number...
                     passim_code = EqualGold.passim_code(auth_num, self.number)
                     if not self.code or self.code != passim_code:

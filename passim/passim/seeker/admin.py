@@ -199,6 +199,19 @@ class SermonDescrAdmin(admin.ModelAdmin):
 
     list_display = ['id', 'siglist', 'title', 'author']
     search_fields = ['id', 'siglist']
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
+class EqualGoldAdmin(admin.ModelAdmin):
+    """EqualGold = SSG"""
+
+    list_display = ['id', 'code', 'number', 'author']
+    search_fields = ['id', 'code']  
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
 
 
 class ManuscriptAdmin(admin.ModelAdmin):
@@ -206,6 +219,9 @@ class ManuscriptAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'idno', 'project']
     search_fields = ['name', 'idno']
     list_filter = ['project'] 
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
 
 
 # Models that serve others
@@ -227,6 +243,7 @@ admin.site.register(LitrefMan)
 admin.site.register(SermonDescr, SermonDescrAdmin)
 admin.site.register(SermonGold)
 admin.site.register(Manuscript, ManuscriptAdmin)
+admin.site.register(EqualGold, EqualGoldAdmin)
 admin.site.register(Chapter, ChapterAdmin)
 admin.site.register(Book, BookAdmin)
 
