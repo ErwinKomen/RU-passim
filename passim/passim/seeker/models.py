@@ -16,6 +16,7 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
+from passim.bible.models import Reference
 import sys, os, io, re
 import copy
 import json
@@ -79,30 +80,6 @@ traffic_light = '<span title="{}"><span class="glyphicon glyphicon-record" style
                                  '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
                                  '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
                 '</span>'
-
-BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name":"Revelations","abbr":"REV"},
-              {"name":"Ps.","abbr":"PSA"},{"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
-              {"name":"Philippians","abbr":"PHP"},{"name":"Phil.","abbr":"PHP"},{"name":"Os.","abbr":"HOS"},
-              {"name":"Mt.","abbr":"MAT"},{"name":"Mt","abbr":"MAT"},{"name":"Matthew","abbr":"MAT"},
-              {"name":"Matth.","abbr":"MAT"},{"name":"Matt.","abbr":"MAT"},{"name":"Mat.","abbr":"MAT"},
-              {"name":"Mark","abbr":"MRK"},{"name":"Marc.","abbr":"MRK"},{"name":"Luke","abbr":"LUK"},
-              {"name":"Lucas","abbr":"LUK"},{"name":"Luc.","abbr":"LUK"},{"name":"Luc","abbr":"LUK"},
-              {"name":"Lc.","abbr":"LUK"},{"name":"Lc","abbr":"LUK"},{"name":"Lamentations","abbr":"LAM"},
-              {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
-              {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
-              {"name":"Isaiah","abbr":"ISA"},{"name":"Is.","abbr":"ISA"},{"name":"Ioh.","abbr":"JHN"},
-              {"name":"II Petr.","abbr":"2PE"},{"name":"II Cor.","abbr":"2CO"},{"name":"Iac.","abbr":"JAS"},
-              {"name":"I Tim.","abbr":"1TI"},{"name":"I Thess.","abbr":"1TH"},{"name":"I Thes.","abbr":"1TH"},
-              {"name":"I Mcc","abbr":"1MA"},{"name":"I Ioh.","abbr":"1JN"},{"name":"I Cor.","abbr":"1CO"},
-              {"name":"Hebr.","abbr":"HEB"},{"name":"Heb.","abbr":"HEB"},{"name":"Gen.","abbr":"GEN"},
-              {"name":"Gal.","abbr":"GAL"},{"name":"Ez.","abbr":"EZK"},{"name":"Ephesians","abbr":"EPH"},
-              {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccli.","abbr":"ECC"},
-              {"name":"Cor.","abbr":"1CO"},{"name":"Col.","abbr":"COL"},{"name":"Canticum Canticorum","abbr":"SNG"},
-              {"name":"Apocalypsis","abbr":"REV"},{"name":"Apoc.","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
-              {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"},{"name":"2 Cor.","abbr":"2CO"},
-              {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
-              {"name":"1 Peter","abbr":"1PE"},{"name":"1 Lamentations","abbr":"LAM"},{"name":"1 John","abbr":"1JN"},
-              {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"}]
 
 class FieldChoice(models.Model):
 
@@ -1512,88 +1489,6 @@ class Stype(models.Model):
 
 
 # ==================== Passim/Seeker models =============================
-
-class Book(models.Model):
-    """One book from the Bible"""
-
-    # [1] obligatory name
-    name = models.CharField("Name", max_length=STANDARD_LENGTH)
-    # [1] standard three letter abbreviation
-    abbr = models.CharField("Abbreviation", max_length=ABBR_LENGTH)
-    # [1] the numerical identifier of this book, running from 1-66
-    idno = models.IntegerField("Identifier", default=-1)
-    # [1] The number of chapters in this book
-    chnum = models.IntegerField("Number of chapters", default=-1)
-
-    def __str__(self):
-        return self.abbr
-
-    def get_abbr(idno):
-        sAbbr = ""
-        # Get the abbreviation, given the IDNO of a book
-        obj = Book.objects.filter(idno=idno).first()
-        if obj != None:
-            sAbbr = obj.abbr
-        return sAbbr
-
-    def get_idno(abbr):
-        abbr_from = ["mt1", "matt.", "luc.", "lc.", "jo."]
-        abbr_to = ["mat", "mat", "luk", "luk", "jhn"]
-
-        idno = -1
-        # Possibly adapt some abbreviations to be able to understand them
-        abbr = abbr.lower()
-        idx = next((x for x in abbr_from if x == abbr), -1)
-        if idx >= 0:
-            abbr = abbr_to[idx]
-
-        # Get the abbreviation, given the IDNO of a book
-        obj = Book.objects.filter(abbr__iexact=abbr).first()
-        if obj != None:
-            idno = obj.idno
-        return idno
-
-
-class Chapter(models.Model):
-    """A chapter in a Bible book"""
-
-    # [1] Each chapter belongs to a book
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookchapters")
-    # [1] The chapter number
-    number = models.IntegerField("Chapter", default = -1)
-    # [1] The number of verses in this chapter
-    vsnum = models.IntegerField("Number of verses", default = -1)
-
-    def __str__(self):
-        sBack = ""
-        if self.book != None and self.number > 0:
-            sBack = "{} {}".format(self.book.abbr, self.number)
-        return sBack
-
-
-class BkChVs():
-    """Helper class to convert to/from bk/ch/vs"""
-
-    book = ""
-    ch = -1
-    vs = -1
-
-    def __init__(self, bkchvs):
-        """Create an object"""
-
-        # Perform the standard initialization
-        response = super(BkChVs, self).__init__()
-        # Disentanble bkchvs
-        if len(bkchvs) == 9:
-            idno = int(bkchvs[0:3])
-            self.ch = int(bkchvs[3:3])
-            selv.vs = int(bkchvs[6:3])
-            # Convert idno into abbreviation
-            self.book = Book.get_abbr(idno)
-
-        # Return the response
-        return response
-
 
 class LocationType(models.Model):
     """Kind of location and level on the location hierarchy"""
@@ -5429,12 +5324,15 @@ class SermonGold(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
+        srchincipit = get_searchable(self.incipit)
+        srchexplicit = get_searchable(self.explicit)
+        if self.srchincipit != srchincipit: self.srchincipit = srchincipit
+        if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist: self.siglist = siglist
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
 
@@ -5976,6 +5874,7 @@ class SermonDescr(models.Model):
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
+    verses = models.TextField("List of verses", null=True, blank=True)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
@@ -6092,7 +5991,16 @@ class SermonDescr(models.Model):
 
     def do_ranges(self):
         if self.bibleref != None and self.bibleref != "":
-            Range.parse(self, self.bibleref)
+            # OLD:
+            # Range.parse(self, self.bibleref)
+            # Open a Reference object
+            oRef = Reference(kwargs={'bibleref': self.bibleref})
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult:
+                # Add this range to the sermon
+                self.verses = json.dumps(lst_verses)
+                self.save()
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""

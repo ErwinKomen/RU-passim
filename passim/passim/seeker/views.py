@@ -9856,7 +9856,8 @@ class SermonGoldEdit(BasicDetails):
                        {'formsetClass': GlitFormSet,  'prefix': 'glit',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'},
                        {'formsetClass': GftxtFormSet, 'prefix': 'gftxt', 'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
-    stype_edi_fields = ['author', 'authorname', 'incipit', 'explicit', 'bibliography', 'equal',
+    # Note: do *NOT* include 'authorname', 
+    stype_edi_fields = ['author', 'incipit', 'explicit', 'bibliography', 'equal',
                         #'kwlist', 
                         'Signature', 'siglist',
                         #'CollectionGold', 'collist_sg',
@@ -10211,7 +10212,8 @@ class EqualGoldEdit(BasicDetails):
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
         ]
 
-    stype_edi_fields = ['author', 'number', 'code', 'incipit', 'explicit',
+    # Note: do not include [code] in here
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
