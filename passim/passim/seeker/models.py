@@ -5991,16 +5991,21 @@ class SermonDescr(models.Model):
 
     def do_ranges(self):
         if self.bibleref != None and self.bibleref != "":
-            # OLD:
-            # Range.parse(self, self.bibleref)
-            # Open a Reference object
-            oRef = Reference(kwargs={'bibleref': self.bibleref})
-            # Calculate the scripture verses
-            bResult, msg, lst_verses = oRef.parse()
-            if bResult:
-                # Add this range to the sermon
-                self.verses = json.dumps(lst_verses)
-                self.save()
+            if self.verses == None or self.verses == "" or self.verses == "[]":
+                # Open a Reference object
+                oRef = Reference(kwargs={'bibleref': self.bibleref})
+
+                print("do_ranges: {}".format(self.bibleref), file=sys.stderr)
+
+                if self.id in [27571, 27572, 27573, 55187]:
+                    iStop = 1
+
+                # Calculate the scripture verses
+                bResult, msg, lst_verses = oRef.parse()
+                if bResult:
+                    # Add this range to the sermon
+                    self.verses = json.dumps(lst_verses)
+                    self.save()
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""

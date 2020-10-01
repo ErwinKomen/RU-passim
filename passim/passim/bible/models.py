@@ -10,29 +10,34 @@ STANDARD_LENGTH=100
 ABBR_LENGTH = 5
 BKCHVS_LENGTH = 9       # BBBCCCVVV
 
-BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name":"Revelations","abbr":"REV"},
+BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name":"Rom:","abbr":"ROM"},
+              {"name":"Revelations","abbr":"REV"},
               {"name":"Ps.","abbr":"PSA"},{"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
               {"name":"Philippians","abbr":"PHP"},{"name":"Phil.","abbr":"PHP"},{"name":"Os.","abbr":"HOS"},
               {"name":"Mt.","abbr":"MAT"},{"name":"Mt","abbr":"MAT"},{"name":"Matthew","abbr":"MAT"},
-              {"name":"Matth.","abbr":"MAT"},{"name":"Matt.","abbr":"MAT"},{"name":"Mat.","abbr":"MAT"},
+              {"name":"Matth.","abbr":"MAT"},{"name":"Matt.","abbr":"MAT"},{"name":"Matt","abbr":"MAT"},
+              {"name":"Mat.","abbr":"MAT"},
               {"name":"Mark","abbr":"MRK"},{"name":"Marc.","abbr":"MRK"},{"name":"Luke","abbr":"LUK"},
               {"name":"Lucas","abbr":"LUK"},{"name":"Luc.","abbr":"LUK"},{"name":"Luc","abbr":"LUK"},
+              {"name":"1 Lamentations","abbr":"LAM"},
+              {"name":"2 Cor.","abbr":"2CO"},
+              {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
+              {"name":"1 Peter","abbr":"1PE"},{"name":"1 John","abbr":"1JN"},{"name":"I Ioh.","abbr":"1JN"},
+              {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"},
               {"name":"Lc.","abbr":"LUK"},{"name":"Lc","abbr":"LUK"},{"name":"Lamentations","abbr":"LAM"},
               {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
               {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
-              {"name":"Isaiah","abbr":"ISA"},{"name":"Is.","abbr":"ISA"},{"name":"Ioh.","abbr":"JHN"},
+              {"name":"Isaiah","abbr":"ISA"},{"name":"Is.","abbr":"ISA"}, {"name":"Ioh.","abbr":"JHN"},
               {"name":"II Petr.","abbr":"2PE"},{"name":"II Cor.","abbr":"2CO"},{"name":"Iac.","abbr":"JAS"},
               {"name":"I Tim.","abbr":"1TI"},{"name":"I Thess.","abbr":"1TH"},{"name":"I Thes.","abbr":"1TH"},
-              {"name":"I Mcc","abbr":"1MA"},{"name":"I Ioh.","abbr":"1JN"},{"name":"I Cor.","abbr":"1CO"},
+              {"name":"I Mcc","abbr":"1MA"},{"name":"I Cor.","abbr":"1CO"},
               {"name":"Hebr.","abbr":"HEB"},{"name":"Heb.","abbr":"HEB"},{"name":"Gen.","abbr":"GEN"},
               {"name":"Gal.","abbr":"GAL"},{"name":"Ez.","abbr":"EZK"},{"name":"Ephesians","abbr":"EPH"},
               {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccli.","abbr":"ECC"},
               {"name":"Cor.","abbr":"1CO"},{"name":"Col.","abbr":"COL"},{"name":"Canticum Canticorum","abbr":"SNG"},
               {"name":"Apocalypsis","abbr":"REV"},{"name":"Apoc.","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
-              {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"},{"name":"2 Cor.","abbr":"2CO"},
-              {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
-              {"name":"1 Peter","abbr":"1PE"},{"name":"1 Lamentations","abbr":"LAM"},{"name":"1 John","abbr":"1JN"},
-              {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"}]
+              {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"}
+              ]
 
 
 
@@ -40,9 +45,12 @@ class Book(models.Model):
     """One book from the Bible"""
 
     # [1] obligatory name
-    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    name = models.CharField("Name (English)", max_length=STANDARD_LENGTH)
+    latname = models.CharField("Name (Latin)", null=True, blank=True, max_length=STANDARD_LENGTH)
     # [1] standard three letter abbreviation
-    abbr = models.CharField("Abbreviation", max_length=ABBR_LENGTH)
+    abbr = models.CharField("Abbreviation (English)", max_length=ABBR_LENGTH)
+    # [0-1] standard three letter abbreviation
+    latabbr = models.CharField("Abbreviation (Latin)", null=True, blank=True, max_length=STANDARD_LENGTH)
     # [1] the numerical identifier of this book, running from 1-66
     idno = models.IntegerField("Identifier", default=-1)
     # [1] The number of chapters in this book
@@ -76,6 +84,14 @@ class Book(models.Model):
             idno = obj.idno
         return idno
 
+    def get_chapters(idno):
+        chnum = 0
+        # Get the abbreviation, given the IDNO of a book
+        obj = Book.objects.filter(idno=idno).first()
+        if obj != None:
+            chnum = obj.chnum
+        return chnum
+    
 
 class Chapter(models.Model):
     """A chapter in a Bible book"""
@@ -100,8 +116,9 @@ class Chapter(models.Model):
         obj = Chapter.objects.filter(book__idno=idno, number=chn).first()
         if obj != None:
             vss = obj.vsnum
+        else:
+            iStop = 1
         return vss
-
 
 
 class BkChVs():
@@ -135,7 +152,8 @@ class Reference():
     ref_len = 0         # Length of the reference string
     num_refs = 0        # Number of references gathered
     pos = 0             # Running position within string
-    sr = []             # List of scriptur references
+    sr = []             # List of scripture reference objects
+    sr_idx = -1         # Index of the current item in [sr]
     
     def __init__(self, kwargs=None):
         if kwargs != None:
@@ -191,6 +209,12 @@ class Reference():
         bFinish = (self.pos > pos_last)
         return bFinish
 
+    def is_end_orsemi(self):
+        bResult = self.is_end()
+        if not bResult:
+            bResult = (self.ref_string[self.pos] == ";")
+        return bResult
+
     def get_number(self):
         """Return the number that is here, if there is a number. Otherwise return None"""
 
@@ -206,13 +230,54 @@ class Reference():
             while self.pos < self.ref_len and self.ref_string[self.pos] in SPACES: self.pos += 1
         return number
 
+    def get_string(self, lst_string):
+        """Try to get one of the strings defined in the list [lst_string]"""
+
+        ln = len(self.ref_string)
+        for item in lst_string:
+            len_this = len(item)
+            if ln >= self.pos + len(item) and self.ref_string[self.pos:self.pos+len_this] == item:
+                # Got it
+                self.pos += len_this
+                self.skip_spaces()
+                return item
+        return ""
+
+    def get_remainder(self, sUntil = None):
+        """Get the remainder as string"""
+
+        sBack = ""
+        if not self.is_end():
+            if sUntil == None:
+                pos_last = len(self.ref_string)
+                sBack = self.ref_string[self.pos:pos_last]
+            else:
+                pos_until = self.ref_string.find(sUntil, self.pos)
+                if pos_until >= 0:
+                    sBack = self.ref_string[self.pos:pos_until]
+                    self.pos = pos_until + 1
+        return sBack
+
+    def has_following(self, sChar):
+        """Check if this has a following symbol"""
+
+        bFound = False
+        if not self.is_end():
+            bFound = (sChar in self.ref_string[self.pos:len(self.ref_string)])
+        return bFound
+
     def syntax_error():
         msg = "Cannot interpret at {}: {}".format(self.pos, self.ref_string)
         bStatus = False
 
     def parse(self):
-        """Parse a string into a list of scripture references
-        
+        """Parse a string into a list of scripture reference objects
+
+        Note: each object consists of:
+            intro   - any introductory words like 'cf.' 'or'
+            added   - any annotations added to these verses
+            reflist - list of references (as strings)
+                     
         Syntax (BNF):
             <ScrRef> ::= <BkRef> (SPACE* ";" SPACE* <BkRef>)*
             <BkRef>  ::= <Book> SPACE <ChVsList> || <Book>
@@ -269,13 +334,27 @@ class Reference():
                 if sNext == ";":
                     self.pos += 1
                     self.skip_spaces()
-                    bFound = self.bnf_BkRef(bi)
+                    bFound, bi = self.bnf_BkRef(bi)
+                elif self.has_following(";"):
+                    added = self.get_remainder(";")
+                    self.add_added(added)
+                    self.skip_spaces()
+                    bFound, bi = self.bnf_BkRef(bi)
                 else:
                     bFound = False
+            # Check if we are at the end already
+            if not self.is_end():
+                # Whatever is left should be 'added'
+                added = self.get_remainder()
+                self.add_added(added)
+                bFound = True
             # Has anything been found?
             if bFound:
                 # Copy the list
                 lst_back = copy.copy(self.sr)
+            else:
+                # There was a problem finding it???
+                iStop = 1
 
         except:
             msg = oErr.get_error_message()
@@ -299,6 +378,8 @@ class Reference():
 
         try:
             intro = self.get_string(["cf.", "or"])
+            if intro != "":
+                self.add_intro(intro)
             # Get the length of the input string
             ln = len(self.ref_string)
             # Is there room enough for the name of the book?
@@ -318,8 +399,19 @@ class Reference():
                         self.pos += 3
                     # Skip spaces
                     self.skip_spaces()
-                    # See if there indeed is another <ChVs>
-                    bFound = self.bnf_ChVs(bi)
+                    # Check if this is a book as a whole
+                    if self.is_end_orsemi():
+                        # This is a book in its entirety
+                        chnum = Book.get_chapters(idno)
+                        for ch in range(1, chnum+1):
+                            vsnum = Chapter.get_vss(idno, ch)
+                            # Walk all verses
+                            for vs in range(1, vsnum+1):
+                                # Process this combination
+                                self.add_bkchvs(bi, ch, vs)
+                    else:
+                        # See if there indeed is another <ChVs>
+                        bFound = self.bnf_ChVs(bi)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Reference/bnf_BkRef")
@@ -327,17 +419,6 @@ class Reference():
 
         # All we return directly is the Status
         return bStatus, bi
-
-    def get_string(self, lst_string):
-        ln = len(self.ref_string)
-        for item in lst_string:
-            len_this = len(item)
-            if ln >= self.pos + len(item) and self.ref_string[self.pos:self.pos+len_this] == item:
-                # Got it
-                self.pos += len_this
-                self.skip_spaces()
-                return item
-        return ""
 
     def bnf_ChVs(self, bi):
         """Process <ChVs> line for bnf_BkRefs
@@ -417,6 +498,8 @@ class Reference():
                 while sNext == ",":
                     # Reset
                     sNext = None
+                    # Skip the comma
+                    self.pos += 1
                     # Skip spaces
                     self.skip_spaces()
                     # Find verses
@@ -441,8 +524,35 @@ class Reference():
         return bStatus, msg
 
     def add_bkchvs(self, bi, chnum, vsnum):
-        self.sr.append("{:0>3d}{:0>3d}{:0>3d}".format(bi, chnum, vsnum))
-        self.num_refs += 1
+        oErr = ErrHandle()
+        try:
+            if self.sr_idx < 0:
+                # Create the first object
+                oScrRef = dict(intro="", added="", scr_refs=[])
+                self.sr.append(oScrRef)
+                self.sr_idx = 0
+            lst_refs = self.sr[self.sr_idx]['scr_refs']
+            lst_refs.append("{:0>3d}{:0>3d}{:0>3d}".format(bi, chnum, vsnum))
+            self.num_refs += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Reference/add_bkchvs")
+        return None
+
+    def add_intro(self, intro):
+        """Create a new ScrRef item and add the intro to it"""
+
+        oScrRef = dict(intro=intro, added="", scr_refs=[])
+        self.sr.append(oScrRef)
+        self.sr_idx = len(self.sr) - 1
+        return None
+
+    def add_added(self, added):
+        """Add text in [added] to the current ScrRef item"""
+
+        if self.sr_idx >= 0 and self.sr_idx < len(self.sr):
+            self.sr[self.sr_idx]['added'] = added
+        return None
 
     def preview_next(self):
         """Get the next character without advancing"""
@@ -457,9 +567,9 @@ class Reference():
         """Check if [sPreview] is here"""
 
         bFound = False
-        lenght = len(sPreview)
+        length = len(sPreview)
         if self.pos + length < self.ref_len:
-            bFound = (self.ref_string[pos:self.pos+length] == sPreview)
+            bFound = (self.ref_string[self.pos:self.pos+length] == sPreview)
         # Return our verdict
         return bFound
 
@@ -478,63 +588,71 @@ class Reference():
         try:
             # Get the first verse number
             verse = self.get_number()
-            # Skip possible spaces
-            self.skip_spaces()
-            # Anything left?
-            if self.is_end():
-                # Only one verse to store!
-                self.add_bkchvs(bi, ch, verse)
+            if verse == None:
+                bStatus = False
             else:
-                # Find out wha tis coming
-                sNext = self.preview_next()
-                if sNext == "-":
-                    # Skip any hyphens
-                    self.skip_char("-")
-                    # Skip possible spaces
-                    self.skip_spaces()
-                    # Is the keyword "end" following here?
-                    if self.preview_string("end"):
-                        # Determin wha the last verse number would be
-                        number = Chapter.get_vss(bi, ch)
-                        # Make sure to advance past "end"
-                        self.pos += 3
-                    else:
-                        # Read eiher chapter or verse number...
-                        number = self.get_number()
-                    # Skip spaces
-                    self.skip_spaces()
-                    # Check if colon is following
-                    sNext = self.preview_next()
-                    if sNext == ":":
-                        # It was a chapter number!
-                        # So we have Chn:Vsn "-" <Ch>:<Vs>
-                        ch2 = number
-                        self.pos += 1
-                        self.skip_spaces()
-                        # Get the verse number
-                        verse2 = self.get_number()
-                        # Situation...
-                        if ch == ch2:
-                            # Chapter numbers are equal, e.g: GEN 4:5-4:6
-                            for vs in range(verse, verse2 + 1):
-                                self.add_bkchvs(bi, ch, vs)
-                        else:
-                            # Get the number of verses for the current chapter [ch]
-                            num_vss = Chapter.get_vss(bi, ch)
-                            for vs in range(verse, num_vss + 1):
-                                self.add_bkchvs(bi, ch, vs)
-                            # Walk all chapters in between
-                            for chapter in range(ch+1, ch2):
-                                # Get the number of verses for the current chapter [ch]
-                                num_vss = Chapter.get_vss(bi, chapter)
-                                for vs in range(verse, num_vss + 1):
-                                    self.add_bkchvs(bi, ch, vs)
-                            # Walk the last chapter
-                            for vs in range(1, verse2 + 1):
-                                self.add_bkchvs(bi, ch2, vs)
-                else:
+                # Skip possible spaces
+                self.skip_spaces()
+                # Anything left?
+                if self.is_end():
                     # Only one verse to store!
                     self.add_bkchvs(bi, ch, verse)
+                else:
+                    # Find out wha tis coming
+                    sNext = self.preview_next()
+                    if sNext == "-":
+                        # Skip any hyphens
+                        self.skip_char("-")
+                        # Skip possible spaces
+                        self.skip_spaces()
+                        # Is the keyword "end" following here?
+                        if self.preview_string("end"):
+                            # Determin wha the last verse number would be
+                            number = Chapter.get_vss(bi, ch)
+                            # Make sure to advance past "end"
+                            self.pos += 3
+                        else:
+                            # Read eiher chapter or verse number...
+                            number = self.get_number()
+                        # Skip spaces
+                        self.skip_spaces()
+                        # Check if colon is following
+                        sNext = self.preview_next()
+                        if sNext == ":":
+                            # It was a chapter number!
+                            # So we have Chn:Vsn "-" <Ch>:<Vs>
+                            ch2 = number
+                            self.pos += 1
+                            self.skip_spaces()
+                            # Get the verse number
+                            verse2 = self.get_number()
+                            # Situation...
+                            if ch == ch2:
+                                # Chapter numbers are equal, e.g: GEN 4:5-4:6
+                                for vs in range(verse, verse2 + 1):
+                                    self.add_bkchvs(bi, ch, vs)
+                            else:
+                                # Get the number of verses for the current chapter [ch]
+                                num_vss = Chapter.get_vss(bi, ch)
+                                for vs in range(verse, num_vss + 1):
+                                    self.add_bkchvs(bi, ch, vs)
+                                # Walk all chapters in between
+                                for chapter in range(ch+1, ch2):
+                                    # Get the number of verses for the current chapter [ch]
+                                    num_vss = Chapter.get_vss(bi, chapter)
+                                    for vs in range(verse, num_vss + 1):
+                                        self.add_bkchvs(bi, ch, vs)
+                                # Walk the last chapter
+                                for vs in range(1, verse2 + 1):
+                                    self.add_bkchvs(bi, ch2, vs)
+                        else:
+                            # This is a reference to a range
+                            # <Vs> SPACE* ("-")$ SPACE* <Vs>
+                            for vs in range(verse, number+1):
+                                self.add_bkchvs(bi, ch, vs)
+                    else:
+                        # Only one verse to store!
+                        self.add_bkchvs(bi, ch, verse)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Reference/bnf_Vss")

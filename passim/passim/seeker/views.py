@@ -5908,11 +5908,11 @@ class SermonListView(BasicList):
         bref_done = Information.get_kvalue("biblerefs")
         if bref_done == None or bref_done != "done":
             # Perform adaptations
-            for sermon in SermonDescr.objects.all():
+            for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
                 sermon.do_ranges()
             # Success
             Information.set_kvalue("biblerefs", "done")
-
+            SermonDescr.objects.all()
         # Make sure to set a basic filter
         self.basic_filter = Q(mtype="man")
         return None

@@ -20,8 +20,8 @@ class ChapterInline(admin.TabularInline):
 
 
 class BookAdmin(admin.ModelAdmin):
-    list_display = ['name', 'idno', 'abbr', 'chnum']
-    fields = ['name', 'idno', 'abbr', 'chnum']
+    list_display = ['name', 'latname', 'idno', 'abbr', 'latabbr', 'chnum']
+    fields = ['name', 'latname', 'idno', 'abbr', 'latabbr', 'chnum']
     inlines = [ChapterInline]
     formfield_overrides = {
         models.TextField: {'widget': admin.widgets.AdminTextareaWidget(attrs={'rows': 1, 'class': 'mytextarea'})},
