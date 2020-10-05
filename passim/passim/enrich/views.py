@@ -21,6 +21,7 @@ import json
 import fnmatch
 import os, csv
 import random
+import copy
 import itertools as it
 from io import StringIO
 from datetime import datetime
@@ -48,21 +49,16 @@ def enrich_experiment():
     oErr = ErrHandle()
 
     # Define the randomization method
-    method = "pergroup"
-    method = "stochastic"
-    method = "quadro"
+    method = "pergroup"     # Method doesn't work correctly
+    method = "quadro"       # Production method for the situation of 78 speakers
+    method = "stochastic"   # Method should work for random chosen stuff
 
     # Other initialisations
-    cnt_speakers = 78   # Number of speakers
-    cnt_sentences = 48  # Number of sentences
+    cnt_speakers = 48   # Number of speakers - used to be 78
+    cnt_sentences = 48  # Number of sentences recorded per speaker
     cnt_conditions = 2  # Number of ntype conditions
-    cnt_groupsize = 6   # Number of speakers in one group
-    cnt_maxspeaker = 12
     cnt_round = 4       # Number of rounds of testsets to be created
-    cnt_sentpercond = cnt_sentences // cnt_conditions
 
-    # How many testunit items are needed per combination of SpeakerGroup + Ntype?
-    cnt_pertestset = cnt_sentences // (cnt_conditions + 12 // cnt_groupsize )
     try:
         # Remove all previous participant-testunit combinations
         with transaction.atomic():
@@ -77,6 +73,11 @@ def enrich_experiment():
             testsets = []
 
             if method == "pergroup":
+                # Method-specific initializations
+                cnt_groupsize = 48  # Number of speakers in one group - used to be 6
+                # How many testunit items are needed per combination of SpeakerGroup + Ntype?
+                cnt_pertestset = cnt_sentences // (cnt_conditions + 12 // cnt_groupsize )
+
                 # Simple testsets
                 for i in range(cnt_speakers * cnt_conditions): testsets.append([])
 
@@ -206,61 +207,64 @@ def enrich_experiment():
                             TestsetUnit.objects.create(testunit=tunit, testset=tsobj)
 
             elif method == "stochastic":
-                # Smart testsets
-                for i in range(cnt_speakers * cnt_conditions): 
-                    oSet = dict(items=[], speaker=[], sentence={}, ntype=dict(n=0,p=0))
-                    testsets.append(oSet)
+                # Each person must hear all 48 different sentences
+                cnt_participants = cnt_speakers * 2
 
-                # Randomize the titems
-                titems = [x for x in Testunit.objects.all()]
-                random.shuffle(titems)
+                tunits = []
 
-                # Walk all test unitsl
-                for idx, tunit in enumerate(titems):
+                testsets = []
+
+                # (1) Get the speaker ids
+                speakers = [x.id for x in Speaker.objects.all()]
+
+                # (2a) Prepare what is available for each sentence
+                sentences = [x.id for x in Sentence.objects.all()]
+
+                # (2b) Walk all sentences
+                sent_set = []
+
+                speaker_start = 0
+
+                # (3) Start creating sets for Participants, based on speaker/sentence
+                for ptcp in range(0, cnt_speakers):
+                    for ntype in ['n', 'p']:
+                        # A combination of speaker/type is: material for one participant
+
+                        # Room for the testset for this participant
+                        testset = []
+
+                        speaker_available = copy.copy(speakers)
+                        # random.shuffle(speaker_available)
+                        speaker_idx = speaker_start
+                        speaker_start += 1
+                        if speaker_start >= cnt_speakers: speaker_start = 0
+
+                        for sent in sentences:
+                            # Determine the speaker
+                            speaker = speaker_available[speaker_idx]
+                            speaker_idx += 1
+                            if speaker_idx >= cnt_speakers: speaker_idx = 0
+
+                            # Switch to the other noise type
+                            ntype = "n" if ntype == "p" else "p"
+
+                            tunit = Testunit.objects.filter(speaker=speaker, sentence=sent, ntype=ntype).first()
+                            testset.append(tunit.id)
+
+                            if tunit.id in tunits:
+                                iStop = 1
+                            else:
+                                tunits.append(tunit.id)
+
+                     # We have a testset for this participant
+                    random.shuffle(testset)
+                    testsets.append(testset)
+
                     # ========== DEBUG ===========
-                    if idx % 100 == 0:
-                        oErr.Status("Round {}, Working on tunit={}".format(round+1, idx+1))
+                    oErr.Status("round {} testset {}".format(round+1, ptcp+1))
                     # ============================
 
-                    tunit_id = tunit.id
-                    speaker_id = tunit.speaker.id
-                    sentence_id = tunit.sentence.id
-                    ntype = tunit.ntype
-                    # Find the first testset where this fits
-                    bFound = False
-                    bSentence = False
-                    while not bFound:
-                        for testset in testsets:
-                            speakers = testset['speaker']
-                            if len(speakers) < cnt_maxspeaker or speaker_id in speakers:
-                                # Speakers are okay; get the number of sentence_id occurrances
-                                num_sent_id = testset['sentence'].get(sentence_id, 0)
-                                #sentences = testset['sentence']
-                                #if bSentence or not sentence_id in sentences:
-                                if num_sent_id < 2:
-                                    # Sentences are okay
-                                    ntype_n = testset['ntype']['n']
-                                    ntype_p = testset['ntype']['p']
-                                    if (ntype == "n" and ntype_n < cnt_sentpercond) or (ntype == "p" and ntype_p < cnt_sentpercond):
-                                        # Ntype is okay - add it
-                                        testset['items'].append(tunit_id)
-                                        # Bookkeeping
-                                        if speaker_id not in speakers:
-                                            testset['speaker'].append(speaker_id)
-                                        # if sentence_id not in sentences:
-                                        testset['sentence'][sentence_id] = num_sent_id + 1
-                                        testset['ntype'][ntype] += 1
-                                        bFound = True
-                                        break
-                        if not bFound:
-                            left_n = [x for x in testsets if x['ntype'][ntype] < 24]
-                            left_sp = [x for x in left_n if len(x['speaker']) < 12 or speaker_id in x['speaker'] ]
-                            left_snt = [x for x in left_sp if len(x['sentence']) < 48 or  sentence_id in x['sentence'] ]
-                            bSentence = True
-                # Shuffle each testset
-                for testset in testsets:
-                    random.shuffle(testset['items'])
- 
+
                 # We now have 156 sets of 48 tunits: these are the testsets for this particular round
                 with transaction.atomic():
                     for idx, testset in enumerate(testsets):
@@ -268,13 +272,13 @@ def enrich_experiment():
                         tsobj = Testset.get_testset(round+1, idx+1)
 
                         # ========== DEBUG ===========
-                        # oErr.Status("round {} testset {}".format(round+1, idx+1))
+                        oErr.Status("round {} testset {}".format(round+1, idx+1))
                         # ============================
 
                         # Add testsets to this particular round
-                        qs = Testunit.objects.filter(id__in=testset['items'])
+                        qs = Testunit.objects.filter(id__in=testset)
                         for tunit in qs:
-                            tunit.testsets.add(tsobj)
+                            TestsetUnit.objects.create(testunit=tunit, testset=tsobj)
 
 
         # Set the message
