@@ -16,6 +16,7 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
+from passim.bible.models import Reference
 import sys, os, io, re
 import copy
 import json
@@ -79,30 +80,6 @@ traffic_light = '<span title="{}"><span class="glyphicon glyphicon-record" style
                                  '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
                                  '<span class="glyphicon glyphicon-record" style="color: {};"></span>' + \
                 '</span>'
-
-BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name":"Revelations","abbr":"REV"},
-              {"name":"Ps.","abbr":"PSA"},{"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
-              {"name":"Philippians","abbr":"PHP"},{"name":"Phil.","abbr":"PHP"},{"name":"Os.","abbr":"HOS"},
-              {"name":"Mt.","abbr":"MAT"},{"name":"Mt","abbr":"MAT"},{"name":"Matthew","abbr":"MAT"},
-              {"name":"Matth.","abbr":"MAT"},{"name":"Matt.","abbr":"MAT"},{"name":"Mat.","abbr":"MAT"},
-              {"name":"Mark","abbr":"MRK"},{"name":"Marc.","abbr":"MRK"},{"name":"Luke","abbr":"LUK"},
-              {"name":"Lucas","abbr":"LUK"},{"name":"Luc.","abbr":"LUK"},{"name":"Luc","abbr":"LUK"},
-              {"name":"Lc.","abbr":"LUK"},{"name":"Lc","abbr":"LUK"},{"name":"Lamentations","abbr":"LAM"},
-              {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
-              {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
-              {"name":"Isaiah","abbr":"ISA"},{"name":"Is.","abbr":"ISA"},{"name":"Ioh.","abbr":"JHN"},
-              {"name":"II Petr.","abbr":"2PE"},{"name":"II Cor.","abbr":"2CO"},{"name":"Iac.","abbr":"JAS"},
-              {"name":"I Tim.","abbr":"1TI"},{"name":"I Thess.","abbr":"1TH"},{"name":"I Thes.","abbr":"1TH"},
-              {"name":"I Mcc","abbr":"1MA"},{"name":"I Ioh.","abbr":"1JN"},{"name":"I Cor.","abbr":"1CO"},
-              {"name":"Hebr.","abbr":"HEB"},{"name":"Heb.","abbr":"HEB"},{"name":"Gen.","abbr":"GEN"},
-              {"name":"Gal.","abbr":"GAL"},{"name":"Ez.","abbr":"EZK"},{"name":"Ephesians","abbr":"EPH"},
-              {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccli.","abbr":"ECC"},
-              {"name":"Cor.","abbr":"1CO"},{"name":"Col.","abbr":"COL"},{"name":"Canticum Canticorum","abbr":"SNG"},
-              {"name":"Apocalypsis","abbr":"REV"},{"name":"Apoc.","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
-              {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"},{"name":"2 Cor.","abbr":"2CO"},
-              {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
-              {"name":"1 Peter","abbr":"1PE"},{"name":"1 Lamentations","abbr":"LAM"},{"name":"1 John","abbr":"1JN"},
-              {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"}]
 
 class FieldChoice(models.Model):
 
@@ -1512,88 +1489,6 @@ class Stype(models.Model):
 
 
 # ==================== Passim/Seeker models =============================
-
-class Book(models.Model):
-    """One book from the Bible"""
-
-    # [1] obligatory name
-    name = models.CharField("Name", max_length=STANDARD_LENGTH)
-    # [1] standard three letter abbreviation
-    abbr = models.CharField("Abbreviation", max_length=ABBR_LENGTH)
-    # [1] the numerical identifier of this book, running from 1-66
-    idno = models.IntegerField("Identifier", default=-1)
-    # [1] The number of chapters in this book
-    chnum = models.IntegerField("Number of chapters", default=-1)
-
-    def __str__(self):
-        return self.abbr
-
-    def get_abbr(idno):
-        sAbbr = ""
-        # Get the abbreviation, given the IDNO of a book
-        obj = Book.objects.filter(idno=idno).first()
-        if obj != None:
-            sAbbr = obj.abbr
-        return sAbbr
-
-    def get_idno(abbr):
-        abbr_from = ["mt1", "matt.", "luc.", "lc.", "jo."]
-        abbr_to = ["mat", "mat", "luk", "luk", "jhn"]
-
-        idno = -1
-        # Possibly adapt some abbreviations to be able to understand them
-        abbr = abbr.lower()
-        idx = next((x for x in abbr_from if x == abbr), -1)
-        if idx >= 0:
-            abbr = abbr_to[idx]
-
-            # Get the abbreviation, given the IDNO of a book
-            obj = Book.objects.filter(abbr__iexact=abbr).first()
-            if obj != None:
-                idno = obj.idno
-        return idno
-
-
-class Chapter(models.Model):
-    """A chapter in a Bible book"""
-
-    # [1] Each chapter belongs to a book
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookchapters")
-    # [1] The chapter number
-    number = models.IntegerField("Chapter", default = -1)
-    # [1] The number of verses in this chapter
-    vsnum = models.IntegerField("Number of verses", default = -1)
-
-    def __str__(self):
-        sBack = ""
-        if self.book != None and self.number > 0:
-            sBack = "{} {}".format(self.book.abbr, self.number)
-        return sBack
-
-
-class BkChVs():
-    """Helper class to convert to/from bk/ch/vs"""
-
-    book = ""
-    ch = -1
-    vs = -1
-
-    def __init__(self, bkchvs):
-        """Create an object"""
-
-        # Perform the standard initialization
-        response = super(BkChVs, self).__init__()
-        # Disentanble bkchvs
-        if len(bkchvs) == 9:
-            idno = int(bkchvs[0:3])
-            self.ch = int(bkchvs[3:3])
-            selv.vs = int(bkchvs[6:3])
-            # Convert idno into abbreviation
-            self.book = Book.get_abbr(idno)
-
-        # Return the response
-        return response
-
 
 class LocationType(models.Model):
     """Kind of location and level on the location hierarchy"""
@@ -4273,9 +4168,17 @@ class EqualGold(models.Model):
                 else:
                     # There is an author--is this different than the author we used to have?
 
-                    if not self.number:
-                        # Check the highest sermon number for this author
-                        self.number = EqualGold.sermon_number(self.author)
+                    if self.number == None:
+                        # This may be a mistake: see if there is a code already
+                        if self.code != None and "PASSIM" in self.code:
+                            # There already is a code: get the number from here
+                            arPart = re.split("\s|\.", self.code)
+                            if len(arPart) == 3 and arPart[0] == "PASSIM":
+                                # Get the author number
+                                self.number = int(arPart[2])
+                        if self.number == None:
+                            # Check the highest sermon number for this author
+                            self.number = EqualGold.sermon_number(self.author)
                     # Now we have both an author and a number...
                     passim_code = EqualGold.passim_code(auth_num, self.number)
                     if not self.code or self.code != passim_code:
@@ -5421,12 +5324,15 @@ class SermonGold(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
+        srchincipit = get_searchable(self.incipit)
+        srchexplicit = get_searchable(self.explicit)
+        if self.srchincipit != srchincipit: self.srchincipit = srchincipit
+        if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist: self.siglist = siglist
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
 
@@ -5968,6 +5874,7 @@ class SermonDescr(models.Model):
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
+    verses = models.TextField("List of verses", null=True, blank=True)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
@@ -6066,6 +5973,14 @@ class SermonDescr(models.Model):
             bOkay = False
         return bOkay, msg
 
+    def add_range(self, start, einde):
+        """Add a range to this sermon, if it is not there already"""
+
+        obj = Range.objects.filter(sermon=self, start=start, einde=einde).first()
+        if obj == None:
+            obj = Range.objects.create(sermon=self, start=start, einde=einde)
+        return obj
+
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
         if self.msitem != None:
@@ -6073,6 +5988,24 @@ class SermonDescr(models.Model):
         # Regular delete operation
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
+
+    def do_ranges(self):
+        if self.bibleref != None and self.bibleref != "":
+            if self.verses == None or self.verses == "" or self.verses == "[]":
+                # Open a Reference object
+                oRef = Reference(kwargs={'bibleref': self.bibleref})
+
+                print("do_ranges: {}".format(self.bibleref), file=sys.stderr)
+
+                if self.id in [27571, 27572, 27573, 55187]:
+                    iStop = 1
+
+                # Calculate the scripture verses
+                bResult, msg, lst_verses = oRef.parse()
+                if bResult:
+                    # Add this range to the sermon
+                    self.verses = json.dumps(lst_verses)
+                    self.save()
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
@@ -6696,7 +6629,7 @@ class Range(models.Model):
         # Return the total
         return sRange
 
-    def parse(self, sRange):
+    def parse(sermon, sRange):
         """Parse a string into a start/einde range
         
         Possibilities:
@@ -6715,30 +6648,31 @@ class Range(models.Model):
         introducer = ""
         obj = None
         msg = ""
+        pos = -1
         oErr = ErrHandle()
         try:
-            def skip_spaces():
+            def skip_spaces(pos):
                 length = len(sRange)
                 while pos < length and sRange[pos] in SPACES: pos += 1
-                return None
+                return pos
 
-            def is_end():
+            def is_end(pos):
                 pos_last = len(sRange)-1
                 bFinish = (pos > pos_last)
                 return bFinish
 
-            def get_number():
+            def get_number(pos):
                 number = -1
                 pos_start = pos
                 length = len(sRange)
                 while pos < length and sRange[pos] in NUMBER: pos += 1
                 # Get the chapter number
-                number = int(sRange[pos_start: pos - pos_start + 1])
+                number = int(sRange[pos_start: pos]) # - pos_start + 1])
                 # Possibly skip following spaces
                 while pos < length and sRange[pos] in SPACES: pos += 1
-                return number
+                return pos, number
 
-            def syntax_error():
+            def syntax_error(pos):
                 msg = "Cannot interpret at {}: {}".format(pos, sRange)
                 bStatus = False
 
@@ -6746,6 +6680,14 @@ class Range(models.Model):
             arRange = sRange.split(";")
 
             for sRange in arRange:
+                # Initializations
+                introducer = ""
+                additional = ""
+                obj = None
+                idno = -1
+
+                if bStatus == False: break
+
                 # Make sure spaces are dealt with
                 sRange = sRange.strip()
                 pos = 0
@@ -6754,39 +6696,47 @@ class Range(models.Model):
                     # There is an introducer
                     introducer = "cf."
                     pos += 3
-                    skip_spaces()
+                    pos = skip_spaces(pos)
                 elif sRange[0:3] == "or ":
                     # There is an introducer
                     introducer = "or"
                     pos += 3
-                    skip_spaces()
+                    pos = skip_spaces(pos)
 
                 # Expecting to read the first book
-                sBook = sRange[pos:3]
-                pos = 3
+                #sBook = sRange[pos:3]
+                #pos = 3
 
-                idno = Book.get_idno(sBook)
+                
+                # if idno < 0:
+                # Check for possible book in BOOK_NAMES
+                for item in BOOK_NAMES:
+                    length = len(item['name'])
+                    if item['name'] == sRange[pos:length]:
+                        # We have the book abbreviation
+                        abbr = item['abbr']
+                        idno = Book.get_idno(abbr)
+                        break;
                 if idno < 0:
-                    # Check for possible book in BOOK_NAMES
-                    for item in BOOK_NAMES:
-                        length = len(item['name'])
-                        if item['name'] == sRange[pos:length]:
-                            # We have the book abbreviation
-                            abbr = item['abbr']
-                            idno = Book.get_idno(abbr)
-                            break;
+                    sBook = sRange[pos:3]
+                    idno = Book.get_idno(sBook)
+                    length = len(sBook)
+
+
                 if idno < 0:
                     msg = "Cannot find book {}".format(sBook)
+                    bStatus = False
                 else:
+                    pos += length
                     # Skip spaces
-                    skip_spaces()
+                    pos = skip_spaces(pos)
                     # Check what follows now
                     sNext = sRange[pos]
                     if sNext == "-":
                         # Range of books
                         pos += 1
                         # Skip spaces
-                        skip_spaces()
+                        pos = skip_spaces(pos)
                         # Get the second book name
                         if len(sRange) - pos >=3:
                             sBook2 = sRange[pos:3]
@@ -6799,86 +6749,102 @@ class Range(models.Model):
                             else:
                                 einde = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
                                 # There is a start-einde, so add a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
                         else:
                             msg = "Expecting book range {}".format(sRange)
                             bStatus = False
                     elif sNext in NUMBER:
                         # Chapter number
-                        chapter = get_number()
+                        pos, chapter = get_number(pos)
                         # Find out what is next
                         sNext = sRange[pos]
                         if sNext == "-":
                             # Possibly skip spaces
-                            skip_spaces()
+                            pos = skip_spaces(pos)
                             # Find out what is next
                             sNext = sRange[pos]
                             if sNext in NUMBER:
                                 # Range of chapters
-                                chnext = get_number()
+                                pos, chnext = get_number(pos)
                                 # Create the two ch/bk/vs items
                                 start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
                                 einde = "{}{:0>3d}{:0>3d}".format(idno, chnext, 0)
                                 # There is a start-einde, so add a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
                             else:
                                 # Syntax error
-                                syntax_error()
+                                syntax_error(pos)
                         elif sNext == ":":
+                            pos += 1
                             # A verse is following
-                            verse = get_number()
+                            pos, verse = get_number(pos)
                             # At least get the start
-                            start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                            start = "{:0>3d}{:0>3d}{:0>3d}".format(idno, chapter, 0)
                             # Skip spaces
-                            skip_spaces()
-                            # See what is following
-                            sNext = sRange[pos]
-                            if sNext == "-":
-                                # Expecting a range
-                                skip_spaces()
-                                sNext = sRange[pos]
-                                if sNext in NUMBER:
-                                    # Read the number
-                                    number = get_number()
-                                    # Skip spaces
-                                    skip_spaces()
-                                    # See what is next
-                                    sNext = sRange[pos]
-                                    if sNext == ":":
-                                        # Range of verses between chapters
-                                        skip_spaces()
-                                        sNext = sRange[pos]
-                                        if sNext in NUMBER:
-                                            verse = get_number()
-                                            einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
-                                            # Add the BBB C:V-V
-                                            obj = Range.objects.create(start=start, einde=einde, sermon=self)
-                                        else:
-                                            syntax_error()
-                                    else:
-                                        # The number is a verse
-                                        einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
-                                        # Add the BBB C:V-V
-                                        obj = Range.objects.create(start=start, einde=einde, sermon=self)
-                                else:
-                                    syntax_error()
-                            else:
-                                # This was just one single verse
+                            pos = skip_spaces(pos)
+                            if is_end(pos):
+                                # Simple bk/ch/vs
                                 einde = start
                                 # Add the single verse as a Range object for this Sermon
-                                obj = Range.objects.create(start=start, einde=einde, sermon=self)
+                                obj = sermon.add_range(start, einde)
+                            else:
+                                # See what is following
+                                sNext = sRange[pos]
+                                if sNext == "-":
+                                    pos += 1
+                                    # Expecting a range
+                                    pos = skip_spaces(pos)
+                                    sNext = sRange[pos]
+                                    if sNext in NUMBER:
+                                        # Read the number
+                                        pos, number = get_number(pos)
+                                        # Skip spaces
+                                        pos = skip_spaces(pos)
+                                        # See what is next
+                                        sNext = sRange[pos]
+                                        if sNext == ":":
+                                            pos += 1
+                                            # Range of verses between chapters
+                                            pos = skip_spaces(pos)
+                                            sNext = sRange[pos]
+                                            if sNext in NUMBER:
+                                                pos, verse = get_number(pos)
+                                                einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
+                                                # Add the BBB C:V-V
+                                                obj = sermon.add_range(start, einde)
+                                            else:
+                                                syntax_error(pos)
+                                        else:
+                                            # The number is a verse
+                                            einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
+                                            # Add the BBB C:V-V
+                                            obj = sermon.add_range(start, einde)
+                                    else:
+                                        syntax_error(pos)
+                                else:
+                                    # This was just one single verse
+                                    einde = start
+                                    # Add the single verse as a Range object for this Sermon
+                                    obj = sermon.add_range(start, einde)
                         else:
                             # Syntax error
-                            syntax_error()
+                            syntax_error(pos)
                     else:
                         # Syntax error
-                        syntax_error()
-                # Should we continue?
-                if bStatus and not is_end():
+                        syntax_error(pos)
+                bNeedSaving = False
+                # Is there any remark following?
+                if bStatus and not is_end(pos):
                     # Is there more stuff?
-                    sNext = sRange[pos]
-                    if sNext in ",;":
-                        # There is more following
+                    additional = sRange[pos:].strip()
+                    if obj != None:
+                        obj.added = sRemark
+                        bNeedSaving = True
+                if introducer != "":
+                    obj.intro = introducer
+                    bNeedSaving = True
+                if bNeedSaving:
+                    obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Range/parse")

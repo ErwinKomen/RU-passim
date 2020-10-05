@@ -5904,6 +5904,15 @@ class SermonListView(BasicList):
                 # Success
                 Information.set_kvalue("nicknames", "done")
 
+        # Check if signature adaptation is needed
+        bref_done = Information.get_kvalue("biblerefs")
+        if bref_done == None or bref_done != "done":
+            # Perform adaptations
+            for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
+                sermon.do_ranges()
+            # Success
+            Information.set_kvalue("biblerefs", "done")
+            SermonDescr.objects.all()
         # Make sure to set a basic filter
         self.basic_filter = Q(mtype="man")
         return None
@@ -9847,7 +9856,8 @@ class SermonGoldEdit(BasicDetails):
                        {'formsetClass': GlitFormSet,  'prefix': 'glit',  'readonly': False, 'noinit': True, 'linkfield': 'sermon_gold'},
                        {'formsetClass': GftxtFormSet, 'prefix': 'gftxt', 'readonly': False, 'noinit': True, 'linkfield': 'gold'}]
 
-    stype_edi_fields = ['author', 'authorname', 'incipit', 'explicit', 'bibliography', 'equal',
+    # Note: do *NOT* include 'authorname', 
+    stype_edi_fields = ['author', 'incipit', 'explicit', 'bibliography', 'equal',
                         #'kwlist', 
                         'Signature', 'siglist',
                         #'CollectionGold', 'collist_sg',
@@ -10202,7 +10212,8 @@ class EqualGoldEdit(BasicDetails):
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
         ]
 
-    stype_edi_fields = ['author', 'number', 'code', 'incipit', 'explicit',
+    # Note: do not include [code] in here
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
@@ -10224,6 +10235,9 @@ class EqualGoldEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
+
+            # Issue #295: the [number] (number within author) must be there, though hidden, not editable
+            {'type': 'plain', 'label': "Number:",        'value': instance.number, 'field_key': 'number', 'empty': 'hide'},
 
             # Issue #212: remove this sermon number
             # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -10718,6 +10732,12 @@ class EqualGoldListView(BasicList):
                         ssg.hccount = hccount
                         ssg.save()
             Information.set_kvalue("hccount", "done")
+
+        #if Information.get_kvalue("ssg_number") != "done":
+        #    with transaction.atomic():
+        #        for obj in EqualGold.objects.all():
+        #            obj.save()
+        #    Information.set_kvalue("ssg_number", "done")
 
         return None
     

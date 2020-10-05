@@ -96,26 +96,6 @@ class NewsItemAdmin(admin.ModelAdmin):
         }
 
 
-class ChapterAdmin(admin.ModelAdmin):
-    fields = ['book', 'number', 'vsnum']
-    list_display = ['book', 'number', 'vsnum']
-
-
-class ChapterInline(admin.TabularInline):
-    model = Chapter
-    fk_name = 'book'
-    extra = 0
-
-
-class BookAdmin(admin.ModelAdmin):
-    list_display = ['name', 'idno', 'abbr', 'chnum']
-    fields = ['name', 'idno', 'abbr', 'chnum']
-    inlines = [ChapterInline]
-    formfield_overrides = {
-        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
-        }
-
-
 class VisitAdmin(admin.ModelAdmin):
     """Display and edit Visit moments"""
 
@@ -199,6 +179,19 @@ class SermonDescrAdmin(admin.ModelAdmin):
 
     list_display = ['id', 'siglist', 'title', 'author']
     search_fields = ['id', 'siglist']
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
+class EqualGoldAdmin(admin.ModelAdmin):
+    """EqualGold = SSG"""
+
+    list_display = ['id', 'code', 'number', 'author']
+    search_fields = ['id', 'code']  
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
 
 
 class ManuscriptAdmin(admin.ModelAdmin):
@@ -206,6 +199,9 @@ class ManuscriptAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'idno', 'project']
     search_fields = ['name', 'idno']
     list_filter = ['project'] 
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
 
 
 # Models that serve others
@@ -227,8 +223,7 @@ admin.site.register(LitrefMan)
 admin.site.register(SermonDescr, SermonDescrAdmin)
 admin.site.register(SermonGold)
 admin.site.register(Manuscript, ManuscriptAdmin)
-admin.site.register(Chapter, ChapterAdmin)
-admin.site.register(Book, BookAdmin)
+admin.site.register(EqualGold, EqualGoldAdmin)
 
 admin.site.register(Report, ReportAdmin)
 
