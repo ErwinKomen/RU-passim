@@ -36,11 +36,13 @@ from passim.enrich.forms import TestunitForm, TestsetForm, SpeakerForm, Sentence
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
 from passim.seeker.views import BasicPart
+from passim.enrich.latin import *
 
 # Global debugging 
 bDebug = False
 
 enrich_editor = "enrich_editor"
+
 
 def enrich_experiment():
     """RUn a complete experiment"""
@@ -224,6 +226,9 @@ def enrich_experiment():
                 sent_set = []
 
                 speaker_start = 0
+
+                # Get a list of speakers with which I am allowed to start
+                first_speaker = copy.copy(speakers)
 
                 # (3) Start creating sets for Participants, based on speaker/sentence
                 for ptcp in range(0, cnt_speakers):
