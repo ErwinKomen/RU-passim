@@ -67,9 +67,8 @@ def enrich_experiment():
     try:
         # Remove all previous participant-testunit combinations
         TestsetUnit.objects.all().delete()
-        #with transaction.atomic():
-        #    for obj in Testset.objects.all():
-        #        obj.testset_testunits.clear()
+        Testset.objects.all().delete()
+
         sBack = "Previous testset-testunit combinations have been removed"
 
         # Create testset for each round
@@ -301,7 +300,6 @@ def enrich_experiment():
                 """Simplere method when there are as many speakers as sentences"""
 
                 # Simple testsets
-                # for i in range(cnt_speakers * cnt_conditions): testsets.append([])
                 testsets = []
                 idx_testset = 0
                 tunits = []
@@ -318,11 +316,6 @@ def enrich_experiment():
                 speakersets = []
                 for idx in range(8):
                     speakersets.append(oSpeakerSet.get_speaker_set())
-
-                tunits = []
-
-                testsets = []
-                idx_testset = 0
 
                 # (2a) Prepare what is available for each sentence
                 sentences = [x.id for x in Sentence.objects.all()]
@@ -357,7 +350,7 @@ def enrich_experiment():
                                 # The col_part determines the speaker
                                 speaker = speakerset[col_part]
 
-                                # The [col_part] also is the index for testsets_a and testsets_b
+                                # The [idx_ts] is the index for testsets_a and testsets_b
 
                                 # Add item to testset_a
                                 tunit = Testunit.objects.filter(speaker__id=speaker, sentence=sentence, ntype=ntype).first()
@@ -375,71 +368,25 @@ def enrich_experiment():
                                     iStop = 1
                                 else:
                                     tunits.append(tunit.id)
-                        pass
+                        
+                        # The 6*6 blob has been treated: continue with the next set of 6 sentences
 
                     # Add the testsets to the list of testsets
                     for idx in range(6):
-                        testsets.append(testsets_A[idx])
-                        testsets.append(testsets_B[idx])
+                        testsets.append(copy.copy(testsets_A[idx]))
+                        testsets.append(copy.copy(testsets_B[idx]))
+                    # Adjust the number of testsets produced: we have made twice 6 testsets in one sweep
                     idx_testset += 2 * 6
 
                     # ========== DEBUG ===========
                     oErr.Status("round {} testset {}".format(round+1, idx_testset+1))
                     # ============================
 
-
-                    ## Now create a 6*6 latin square
-                    #blob_start = list(range(6))
-                    #blob_list = latin_square2(blob_start)
-
-                    #np_division = ['n','n','n','p','p','p']
-
-                    ## Each blob aims for two testsets (with inverted ntype)
-                    #for idx_b, blob in enumerate(blob_list):
-                    #    # Start two test sets
-                    #    testset_A = []
-                    #    testset_B = []
-                    #    for row_part, col_part in enumerate(blob):
-                    #        # Determine what the right person is
-                    #        speaker = speakerset[col_part]
-                    #        # Re-arrange np's
-                    #        random.shuffle(np_division)
-                    #        # Walk the 6 sentences of this part
-                    #        for snt_idx in range(6):
-                    #            # Get this sentence number
-                    #            sentence = snt_order[row_part * 6 + snt_idx]
-                    #            # Get the ntype
-                    #            ntype = np_division[snt_idx]
-                    #            # Add item to testset_a
-                    #            tunit = Testunit.objects.filter(speaker__id=speaker, sentence=sentence, ntype=ntype).first()
-                    #            testset_A.append(tunit.id)
-                    #            if tunit.id in tunits:
-                    #                iStop = 1
-                    #            else:
-                    #                tunits.append(tunit.id)
-
-                    #            # Calculate the other Ntype
-                    #            ntype = "n" if ntype == "p" else "p"
-                    #            tunit = Testunit.objects.filter(speaker__id=speaker, sentence=sentence, ntype=ntype).first()
-                    #            testset_B.append(tunit.id)
-                    #            if tunit.id in tunits:
-                    #                iStop = 1
-                    #            else:
-                    #                tunits.append(tunit.id)
-                    #    # Add the testsets to the list of testsets
-                    #    testsets.append(testset_A)
-                    #    testsets.append(testset_B)
-                    #    idx_testset += 2
-
-                    #    # ========== DEBUG ===========
-                    #    oErr.Status("round {} testset {}".format(round+1, idx_testset+1))
-                    #    # ============================
-
                 # Shuffle each testset
                 for testset in testsets:
                     random.shuffle(testset)
  
-                # We now have 156 sets of 48 tunits: these are the testsets for this particular round
+                # We now have 96 (2 * 48) sets of 48 tunits: these are the testsets for this particular round
                 with transaction.atomic():
                     for idx, testset in enumerate(testsets):
                         # Get the testset object for this round
@@ -454,9 +401,9 @@ def enrich_experiment():
                         for tunit in qs:
                             # tunit.testsets.add(tsobj)
                             TestsetUnit.objects.create(testunit=tunit, testset=tsobj)
-
-
-
+                        # Debugging
+                        x = Testunit.objects.count()
+                        y = TestsetUnit.objects.count()
             elif method == "gendered":
                 # Divide groups of 4 titems of one author over testsets
                 # (so each testset gets 6 authors, 4*6=24)
