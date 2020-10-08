@@ -125,6 +125,15 @@ def enrich_experiment():
                     obj.name = name
                     obj.save()
 
+        # Check the filenames and calculate them if needed
+        if Information.get_kvalue("enrich-filenames") != "done":
+            # Walk all testunits
+            with transaction.atomic():
+                for obj in Testunit.objects.all():
+                    obj.fname = obj.get_filename()
+                    obj.save()
+            Information.set_kvalue("enrich-filenames", "done")
+
         # Create testset for each round
         for round in range(cnt_round):
 

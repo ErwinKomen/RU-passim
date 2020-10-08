@@ -9,6 +9,40 @@ GENDER_TYPE = ( ('m', 'Male'), ('f', 'Female') )
 
 # Models for ENRICH
 
+class Information(models.Model):
+    """Specific information that needs to be kept in the database"""
+
+    # [1] The key under which this piece of information resides
+    name = models.CharField("Key name", max_length=255)
+    # [0-1] The value for this piece of information
+    kvalue = models.TextField("Key value", default = "", null=True, blank=True)
+
+    class Meta:
+        verbose_name_plural = "Information Items"
+
+    def __str__(self):
+        return self.name
+
+    def get_kvalue(name):
+        info = Information.objects.filter(name=name).first()
+        if info == None:
+            return ''
+        else:
+            return info.kvalue
+
+    def set_kvalue(name, value):
+        info = Information.objects.filter(name=name).first()
+        if info == None:
+            info = Information(name=name)
+            info.save()
+        info.kvalue = value
+        info.save()
+        return True
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        return super(Information, self).save(force_insert, force_update, using, update_fields)
+
+
 class Speakerset():
     size_m = 0
     size_f = 0
@@ -56,6 +90,7 @@ class Speakerset():
             self.idx_lsts += 1
         # Return the list
         return lst_back
+
 
 class TestItem():
     sentence = 0
@@ -145,7 +180,7 @@ class Speaker(models.Model):
     # [1] The name of the speaker
     name = models.CharField("Name or number code", max_length=LONG_STRING)
     # [1] The gender of the speaker
-    gender = models.CharField("Gender", choices=GENDER_TYPE, max_length=5)
+    gender = models.CharField("Gender", choices=GENDER_TYPE, max_length=5, default="f")
 
     def __str__(self):
         return self.name
