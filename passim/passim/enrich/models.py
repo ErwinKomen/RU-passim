@@ -170,6 +170,9 @@ class Testunit(models.Model):
     # [1] ANd it is one variant: 'p' (plain) or 'n' (noise)
     ntype = models.CharField("Noise type", choices=NOISE_TYPE, max_length=5)
 
+    # [0-1] The filename
+    fname = models.CharField("Filename", null=True, blank=True, max_length=LONG_STRING)
+
     # [0-1] The number of times this testunit has been used by participants
     #       (This field has not been used yet)
     count = models.IntegerField("Count", default=0)

@@ -64,12 +64,66 @@ def enrich_experiment():
     cnt_conditions = 2  # Number of ntype conditions
     cnt_round = 4       # Number of rounds of testsets to be created
 
+    # Make sure the speakers have the right id and gender
+    SPEAKER_INFO = [
+        {"SpeakerNum":1,"Gender":"f"},{"SpeakerNum":4,"Gender":"m"},{"SpeakerNum":8,"Gender":"f"},
+        {"SpeakerNum":9,"Gender":"f"},{"SpeakerNum":11,"Gender":"f"},{"SpeakerNum":12,"Gender":"f"},
+        {"SpeakerNum":13,"Gender":"f"},{"SpeakerNum":14,"Gender":"f"},{"SpeakerNum":15,"Gender":"m"},
+        {"SpeakerNum":16,"Gender":"m"},{"SpeakerNum":17,"Gender":"f"},{"SpeakerNum":18,"Gender":"f"},
+        {"SpeakerNum":19,"Gender":"f"},{"SpeakerNum":21,"Gender":"f"},{"SpeakerNum":22,"Gender":"m"},
+        {"SpeakerNum":23,"Gender":"f"},{"SpeakerNum":25,"Gender":"f"},{"SpeakerNum":27,"Gender":"f"},
+        {"SpeakerNum":30,"Gender":"f"},{"SpeakerNum":31,"Gender":"f"},{"SpeakerNum":32,"Gender":"f"},
+        {"SpeakerNum":33,"Gender":"f"},{"SpeakerNum":34,"Gender":"f"},{"SpeakerNum":35,"Gender":"m"},
+        {"SpeakerNum":36,"Gender":"f"},{"SpeakerNum":37,"Gender":"m"},{"SpeakerNum":38,"Gender":"f"},
+        {"SpeakerNum":39,"Gender":"f"},{"SpeakerNum":40,"Gender":"m"},{"SpeakerNum":42,"Gender":"f"},
+        {"SpeakerNum":43,"Gender":"f"},{"SpeakerNum":44,"Gender":"m"},{"SpeakerNum":46,"Gender":"m"},
+        {"SpeakerNum":47,"Gender":"f"},{"SpeakerNum":48,"Gender":"f"},{"SpeakerNum":49,"Gender":"f"},
+        {"SpeakerNum":51,"Gender":"f"},{"SpeakerNum":52,"Gender":"m"},{"SpeakerNum":53,"Gender":"f"},
+        {"SpeakerNum":54,"Gender":"f"},{"SpeakerNum":55,"Gender":"f"},{"SpeakerNum":57,"Gender":"f"},
+        {"SpeakerNum":61,"Gender":"m"},{"SpeakerNum":64,"Gender":"m"},{"SpeakerNum":65,"Gender":"m"},
+        {"SpeakerNum":69,"Gender":"m"},{"SpeakerNum":70,"Gender":"m"},{"SpeakerNum":78,"Gender":"m"}]
+
+    SENTENCE_NAMES = ["F1", "K1", "F2", "K2", "F3", "K3", "F4", "K4", "F5", "K5", "F6", "K6", "F7", "K7", 
+                      "F8", "K8", "F9", "K9", "F10", "K10", "F11", "K11", "F12", "K12", "F13", "K13", 
+                      "F14", "K14", "F15", "K15", "F16", "K16", "F17", "K17", "F18", "K18", "F19", "K19", 
+                      "F20", "K20", "F21", "K21", "F22", "K22", "F23", "K23", "F24", "K24"]
+
     try:
         # Remove all previous participant-testunit combinations
         TestsetUnit.objects.all().delete()
-        Testset.objects.all().delete()
+        oErr.Status("Previous testset-testunit combinations have been removed")
 
-        sBack = "Previous testset-testunit combinations have been removed"
+        # Remove testsets if the numbers don't add up
+        if Testset.objects.count() != cnt_conditions * cnt_sentences * cnt_round:
+            oErr.Status("Deleting previous testsets (numbers don't match)")
+            Testset.objects.all().delete()
+
+        # Remove speakers above the cnt_speakers count
+        if Speaker.objects.count() > cnt_speakers:
+            delete_speakers = []
+            for idx, obj in enumerate(Speaker.objects.all()):
+                if idx >= cnt_speakers:
+                    delete_speakers.append(obj.id)
+            Speaker.objects.filter(id__in=delete_speakers).delete()
+
+        # Make sure the 48 speakers have the correct ID and gender
+        with transaction.atomic():
+            for idx, obj in enumerate(Speaker.objects.all()):
+                oInfo = SPEAKER_INFO[idx]
+                name = "{}".format(oInfo['SpeakerNum'])
+                gender = oInfo['Gender']
+                if obj.name != name or obj.gender != gender:
+                    obj.name = name
+                    obj.gender = gender
+                    obj.save()
+
+        # Make sure the 48 sentences have the right ID
+        with transaction.atomic():
+            for idx, obj in enumerate(Sentence.objects.all()):
+                name = SENTENCE_NAMES[idx]
+                if name != obj.name:
+                    obj.name = name
+                    obj.save()
 
         # Create testset for each round
         for round in range(cnt_round):
@@ -642,14 +696,18 @@ def get_testsets(request):
             lstQ.append(Q(testset__round=round))
             items = TestsetUnit.objects.filter(*lstQ).order_by("testset__number").values(
                 'testset__round', 'testset__number', 'testunit__speaker__name', 
+                'testunit__speaker__gender', 'testunit__fname',
                 'testunit__sentence__name', 'testunit__ntype')
             results = []
             for idx, obj in enumerate(items):
                 number = obj.get('testset__number')           
                 speaker = obj.get('testunit__speaker__name')  
-                sentence = obj.get('testunit__sentence__name')
+                gender = obj.get('testunit__speaker__gender')
+                fname = obj.get('testunit__sentence__name')
+                sentence = obj.get('testunit__fname')
                 ntype = "Lom" if obj.get('testunit__ntype') == "n" else "Nat"
-                co_json = {'idx': idx+1, 'testset': number, 'speaker': speaker, 'sentence': sentence, 'ntype': ntype }
+                co_json = {'idx': idx+1, 'testset': number, 'speaker': speaker, 'gender': gender,
+                           'filename': fname, 'sentence': sentence, 'ntype': ntype }
                 results.append(co_json)
             data = json.dumps(results)
         else:
@@ -831,6 +889,14 @@ class TestunitListView(BasicList):
                             obj = Testunit.objects.create(sentence=sentence, speaker=speaker, ntype=ntype)
             Information.set_kvalue("enrich-tunits", "done")
 
+        if Information.get_kvalue("enrich-filenames") != "done":
+            # Walk all testunits
+            with transaction.atomic():
+                for obj in Testunit.objects.all():
+                    obj.fname = obj.get_filename()
+                    obj.save()
+            Information.set_kvalue("enrich-filenames", "done")
+
         return None
 
     def get_field_value(self, instance, custom):
@@ -903,6 +969,7 @@ class TestsetDetails(TestsetEdit):
         resizable = True
         index = 1
         sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
         sort_end = '</span>'
 
         # List of Testunits contained in this testset
@@ -921,6 +988,12 @@ class TestsetDetails(TestsetEdit):
             # Speaker
             add_rel_item(rel_item, item.speaker.name, False, main=True, link=url)
 
+            # Gender
+            add_rel_item(rel_item, item.speaker.gender, False, main=True, link=url)
+
+            # Gile name
+            add_rel_item(rel_item, item.fname, False, main=True, link=url)
+
             # Ntype
             add_rel_item(rel_item, item.get_ntype_display(), False, link=url)
 
@@ -933,8 +1006,10 @@ class TestsetDetails(TestsetEdit):
         testunits['rel_list'] = rel_list
 
         testunits['columns'] = [
-            '#',
+            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
             '{}<span>Speaker</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Gender</span>{}'.format(sort_start, sort_end), 
+            '{}<span>File</span>{}'.format(sort_start, sort_end), 
             '{}<span title="Ntype is either [P]lain or Lomdard [N]oise">Ntype</span>{}'.format(sort_start, sort_end), 
             '{}<span>Sentence</span>{}'.format(sort_start, sort_end)
             ]
@@ -995,8 +1070,8 @@ class TestsetDownload(BasicPart):
 
         # Construct the QS
         qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
-            'testset__round', 'testset__number', 'testunit__speaker__name', 
-            'testunit__sentence__name', 'testunit__ntype')
+            'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
+            'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
 
         return qs
 
@@ -1010,13 +1085,15 @@ class TestsetDownload(BasicPart):
         if dtype == "json":
             # Loop over all round/number combinations (testsets)
             for obj in self.get_queryset(prefix):
-                round = obj.get('testset__round')                # obj.testset.round
+                round = obj.get('testset__round')               # obj.testset.round
                 number = obj.get('testset__number')             # obj.testset.number
                 speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
                 sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
                 ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
-                row = dict(round=round, testset=number, speaker=speaker,
-                    sentence=sentence, ntype=ntype)
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                row = dict(round=round, testset=number, speaker=speaker, gender=gender,
+                    filename=fname, sentence=sentence, ntype=ntype)
                 lData.append(row)
             # convert to string
             sData = json.dumps(lData, indent=2)
@@ -1026,15 +1103,17 @@ class TestsetDownload(BasicPart):
             delimiter = "\t" if dtype == "csv" else ","
             csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
             # Headers
-            headers = ['round', 'testset', 'speaker', 'sentence', 'ntype']
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
             csvwriter.writerow(headers)
             for obj in self.get_queryset(prefix):
                 round = obj.get('testset__round')                # obj.testset.round
                 number = obj.get('testset__number')             # obj.testset.number
                 speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
                 sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
                 ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
-                row = [round, number, speaker, sentence, ntype]
+                row = [round, number, speaker, gender, fname, sentence, ntype]
                 csvwriter.writerow(row)
 
             # Convert to string
