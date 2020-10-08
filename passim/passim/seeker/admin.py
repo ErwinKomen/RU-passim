@@ -177,7 +177,7 @@ class LitrefAdmin(admin.ModelAdmin):
 class SermonDescrAdmin(admin.ModelAdmin):
     """SermonDescr"""
 
-    list_display = ['id', 'siglist', 'title', 'author']
+    list_display = ['id', 'siglist', 'verses', 'title', 'author']
     search_fields = ['id', 'siglist']
     formfield_overrides = {
         models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},

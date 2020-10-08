@@ -33,7 +33,7 @@ BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name
               {"name":"I Mcc","abbr":"1MA"},{"name":"I Cor.","abbr":"1CO"},
               {"name":"Hebr.","abbr":"HEB"},{"name":"Heb.","abbr":"HEB"},{"name":"Gen.","abbr":"GEN"},
               {"name":"Gal.","abbr":"GAL"},{"name":"Ez.","abbr":"EZK"},{"name":"Ephesians","abbr":"EPH"},
-              {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccli.","abbr":"ECC"},
+              {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccle.","abbr":"ECC"},{"name":"Eccli.","abbr":"SIR"},
               {"name":"Cor.","abbr":"1CO"},{"name":"Col.","abbr":"COL"},{"name":"Canticum Canticorum","abbr":"SNG"},
               {"name":"Apocalypsis","abbr":"REV"},{"name":"Apoc.","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
               {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"}
