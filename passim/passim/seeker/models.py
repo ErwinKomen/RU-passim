@@ -16,7 +16,7 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
-from passim.bible.models import Reference
+from passim.bible.models import Reference, Book
 import sys, os, io, re
 import copy
 import json
@@ -5975,6 +5975,33 @@ class SermonDescr(models.Model):
             bOkay = False
         return bOkay, msg
 
+    def adapt_verses(self):
+        """Re-calculated what should be in [verses], and adapt if needed"""
+
+        oErr = ErrHandle()
+        bStatus = True
+        msg = ""
+        try:
+            lst_verse = []
+            for obj in self.sermonbibranges.all():
+                lst_verse.append("{}".format(obj.get_fullref()))
+            refstring = "; ".join(lst_verse)
+            oRef = Reference(refstring)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult:
+                verses = json.dumps(lst_verses)
+                if self.verses != verses:
+                    self.verses = verses
+                    self.save()
+            else:
+                # Unable to parse this scripture reference
+                bStatus = False
+        except:
+            msg = oErr.get_error_message()
+            bStatus = False
+        return bStatus, msg
+
     def add_range(self, start, einde):
         """Add a range to this sermon, if it is not there already"""
 
@@ -5996,7 +6023,7 @@ class SermonDescr(models.Model):
             done = Information.get_kvalue("biblerefs")
             if self.verses == None or self.verses == "" or self.verses == "[]" or done == "":
                 # Open a Reference object
-                oRef = Reference(kwargs={'bibleref': self.bibleref})
+                oRef = Reference(self.bibleref)
 
                 if self.id in [27571, 27572, 27573, 55187]:
                     iStop = 1
@@ -6007,10 +6034,17 @@ class SermonDescr(models.Model):
                     # Add this range to the sermon
                     self.verses = json.dumps(lst_verses)
                     self.save()
+                    # Check and add (if needed) the corresponding BibRange object
+                    for oScrref in lst_verses:
+                        intro = oScrref.get("intro", None)
+                        added = oScrref.get("added", None)
+                        # THis is one book and a chvslist
+                        book, chvslist = oRef.get_chvslist(oScrref)
+                        # Possibly create an appropriate Bibrange object (or emend it)
+                        obj = BibRange.get_range(self, book, chvslist, intro, added)
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
                     print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
-
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
@@ -6073,6 +6107,30 @@ class SermonDescr(models.Model):
 
         # Combine all of this
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
+        return sBack
+
+    def get_bibleref(self):
+        """Interpret the BibRange objects into a proper view"""
+
+        # First attempt: just show .bibleref
+        sBack = self.bibleref
+        # Or do we have BibRange objects?
+        if self.sermonbibranges.count() > 0:
+            html = []
+            for obj in self.sermonbibranges.all().order_by('book__idno', 'chvslist'):
+                # Add this range
+                intro = "" 
+                if obj.intro != None and obj.intro != "":
+                    intro = "{} ".format(obj.intro)
+                added = ""
+                if obj.added != None and obj.added != "":
+                    added = " ({})".format(obj.added)
+                bref_display = "<span class='badge signature ot' title='{}'>{}{} {}{}</span>".format(
+                    obj, intro, obj.book.latabbr, obj.chvslist, added)
+                html.append(bref_display)
+                sBack = "; ".join(html)
+
+        # Return what we have
         return sBack
 
     def get_collection_link(self, settype):
@@ -6855,6 +6913,75 @@ class Range(models.Model):
             oErr.DoError("Range/parse")
             bStatus = False
         return bStatus, msg, obj
+
+
+class BibRange(models.Model):
+    """A range of chapters/verses from one particular book"""
+
+    # [1] Each chapter belongs to a book
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookbibranges")
+    # [0-1] Optional ChVs list
+    chvslist = models.TextField("Chapters and verses", blank=True, null=True)
+    # [1] Each range is linked to a Sermon
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonbibranges")
+
+    # [0-1] Optional introducer
+    intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Optional addition
+    added = models.CharField("Addition",  null=True, blank=True, max_length=LONG_STRING)
+
+    def __str__(self):
+        html = []
+        sBack = ""
+        if self.book != None:
+            html.append(self.book.abbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            sBack = " ".join(html)
+        return sBack
+
+    def get_ref_latin(self):
+        html = []
+        sBack = ""
+        if self.book != None:
+            html.append(self.book.latabbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            sBack = " ".join(html)
+        return sBack
+
+    def get_fullref(self):
+        html = []
+        sBack = ""
+        if self.book != None:
+            if self.intro != None and self.intro != "":
+                html.append(self.intro)
+            html.append(self.book.abbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            if self.added != None and self.added != "":
+                html.append(self.added)
+            sBack = " ".join(html)
+        return sBack
+
+    def get_range(sermon, book, chvslist, intro=None, added=None):
+        """Get the bk/ch range for this particular sermon"""
+
+        bNeedSaving = False
+        obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
+        if obj == None:
+            obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
+            bNeedSaving = True
+        # Double check for intro and added
+        if obj.intro != intro:
+            obj.intro = intro
+            bNeedSaving = True
+        if obj.added != added:
+            obj.added = added
+            bNeedSaving = True
+        if bNeedSaving:
+            obj.save()
+        return obj
 
 
 class SermonDescrKeyword(models.Model):

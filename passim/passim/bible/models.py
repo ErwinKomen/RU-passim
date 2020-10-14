@@ -136,13 +136,44 @@ class BkChVs():
         # Disentanble bkchvs
         if len(bkchvs) == 9:
             idno = int(bkchvs[0:3])
-            self.ch = int(bkchvs[3:3])
-            selv.vs = int(bkchvs[6:3])
+            self.ch = int(bkchvs[3:6])
+            self.vs = int(bkchvs[6:])
             # Convert idno into abbreviation
             self.book = Book.get_abbr(idno)
 
         # Return the response
         return response
+
+    def is_next(self, other):
+        """Check if [self] follows immediately upon [other]"""
+
+        if self.book != other.book: return False
+        if self.ch == other.ch:
+            # Same chapter: verse must be consecutive
+            return (self.vs == other.vs + 1)
+        if self.ch + 1 == other.ch:
+            # Check if self.ch is the first verse
+            if self.vs != 1: return False
+            # Check if [other.vs] is the last verse in [other.ch]
+            idno = Book.get_idno(other.book)
+            vss = Chapter.get_vss(idno, other.ch)
+            return other.vs == vss
+        # Otherwise return false
+        return False
+
+    def get_until(self, einde, include_book = False):
+        """Show ch/vs-ch/vs"""
+
+        sBack = ""
+        # Is this the same chapter?
+        if self.ch == einde.ch:
+            if self.vs == einde.vs:
+                sBack = "{}:{}".format(self.ch, self.vs)
+            else:
+                sBack = "{}:{}-{}".format(self.ch, self.vs, einde.vs)
+        else:
+            sBack = "{}:{}-{}:{}".format(self.ch, self.vs, einde.ch, einde.vs)
+        return sBack
 
 
 class Reference():
@@ -155,14 +186,13 @@ class Reference():
     sr = []             # List of scripture reference objects
     sr_idx = -1         # Index of the current item in [sr]
     
-    def __init__(self, kwargs=None):
-        if kwargs != None:
-            self.ref_string = kwargs.pop("bibleref", "")
+    def __init__(self, bibleref):
+        self.ref_string = bibleref
         if self.ref_string != "":
             self.ref_string = self.ref_string.strip()
             self.ref_len = len(self.ref_string)
             self.pos = 0
-        return super(Reference, self).__init__(**kwargs)
+        return super(Reference, self).__init__()
 
     def get_range(self):
         sRange = ""
@@ -195,6 +225,64 @@ class Reference():
                 sRange = "{}-{}".format(oStart.book, oEinde.book)
         # Return the total
         return sRange
+
+    def get_chvslist(self, oSrcRef):
+        """Convert the book + chvslist of the scripture reference"""
+
+        book = None
+        chvslist = ""
+
+        sr = oSrcRef.get("scr_refs", [])
+        if len(sr) > 0:
+            sr.sort()
+            # Get the book's idno from the first entry
+            first = sr[0]
+            idno = int(first[0:3])
+            # Get the book with this idno
+            book = Book.objects.filter(idno=idno).first()
+            # Convert the list of scripture references into a chvslist
+            ch = -1
+            vs = -1
+            lst_chvs = []
+            start = None
+            einde = None
+            current = None
+            previous = None
+            for item in sr:
+                # Get the bk/ch/vs of this item
+                current = BkChVs(item)
+                # Is this the start?
+                if start == None:
+                    # Remember the start
+                    start = copy.copy(current)
+                    # Also make a previous copy
+                    previous = copy.copy(current)
+                else:
+                    # Check if this follows upon the previous one
+                    if previous == None:
+                        # Not sure how we get here
+                        pass
+                    elif current.is_next(previous):
+                        # Continuing
+                        previous = copy.copy(current)
+                    else:
+                        # Finish the previous one
+                        einde = copy.copy(previous)
+                        # Create from-end
+                        lst_chvs.append(start.get_until(einde))
+                        # Reset start and einde
+                        start = copy.copy(current)
+                        einde = None
+                        previous = copy.copy(current)
+            # Check if all was processed
+            if start != None:
+                # There's one verse that still needs processing
+                # lst_chvs.append("{}:{}".format(start.ch, start.vs))
+                lst_chvs.append(start.get_until(current))
+  
+            chvslist = ", ".join(lst_chvs)
+        # Return what we found
+        return book, chvslist
 
     def skip_spaces(self):
         while self.pos < self.ref_len and self.ref_string[self.pos] in SPACES: self.pos += 1
@@ -342,6 +430,8 @@ class Reference():
                     bFound, bi = self.bnf_BkRef(bi)
                 else:
                     bFound = False
+                ## Reset [bi]
+                #bi = None
             # Check if we are at the end already
             if not self.is_end():
                 # Whatever is left should be 'added'
@@ -377,6 +467,8 @@ class Reference():
         oErr = ErrHandle()
 
         try:
+            # Add a new scrref
+            self.add_scrref()
             intro = self.get_string(["cf.", "or"])
             if intro != "":
                 self.add_intro(intro)
@@ -388,10 +480,27 @@ class Reference():
                 bk = self.ref_string[self.pos:self.pos+3].upper()
                 # Get the BkNo of the book
                 idno = Book.get_idno(bk)
+                # Make sure we get it
+                pos_intro = self.pos
+                while idno < 0 and not self.is_end():
+                    # Try finding the book one position further
+                    self.pos += 1
+                    # Get the book abbreviation in upper case
+                    bk = self.ref_string[self.pos:self.pos+3].upper()
+                    # Get the BkNo of the book
+                    idno = Book.get_idno(bk)
+                    if idno >= 0:
+                        # Define the intro
+                        intro = self.ref_string[pos_intro: self.pos].strip()
+                        self.add_intro(intro)
+                if idno < 0 and bi != None:
+                    # reset position
+                    self.pos = pos_intro
+
                 # If book number cannot be determined: indicate failure
-                if idno < 0 and bi == None:
+                if idno < 0 and bi == None and self.is_end():
                     bStatus = False
-                    msg = "Cannot determine book number for [{}]".format(bk)
+                    msg = "Cannot determine book number for [{}]".format(self.ref_string[pos_intro:])
                 else:
                     if idno >= 0: 
                         bi = idno
@@ -411,7 +520,7 @@ class Reference():
                                 self.add_bkchvs(bi, ch, vs)
                     else:
                         # See if there indeed is another <ChVs>
-                        bFound = self.bnf_ChVs(bi)
+                        bFound, msg = self.bnf_ChVs(bi)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Reference/bnf_BkRef")
@@ -507,9 +616,9 @@ class Reference():
                     if bFoundMore:
                         self.skip_spaces()
                         sNext = self.preview_next()  
-            elif re.match("[A-Za-z]", sNext):
-                # This must be a chapter named like 2CH, 1TI or so
-                bStatus = False
+            #elif re.match("[A-Za-z]", sNext):
+            #    # This must be a chapter named like 2CH, 1TI or so
+            #    bStatus = False
             else:
                 # THis is just a whole chapter
                 num_vss = Chapter.get_vss(bi, chapter)
@@ -539,12 +648,19 @@ class Reference():
             oErr.DoError("Reference/add_bkchvs")
         return None
 
-    def add_intro(self, intro):
-        """Create a new ScrRef item and add the intro to it"""
+    def add_scrref(self):
+        """Create a new ScrRef item"""
 
-        oScrRef = dict(intro=intro, added="", scr_refs=[])
+        oScrRef = dict(intro="", added="", scr_refs=[])
         self.sr.append(oScrRef)
         self.sr_idx = len(self.sr) - 1
+        return None
+
+    def add_intro(self, intro):
+        """Add text in [intro] to the current ScrRef item"""
+
+        if self.sr_idx >= 0 and self.sr_idx < len(self.sr):
+            self.sr[self.sr_idx]['intro'] = intro
         return None
 
     def add_added(self, added):

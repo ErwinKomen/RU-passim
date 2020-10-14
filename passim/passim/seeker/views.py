@@ -59,7 +59,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-    SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, \
+    SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
     SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
     ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
@@ -5418,11 +5418,16 @@ class SermonEdit(BasicDetails):
                                          form=SermonDescrSignatureForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
+    SbrefFormSet = inlineformset_factory(SermonDescr, BibRange,
+                                         form=BibRangeForm, min_num=0,
+                                         fk_name = "sermon",
+                                         extra=0, can_delete=True, can_order=False)
 
     formset_objects = [{'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
                        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
-                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
+                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+                       {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
 
     stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'postscriptum', 'quote', 
                                 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
@@ -5484,7 +5489,9 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
-            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
+            # {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
+            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),         
+             'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]},
             {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
              'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
@@ -5662,6 +5669,26 @@ class SermonEdit(BasicDetails):
                                     form.instance.linktype = linktype
                                     form.instance.super = super
                         # Note: it will get saved with form.save()
+                    elif prefix == "sbref":
+                        # Processing one BibRange
+                        newintro = cleaned.get('newintro', None)
+                        onebook = cleaned.get('onebook', None)
+                        newchvs = cleaned.get('newchvs', None)
+                        newadded = cleaned.get('newadded', None)
+
+                        # Minimal need is BOOK
+                        if onebook != None:
+                            # Double check if this one already exists for the current instance
+                            obj = instance.sermonbibranges.filter(book=onebook, chvslist=newchvs, intro=newintro, added=newadded).first()
+                            if obj == None:
+                                form.instance.intro = newintro
+                                form.instance.added = newadded
+                            # Do we have a reference?
+                            if onebook != None:
+                                form.instance.book = onebook
+                                if newchvs != None:
+                                    form.instance.chvslist = newchvs
+                            # Note: it will get saved with formset.save()
                 else:
                     errors.append(form.errors)
                     bResult = False
@@ -5705,6 +5732,14 @@ class SermonEdit(BasicDetails):
             # (5) 'collections'
             collist_s = form.cleaned_data['collist_s']
             adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
+
+            # Process many-to-ONE changes
+            # (1) links from bibrange to sermon
+            bibreflist = form.cleaned_data['bibreflist']
+            adapt_m2o(BibRange, instance, "sermon", bibreflist)
+
+            # Make sure the 'verses' field is adapted, if needed
+            bResult, msg = instance.adapt_verses()
 
         except:
             msg = oErr.get_error_message()

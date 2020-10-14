@@ -73,6 +73,33 @@ class AutypeWidget(ModelSelect2Widget):
         return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
 
 
+class BibrefWidget(ModelSelect2MultipleWidget):
+    model = BibRange
+    search_fields = ['book__name__icontains', 'book__latname__icontains']
+
+
+    def label_from_instance(self, obj):
+        # Provide a suitable reference label
+        return obj.get_ref_latin()
+
+    def get_queryset(self):
+        return BibRange.objects.all().order_by('book__idno', 'chvslist').distinct()
+
+
+class BookWidget(ModelSelect2Widget):
+    model = Book
+    search_fields = [ 'name__icontains', 'latname__icontains', 'abbr__icontains', 'latabbr__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Provide both the Latin as well as the English name
+        full = "{} ({})".format(obj.latname, obj.name)
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return Book.objects.all().order_by('idno').distinct()
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
@@ -1037,6 +1064,8 @@ class SermonForm(PassimModelForm):
                                                        'class': 'searching'}))
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
+    bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=BibrefWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -1120,6 +1149,7 @@ class SermonForm(PassimModelForm):
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['mtype'].required = False
+
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -1140,6 +1170,11 @@ class SermonForm(PassimModelForm):
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+
+            # Some lists need to be initialized to NONE:
+            self.fields['bibreflist'].queryset = Daterange.objects.none()
+
+            self.fields['bibreflist'].widget.addonly = True
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1198,6 +1233,9 @@ class SermonForm(PassimModelForm):
 
                 # Make sure the initial superlist captures exactly what we have
                 self.fields['superlist'].queryset = SermonDescrEqual.objects.filter(Q(id__in = self.fields['superlist'].initial))
+
+                self.fields['bibreflist'].initial = [x.pk for x in instance.sermonbibranges.all()]
+                self.fields['bibreflist'].queryset = BibRange.objects.filter(id__in=self.fields['bibreflist'].initial)
 
                 self.fields['autype'].initial = instance.autype
 
@@ -3099,6 +3137,48 @@ class DaterangeForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+
+
+class BibRangeForm(forms.ModelForm):
+    newintro    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Intro...',  'style': 'width: 100%;'}))
+    onebook    = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newchvs    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Chapter-verse list...',  'style': 'width: 100%;'}))
+    newadded    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Note...',  'style': 'width: 100%;'}))
+    action_log = ['book', 'chvslist', 'intro', 'added']
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = BibRange
+        fields = ['book', 'chvslist', 'intro', 'added']
+        widgets={'book':        BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'added':       forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(BibRangeForm, self).__init__(*args, **kwargs)
+
+        # Set other parameters
+        self.fields['book'].required = False
+        self.fields['chvslist'].required = False
+        self.fields['intro'].required = False
+        self.fields['added'].required = False
+        self.fields['newintro'].required = False
+        self.fields['onebook'].required = False
+        self.fields['newchvs'].required = False
+        self.fields['newadded'].required = False
+        self.fields['onebook'].queryset = Book.objects.all().order_by('idno')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
 
 
 class SearchCollectionForm(forms.Form):
