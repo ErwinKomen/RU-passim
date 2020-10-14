@@ -8490,11 +8490,18 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
                     {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
                     {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
-                        'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] },
-                    {'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
-                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] }
+                        'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] }
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
+
+                # Possibly append notes view
+                if user_is_ingroup(self.request, app_editor):
+                    context['mainitems'].append(
+                        {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+
+                # Always append external links
+                context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
+                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
 
             # Signal that we have select2
             context['has_select2'] = True

@@ -2753,6 +2753,8 @@ class Manuscript(models.Model):
     filename = models.CharField("Filename", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Optional link to a website with (more) information on this manuscript
     url = models.URLField("Web info", null=True, blank=True)
+    # [0-1] Notes field, which may be empty - see issue #298
+    notes = models.TextField("Notes", null=True, blank=True)
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
