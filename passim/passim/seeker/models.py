@@ -6957,7 +6957,9 @@ class BibRange(models.Model):
     def __str__(self):
         html = []
         sBack = ""
-        if self.book != None:
+        if getattr(self,"book") == None:
+            msg = "BibRange doesn't have a BOOK"
+        else:
             html.append(self.book.abbr)
             if self.chvslist != None and self.chvslist != "":
                 html.append(self.chvslist)
