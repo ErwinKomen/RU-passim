@@ -6933,7 +6933,9 @@ class BibRange(models.Model):
     def __str__(self):
         html = []
         sBack = ""
-        if self.book != None:
+        if getattr(self,"book") == None:
+            msg = "BibRange doesn't have a BOOK"
+        else:
             html.append(self.book.abbr)
             if self.chvslist != None and self.chvslist != "":
                 html.append(self.chvslist)
@@ -6968,19 +6970,26 @@ class BibRange(models.Model):
         """Get the bk/ch range for this particular sermon"""
 
         bNeedSaving = False
-        obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
-        if obj == None:
-            obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
-            bNeedSaving = True
-        # Double check for intro and added
-        if obj.intro != intro:
-            obj.intro = intro
-            bNeedSaving = True
-        if obj.added != added:
-            obj.added = added
-            bNeedSaving = True
-        if bNeedSaving:
-            obj.save()
+        oErr = ErrHandle()
+        obj = None
+        try:
+            obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
+            if obj == None:
+                obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
+                bNeedSaving = True
+            # Double check for intro and added
+            if obj.intro != intro:
+                obj.intro = intro
+                bNeedSaving = True
+            if obj.added != added:
+                obj.added = added
+                bNeedSaving = True
+            if bNeedSaving:
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Range/get_range")
+            bStatus = False
         return obj
 
 

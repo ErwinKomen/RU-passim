@@ -68,7 +68,7 @@ table tbody tr:hover {
   cursor: pointer;*/
   /*  */
 }
-table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, th div a.clickable:hover {
+table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, div.clickable:hover, span.clickable:hover, th div a.clickable:hover {
   cursor: pointer;
 }
 table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbody tr td span.clickable:hover, th div a.clickable:hover {
@@ -553,17 +553,17 @@ form .panel-heading.row {
 }
 .jumbo-2 {
   background-color: chocolate;
-  color: lavender;
+  color: lavender !important;
   fill: chocolate;
 }
 .jumbo-3 {
   background-color: #355e3b;
-  color: lavender;
+  color: lavender !important;
   fill: #355e3b;
 }
 .jumbo-4 {
   background-color: #ff2400;
-  color: lavender;
+  color: lavender !important;
   fill: #ff2400;
 }
 .jumbo-2 text, .jumbo-3 text, .jumbo-4 text {
@@ -832,6 +832,7 @@ table.func-view th {
   margin-left:20px;
   vertical-align: top;
   padding: 2px;
+  background-clip: padding-box;
 }
 table.func-view th.selected {
   background-color: darkorange;
@@ -884,6 +885,10 @@ table.func-view td {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
+  overflow: hidden;
+  /*
+  overflow-wrap: normal;
+  text-overflow: clip;*/
 }
 table.func-view.sermons td {
     padding: 0px 2px 0px 2px;
@@ -1332,6 +1337,9 @@ a.sermon:link, a.sermon:visited {
   font-size: smaller;
   color: darkblue;
 }
+.signature.ma {
+    color: darkgreen;
+}
 
 .passimcode {
   /* font-family: monospace; */
@@ -1474,4 +1482,34 @@ input:checked + .slider:before {
 .searchincexp {
     font-size: x-small;
     color: darkblue;
+}
+
+.eqg-manu-col.full {
+    white-space:nowrap !important;
+}
+.eqg-manu-col.abbreviated {
+    min-width: 20px;
+}
+
+.columnSelector:hover {
+    border-right: 2px solid blue;
+}
+
+.template_notice {
+    width: 50%;
+    background-color: darkolivegreen;
+    color: white;
+}
+.template_notice:hover {
+    background-color: darkslateblue;
+    color: yellow;
+}
+
+span.overlap {
+    background-color: lightyellow;
+    color: darkblue;
+}
+
+.authorname {
+    color: darkgreen; font-size: small;
 }
