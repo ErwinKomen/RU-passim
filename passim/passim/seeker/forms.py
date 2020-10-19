@@ -76,14 +76,22 @@ class AutypeWidget(ModelSelect2Widget):
 class BibrefWidget(ModelSelect2MultipleWidget):
     model = BibRange
     search_fields = ['book__name__icontains', 'book__latname__icontains']
-
+    addonly = False
 
     def label_from_instance(self, obj):
         # Provide a suitable reference label
         return obj.get_ref_latin()
 
     def get_queryset(self):
-        return BibRange.objects.all().order_by('book__idno', 'chvslist').distinct()
+        if self.addonly:
+            qs = BibRange.objects.none()
+        else:
+            qs = BibRange.objects.all().order_by('book__idno', 'chvslist').distinct()
+        return qs
+
+
+class BibrefAddonlyWidget(BibrefWidget):
+    addonly = True
 
 
 class BookWidget(ModelSelect2Widget):
@@ -1065,7 +1073,7 @@ class SermonForm(PassimModelForm):
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=BibrefWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -3165,19 +3173,33 @@ class BibRangeForm(forms.ModelForm):
         # Start by executing the standard handling
         super(BibRangeForm, self).__init__(*args, **kwargs)
 
-        # Set other parameters
-        self.fields['book'].required = False
-        self.fields['chvslist'].required = False
-        self.fields['intro'].required = False
-        self.fields['added'].required = False
-        self.fields['newintro'].required = False
-        self.fields['onebook'].required = False
-        self.fields['newchvs'].required = False
-        self.fields['newadded'].required = False
-        self.fields['onebook'].queryset = Book.objects.all().order_by('idno')
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
+        oErr = ErrHandle()
+        try:
+            # Set other parameters
+            self.fields['book'].required = False
+            self.fields['chvslist'].required = False
+            self.fields['intro'].required = False
+            self.fields['added'].required = False
+            self.fields['newintro'].required = False
+            self.fields['onebook'].required = False
+            self.fields['newchvs'].required = False
+            self.fields['newadded'].required = False
+            self.fields['onebook'].queryset = Book.objects.all().order_by('idno')
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+                    # Make sure the initials are taken over into new-elements
+                    self.fields['newintro'].initial = instance.intro
+                    self.fields['onebook'].initial = [ instance.book.id ]
+                    self.fields['newchvs'].initial = instance.chvslist
+                    self.fields['newadded'].initial = instance.added
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRangeForm")
+
+        # Return the response
+        return None
 
 
 

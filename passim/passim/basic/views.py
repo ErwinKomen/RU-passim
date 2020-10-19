@@ -1231,16 +1231,6 @@ class BasicDetails(DetailView):
                         # Only process actual changes!!
                         if self.request.method == "POST" and self.request.POST:
 
-                            #if self.add:
-                            #    # Saving a NEW item
-                            #    if 'initial' in formsetObj:
-                            #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
-                            #    else:
-                            #        formset = formsetClass(self.request.POST, self.request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                            #else:
-                            #    # Get a formset including any stuff from POST
-                            #    formset = formsetClass(self.request.POST, prefix=prefix, instance=instance)
-
                             # Double check to see if information on this formset is available or not
                             formsetObj['may_evaluate'] = (self.qd.get("{}-TOTAL_FORMS".format(prefix), None) != None)
                             bypass = False
@@ -1280,11 +1270,38 @@ class BasicDetails(DetailView):
                             formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
                     else:
                         # show the data belonging to the current [obj]
+                        parent_instance = instance
+                        if 'parent' in formsetObj: parent_instance = formsetObj['parent']
                         qs = self.get_formset_queryset(prefix)
-                        if qs == None:
-                            formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                        if self.request.method == "POST" and self.request.POST:
+                            if qs == None:
+                                formset = formsetClass(self.request.POST, prefix=prefix, instance=parent_instance, form_kwargs=form_kwargs)
+                            else:
+                                formset = formsetClass(self.request.POST, prefix=prefix, instance=parent_instance, queryset=qs, form_kwargs=form_kwargs)
+                            # Process this formset
+                            self.process_formset(prefix, self.request, formset)
+                        
+                            # Process all the correct forms in the formset
+                            for subform in formset:
+                                if subform.is_valid():
+                                    # DO the actual saving
+                                    subform.save()
+
+                                    # Log the SAVE action
+                                    details = {'id': instance.id}
+                                    details["savetype"] = "add" # if bNew else "change"
+                                    details['model'] = subform.instance.__class__.__name__
+                                    if subform.changed_data != None and len(subform.changed_data) > 0:
+                                        details['changes'] = action_model_changes(subform, subform.instance)
+                                    self.action_add(instance, details, "add")
+
+                                    # Signal that the *FORM* needs refreshing, because the formset changed
+                                    bFormsetChanged = True
                         else:
-                            formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
+                            if qs == None:
+                                formset = formsetClass(prefix=prefix, instance=parent_instance, form_kwargs=form_kwargs)
+                            else:
+                                formset = formsetClass(prefix=prefix, instance=parent_instance, queryset=qs, form_kwargs=form_kwargs)
 
                     # Only continue if we have a formset
                     if formset != None:
@@ -1292,6 +1309,7 @@ class BasicDetails(DetailView):
                         ordered_forms = self.process_formset(prefix, self.request, formset)
                         if ordered_forms:
                             context[prefix + "_ordered"] = ordered_forms
+
                         # Store the instance
                         formsetObj['formsetinstance'] = formset
                         # Add the formset to the context
@@ -1366,6 +1384,8 @@ class BasicDetails(DetailView):
             # fill in the form values
             if frm and 'mainitems' in context:
                 for mobj in context['mainitems']:
+                    # Initialize
+                    if not 'nolist' in mobj: mobj['nolist'] = False
                     # Check for possible form field information
                     if 'field_key' in mobj: 
                         mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
@@ -1380,7 +1400,7 @@ class BasicDetails(DetailView):
                         mobj['allowing'] = "edit"
                     else:
                         mobj['allowing'] = "view"
-                    if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                    if ('field_key' in mobj or 'field_list' in mobj or 'nolist' in mobj) and (mobj['allowing'] == "edit"):
                         mobj['allowing_key_list'] = "edit"
                     else:
                         mobj['allowing_key_list'] = "view"

@@ -706,8 +706,14 @@ class Reference():
     def add_added(self, added):
         """Add text in [added] to the current ScrRef item"""
 
-        if self.sr_idx >= 0 and self.sr_idx < len(self.sr):
-            self.sr[self.sr_idx]['added'] = added
+        # Make sure what is added is okay
+        if added != None:
+            added = added.strip()
+            # Remove left and right bracket, if existing
+            if added[0] == "(" and added[-1] == ")":
+                added = added[1:len(added)-1]
+            if self.sr_idx >= 0 and self.sr_idx < len(self.sr):
+                self.sr[self.sr_idx]['added'] = added
         return None
 
     def preview_next(self):

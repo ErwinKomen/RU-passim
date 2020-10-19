@@ -5494,8 +5494,10 @@ class SermonEdit(BasicDetails):
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
 
-            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),         
+            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
              'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]},
+            #{'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(), 'nolist': True,        
+            # 'multiple': True, 'fso': self.formset_objects[4]},
             {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
              'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
@@ -5682,17 +5684,33 @@ class SermonEdit(BasicDetails):
 
                         # Minimal need is BOOK
                         if onebook != None:
-                            # Double check if this one already exists for the current instance
-                            obj = instance.sermonbibranges.filter(book=onebook, chvslist=newchvs, intro=newintro, added=newadded).first()
-                            if obj == None:
-                                form.instance.intro = newintro
-                                form.instance.added = newadded
-                            # Do we have a reference?
-                            if onebook != None:
-                                form.instance.book = onebook
-                                if newchvs != None:
-                                    form.instance.chvslist = newchvs
-                            # Note: it will get saved with formset.save()
+                            # Note: normally it will get saved with formset.save()
+                            #       However, 'noinit=False' formsets must arrange their own saving
+
+                            #bNeedSaving = False
+
+                            ## Double check if this one already exists for the current instance
+                            #obj = instance.sermonbibranges.filter(book=onebook, chvslist=newchvs, intro=newintro, added=newadded).first()
+                            #if obj == None:
+                            #    obj = BibRange.objects.create(sermon=instance, book=onebook, chvslist=newchvs)
+                            #    bNeedSaving = True
+                            #if newintro != None and newintro != "": 
+                            #    obj.intro = newintro
+                            #    bNeedSaving = True
+                            #if newadded != None and newadded != "": 
+                            #    obj.added = newadded
+                            #    bNeedSaving = True
+                            #if bNeedSaving:
+                            #    obj.save()
+                            #    x = instance.sermonbibranges.all()
+
+                            form.instance.book = onebook
+                            if newchvs != None:
+                                form.instance.chvslist = newchvs
+                            form.instance.intro = newintro
+                            form.instance.added = newadded
+                            
+
                 else:
                     errors.append(form.errors)
                     bResult = False
