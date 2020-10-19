@@ -6518,6 +6518,127 @@ class ProvenanceListView(BasicList):
         return fields, lstExclude, qAlternative
 
 
+class BibRangeEdit(BasicDetails):
+    """The details of one 'user-keyword': one that has been linked by a user"""
+
+    model = BibRange
+    mForm = BibRangeForm
+    prefix = 'brng'
+    title = "Bible references"
+    title_sg = "Bible reference"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),                       },
+            {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,                         },
+            {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
+            {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},
+            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                      },
+            {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def get_manuscript(self, instance):
+        # find the shelfmark via the sermon
+        manu = instance.sermon.msitem.manu
+        url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+        shelfmark = manu.idno[:20]
+        sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        return sBack
+
+    def get_sermon(self, instance):
+        # Get the sermon
+        sermon = instance.sermon
+        url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+        title = "{}: {}".format(sermon.msitem.manu.idno, sermon.locus)
+        sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, title)
+        return sBack
+
+
+
+class BibRangeDetails(BibRangeEdit):
+    """Like BibRange Edit, but then html output"""
+    rtype = "html"
+    
+
+class BibRangeListView(BasicList):
+    """Search and list provenances"""
+
+    model = BibRange
+    listform = BibRangeForm
+    prefix = "brng"
+    has_select2 = True
+    sg_name = "Bible reference"
+    plural_name = "Bible references"
+    new_button = False  # BibRanges are added in the Manuscript view; each provenance belongs to one manuscript
+    order_cols = ['book__idno', 'chvslist', 'sermon__msitem__manu__idno']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Book',            'order': 'o=1', 'type': 'str', 'custom': 'book', 'linkdetails': True},
+        {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
+        {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
+        {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
+        {'name': 'Manuscript',      'order': 'o=5', 'type': 'str', 'custom': 'manuscript'}
+        ]
+    filters = [ {"name": "Book",        "id": "filter_book",    "enabled": False},
+                {"name": "Intro",       "id": "filter_intro",   "enabled": False},
+                {"name": "Extra",       "id": "filter_added",   "enabled": False},
+                {"name": "Manuscript",  "id": "filter_manuid",  "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'book',      'fkfield': 'book', 'keyFk': 'name', 'infield': 'id', 'keyList': 'bookidlist'},
+            {'filter': 'intro',     'dbfield': 'name', 'keyS': 'intro'},
+            {'filter': 'added',     'dbfield': 'name', 'keyS': 'added'},
+            {'filter': 'manuid',    'fkfield': 'sermon__msitem__manu', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            ]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "manuscript":
+            # find the shelfmark
+            manu = instance.sermon.msitem.manu
+            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        elif custom == "book":
+            sBack = instance.book.name
+        elif custom == "intro":
+            sBack = " "
+            if instance.intro != "":
+                sBack = instance.intro
+        elif custom == "added":
+            sBack = " "
+            if instance.added != "":
+                sBack = instance.added
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+        x = fields
+        return fields, lstExclude, qAlternative
+
+
 class TemplateEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
 

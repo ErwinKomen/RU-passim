@@ -6991,6 +6991,12 @@ class BibRange(models.Model):
 
         return response
 
+    def get_book(self):
+        """Get the book for details view"""
+
+        sBack = "<span title='{}'>{}</span>".format(self.book.latname, self.book.name)
+        return sBack
+
     def get_ref_latin(self):
         html = []
         sBack = ""
