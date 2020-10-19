@@ -5469,7 +5469,11 @@ class SermonEdit(BasicDetails):
         # Get the main items
         mainitems_main = [
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'},
-            {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu", 'empty': 'hide'},
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
+            #{'type': 'plain', 'label': 'Hidden: Bible Ref',     'value': instance.bibleref,         'field_key': 'bibleref',    'empty': 'hide'},
+            #{'type': 'plain', 'label': 'Hidden: Verses',        'value': instance.verses,           'field_key': 'verses',      'empty': 'hide'},
+            # --------------------------------------------
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
             {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
@@ -5489,7 +5493,7 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
-            # {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.bibleref,         'field_key': 'bibleref'},
+
             {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),         
              'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]},
             {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
@@ -5712,34 +5716,35 @@ class SermonEdit(BasicDetails):
         
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
-            # (1) 'keywords'
-            kwlist = form.cleaned_data['kwlist']
-            adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
+            if getattr(form, 'cleaned_data') != None:
+                # (1) 'keywords'
+                kwlist = form.cleaned_data['kwlist']
+                adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
             
-            # (2) user-specific 'keywords'
-            ukwlist = form.cleaned_data['ukwlist']
-            profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
+                # (2) user-specific 'keywords'
+                ukwlist = form.cleaned_data['ukwlist']
+                profile = Profile.get_user_profile(self.request.user.username)
+                adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
 
-            # (3) 'Links to Gold Signatures'
-            siglist = form.cleaned_data['siglist']
-            adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
+                # (3) 'Links to Gold Signatures'
+                siglist = form.cleaned_data['siglist']
+                adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
 
-            # (4) 'Links to Gold Sermons'
-            superlist = form.cleaned_data['superlist']
-            adapt_m2m(SermonDescrEqual, instance, "sermon", superlist, "super", extra = ['linktype'], related_is_through=True)
+                # (4) 'Links to Gold Sermons'
+                superlist = form.cleaned_data['superlist']
+                adapt_m2m(SermonDescrEqual, instance, "sermon", superlist, "super", extra = ['linktype'], related_is_through=True)
 
-            # (5) 'collections'
-            collist_s = form.cleaned_data['collist_s']
-            adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
+                # (5) 'collections'
+                collist_s = form.cleaned_data['collist_s']
+                adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
 
-            # Process many-to-ONE changes
-            # (1) links from bibrange to sermon
-            bibreflist = form.cleaned_data['bibreflist']
-            adapt_m2o(BibRange, instance, "sermon", bibreflist)
+                # Process many-to-ONE changes
+                # (1) links from bibrange to sermon
+                bibreflist = form.cleaned_data['bibreflist']
+                adapt_m2o(BibRange, instance, "sermon", bibreflist)
 
-            # Make sure the 'verses' field is adapted, if needed
-            bResult, msg = instance.adapt_verses()
+            ## Make sure the 'verses' field is adapted, if needed
+            #bResult, msg = instance.adapt_verses()
 
         except:
             msg = oErr.get_error_message()
@@ -5942,9 +5947,11 @@ class SermonListView(BasicList):
         # Check if signature adaptation is needed
         bref_done = Information.get_kvalue("biblerefs")
         if bref_done == None or bref_done != "done":
+            # Remove any previous BibRange objects
+            BibRange.objects.all().delete()
             # Perform adaptations
             for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
-                sermon.do_ranges()
+                sermon.do_ranges(force=True)
             # Success
             Information.set_kvalue("biblerefs", "done")
             SermonDescr.objects.all()

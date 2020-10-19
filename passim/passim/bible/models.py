@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.urls import reverse
 import re, copy
 from passim.bible.utils import *
@@ -10,34 +11,27 @@ STANDARD_LENGTH=100
 ABBR_LENGTH = 5
 BKCHVS_LENGTH = 9       # BBBCCCVVV
 
-BOOK_NAMES = [{"name":"Romans","abbr":"ROM"},{"name":"Rom.","abbr":"ROM"},{"name":"Rom:","abbr":"ROM"},
-              {"name":"Revelations","abbr":"REV"},
-              {"name":"Ps.","abbr":"PSA"},{"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
-              {"name":"Philippians","abbr":"PHP"},{"name":"Phil.","abbr":"PHP"},{"name":"Os.","abbr":"HOS"},
-              {"name":"Mt.","abbr":"MAT"},{"name":"Mt","abbr":"MAT"},{"name":"Matthew","abbr":"MAT"},
-              {"name":"Matth.","abbr":"MAT"},{"name":"Matt.","abbr":"MAT"},{"name":"Matt","abbr":"MAT"},
-              {"name":"Mat.","abbr":"MAT"},
-              {"name":"Mark","abbr":"MRK"},{"name":"Marc.","abbr":"MRK"},{"name":"Luke","abbr":"LUK"},
-              {"name":"Lucas","abbr":"LUK"},{"name":"Luc.","abbr":"LUK"},{"name":"Luc","abbr":"LUK"},
-              {"name":"1 Lamentations","abbr":"LAM"},
-              {"name":"2 Cor.","abbr":"2CO"},
-              {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
-              {"name":"1 Peter","abbr":"1PE"},{"name":"1 John","abbr":"1JN"},{"name":"I Ioh.","abbr":"1JN"},
-              {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"},
-              {"name":"Lc.","abbr":"LUK"},{"name":"Lc","abbr":"LUK"},{"name":"Lamentations","abbr":"LAM"},
-              {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
-              {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
-              {"name":"Isaiah","abbr":"ISA"},{"name":"Is.","abbr":"ISA"}, {"name":"Ioh.","abbr":"JHN"},
-              {"name":"II Petr.","abbr":"2PE"},{"name":"II Cor.","abbr":"2CO"},{"name":"Iac.","abbr":"JAS"},
-              {"name":"I Tim.","abbr":"1TI"},{"name":"I Thess.","abbr":"1TH"},{"name":"I Thes.","abbr":"1TH"},
-              {"name":"I Mcc","abbr":"1MA"},{"name":"I Cor.","abbr":"1CO"},
-              {"name":"Hebr.","abbr":"HEB"},{"name":"Heb.","abbr":"HEB"},{"name":"Gen.","abbr":"GEN"},
-              {"name":"Gal.","abbr":"GAL"},{"name":"Ez.","abbr":"EZK"},{"name":"Ephesians","abbr":"EPH"},
-              {"name":"Eph:","abbr":"EPH"},{"name":"Eph.","abbr":"EPH"},{"name":"Eccle.","abbr":"ECC"},{"name":"Eccli.","abbr":"SIR"},
-              {"name":"Cor.","abbr":"1CO"},{"name":"Col.","abbr":"COL"},{"name":"Canticum Canticorum","abbr":"SNG"},
-              {"name":"Apocalypsis","abbr":"REV"},{"name":"Apoc.","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
-              {"name":"Act. Apost.","abbr":"ACT"},{"name":"Act.","abbr":"ACT"}
-              ]
+BOOK_NAMES = [
+    {"name":"Romans","abbr":"ROM"},{"name":"Rom:","abbr":"ROM"},{"name":"Revelations","abbr":"REV"},
+    {"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
+    {"name":"Philippians","abbr":"PHP"},
+    {"name":"Mt.","abbr":"MAT"},{"name":"Mt","abbr":"MAT"},{"name":"Matthew","abbr":"MAT"},
+    {"name":"Matt.","abbr":"MAT"},{"name":"Matt","abbr":"MAT"},{"name":"Mat.","abbr":"MAT"},
+    {"name":"Mark","abbr":"MRK"},{"name":"Luke","abbr":"LUK"},
+    {"name":"Lucas","abbr":"LUK"},{"name":"Luc","abbr":"LUK"},
+    {"name":"1 Lamentations","abbr":"LAM"}, {"name":"2 Cor.","abbr":"2CO"},
+    {"name":"2 Cor","abbr":"2CO"},{"name":"1 Timothy","abbr":"1TI"},{"name":"1 Thess.","abbr":"1TH"},
+    {"name":"1 Peter","abbr":"1PE"},{"name":"1 John","abbr":"1JN"},
+    {"name":"1 Cor.","abbr":"1CO"},{"name":"1 Cor","abbr":"1CO"},
+    {"name":"Lc.","abbr":"LUK"},{"name":"Lc","abbr":"LUK"},{"name":"Lamentations","abbr":"LAM"},
+    {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
+    {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
+    {"name":"Isaiah","abbr":"ISA"}, {"name":"I Thes.","abbr":"1TH"},
+    {"name":"I Mcc","abbr":"1MA"}, {"name":"Heb.","abbr":"HEB"}, {"name":"Ephesians","abbr":"EPH"},
+    {"name":"Eph:","abbr":"EPH"}, {"name":"Cor.","abbr":"1CO"},{"name":"Canticum Canticorum","abbr":"SNG"},
+    {"name":"Apocalypsis","abbr":"REV"},{"name":"Acts","abbr":"ACT"}
+    ]
+BOOK_SPECIAL = [{"name":"Act. Apost.","abbr":"ACT"}]
 
 
 
@@ -68,18 +62,18 @@ class Book(models.Model):
         return sAbbr
 
     def get_idno(abbr):
-        abbr_from = ["mt1", "matt.", "luc.", "lc.", "jo."]
-        abbr_to = ["mat", "mat", "luk", "luk", "jhn"]
+        abbr_from = ["mt1", "matt.", "lc.", "jo."]
+        abbr_to = ["mat", "mat", "luk", "jhn"]
 
         idno = -1
         # Possibly adapt some abbreviations to be able to understand them
         abbr = abbr.lower()
-        idx = next((x for x in abbr_from if x == abbr), -1)
+        idx = next((idx for idx, x in enumerate(abbr_from) if x == abbr), -1)
         if idx >= 0:
             abbr = abbr_to[idx]
 
         # Get the abbreviation, given the IDNO of a book
-        obj = Book.objects.filter(abbr__iexact=abbr).first()
+        obj = Book.objects.filter(Q(abbr__iexact=abbr)|Q(latabbr__iexact=abbr)).first()
         if obj != None:
             idno = obj.idno
         return idno
@@ -151,7 +145,7 @@ class BkChVs():
         if self.ch == other.ch:
             # Same chapter: verse must be consecutive
             return (self.vs == other.vs + 1)
-        if self.ch + 1 == other.ch:
+        if self.ch == other.ch + 1:
             # Check if self.ch is the first verse
             if self.vs != 1: return False
             # Check if [other.vs] is the last verse in [other.ch]
@@ -243,11 +237,13 @@ class Reference():
             # Convert the list of scripture references into a chvslist
             ch = -1
             vs = -1
+            ch_start = -1
             lst_chvs = []
             start = None
             einde = None
             current = None
             previous = None
+            chvslist = ""
             for item in sr:
                 # Get the bk/ch/vs of this item
                 current = BkChVs(item)
@@ -268,19 +264,40 @@ class Reference():
                     else:
                         # Finish the previous one
                         einde = copy.copy(previous)
-                        # Create from-end
-                        lst_chvs.append(start.get_until(einde))
+                        # Add to string
+                        if einde.ch == ch_start:
+                            # Add with a comma
+                            chvslist = "{}, {}".format(chvslist, einde.vs)
+                        elif ch_start < 0:
+                            # This is the bare beginning
+                            chvslist = start.get_until(einde)
+                        else:
+                            # Add to what we have
+                            chvslist = "{}, {}".format(chvslist, start.get_until(einde))
+                        ## Create from-end
+                        #lst_chvs.append(start.get_until(einde))
+                        # Make sure we remember what chapter we are in
+                        ch_start = einde.ch
                         # Reset start and einde
                         start = copy.copy(current)
                         einde = None
                         previous = copy.copy(current)
             # Check if all was processed
             if start != None:
-                # There's one verse that still needs processing
-                # lst_chvs.append("{}:{}".format(start.ch, start.vs))
-                lst_chvs.append(start.get_until(current))
+                ## There's one verse that still needs processing
+                #lst_chvs.append(start.get_until(current))
+                # Add to string
+                if current.ch == ch_start:
+                    # Add with a comma
+                    chvslist = "{}, {}".format(chvslist, current.vs)
+                elif ch_start < 0:
+                    # This is the bare beginning
+                    chvslist = start.get_until(current)
+                else:
+                    # Add to what we have
+                    chvslist = "{}, {}".format(chvslist, start.get_until(current))
   
-            chvslist = ", ".join(lst_chvs)
+            #chvslist = ", ".join(lst_chvs)
         # Return what we found
         return book, chvslist
 
@@ -388,15 +405,38 @@ class Reference():
         obj = None
         msg = ""
         lst_back = None
+        # pattern = r'\b\w*\.'
+        pattern = r'(?:I+\s)?\b\w*\.'
 
         self.pos = 0
         self.num_refs = 0    # Number of references
         self.sr.clear()
 
         try:
+            if "Lam." in self.ref_string:
+                iStop = 1
 
-            # Ad-hoc: replace any older book names
+            bFound = False
             sRange = self.ref_string
+
+            # (1) Look for special names
+            for item in BOOK_SPECIAL:
+                if item['name'] in sRange:
+                    sRange = sRange.replace(item['name'], item['abbr'])
+
+            # (2) look for the Latin book name
+            # - Regex: get all words ending with a period
+            matches = re.findall(pattern, sRange)
+            for sLatinTry in matches:
+                # Try the latin name first, see if this ends with a period
+                # sLatinTry = sRange[0:sRange.find(".")+1]
+                idx = Book.get_idno(sLatinTry)
+                if idx >=0:
+                    # Replace the bookname we found
+                    abbr = Book.get_abbr(idx)
+                    sRange = sRange.replace(sLatinTry, abbr)
+
+            # (3) Replace any older book names
             for item in BOOK_NAMES:
                 if item['name'] in sRange:
                     sRange = sRange.replace(item['name'], item['abbr'])
@@ -408,7 +448,7 @@ class Reference():
             # Sanity check
             if self.ref_len == 0:
                 # Just return zero - there is nothing to be done
-                return bStatus, "", sr
+                return bStatus, "", None
 
             # Work on line: 
             # <ScrRef> ::= <BkRef> (SPACE* ";" SPACE* <BkRef>)*
@@ -702,6 +742,8 @@ class Reference():
         oErr = ErrHandle()
         bStatus = True
         try:
+            if bi == 23 and ch == 61:
+                iStop = 1
             # Get the first verse number
             verse = self.get_number()
             if verse == None:
@@ -756,8 +798,8 @@ class Reference():
                                 for chapter in range(ch+1, ch2):
                                     # Get the number of verses for the current chapter [ch]
                                     num_vss = Chapter.get_vss(bi, chapter)
-                                    for vs in range(verse, num_vss + 1):
-                                        self.add_bkchvs(bi, ch, vs)
+                                    for vs in range(1, num_vss + 1):
+                                        self.add_bkchvs(bi, chapter, vs)
                                 # Walk the last chapter
                                 for vs in range(1, verse2 + 1):
                                     self.add_bkchvs(bi, ch2, vs)

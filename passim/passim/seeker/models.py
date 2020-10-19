@@ -16,7 +16,7 @@ from markdown import markdown
 from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR
 from passim.seeker.excel import excel_to_list
-from passim.bible.models import Reference, Book
+from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 import sys, os, io, re
 import copy
 import json
@@ -37,7 +37,6 @@ STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
 ABBR_LENGTH = 5
-BKCHVS_LENGTH = 9       # BBBCCCVVV
 PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
@@ -5986,14 +5985,22 @@ class SermonDescr(models.Model):
             for obj in self.sermonbibranges.all():
                 lst_verse.append("{}".format(obj.get_fullref()))
             refstring = "; ".join(lst_verse)
+
+            # Possibly update the field [bibleref] of the sermon
+            if self.bibleref != refstring:
+                self.bibleref = refstring
+                self.save()
+
             oRef = Reference(refstring)
             # Calculate the scripture verses
             bResult, msg, lst_verses = oRef.parse()
             if bResult:
-                verses = json.dumps(lst_verses)
+                verses = "[]" if lst_verses == None else json.dumps(lst_verses)
                 if self.verses != verses:
                     self.verses = verses
                     self.save()
+                    # All is well, so also adapt the ranges (if needed)
+                    self.do_ranges(lst_verses)
             else:
                 # Unable to parse this scripture reference
                 bStatus = False
@@ -6001,14 +6008,6 @@ class SermonDescr(models.Model):
             msg = oErr.get_error_message()
             bStatus = False
         return bStatus, msg
-
-    def add_range(self, start, einde):
-        """Add a range to this sermon, if it is not there already"""
-
-        obj = Range.objects.filter(sermon=self, start=start, einde=einde).first()
-        if obj == None:
-            obj = Range.objects.create(sermon=self, start=start, einde=einde)
-        return obj
 
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
@@ -6018,33 +6017,58 @@ class SermonDescr(models.Model):
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
 
-    def do_ranges(self):
-        if self.bibleref != None and self.bibleref != "":
-            done = Information.get_kvalue("biblerefs")
-            if self.verses == None or self.verses == "" or self.verses == "[]" or done == "":
+    def do_ranges(self, lst_verses = None, force = False):
+        if self.bibleref == None or self.bibleref == "":
+            # Remove any existing bibrange objects
+            self.sermonbibranges.all().delete()
+        else:
+            # done = Information.get_kvalue("biblerefs")
+            if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
                 # Open a Reference object
                 oRef = Reference(self.bibleref)
 
-                if self.id in [27571, 27572, 27573, 55187]:
-                    iStop = 1
+                # Do we have verses already?
+                if lst_verses == None:
 
-                # Calculate the scripture verses
-                bResult, msg, lst_verses = oRef.parse()
+                    # Calculate the scripture verses
+                    bResult, msg, lst_verses = oRef.parse()
+                else:
+                    bResult = True
                 if bResult:
-                    # Add this range to the sermon
-                    self.verses = json.dumps(lst_verses)
-                    self.save()
+                    # Add this range to the sermon (if it's not there already)
+                    verses = json.dumps(lst_verses)
+                    if self.verses != verses:
+                        self.verses = verses
+                        self.save()
                     # Check and add (if needed) the corresponding BibRange object
                     for oScrref in lst_verses:
                         intro = oScrref.get("intro", None)
                         added = oScrref.get("added", None)
                         # THis is one book and a chvslist
                         book, chvslist = oRef.get_chvslist(oScrref)
+
                         # Possibly create an appropriate Bibrange object (or emend it)
+                        # Note: this will also add BibVerse objects
                         obj = BibRange.get_range(self, book, chvslist, intro, added)
+
+                        # Add BibVerse objects if needed
+                        verses_new = oScrref.get("scr_refs", [])
+                        verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                        # Remove outdated verses
+                        deletable = []
+                        for item in verses_old:
+                            if item not in verses_new: deletable.append(item)
+                        if len(deletable) > 0:
+                            obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                        # Add new verses
+                        with transaction.atomic():
+                            for item in verses_new:
+                                if not item in verses_old:
+                                    verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
                     print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
+
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
@@ -6923,7 +6947,7 @@ class BibRange(models.Model):
     # [0-1] Optional ChVs list
     chvslist = models.TextField("Chapters and verses", blank=True, null=True)
     # [1] Each range is linked to a Sermon
-    sermon = models.ForeignKey(SermonDescr, related_name="sermonbibranges")
+    sermon = models.ForeignKey(SermonDescr, on_delete=models.CASCADE, related_name="sermonbibranges")
 
     # [0-1] Optional introducer
     intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
@@ -6939,6 +6963,31 @@ class BibRange(models.Model):
                 html.append(self.chvslist)
             sBack = " ".join(html)
         return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do my own saving
+        response = super(BibRange, self).save(force_insert, force_update, using, update_fields)
+
+        # Make sure the fields in [sermon] are adapted, if needed
+        bResult, msg = self.sermon.adapt_verses()
+
+
+        ## Add BibVerse objects if needed
+        #verses_new = oScrref.get("scr_refs", [])
+        #verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+        ## Remove outdated verses
+        #deletable = []
+        #for item in verses_old:
+        #    if item not in verses_new: deletable.append(item)
+        #if len(deletable) > 0:
+        #    obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+        ## Add new verses
+        #with transaction.atomic():
+        #    for item in verses_new:
+        #        if not item in verses_old:
+        #            verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+
+        return response
 
     def get_ref_latin(self):
         html = []
@@ -6968,20 +7017,40 @@ class BibRange(models.Model):
         """Get the bk/ch range for this particular sermon"""
 
         bNeedSaving = False
-        obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
-        if obj == None:
-            obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
-            bNeedSaving = True
-        # Double check for intro and added
-        if obj.intro != intro:
-            obj.intro = intro
-            bNeedSaving = True
-        if obj.added != added:
-            obj.added = added
-            bNeedSaving = True
-        if bNeedSaving:
-            obj.save()
+        oErr = ErrHandle()
+        try:
+            obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
+            if obj == None:
+                obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
+                bNeedSaving = True
+                bNeedVerses = True
+            # Double check for intro and added
+            if obj.intro != intro:
+                obj.intro = intro
+                bNeedSaving = True
+            if obj.added != added:
+                obj.added = added
+                bNeedSaving = True
+            # Possibly save the BibRange
+            if bNeedSaving:
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRange/get_range")
+            obj = None
         return obj
+
+
+class BibVerse(models.Model):
+    """One verse that belongs to [BibRange]"""
+
+    # [1] The Bk/Ch/Vs code (9 characters)
+    bkchvs = models.CharField("Bk/Ch/Vs", max_length=BKCHVS_LENGTH)
+    # [1] Each verse is part of a BibRange
+    bibrange = models.ForeignKey(BibRange, on_delete=models.CASCADE, related_name="bibrangeverses")
+
+    def __str__(self):
+        return self.bkchvs
 
 
 class SermonDescrKeyword(models.Model):

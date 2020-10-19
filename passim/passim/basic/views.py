@@ -1476,40 +1476,43 @@ class BasicDetails(DetailView):
                     frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(prefix=prefix, instance=instance)
+                # There is no saving, but the after_save() must still be called in this situation
+                ## Any action(s) after saving
+                #bResult, msg = self.after_save(frm, instance)
             else:
                 # Editing an existing one
                 if self.use_team_group:
                     frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
                 else:
                     frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
-            # Both cases: validation and saving
-            if frm.is_valid():
-                # The form is valid - do a preliminary saving
-                obj = frm.save(commit=False)
-                # Any checks go here...
-                bResult, msg = self.before_save(form=frm, instance=obj)
-                if bResult:
-                    # Now save it for real
-                    obj.save()
-                    # Log the SAVE action
-                    details = {'id': obj.id}
-                    details["savetype"] = "new" if bNew else "change"
-                    if frm.changed_data != None and len(frm.changed_data) > 0:
-                        details['changes'] = action_model_changes(frm, obj)
-                    self.action_add(obj, details, "save")
+                # If there is an [initial]: validation and saving
+                if frm.is_valid():
+                    # The form is valid - do a preliminary saving
+                    obj = frm.save(commit=False)
+                    # Any checks go here...
+                    bResult, msg = self.before_save(form=frm, instance=obj)
+                    if bResult:
+                        # Now save it for real
+                        obj.save()
+                        # Log the SAVE action
+                        details = {'id': obj.id}
+                        details["savetype"] = "new" if bNew else "change"
+                        if frm.changed_data != None and len(frm.changed_data) > 0:
+                            details['changes'] = action_model_changes(frm, obj)
+                        self.action_add(obj, details, "save")
 
-                    # Make sure the form is actually saved completely
-                    frm.save()
-                    instance = obj
+                        # Make sure the form is actually saved completely
+                        frm.save()
+                        instance = obj
                     
-                    # Any action(s) after saving
-                    bResult, msg = self.after_save(frm, obj)
+                        # Any action(s) after saving
+                        bResult, msg = self.after_save(frm, obj)
+                    else:
+                        context['errors'] = {'save': msg }
                 else:
-                    context['errors'] = {'save': msg }
-            else:
-                # We need to pass on to the user that there are errors
-                context['errors'] = frm.errors
-                oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
+                    # We need to pass on to the user that there are errors
+                    context['errors'] = frm.errors
+                    oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
 
             # Check if this is a new one
             if bNew:
