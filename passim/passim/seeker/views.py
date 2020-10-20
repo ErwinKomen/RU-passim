@@ -6535,11 +6535,11 @@ class BibRangeEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),                       },
-            {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,                         },
+            {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),   'field_key': 'book', 'key_hide': True },
+            {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,     'field_key': 'chvslist', 'key_hide': True },
             {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
             {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},
-            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                      },
+            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
             {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
             ]
 

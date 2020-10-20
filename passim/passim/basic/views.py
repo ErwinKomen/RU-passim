@@ -1396,7 +1396,7 @@ class BasicDetails(DetailView):
 
                     # Calculate view-mode versus any-mode
                     #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
-                    if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                    if self.permission == "write" and mobj.get("key_hide") == None:       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
                         mobj['allowing'] = "edit"
                     else:
                         mobj['allowing'] = "view"

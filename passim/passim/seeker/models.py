@@ -6142,6 +6142,8 @@ class SermonDescr(models.Model):
         if self.sermonbibranges.count() > 0:
             html = []
             for obj in self.sermonbibranges.all().order_by('book__idno', 'chvslist'):
+                # Find out the URL of this range
+                url = reverse("bibrange_details", kwargs={'pk': obj.id})
                 # Add this range
                 intro = "" 
                 if obj.intro != None and obj.intro != "":
@@ -6149,8 +6151,8 @@ class SermonDescr(models.Model):
                 added = ""
                 if obj.added != None and obj.added != "":
                     added = " ({})".format(obj.added)
-                bref_display = "<span class='badge signature ot' title='{}'>{}{} {}{}</span>".format(
-                    obj, intro, obj.book.latabbr, obj.chvslist, added)
+                bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
+                    obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
                 sBack = "; ".join(html)
 
