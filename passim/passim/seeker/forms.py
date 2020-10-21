@@ -916,6 +916,8 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -1489,6 +1491,8 @@ class CollectionForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Title'}))
     sermofeast  = forms.CharField(label=_("Feast"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))
+    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
     sermonote  = forms.CharField(label=_("Note"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Note'}))
     sermoauthorname = forms.CharField(label=_("Author"), required=False, 

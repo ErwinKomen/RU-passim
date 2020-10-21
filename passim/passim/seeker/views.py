@@ -8185,6 +8185,7 @@ class CollectionListView(BasicList):
                 {"name": "Explicit",        "id": "filter_sermoexplicit",   "enabled": False, "head_id": "filter_sermo"},
                 {"name": "Keyword",         "id": "filter_sermokeyword",    "enabled": False, "head_id": "filter_sermo"}, 
                 {"name": "Feast",           "id": "filter_sermofeast",      "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Bible reference", "id": "filter_bibref",          "enabled": False, "head_id": "filter_sermo"},
                 {"name": "Note",            "id": "filter_sermonote",       "enabled": False, "head_id": "filter_sermo"},
                 {"name": "Status",          "id": "filter_sermostype",      "enabled": False, "head_id": "filter_sermo"},
                 # Section M
@@ -8223,6 +8224,7 @@ class CollectionListView(BasicList):
                     {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
                     {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},
                     {'filter': 'sermofeast',         'dbfield': 'super_col__super__equalgold_sermons__feast',         'keyS': 'sermofeast'},
+                    {'filter': 'bibref',             'dbfield': 'id',                                                 'keyS': 'bibref'},
                     {'filter': 'sermonote',          'dbfield': 'super_col__super__equalgold_sermons__additional',    'keyS': 'sermonote'},
                     {'filter': 'sermoauthor',        'fkfield': 'super_col__super__equalgold_sermons__author',            
                      'keyS': 'sermoauthorname', 'keyFk': 'name', 'keyList': 'sermoauthorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -8280,14 +8282,40 @@ class CollectionListView(BasicList):
         if self.prefix == "hist":
             # The settype should be specified
             fields['settype'] = "hc"
+
             # The collection type is 'super'
             fields['type'] = "super"
+
             # The scope of a historical collection to be shown should be 'public'
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
                 profile = Profile.get_user_profile(self.request.user.username)
                 fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
             else:
                 fields['scope'] = "publ"
+
+            # Adapt the bible reference list
+            bibref = fields.get("bibref")
+            if bibref != None and bibref != "":
+                # Reset the current field
+                fields['bibref'] = ""
+                # Convert the reference to a chvslist
+                oRef = Reference(bibref)
+                # Calculate the scripture verses
+                bResult, msg, lst_verses = oRef.parse()
+                if bResult and lst_verses != None and len(lst_verses) > 0:
+                    # Get the first and the last verse
+                    sr = lst_verses[0]['scr_refs']
+                    if len(sr) > 0:
+                        start = sr[0]
+                        einde = sr[-1]
+                        # Find out which sermons have references in this range
+                        lstQ = []
+                        lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                        lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                        collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
+                        # fields['sermonlist'] = sermonlist
+                        fields['bibref'] = Q(id__in=collectionlist)
+
         elif self.prefix == "priv":
             # Show private datasets as well as those with scope "team", provided the person is in the team
             fields['settype'] = "pd"
@@ -9232,6 +9260,7 @@ class ManuscriptListView(BasicList):
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis",        "id": "filter_signature",           "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Bible reference",         "id": "filter_bibref",              "enabled": False, "head_id": "filter_sermon"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
         {"name": "HC overlap",              "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
@@ -9274,6 +9303,7 @@ class ManuscriptListView(BasicList):
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'bibref',    'dbfield': 'id',                                        'keyS': 'bibref'},
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
@@ -9434,6 +9464,7 @@ class ManuscriptListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
         # Check if the prjlist is identified
         if fields['prjlist'] == None or len(fields['prjlist']) == 0:
             # Get the default project
@@ -9443,6 +9474,7 @@ class ManuscriptListView(BasicList):
                 qs = Project.objects.filter(id=prj_default.id)
                 fields['prjlist'] = qs
                 prjlist = qs
+
         # Check if an overlap percentage is specified
         if 'overlap' in fields and fields['overlap'] != None:
             # Get the overlap
@@ -9475,6 +9507,30 @@ class ManuscriptListView(BasicList):
                             for coll in coll_list:
                                 for manu in manu_list:
                                     ptc = CollOverlap.get_overlap(profile, coll, manu)
+
+        # Adapt the bible reference list
+        bibref = fields.get("bibref")
+        if bibref != None and bibref != "":
+            # Reset the current field
+            fields['bibref'] = ""
+            # Convert the reference to a chvslist
+            oRef = Reference(bibref)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult and lst_verses != None and len(lst_verses) > 0:
+                # Get the first and the last verse
+                sr = lst_verses[0]['scr_refs']
+                if len(sr) > 0:
+                    start = sr[0]
+                    einde = sr[-1]
+                    # Find out which manuscripts have sermons having references in this range
+                    lstQ = []
+                    lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                    lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                    manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
+
+                    fields['bibref'] = Q(id__in=manulist)
+
         # Make sure we only show manifestations
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
