@@ -1074,6 +1074,9 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
+    sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)

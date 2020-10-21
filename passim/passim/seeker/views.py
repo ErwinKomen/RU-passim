@@ -78,6 +78,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
+from passim.bible.models import Reference
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list
@@ -5897,6 +5898,7 @@ class SermonListView(BasicList):
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
+                {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
@@ -5923,6 +5925,7 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
+            {'filter': 'bibref',        'dbfield': 'id',                'keyS': 'bibref'},  #, 'keyList': 'sermonlist'},
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -6051,6 +6054,29 @@ class SermonListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
+        # Adapt the bible reference list
+        bibref = fields.get("bibref")
+        if bibref != None and bibref != "":
+            # Reset the current field
+            fields['bibref'] = ""
+            # Convert the reference to a chvslist
+            oRef = Reference(bibref)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult and lst_verses != None and len(lst_verses) > 0:
+                # Get the first and the last verse
+                sr = lst_verses[0]['scr_refs']
+                if len(sr) > 0:
+                    start = sr[0]
+                    einde = sr[-1]
+                    # Find out which sermons have references in this range
+                    lstQ = []
+                    lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                    lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                    sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
+                    # fields['sermonlist'] = sermonlist
+                    fields['bibref'] = Q(id__in=sermonlist)
 
         # Make sure to only show mtype manifestations
         fields['mtype'] = "man"
@@ -6536,6 +6562,7 @@ class BibRangeEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),   'field_key': 'book', 'key_hide': True },
+            {'type': 'plain', 'label': "Abbreviations:",'value': instance.get_abbr()                        },
             {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,     'field_key': 'chvslist', 'key_hide': True },
             {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
             {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},

@@ -155,7 +155,7 @@ class BkChVs():
         # Otherwise return false
         return False
 
-    def get_until(self, einde, include_book = False):
+    def get_until(self, einde, idno, include_book = False):
         """Show ch/vs-ch/vs"""
 
         sBack = ""
@@ -166,7 +166,12 @@ class BkChVs():
             else:
                 sBack = "{}:{}-{}".format(self.ch, self.vs, einde.vs)
         else:
-            sBack = "{}:{}-{}:{}".format(self.ch, self.vs, einde.ch, einde.vs)
+            # Check if the whole finishing chapter has been taken
+            vss = Chapter.get_vss(idno, einde.ch)
+            if einde.vs == vss:
+                sBack = "{}-{}".format(self.ch, einde.ch)
+            else:
+                sBack = "{}:{}-{}:{}".format(self.ch, self.vs, einde.ch, einde.vs)
         return sBack
 
 
@@ -243,6 +248,7 @@ class Reference():
             einde = None
             current = None
             previous = None
+            vss = None          # TOtal number of verses in the first chapter
             chvslist = ""
             for item in sr:
                 # Get the bk/ch/vs of this item
@@ -261,6 +267,13 @@ class Reference():
                     elif current.is_next(previous):
                         # Continuing
                         previous = copy.copy(current)
+                        ## See if we have completely dealt with the first chapter
+                        #if start.vs == 1 and ch_start < 0:
+                        #    if vss == None:
+                        #        vss = Chapter.get_vss(idno, current.ch)
+                        #    if current.vs == vss:
+                        #        # We've reached the full first chapter
+                        #        ch_start = current.ch
                     else:
                         # Finish the previous one
                         einde = copy.copy(previous)
@@ -270,10 +283,10 @@ class Reference():
                             chvslist = "{}, {}".format(chvslist, einde.vs)
                         elif ch_start < 0:
                             # This is the bare beginning
-                            chvslist = start.get_until(einde)
+                            chvslist = start.get_until(einde, idno)
                         else:
                             # Add to what we have
-                            chvslist = "{}, {}".format(chvslist, start.get_until(einde))
+                            chvslist = "{}, {}".format(chvslist, start.get_until(einde, idno))
                         ## Create from-end
                         #lst_chvs.append(start.get_until(einde))
                         # Make sure we remember what chapter we are in
@@ -292,10 +305,10 @@ class Reference():
                     chvslist = "{}, {}".format(chvslist, current.vs)
                 elif ch_start < 0:
                     # This is the bare beginning
-                    chvslist = start.get_until(current)
+                    chvslist = start.get_until(current, idno)
                 else:
                     # Add to what we have
-                    chvslist = "{}, {}".format(chvslist, start.get_until(current))
+                    chvslist = "{}, {}".format(chvslist, start.get_until(current, idno))
   
             #chvslist = ", ".join(lst_chvs)
         # Return what we found
@@ -404,7 +417,7 @@ class Reference():
         introducer = ""
         obj = None
         msg = ""
-        lst_back = None
+        lst_back = []
         # pattern = r'\b\w*\.'
         pattern = r'(?:I+\s)?\b\w*\.'
 

@@ -6136,6 +6136,8 @@ class SermonDescr(models.Model):
     def get_bibleref(self):
         """Interpret the BibRange objects into a proper view"""
 
+        bAutoCorrect = False
+
         # First attempt: just show .bibleref
         sBack = self.bibleref
         # Or do we have BibRange objects?
@@ -6155,6 +6157,10 @@ class SermonDescr(models.Model):
                     obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
                 sBack = "; ".join(html)
+            # Possibly adapt the bibleref
+            if bAutoCorrect and self.bibleref != sBack:
+                self.bibleref = sBack
+                self.save()
 
         # Return what we have
         return sBack
@@ -6617,6 +6623,11 @@ class SermonDescr(models.Model):
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
             bNeedSave = True
+
+        # =========== DEBUGGING ================
+        # self.do_ranges(force = True)
+        # ======================================
+
         # Make sure to save the siglist too
         if bNeedSave: 
             self.siglist = json.dumps(lSign)
@@ -6992,6 +7003,12 @@ class BibRange(models.Model):
         #            verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
 
         return response
+
+    def get_abbr(self):
+        """Get the official abbreviations for this book"""
+        sBack = "<span class='badge signature ot' title='English'>{}</span><span class='badge signature gr' title='Latin'>{}</span>".format(
+            self.book.abbr, self.book.latabbr)
+        return sBack
 
     def get_book(self):
         """Get the book for details view"""
