@@ -5472,8 +5472,6 @@ class SermonEdit(BasicDetails):
             {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'},
             # -------- HIDDEN field values ---------------
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
-            #{'type': 'plain', 'label': 'Hidden: Bible Ref',     'value': instance.bibleref,         'field_key': 'bibleref',    'empty': 'hide'},
-            #{'type': 'plain', 'label': 'Hidden: Verses',        'value': instance.verses,           'field_key': 'verses',      'empty': 'hide'},
             # --------------------------------------------
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
@@ -5493,21 +5491,23 @@ class SermonEdit(BasicDetails):
             # Issue #23: delete bibliographic notes
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
-            {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'},
+            {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'}
+             ]
+        for item in mainitems_main: context['mainitems'].append(item)
 
-            {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-             'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]},
-            #{'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(), 'nolist': True,        
-            # 'multiple': True, 'fso': self.formset_objects[4]},
+        # Bibref can only be added to non-templates
+        if not istemplate:
+            mainitems_BibRef ={'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+             'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]}
+            context['mainitems'].append(mainitems_BibRef)
+
+        mainitems_more =[
             {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
              'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
             ]
-        for item in mainitems_main: context['mainitems'].append(item)
-        #if istemplate:
-        #    # Remove some of the formset_objects
-        #    self.formset_objects = [{'formsetClass': self.StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'}]
-        #else:
+        for item in mainitems_more: context['mainitems'].append(item)
+
         if not istemplate:
             username = profile.user.username
             team_group = app_editor
@@ -9328,6 +9328,21 @@ class ManuscriptListView(BasicList):
                         obj.save()
             # Success
             Information.set_kvalue("locationcitycountry", "done")
+
+        # Remove all 'template' manuscripts that are not in the list of templates
+        sh_done = Information.get_kvalue("templatecleanup")
+        if sh_done == None or sh_done == "":
+            # Get a list of all the templates and the manuscript id's in it
+            template_manu_id = [x.manu.id for x in Template.objects.all().order_by('manu__id')]
+
+            # Get all manuscripts that are supposed to be template, but whose ID is not in [templat_manu_id]
+            qs_manu = Manuscript.objects.filter(mtype='tem').exclude(id__in=template_manu_id)
+
+            # Remove these manuscripts (and their associated msitems, sermondescr, sermonhead
+            qs_manu.delete()
+
+            # Success
+            Information.set_kvalue("templatecleanup", "done")
 
         return None
 

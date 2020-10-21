@@ -5780,8 +5780,9 @@ class MsItem(models.Model):
 
     # ========================================================================
     # [1] Every MsItem belongs to exactly one manuscript
-    #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
-    manu = models.ForeignKey(Manuscript, null=True, related_name="manuitems")
+    #     Note: when a Manuscript is removed, all its associated MsItems are also removed
+    #           and when an MsItem is removed, so is its SermonDescr or SermonHead
+    manu = models.ForeignKey(Manuscript, null=True, on_delete = models.CASCADE, related_name="manuitems")
 
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
     # [0-1] Parent sermon, if applicable
@@ -5830,7 +5831,8 @@ class SermonHead(models.Model):
 
     # [1] Every SermonHead belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
-    msitem = models.ForeignKey(MsItem, null=True, related_name="itemheads")
+    #           when the MsItem is removed, its SermonHead is too
+    msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemheads")
 
 
 class SermonDescr(models.Model):
@@ -5908,10 +5910,11 @@ class SermonDescr(models.Model):
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
-    manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
+    manu = models.ForeignKey(Manuscript, null=True, on_delete = models.SET_NULL, related_name="manusermons")
     # [1] Every semondescr belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonDescr], but using an FK is easier for processing (than a OneToOneField)
-    msitem = models.ForeignKey(MsItem, null=True, related_name="itemsermons")
+    #           when the MsItem is removed, so are we
+    msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemsermons")
 
     # Automatically created and processed fields
     # [1] Every sermondesc has a list of signatures that are automatically created
