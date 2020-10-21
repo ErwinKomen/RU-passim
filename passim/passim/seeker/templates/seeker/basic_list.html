@@ -367,7 +367,7 @@
                           <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
                               <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{basic_name}}">
-                                {% if field.value %}{{field.value|safe}}{% else %}<i>(unidentified)</i>{% endif %}
+                                {% if field.value %}{{field.value|safe}}{% else %}&nbsp;&nbsp;{% endif %}
                               </a>
                             {% else %}
                               {{field.value|safe}}

@@ -6527,7 +6527,7 @@ class BibRangeEdit(BasicDetails):
     title = "Bible references"
     title_sg = "Bible reference"
     rtype = "json"
-    history_button = True
+    history_button = False # True
     mainitems = []
     
     def add_to_context(self, context, instance):
@@ -6560,8 +6560,7 @@ class BibRangeEdit(BasicDetails):
         # find the shelfmark via the sermon
         manu = instance.sermon.msitem.manu
         url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-        shelfmark = manu.idno[:20]
-        sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.get_full_name())
         return sBack
 
     def get_sermon(self, instance):
@@ -6571,7 +6570,6 @@ class BibRangeEdit(BasicDetails):
         title = "{}: {}".format(sermon.msitem.manu.idno, sermon.locus)
         sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, title)
         return sBack
-
 
 
 class BibRangeDetails(BibRangeEdit):
@@ -6589,14 +6587,14 @@ class BibRangeListView(BasicList):
     sg_name = "Bible reference"
     plural_name = "Bible references"
     new_button = False  # BibRanges are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['book__idno', 'chvslist', 'sermon__msitem__manu__idno']
+    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 'sermon__msitem__manu__idno;sermon__locus']
     order_default = order_cols
     order_heads = [
         {'name': 'Book',            'order': 'o=1', 'type': 'str', 'custom': 'book', 'linkdetails': True},
         {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
         {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
-        {'name': 'Manuscript',      'order': 'o=5', 'type': 'str', 'custom': 'manuscript'}
+        {'name': 'Sermon',          'order': 'o=5', 'type': 'str', 'custom': 'sermon'}
         ]
     filters = [ {"name": "Book",        "id": "filter_book",    "enabled": False},
                 {"name": "Intro",       "id": "filter_intro",   "enabled": False},
@@ -6615,11 +6613,12 @@ class BibRangeListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "manuscript":
+        if custom == "sermon":
+            sermon = instance.sermon
             # find the shelfmark
-            manu = instance.sermon.msitem.manu
-            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-            sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+            manu = sermon.msitem.manu
+            url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+            sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
         elif custom == "book":
             sBack = instance.book.name
         elif custom == "intro":
