@@ -5523,7 +5523,8 @@ class SermonEdit(BasicDetails):
                  'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
                 {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
                  'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
-                 'field_list': 'siglist',        'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
+                 'multiple': True,
+                 'field_list': 'siglist_m', 'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
                 {'type': 'plain',   'label': "Personal datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                  'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
                 {'type': 'plain',   'label': "Public datasets (link):",  'value': instance.get_collection_link("pd"), 
@@ -5600,7 +5601,7 @@ class SermonEdit(BasicDetails):
     def process_formset(self, prefix, request, formset):
         """This is for processing *NEWLY* added items (using the '+' sign)"""
 
-        bAllowNewSignatureManually = False
+        bAllowNewSignatureManually = True   # False
         errors = []
         bResult = True
         oErr = ErrHandle()
@@ -5610,7 +5611,7 @@ class SermonEdit(BasicDetails):
                 if form.is_valid():
                     cleaned = form.cleaned_data
                     # Action depends on prefix
-                    if prefix == "sdsign" and bAllowNewSignatureManually:
+                    if prefix == "sdsig" and bAllowNewSignatureManually:
                         # Signature processing
                         # NOTE: this should never be reached, because we do not allow adding *new* signatures manually here
                         editype = ""
@@ -5745,9 +5746,9 @@ class SermonEdit(BasicDetails):
                 profile = Profile.get_user_profile(self.request.user.username)
                 adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
 
-                # (3) 'Links to Gold Signatures'
-                siglist = form.cleaned_data['siglist']
-                adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
+                ## (3) 'Links to Sermon (not 'Gold') Signatures'
+                #siglist = form.cleaned_data['siglist']
+                #adapt_m2m(SermonSignature, instance, "sermon", siglist, "gsig", extra = ['editype', 'code'])
 
                 # (4) 'Links to Gold Sermons'
                 superlist = form.cleaned_data['superlist']
@@ -5761,6 +5762,10 @@ class SermonEdit(BasicDetails):
                 # (1) links from bibrange to sermon
                 bibreflist = form.cleaned_data['bibreflist']
                 adapt_m2o(BibRange, instance, "sermon", bibreflist)
+
+                # (2) 'sermonsignatures'
+                siglist_m = form.cleaned_data['siglist_m']
+                adapt_m2o(SermonSignature, instance, "sermon", siglist_m)
 
             ## Make sure the 'verses' field is adapted, if needed
             #bResult, msg = instance.adapt_verses()

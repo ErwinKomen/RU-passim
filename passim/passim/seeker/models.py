@@ -7288,6 +7288,14 @@ class Signature(models.Model):
             response = super(Signature, self).save(force_insert, force_update, using, update_fields)
             # Adapt list of signatures for the related GOLD
             self.gold.do_signatures()
+            # Check if manual signatures need to be linked to this gsig
+            qs = SermonSignature.objects.filter(code=self.code, editype=self.editype)
+            with transaction.atomic():
+                for obj in qs:
+                    if obj.gsig == None:
+                        obj.gsig = self
+                        obj.save()
+
         # Then return the super-response
         return response
 

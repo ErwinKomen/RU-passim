@@ -685,7 +685,7 @@ class ManualSignatureWidget(ModelSelect2MultipleWidget):
         return obj.code
 
     def get_queryset(self):
-        return SermonSignatureSignature.objects.all().order_by('code').distinct()
+        return SermonSignature.objects.all().order_by('code').distinct()
 
 
 class SignatureWidget(ModelSelect2MultipleWidget):
@@ -1238,6 +1238,7 @@ class SermonForm(PassimModelForm):
 
                 # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
                 self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
+                self.fields['siglist_m'].initial = [x.pk for x in instance.sermonsignatures.all().order_by('-editype', 'code')]
 
                 # Note: this is the list of links between SermonDesrc-Gold
                 self.fields['superlist'].initial = [x.pk for x in instance.sermondescr_super.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
@@ -1645,6 +1646,12 @@ class CollectionForm(PassimModelForm):
 
 class SermonDescrSignatureForm(forms.ModelForm):
     """The link between SermonDescr and manually identified Signature"""
+    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
+    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
+    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1665,6 +1672,47 @@ class SermonDescrSignatureForm(forms.ModelForm):
         self.fields['code'].required = False
         self.fields['editype'].required = False
         self.fields['gsig'].required = False
+
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonDescrSignatureForm, self).clean()
+        sermon = cleaned_data.get("sermon")
+        editype = cleaned_data.get("editype")
+        code = cleaned_data.get("code")
+
+        # Check if this is a new one
+        if editype == "":
+            newgr = cleaned_data.get("newgr")
+            if newgr != "":
+                code = newgr
+                editype = "gr"
+            else:
+                newcl = cleaned_data.get("newcl")
+                if newcl != "":
+                    code = newcl
+                    editype = "cl"
+                else:
+                    newot = cleaned_data.get("newot")
+                    if newot != "":
+                        code = newot
+                        editype = "ot"
+        # Do we actually have something?
+
+        # Check if any of [name] or [newkw] already exists
+        if code == "" or editype == "":
+            # No keyword chosen
+            raise forms.ValidationError(
+                    "No signature specified to attach to this Sermon manifestation"
+                )
+        else:
+            # Check if [code|editype] already exists
+            signature = SermonSignature.objects.filter(sermon=sermon, code=code, editype=editype).first()
+            if signature:
+                # This combination already exists
+                raise forms.ValidationError(
+                        "This signature already exists for this Sermon manifestation"
+                    )
 
 
 class SermonDescrGoldForm(forms.ModelForm):
