@@ -916,8 +916,10 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
-    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -1076,8 +1078,10 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
-    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -1491,8 +1495,10 @@ class CollectionForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Title'}))
     sermofeast  = forms.CharField(label=_("Feast"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))
-    bibref      = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Use Book, Book Chapter or Book Chapter:verse'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonote  = forms.CharField(label=_("Note"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Note'}))
     sermoauthorname = forms.CharField(label=_("Author"), required=False, 
@@ -3211,6 +3217,29 @@ class BibRangeForm(forms.ModelForm):
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Chapter-verse list...',  'style': 'width: 100%;'}))
     newadded    = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Note...',  'style': 'width: 100%;'}))
+
+    # =========== SEarching for bible references ===============
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+
+    # =========== MANUSCRIPT-specific ===========================
+    manuidno    = forms.CharField(label=_("Manuscript"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+
     action_log = ['book', 'chvslist', 'intro', 'added']
 
     class Meta:
@@ -3240,6 +3269,11 @@ class BibRangeForm(forms.ModelForm):
             self.fields['newchvs'].required = False
             self.fields['newadded'].required = False
             self.fields['onebook'].queryset = Book.objects.all().order_by('idno')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+            
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+
             # Get the instance
             if 'instance' in kwargs:
                 instance = kwargs['instance']

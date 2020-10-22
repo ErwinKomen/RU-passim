@@ -5930,7 +5930,8 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
             {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
-            {'filter': 'bibref',        'dbfield': 'id',                'keyS': 'bibref'},  #, 'keyList': 'sermonlist'},
+            {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
+            {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -6061,32 +6062,20 @@ class SermonListView(BasicList):
                 fields['kwlist'] = kwlist
 
         # Adapt the bible reference list
-        bibref = fields.get("bibref")
-        if bibref != None and bibref != "":
-            # Reset the current field
-            fields['bibref'] = ""
+        bibrefbk = fields.get("bibrefbk", "")
+        if bibrefbk != None and bibrefbk != "":
+            bibrefchvs = fields.get("bibrefchvs", "")
+
             # Get the start and end of this bibref
-            start, einde = Reference.get_startend(bibref)
-            ## Convert the reference to a chvslist
-            #oRef = Reference(bibref)
-            ## Calculate the scripture verses
-            #bResult, msg, lst_verses = oRef.parse()
-            #if bResult and lst_verses != None and len(lst_verses) > 0:
-            #    # Get the first and the last verse
-            #    sr = lst_verses[0]['scr_refs']
-            #    if len(sr) == 0:
-            #        # If the reference did not exist, there are no results
-            #        # For the search we need to add a dummy result to make sure *nothing* returns
-            #        sr.append("000000000")
-            #    start = sr[0]
-            #    einde = sr[-1]
+            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+ 
             # Find out which sermons have references in this range
             lstQ = []
             lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
             lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
             sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
-            # fields['sermonlist'] = sermonlist
-            fields['bibref'] = Q(id__in=sermonlist)
+
+            fields['bibrefbk'] = Q(id__in=sermonlist)
 
         # Make sure to only show mtype manifestations
         fields['mtype'] = "man"
@@ -6633,17 +6622,39 @@ class BibRangeListView(BasicList):
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
         {'name': 'Sermon',          'order': 'o=5', 'type': 'str', 'custom': 'sermon'}
         ]
-    filters = [ {"name": "Book",        "id": "filter_book",    "enabled": False},
-                {"name": "Intro",       "id": "filter_intro",   "enabled": False},
-                {"name": "Extra",       "id": "filter_added",   "enabled": False},
-                {"name": "Manuscript",  "id": "filter_manuid",  "enabled": False},
+    filters = [ 
+        {"name": "Bible reference", "id": "filter_bibref",      "enabled": False},
+        {"name": "Intro",           "id": "filter_intro",       "enabled": False},
+        {"name": "Extra",           "id": "filter_added",       "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
                ]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'book',      'fkfield': 'book', 'keyFk': 'name', 'infield': 'id', 'keyList': 'bookidlist'},
-            {'filter': 'intro',     'dbfield': 'name', 'keyS': 'intro'},
-            {'filter': 'added',     'dbfield': 'name', 'keyS': 'added'},
-            {'filter': 'manuid',    'fkfield': 'sermon__msitem__manu', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            {'filter': 'bibref',    'dbfield': '$dummy',    'keyS': 'bibrefbk'},
+            {'filter': 'bibref',    'dbfield': '$dummy',    'keyS': 'bibrefchvs'},
+            {'filter': 'intro',     'dbfield': 'intro',     'keyS': 'intro'},
+            {'filter': 'added',     'dbfield': 'added',     'keyS': 'added'}
+            ]},
+        {'section': 'manuscript', 'filterlist': [
+            {'filter': 'manuid',        'fkfield': 'sermon__msitem__manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'sermon__msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'sermon__msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'sermon__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'sermon__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'sermon__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',     'dbfield': 'sermon__msitem__manu__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'sermon__msitem__manu__yearfinish__lte',   'keyS': 'date_until'},
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'bibref',     'dbfield': 'id',    'keyS': 'bibref'}
             ]}
         ]
 
@@ -6671,7 +6682,23 @@ class BibRangeListView(BasicList):
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        x = fields
+
+        # Adapt the bible reference list
+        bibrefbk = fields.get("bibrefbk", "")
+        if bibrefbk != None and bibrefbk != "":
+            bibrefchvs = fields.get("bibrefchvs", "")
+
+            # Get the start and end of this bibref
+            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+ 
+            # Find out which sermons have references in this range
+            lstQ = []
+            lstQ.append(Q(bibrangeverses__bkchvs__gte=start))
+            lstQ.append(Q(bibrangeverses__bkchvs__lte=einde))
+            sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
+
+            fields['bibref'] = Q(id__in=sermonlist)
+
         return fields, lstExclude, qAlternative
 
 
@@ -8229,7 +8256,8 @@ class CollectionListView(BasicList):
                     {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
                     {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},
                     {'filter': 'sermofeast',         'dbfield': 'super_col__super__equalgold_sermons__feast',         'keyS': 'sermofeast'},
-                    {'filter': 'bibref',             'dbfield': 'id',                                                 'keyS': 'bibref'},
+                    {'filter': 'bibref',             'dbfield': '$dummy',                                             'keyS': 'bibrefbk'},
+                    {'filter': 'bibref',             'dbfield': '$dummy',                                             'keyS': 'bibrefchvs'},
                     {'filter': 'sermonote',          'dbfield': 'super_col__super__equalgold_sermons__additional',    'keyS': 'sermonote'},
                     {'filter': 'sermoauthor',        'fkfield': 'super_col__super__equalgold_sermons__author',            
                      'keyS': 'sermoauthorname', 'keyFk': 'name', 'keyList': 'sermoauthorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -8299,33 +8327,20 @@ class CollectionListView(BasicList):
                 fields['scope'] = "publ"
 
             # Adapt the bible reference list
-            bibref = fields.get("bibref")
-            if bibref != None and bibref != "":
-                # Reset the current field
-                fields['bibref'] = ""
+            bibrefbk = fields.get("bibrefbk", "")
+            if bibrefbk != None and bibrefbk != "":
+                bibrefchvs = fields.get("bibrefchvs", "")
+
                 # Get the start and end of this bibref
-                start, einde = Reference.get_startend(bibref)
-                ## Convert the reference to a chvslist
-                #oRef = Reference(bibref)
-                ## Calculate the scripture verses
-                #bResult, msg, lst_verses = oRef.parse()
-                #if bResult and lst_verses != None and len(lst_verses) > 0:
-                #    # Get the first and the last verse
-                #    sr = lst_verses[0]['scr_refs']
-                #    if len(sr) == 0:
-                #        # If the reference did not exist, there are no results
-                #        # For the search we need to add a dummy result to make sure *nothing* returns
-                #        sr.append("000000000")
-                #    start = sr[0]
-                #    einde = sr[-1]
+                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
 
                 # Find out which sermons have references in this range
                 lstQ = []
                 lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
                 lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
                 collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
-                # fields['sermonlist'] = sermonlist
-                fields['bibref'] = Q(id__in=collectionlist)
+
+                fields['bibrefbk'] = Q(id__in=collectionlist)
 
         elif self.prefix == "priv":
             # Show private datasets as well as those with scope "team", provided the person is in the team
@@ -9314,7 +9329,8 @@ class ManuscriptListView(BasicList):
             ]},
         {'section': 'sermon', 'filterlist': [
             {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'bibref',    'dbfield': 'id',                                        'keyS': 'bibref'},
+            {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefbk'},
+            {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
@@ -9520,32 +9536,20 @@ class ManuscriptListView(BasicList):
                                     ptc = CollOverlap.get_overlap(profile, coll, manu)
 
         # Adapt the bible reference list
-        bibref = fields.get("bibref")
-        if bibref != None and bibref != "":
-            # Reset the current field
-            fields['bibref'] = ""
+        bibrefbk = fields.get("bibrefbk", "")
+        if bibrefbk != None and bibrefbk != "":
+            bibrefchvs = fields.get("bibrefchvs", "")
+
             # Get the start and end of this bibref
-            start, einde = Reference.get_startend(bibref)
-            ## Convert the reference to a chvslist
-            #oRef = Reference(bibref)
-            ## Calculate the scripture verses
-            #bResult, msg, lst_verses = oRef.parse()
-            #if bResult and lst_verses != None and len(lst_verses) > 0:
-            #    # Get the first and the last verse
-            #    sr = lst_verses[0]['scr_refs']
-            #    if len(sr) == 0:
-            #        # If the reference did not exist, there are no results
-            #        # For the search we need to add a dummy result to make sure *nothing* returns
-            #        sr.append("000000000")
-            #    start = sr[0]
-            #    einde = sr[-1]
+            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+
             # Find out which manuscripts have sermons having references in this range
             lstQ = []
             lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
             lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
             manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibref'] = Q(id__in=manulist)
+            fields['bibrefbk'] = Q(id__in=manulist)
 
         # Make sure we only show manifestations
         fields['mtype'] = 'man'

@@ -323,10 +323,14 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             elif "*" in val:
                                 val = adapt_search(val)
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
+                            elif "$" in dbfield:
+                                val = adapt_search(val)
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
                     elif has_Q_value(keyS, oFields):
-                        s_q = oFields[keyS]
+                        if not "$" in dbfield:
+                            s_q = oFields[keyS]
+                        enable_filter(filter_type, head_id)
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):

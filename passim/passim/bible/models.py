@@ -348,12 +348,15 @@ class Reference():
             while self.pos < self.ref_len and self.ref_string[self.pos] in SPACES: self.pos += 1
         return number
 
-    def get_startend(bibref):
+    def get_startend(bibref, book = None):
         oErr = ErrHandle()
         start = None
         einde = None
         dummy = "000000000"
         try:
+            # Do we need to get the book?
+            if book != None:
+                bibref = "{} {}".format(book.abbr, bibref)
             # Convert the reference to a chvslist
             oRef = Reference(bibref)
             # Calculate the scripture verses
