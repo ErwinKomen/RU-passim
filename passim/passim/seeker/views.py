@@ -8308,6 +8308,7 @@ class CollectionListView(BasicList):
                     if len(sr) > 0:
                         start = sr[0]
                         einde = sr[-1]
+
                         # Find out which sermons have references in this range
                         lstQ = []
                         lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
