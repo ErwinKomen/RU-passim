@@ -348,6 +348,33 @@ class Reference():
             while self.pos < self.ref_len and self.ref_string[self.pos] in SPACES: self.pos += 1
         return number
 
+    def get_startend(bibref):
+        oErr = ErrHandle()
+        start = None
+        einde = None
+        dummy = "000000000"
+        try:
+            # Convert the reference to a chvslist
+            oRef = Reference(bibref)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult and lst_verses != None:
+                if len(lst_verses) > 0:
+                    # Get the first and the last verse
+                    sr = lst_verses[0]['scr_refs']
+                    if len(sr) == 0:
+                        # If the reference did not exist, there are no results
+                        # For the search we need to add a dummy result to make sure *nothing* returns
+                        sr.append(dummy)
+                else:
+                    sr = [ dummy ]
+                start = sr[0]
+                einde = sr[-1]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Reference/get_startend")
+        return start, einde
+
     def get_string(self, lst_string):
         """Try to get one of the strings defined in the list [lst_string]"""
 

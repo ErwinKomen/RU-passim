@@ -6065,23 +6065,28 @@ class SermonListView(BasicList):
         if bibref != None and bibref != "":
             # Reset the current field
             fields['bibref'] = ""
-            # Convert the reference to a chvslist
-            oRef = Reference(bibref)
-            # Calculate the scripture verses
-            bResult, msg, lst_verses = oRef.parse()
-            if bResult and lst_verses != None and len(lst_verses) > 0:
-                # Get the first and the last verse
-                sr = lst_verses[0]['scr_refs']
-                if len(sr) > 0:
-                    start = sr[0]
-                    einde = sr[-1]
-                    # Find out which sermons have references in this range
-                    lstQ = []
-                    lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
-                    lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-                    sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
-                    # fields['sermonlist'] = sermonlist
-                    fields['bibref'] = Q(id__in=sermonlist)
+            # Get the start and end of this bibref
+            start, einde = Reference.get_startend(bibref)
+            ## Convert the reference to a chvslist
+            #oRef = Reference(bibref)
+            ## Calculate the scripture verses
+            #bResult, msg, lst_verses = oRef.parse()
+            #if bResult and lst_verses != None and len(lst_verses) > 0:
+            #    # Get the first and the last verse
+            #    sr = lst_verses[0]['scr_refs']
+            #    if len(sr) == 0:
+            #        # If the reference did not exist, there are no results
+            #        # For the search we need to add a dummy result to make sure *nothing* returns
+            #        sr.append("000000000")
+            #    start = sr[0]
+            #    einde = sr[-1]
+            # Find out which sermons have references in this range
+            lstQ = []
+            lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
+            lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+            sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
+            # fields['sermonlist'] = sermonlist
+            fields['bibref'] = Q(id__in=sermonlist)
 
         # Make sure to only show mtype manifestations
         fields['mtype'] = "man"
@@ -8298,24 +8303,29 @@ class CollectionListView(BasicList):
             if bibref != None and bibref != "":
                 # Reset the current field
                 fields['bibref'] = ""
-                # Convert the reference to a chvslist
-                oRef = Reference(bibref)
-                # Calculate the scripture verses
-                bResult, msg, lst_verses = oRef.parse()
-                if bResult and lst_verses != None and len(lst_verses) > 0:
-                    # Get the first and the last verse
-                    sr = lst_verses[0]['scr_refs']
-                    if len(sr) > 0:
-                        start = sr[0]
-                        einde = sr[-1]
+                # Get the start and end of this bibref
+                start, einde = Reference.get_startend(bibref)
+                ## Convert the reference to a chvslist
+                #oRef = Reference(bibref)
+                ## Calculate the scripture verses
+                #bResult, msg, lst_verses = oRef.parse()
+                #if bResult and lst_verses != None and len(lst_verses) > 0:
+                #    # Get the first and the last verse
+                #    sr = lst_verses[0]['scr_refs']
+                #    if len(sr) == 0:
+                #        # If the reference did not exist, there are no results
+                #        # For the search we need to add a dummy result to make sure *nothing* returns
+                #        sr.append("000000000")
+                #    start = sr[0]
+                #    einde = sr[-1]
 
-                        # Find out which sermons have references in this range
-                        lstQ = []
-                        lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-                        lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-                        collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
-                        # fields['sermonlist'] = sermonlist
-                        fields['bibref'] = Q(id__in=collectionlist)
+                # Find out which sermons have references in this range
+                lstQ = []
+                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
+                # fields['sermonlist'] = sermonlist
+                fields['bibref'] = Q(id__in=collectionlist)
 
         elif self.prefix == "priv":
             # Show private datasets as well as those with scope "team", provided the person is in the team
@@ -9514,23 +9524,28 @@ class ManuscriptListView(BasicList):
         if bibref != None and bibref != "":
             # Reset the current field
             fields['bibref'] = ""
-            # Convert the reference to a chvslist
-            oRef = Reference(bibref)
-            # Calculate the scripture verses
-            bResult, msg, lst_verses = oRef.parse()
-            if bResult and lst_verses != None and len(lst_verses) > 0:
-                # Get the first and the last verse
-                sr = lst_verses[0]['scr_refs']
-                if len(sr) > 0:
-                    start = sr[0]
-                    einde = sr[-1]
-                    # Find out which manuscripts have sermons having references in this range
-                    lstQ = []
-                    lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-                    lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-                    manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
+            # Get the start and end of this bibref
+            start, einde = Reference.get_startend(bibref)
+            ## Convert the reference to a chvslist
+            #oRef = Reference(bibref)
+            ## Calculate the scripture verses
+            #bResult, msg, lst_verses = oRef.parse()
+            #if bResult and lst_verses != None and len(lst_verses) > 0:
+            #    # Get the first and the last verse
+            #    sr = lst_verses[0]['scr_refs']
+            #    if len(sr) == 0:
+            #        # If the reference did not exist, there are no results
+            #        # For the search we need to add a dummy result to make sure *nothing* returns
+            #        sr.append("000000000")
+            #    start = sr[0]
+            #    einde = sr[-1]
+            # Find out which manuscripts have sermons having references in this range
+            lstQ = []
+            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+            manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
 
-                    fields['bibref'] = Q(id__in=manulist)
+            fields['bibref'] = Q(id__in=manulist)
 
         # Make sure we only show manifestations
         fields['mtype'] = 'man'
