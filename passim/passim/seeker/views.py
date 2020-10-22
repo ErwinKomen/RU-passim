@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
@@ -5491,7 +5491,7 @@ class SermonEdit(BasicDetails):
             # Issue #23: delete bibliographic notes
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
-            {'type': 'plain', 'label': "Feast:",                'value': instance.feast,            'field_key': 'feast'}
+            {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feastnew'}
              ]
         for item in mainitems_main: context['mainitems'].append(item)
 
@@ -9405,6 +9405,27 @@ class ManuscriptListView(BasicList):
 
             # Success
             Information.set_kvalue("templatecleanup", "done")
+
+        # Remove all 'template' manuscripts that are not in the list of templates
+        sh_done = Information.get_kvalue("feastupdate")
+        if sh_done == None or sh_done == "":
+            # Get a list of all the templates and the manuscript id's in it
+            feast_lst = [x['feast'] for x in SermonDescr.objects.exclude(feast__isnull=True).order_by('feast').values('feast').distinct()]
+            feast_set = {}
+            # Create the feasts
+            for feastname in feast_lst:
+                obj = Feast.objects.filter(name=feastname).first()
+                if obj == None:
+                    obj = Feast.objects.create(name=feastname)
+                feast_set[feastname] = obj
+
+            with transaction.atomic():
+                for obj in SermonDescr.objects.filter(feast__isnull=False):
+                    obj.feastnew = feast_set[obj.feast]
+                    obj.save()
+
+            # Success
+            Information.set_kvalue("feastupdate", "done")
 
         return None
 

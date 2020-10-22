@@ -3478,6 +3478,13 @@ class Manuscript(models.Model):
                     if 'keyword' in msItem: sermon.keyword = msItem['keyword']  # Keyword
                     if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
+                    if 'feast' in msItem: 
+                        # Get object that is being referred to
+                        sermon.feast = Feast.get_one(msItem['feast'])
+                    if sermon.bibleref != None and sermon.biblref != "": 
+                        # Calculate and set BibRange and BibVerse objects
+                        sermon.do_ranges()
+
                     # Set the default status type
                     sermon.stype = STYPE_IMPORTED    # Imported
 
@@ -3508,7 +3515,7 @@ class Manuscript(models.Model):
                     if 'quote' in msItem and sermon.quote != msItem['quote']: sermon.quote = msItem['quote'] ; bNeedSaving = True
                     if 'gryson' in msItem and sermon.gryson != msItem['gryson']: sermon.gryson = msItem['gryson'] ; bNeedSaving = True
                     if 'clavis' in msItem and sermon.clavis != msItem['clavis']: sermon.clavis = msItem['clavis'] ; bNeedSaving = True
-                    if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = msItem['feast'] ; bNeedSaving = True
+                    if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = Feast.get_one(msItem['feast']) ; bNeedSaving = True
                     if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
                     if 'bibleref' in msItem and sermon.bibleref != msItem['bibleref']: sermon.bibleref = msItem['bibleref'] ; bNeedSaving = True
                     if 'additional' in msItem and sermon.additional != msItem['additional']: sermon.additional = msItem['additional'] ; bNeedSaving = True
@@ -3524,6 +3531,10 @@ class Manuscript(models.Model):
                         else:
                             sermon.author = author
                         bNeedSaving = True
+
+                    if sermon.bibleref != None and sermon.biblref != "": 
+                        # Calculate and set BibRange and BibVerse objects
+                        sermon.do_ranges()
 
                     if bNeedSaving:
                         # Now save it
@@ -4099,6 +4110,27 @@ class Nickname(models.Model):
             hit = qs[0]
         # Return what we found or created
         return hit
+
+
+class Feast(models.Model):
+    """Christian feast commemmorated in one of the Latin texts or sermons"""
+
+    # [1] Name of the feast in English
+    name = models.CharField("Name (English)", max_length=LONG_STRING)
+    # [0-1] Name of the feast in Latin
+    latname = models.CharField("Name (Latin)", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Date of the feast
+    feastdate = models.TextField("Feast date", null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_one(sFeastName):
+        sFeastName = sFeastName.strip()
+        obj = Feast.objects.filter(name__iexact=sFeastName).first()
+        if obj == None:
+            obj = Feast.objects.create(name=sFeastName)
+        return obj
 
 
 class EqualGold(models.Model):
@@ -5869,6 +5901,7 @@ class SermonDescr(models.Model):
     quote = models.TextField("Quote", null=True, blank=True)
     # [0-1] The FEAST??
     feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
+    feastnew = models.ForeignKey(Feast, null=True, blank=True, on_delete=models.SET_NULL, related_name="feastsermons")
     # [0-1] Notes on the bibliography, literature for this sermon
     bibnotes = models.TextField("Bibliography notes", null=True, blank=True)
     # [0-1] Any notes for this sermon
@@ -6071,7 +6104,6 @@ class SermonDescr(models.Model):
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
                     print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
-
 
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
@@ -6301,6 +6333,13 @@ class SermonDescr(models.Model):
                     lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
         sBack = "<span class='view-mode'>,</span> ".join(lHtml)
+        return sBack
+
+    def get_feast(self):
+        sBack = ""
+        if self.feastnew != None:
+            url = "#"
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feastnew.name)
         return sBack
 
     def get_goldlinks_markdown(self):

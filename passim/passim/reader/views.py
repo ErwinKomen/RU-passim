@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    Library, Location, SermonSignature, Author, \
+    Library, Location, SermonSignature, Author, Feast, \
     Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
@@ -241,10 +241,9 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 if 'incipit' in msItem: sermon.incipit = msItem['incipit']
                 if 'explicit' in msItem: sermon.explicit = msItem['explicit']
                 if 'quote' in msItem: sermon.quote = msItem['quote']
-                if 'feast' in msItem: sermon.feast = msItem['feast']
-                if 'bibleref' in msItem: sermon.bibleref = msItem['bibleref']
                 if 'additional' in msItem: sermon.additional = msItem['additional']
                 if 'note' in msItem: sermon.note = msItem['note']
+                if 'bibleref' in msItem: sermon.bibleref = msItem['bibleref']
                 if 'order' in msItem: sermon.order = msItem['order']
                 if 'author' in msItem:
                     author = Author.find(msItem['author'])
@@ -279,6 +278,12 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 if 'clavis' in msItem : 
                     code = msItem['clavis']
                     sig = SermonSignature.objects.create(sermon=sermon, editype="cl", code=code)
+                if 'feast' in msItem: 
+                    # Get object that is being referred to
+                    sermon.feast = Feast.get_one(msItem['feast'])
+                if sermon.bibleref != None and sermon.biblref != "": 
+                    # Calculate and set BibRange and BibVerse objects
+                    sermon.do_ranges()
 
                 # Keep track of the number of sermons added
                 iSermCount += 1
@@ -299,12 +304,16 @@ def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None,
                 if 'incipit' in msItem and sermon.incipit != msItem['incipit']: sermon.incipit = msItem['incipit'] ; bNeedSaving = True
                 if 'explicit' in msItem and sermon.explicit != msItem['explicit']: sermon.explicit = msItem['explicit'] ; bNeedSaving = True
                 if 'quote' in msItem and sermon.quote != msItem['quote']: sermon.quote = msItem['quote'] ; bNeedSaving = True
-                if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = msItem['feast'] ; bNeedSaving = True
+                if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = Feast.get_one(msItem['feast']) ; bNeedSaving = True
                 # OLD (doesn't exist in e-codices)if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
                 if 'bibleref' in msItem and sermon.bibleref != msItem['bibleref']: sermon.bibleref = msItem['bibleref'] ; bNeedSaving = True
                 if 'additional' in msItem and sermon.additional != msItem['additional']: sermon.additional = msItem['additional'] ; bNeedSaving = True
                 if 'note' in msItem and sermon.note != msItem['note']: sermon.note = msItem['note'] ; bNeedSaving = True
                 if 'order' in msItem and sermon.order != msItem['order']: sermon.order = msItem['order'] ; bNeedSaving = True
+
+                if sermon.bibleref != None and sermon.biblref != "": 
+                    # Calculate and set BibRange and BibVerse objects
+                    sermon.do_ranges()
 
                 if 'author' in msItem and (sermon.author == None or sermon.author.name != msItem['author'] ):
                     author = Author.find(msItem['author'])

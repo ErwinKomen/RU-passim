@@ -344,6 +344,17 @@ class EqualGoldWidget(ModelSelect2Widget):
         return qs
 
 
+class FeastOneWidget(ModelSelect2Widget):
+    model = Feast
+    search_fields = [ 'name__icontains', 'latname__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Feast.objects.all().order_by('name').distinct()
+
+
 class FtextlinkWidget(ModelSelect2MultipleWidget):
     model = Ftextlink
     search_fields = [ 'url__icontains' ]
@@ -983,6 +994,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
@@ -1128,7 +1140,7 @@ class SermonForm(PassimModelForm):
 
         model = SermonDescr
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',
-                  'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
+                  'feast', 'feastnew', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1138,6 +1150,7 @@ class SermonForm(PassimModelForm):
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'feastnew':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1187,6 +1200,7 @@ class SermonForm(PassimModelForm):
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
             # Some lists need to be initialized to NONE:
             self.fields['bibreflist'].queryset = Daterange.objects.none()
@@ -1566,6 +1580,8 @@ class CollectionForm(PassimModelForm):
         self.fields['scope'].required = False
         self.fields['url'].required = False
         self.fields['collone'].required = False
+
+        self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
         # Set the widgets correctly
         self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
