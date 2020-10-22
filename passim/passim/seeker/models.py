@@ -4132,6 +4132,18 @@ class Feast(models.Model):
             obj = Feast.objects.create(name=sFeastName)
         return obj
 
+    def get_latname(self):
+        sBack = ""
+        if self.latname != None and self.latname != "":
+            sBack = self.latname
+        return sBack
+
+    def get_date(self):
+        sBack = ""
+        if self.feastdate != None and self.feastdate != "":
+            sBack = self.feastdate
+        return sBack
+
 
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
@@ -5899,9 +5911,8 @@ class SermonDescr(models.Model):
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
     quote = models.TextField("Quote", null=True, blank=True)
-    # [0-1] The FEAST??
-    feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
-    feastnew = models.ForeignKey(Feast, null=True, blank=True, on_delete=models.SET_NULL, related_name="feastsermons")
+    # [0-1] Christian feast like Easter etc
+    feast = models.ForeignKey(Feast, null=True, blank=True, on_delete=models.SET_NULL, related_name="feastsermons")
     # [0-1] Notes on the bibliography, literature for this sermon
     bibnotes = models.TextField("Bibliography notes", null=True, blank=True)
     # [0-1] Any notes for this sermon
@@ -6337,9 +6348,9 @@ class SermonDescr(models.Model):
 
     def get_feast(self):
         sBack = ""
-        if self.feastnew != None:
-            url = "#"
-            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feastnew.name)
+        if self.feast != None:
+            url = reverse("feast_details", kwargs={'pk': self.feast.id})
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
     def get_goldlinks_markdown(self):

@@ -355,6 +355,17 @@ class FeastOneWidget(ModelSelect2Widget):
         return Feast.objects.all().order_by('name').distinct()
 
 
+class FeastWidget(ModelSelect2MultipleWidget):
+    model = Feast
+    search_fields = [ 'name__icontains', 'latname__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Feast.objects.all().order_by('name').distinct()
+
+
 class FtextlinkWidget(ModelSelect2MultipleWidget):
     model = Ftextlink
     search_fields = [ 'url__icontains' ]
@@ -1080,6 +1091,8 @@ class SermonForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    feastlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -1139,8 +1152,8 @@ class SermonForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',
-                  'feast', 'feastnew', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
+        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',  #  'feast', 
+                 'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1149,8 +1162,8 @@ class SermonForm(PassimModelForm):
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'feastnew':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 #'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'feast':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1183,6 +1196,7 @@ class SermonForm(PassimModelForm):
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -3223,6 +3237,61 @@ class DaterangeForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
 
+
+class FeastForm(forms.ModelForm):
+    # =========== MANUSCRIPT-specific ===========================
+    manuidno    = forms.CharField(label=_("Manuscript"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Feast
+        fields = ['name', 'latname', 'feastdate']
+        widgets={'name':        forms.TextInput(attrs={'placeholder': 'English name...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'latname':     forms.TextInput(attrs={'placeholder': 'Latin name...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'feastdate':   forms.TextInput(attrs={'placeholder': 'Date of the feast...', 'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(FeastForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Set other parameters
+            self.fields['name'].required = False
+            
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+                    pass
+                    ## Make sure the initials are taken over into new-elements
+                    #self.fields['newintro'].initial = instance.intro
+                    #self.fields['onebook'].initial = [ instance.book.id ]
+                    #self.fields['newchvs'].initial = instance.chvslist
+                    #self.fields['newadded'].initial = instance.added
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRangeForm")
+
+        # Return the response
+        return None
 
 class BibRangeForm(forms.ModelForm):
     newintro    = forms.CharField(required=False, help_text='editable', 

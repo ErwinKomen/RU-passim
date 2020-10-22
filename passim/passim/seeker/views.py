@@ -59,7 +59,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
-    SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, \
+    SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
     SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
     ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
@@ -5491,7 +5491,7 @@ class SermonEdit(BasicDetails):
             # Issue #23: delete bibliographic notes
             {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
-            {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feastnew'}
+            {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}
              ]
         for item in mainitems_main: context['mainitems'].append(item)
 
@@ -5928,7 +5928,7 @@ class SermonListView(BasicList):
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit'},
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit'},
             {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
-            {'filter': 'feast',         'dbfield': 'feast',             'keyS': 'feast'},
+            {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
@@ -6700,6 +6700,134 @@ class BibRangeListView(BasicList):
             fields['bibref'] = Q(id__in=sermonlist)
 
         return fields, lstExclude, qAlternative
+
+
+class FeastEdit(BasicDetails):
+    """The details of one Christian Feast"""
+
+    model = Feast
+    mForm = FeastForm
+    prefix = 'fst'
+    title = "Feast"
+    title_sg = "Feast"
+    rtype = "json"
+    history_button = False # True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",         'value': instance.name,         'field_key': 'name'     },
+            {'type': 'plain', 'label': "Latin name:",   'value': instance.get_latname(),'field_key': 'latname'  },
+            {'type': 'plain', 'label': "Feast date:",   'value': instance.get_date(),   'field_key': 'feastdate' },
+            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
+            {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def get_manuscript(self, instance):
+        html = []
+        # find the shelfmark via the sermon
+        for manu in Manuscript.objects.filter(manuitems__itemsermons__feast=instance).order_by("idno"):
+            url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            html.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.get_full_name()))
+        sBack = ", ".join(html)
+        return sBack
+
+    def get_sermon(self, instance):
+        html = []
+        # Get the sermons
+        for sermon in SermonDescr.objects.filter(feast=instance).order_by("msitem__manu__idno", "locus"):
+            url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+            title = "{}: {}".format(sermon.msitem.manu.idno, sermon.locus)
+            html.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, title))
+        sBack = ", ".join(html)
+        return sBack
+
+
+class FeastDetails(FeastEdit):
+    """Like Feast Edit, but then html output"""
+    rtype = "html"
+    
+
+class FeastListView(BasicList):
+    """Search and list Christian feasts"""
+
+    model = Feast
+    listform = FeastForm
+    prefix = "fst"
+    has_select2 = True
+    sg_name = "Feast"
+    plural_name = "Feasts"
+    new_button = True  # Feasts can be added from the listview
+    order_cols = ['name', 'latname', 'feastdate', '']   # feastsermons__msitem__manu__idno;feastsermons__locus
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Name',    'order': 'o=1', 'type': 'str', 'field': 'name',     'linkdetails': True},
+        {'name': 'Latin',   'order': 'o=2', 'type': 'str', 'field': 'latname',  'linkdetails': True},
+        {'name': 'Date',    'order': 'o=3', 'type': 'str', 'field': 'feastdate','linkdetails': True, 'main': True},
+        {'name': 'Sermons', 'order': '',    'type': 'str', 'custom': 'sermons'}
+        ]
+    filters = [ 
+        {"name": "Name",            "id": "filter_engname",     "enabled": False},
+        {"name": "Latin",           "id": "filter_latname",     "enabled": False},
+        {"name": "Date",            "id": "filter_feastdate",   "enabled": False},
+        {"name": "Manuscript...",   "id": "filter_manuscript",  "enabled": False, "head_id": "none"},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Country",         "id": "filter_country",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "City",            "id": "filter_city",        "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Library",         "id": "filter_library",     "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Origin",          "id": "filter_origin",      "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Provenance",      "id": "filter_provenance",  "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date from",       "id": "filter_datestart",   "enabled": False, "head_id": "filter_manuscript"},
+        {"name": "Date until",      "id": "filter_datefinish",  "enabled": False, "head_id": "filter_manuscript"},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'engname',   'dbfield': 'name',      'keyS': 'name'},
+            {'filter': 'latname',   'dbfield': 'latname',   'keyS': 'latname'},
+            {'filter': 'feastdate', 'dbfield': 'feastdate', 'keyS': 'feastdate'}
+            ]},
+        {'section': 'manuscript', 'filterlist': [
+            {'filter': 'manuid',        'fkfield': 'feastsermons__msitem__manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'feastsermons__msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'feastsermons__msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'feastsermons__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'feastsermons__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'feastsermons__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',     'dbfield': 'feastsermons__msitem__manu__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'feastsermons__msitem__manu__yearfinish__lte',   'keyS': 'date_until'},
+            ]}
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "sermon":
+            html = []
+            for sermon in instance.feastsermons.all().order_by('feast__name'):
+                # find the shelfmark
+                manu = sermon.msitem.manu
+                url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
+            sBack = ", ".join(html)
+        elif custom == "sermons":
+            sBack = "{}".format(instance.feastsermons.count())
+        return sBack, sTitle
 
 
 class TemplateEdit(BasicDetails):
@@ -9421,7 +9549,7 @@ class ManuscriptListView(BasicList):
 
             with transaction.atomic():
                 for obj in SermonDescr.objects.filter(feast__isnull=False):
-                    obj.feastnew = feast_set[obj.feast]
+                    obj.feast = feast_set[obj.feast]
                     obj.save()
 
             # Success
