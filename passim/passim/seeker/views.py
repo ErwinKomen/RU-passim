@@ -81,7 +81,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails, make_search_list
+from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
 
 
 # Some constants that can be used
@@ -5568,6 +5568,11 @@ class SermonEdit(BasicDetails):
         # Signal that we have select2
         context['has_select2'] = True
 
+        # Add comment modal stuff
+        lhtml = []
+        lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+        context['after_details'] = "\n".join(lhtml)
+
         # Return the context we have made
         return context
 
@@ -6722,8 +6727,8 @@ class FeastEdit(BasicDetails):
             {'type': 'plain', 'label': "Name:",         'value': instance.name,         'field_key': 'name'     },
             {'type': 'plain', 'label': "Latin name:",   'value': instance.get_latname(),'field_key': 'latname'  },
             {'type': 'plain', 'label': "Feast date:",   'value': instance.get_date(),   'field_key': 'feastdate' },
-            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
-            {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
+            #{'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
+            #{'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
             ]
 
         # Signal that we have select2
@@ -6762,6 +6767,74 @@ class FeastEdit(BasicDetails):
 class FeastDetails(FeastEdit):
     """Like Feast Edit, but then html output"""
     rtype = "html"
+
+    def add_to_context(self, context, instance):
+        # First get the 'standard' context from TestsetEdit
+        context = super(FeastDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        # Lists of related objects
+        related_objects = []
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        # List of Sermons that link to this feast (with an FK)
+        sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
+        if resizable: sermons['gridclass'] = "resizable"
+
+        rel_list =[]
+        qs = instance.feastsermons.all().order_by('msitem__manu__idno', 'locus')
+        for item in qs:
+            manu = item.msitem.manu
+            url = reverse('sermon_details', kwargs={'pk': item.id})
+            url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
+            rel_item = []
+
+            # S: Order number for this sermon
+            add_rel_item(rel_item, index, False, align="right")
+            index += 1
+
+            # Manuscript
+            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
+            add_rel_item(rel_item, manu_full, False, main=True, link=url_m)
+
+            # Locus
+            locus = "(none)" if item.locus == None or item.locus == "" else item.locus
+            add_rel_item(rel_item, locus, False, main=True, link=url, 
+                         title="Locus within the manuscript (links to the sermon)")
+
+            # Origin/provenance
+            or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
+            add_rel_item(rel_item, or_prov, False, main=True, 
+                         title="Origin (if known), followed by provenances (between brackets)")
+
+            # Date
+            daterange = "{}-{}".format(manu.yearstart, manu.yearfinish)
+            add_rel_item(rel_item, daterange, False, link=url_m, align="right")
+
+            # Add this line to the list
+            rel_list.append(dict(id=item.id, cols=rel_item))
+
+        sermons['rel_list'] = rel_list
+
+        sermons['columns'] = [
+            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
+            '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
+            '{}<span>date</span>{}'.format(sort_start_int, sort_end)
+            ]
+        related_objects.append(sermons)
+
+        # Add all related objects to the context
+        context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
     
 
 class FeastListView(BasicList):
@@ -8949,6 +9022,9 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
+                # Add comment modal stuff
+                lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)
         except:
@@ -9204,7 +9280,7 @@ class ManuscriptDetails(ManuscriptEdit):
             context['sermon_list'] = sermon_list
             context['sermon_count'] = len(sermon_list)
 
-            # Add the list of sermons
+            # Add the list of sermons and the comment button
             context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
         except:
             msg = oErr.get_error_message()
@@ -10368,7 +10444,11 @@ class SermonGoldEdit(BasicDetails):
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
 
-            # TODO: add [sermongold_litset] unobtrusively
+            # Add comment modal stuff
+            lhtml = []
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+            context['after_details'] = "\n".join(lhtml)
+
 
             # Signal that we have select2
             context['has_select2'] = True
@@ -10577,14 +10657,6 @@ class SermonGoldDetails(SermonGoldEdit):
 
             # List of post-load objects
             postload_objects = []
-            ## (1) postload: full-text
-            #ftxt_obj = dict(prefix="gftxt", url=reverse('gold_ftxtset', kwargs={'pk': instance.id}))
-            #postload_objects.append(ftxt_obj)
-
-            ## (2) postload: literature
-            #lit_obj = dict(prefix="lit", url=reverse('gold_litset', kwargs={'pk': instance.id}))
-            #postload_objects.append(lit_obj)
-
             context['postload_objects'] = postload_objects
 
             # Lists of related objects
@@ -10738,6 +10810,11 @@ class EqualGoldEdit(BasicDetails):
             #for mainitem in context['mainitems']:
             #    for field in remove_fields:
             #        mainitem.pop(field, None)
+
+        # Add comment modal stuff
+        lhtml = []
+        lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+        context['after_details'] = "\n".join(lhtml)
 
         # Signal that we have select2
         context['has_select2'] = True

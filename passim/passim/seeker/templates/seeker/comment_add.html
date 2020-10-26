@@ -1,0 +1,31 @@
+﻿<!-- Modal form for a user's comment -->
+<div id="modal-history" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <!-- introduction header -->
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">User comment</h4>
+      </div>
+
+      <!-- Body of the modal-->
+      <div class="modal-body modal-dragpoint" id="view-history">
+        <!-- This is where the current user-comment shows up -->
+        <div  style='height: 300px; overflow-y: scroll;'>
+          {{comment_contents|safe}}
+        </div>
+      </div>
+
+      <!-- Footer with the save button -->
+      <div class="modal-footer">
+        {% if is_app_editor %}
+          <a class="btn jumbo-1" data-dismiss="modal" >
+            <span class="glyphicon glyphicon-ok" title="Send comment to the Passim team">&nbsp;Send</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+

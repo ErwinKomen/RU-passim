@@ -2732,6 +2732,20 @@ class Keyword(models.Model):
         return qs
 
 
+class Comment(models.Model):
+    """User comment"""
+
+    # [0-1] The text of the comment itself
+    content = models.TextField("Comment", null=True, blank=True)
+    # [1] links to a user via profile
+    profile = models.ForeignKey(Profile, related_name="profilecomments", on_delete=models.CASCADE)
+    # [1] Date created (automatically done)
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        return self.content
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -2799,6 +2813,8 @@ class Manuscript(models.Model):
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
 
     def __str__(self):
         return self.name
@@ -4185,6 +4201,9 @@ class EqualGold(models.Model):
 
     # [m] Many-to-many: one sermon can be a part of a series of collections
     collections = models.ManyToManyField("Collection", through="CollectionSuper", related_name="collections_super")
+
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_super")
     
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
@@ -4673,6 +4692,9 @@ class SermonGold(models.Model):
 
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionGold", related_name="collections_gold")
+
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_gold")
 
     def __str__(self):
         name = self.signatures()
@@ -5950,6 +5972,9 @@ class SermonDescr(models.Model):
 
     # [m] Many-to-many: signatures linked manually through SermonSignature
     signatures = models.ManyToManyField("Signature", through="SermonSignature", related_name="signatures_sermon")
+
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_sermon")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
