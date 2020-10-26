@@ -3174,8 +3174,8 @@ class Manuscript(models.Model):
             count = self.manusermons.all().count()
         return count
 
-    def get_stype_light(self):
-        sBack = get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -4547,8 +4547,9 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_stype_light(self):
-        return get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
+        return sBack
 
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
@@ -5066,8 +5067,9 @@ class SermonGold(models.Model):
         sBack = "".join(lHtml)
         return sBack
 
-    def get_stype_light(self):
-        return get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
+        return sBack
 
     def get_view(self):
         """Get a HTML valid view of myself similar to [sermongold_view.html]"""
@@ -6630,8 +6632,8 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_stype_light(self):
-        sBack = get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
         return sBack
 
     def get_template_link(self, profile):

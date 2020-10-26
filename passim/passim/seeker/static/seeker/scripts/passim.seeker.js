@@ -1401,6 +1401,54 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * comment_send
+       *    Send a user-comment to the server
+       * 
+       * @param {DOM} elStart
+       */
+      comment_send: function (elStart) {
+        var frm = null,
+            data = null,
+            targeturl = null,
+            target = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest('form');
+          // Get the data from the form
+          data = frm.serializeArray();
+          // The url is in the ajaxurl
+          targeturl = $(elStart).attr("ajaxurl");
+
+          // Call the ajax POST method
+          // Issue a post
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(target).html(response.msg);
+                  } else {
+                    $(target).html("An error has occurred (passim.seeker comment_send)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("comment_send", ex);
+        }
+      },
+
+      /**
        *  manusermo
        *      Visibility buttons for sermons within a manuscript
        *

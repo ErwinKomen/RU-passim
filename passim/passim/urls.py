@@ -251,6 +251,7 @@ urlpatterns = [
     
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
+    url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
 
     # ================ Any READER APP URLs should come here =======================================
     #url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),

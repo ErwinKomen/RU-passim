@@ -58,7 +58,7 @@ from reportlab.rl_config import defaultPageSize
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
-    AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, \
+    AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
     SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
     SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
@@ -114,6 +114,23 @@ app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
+
+def get_usercomments(type, instance, profile):
+    """Get a HTML list of user-made comments"""
+
+    html = []
+    qs = instance.comments.filter(profile=profile).order_by("-created")
+    if qs.count() > 0:
+        html.append("<table style='width: 100%;'><tbody>")
+        for obj in qs:
+            # Add one comment into the table
+            html.append("<tr><td class='tdnowrap'>{}</td><td style='margin-left: 10px; width: 90%;'>{}</td></tr>".format(
+                get_crpp_date(obj.created, True), obj.content ))
+        html.append("</tbody></table>")
+
+    # Combine
+    sBack = "\n".join(html)
+    return sBack
 
 
 def treat_bom(sHtml):
@@ -5469,7 +5486,7 @@ class SermonEdit(BasicDetails):
                 )
         # Get the main items
         mainitems_main = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True),'field_key': 'stype'},
             # -------- HIDDEN field values ---------------
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
             # --------------------------------------------
@@ -8862,6 +8879,44 @@ class SermonLitset(BasicPart):
         return context
 
 
+class CommentSend(BasicPart):
+    """Receive a comment from a user"""
+    MainModel = Comment
+
+    def add_to_context(self, context):
+        def get_object(otype, objid):
+            obj = None
+            if otype == "manu":
+                obj = Manuscript.objects.filter(id=objid).first()
+            elif otype == "sermo":
+                obj = SermonDescr.objects.filter(id=objid).first()
+            elif otype == "gold":
+                obj = SermonGold.objects.filter(id=objid).first()
+            elif otype == "super":
+                obj = EqualGold.objects.filter(id=objid).first()
+            return obj
+
+        if self.add:
+            # Get the form
+            form = CommentForm(self.qd, prefix="com")
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Yes, we are adding something new - check what we have
+                profile = cleaned.get("profile")
+                otype = cleaned.get("otype")
+                objid = cleaned.get("objid")
+                content = cleaned.get("content")
+                if content != None and content != "":
+                    # Yes, there is a remark
+                    comment = Comment.objects.create(profile=profile, content=content)
+                    obj = get_object(otype, objid)
+                    # Add a new object for this user
+                    obj.comments.add(comment)
+        return context
+
+    
+
+
 class ManuscriptEdit(BasicDetails):
     """The details of one manuscript"""
 
@@ -8929,7 +8984,7 @@ class ManuscriptEdit(BasicDetails):
                     )
             # Get the main items
             mainitems_main = [
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),  'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),  'field_key': 'stype'},
                 {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
                 {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
                  'title': 'City, village or abbey (monastery) of the library'},
@@ -8977,8 +9032,9 @@ class ManuscriptEdit(BasicDetails):
             title_right = '<span style="font-size: xx-small">{}</span>'.format(instance.get_full_name())
             context['title_right'] = title_right
 
+            # Note: non-app editors may still add a comment
+            lhtml = []
             if context['is_app_editor']:
-                lhtml = []
                 lbuttons = []
                 template_import_button = "import_template_button"
                 has_sermons = (instance.manuitems.count() > 0)
@@ -9022,11 +9078,16 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
-                # Add comment modal stuff
-                lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+            # Add comment modal stuff
+            initial = dict(otype="manu", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
 
-                # Store the after_details in the context
-                context['after_details'] = "\n".join(lhtml)
+            context['comment_list'] = get_usercomments('manu', instance, profile)
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptEdit/add_to_context")
@@ -10416,7 +10477,7 @@ class SermonGoldEdit(BasicDetails):
                  'title': 'Belongs to the equality set of Super Sermon Gold...', 'field_key': "equal"}, 
                 {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
                  'title': 'Other Sermons Gold members of the same equality set'},
-                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light, 'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True), 'field_key': 'stype', 'hidenew': True},
                 {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
                 {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
                  'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
@@ -10764,7 +10825,7 @@ class EqualGoldEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
             {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
 
             # Issue #295: the [number] (number within author) must be there, though hidden, not editable

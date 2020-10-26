@@ -3467,6 +3467,34 @@ class AuthorSearchForm(forms.ModelForm):
             instance = kwargs['instance']
 
 
+class CommentForm(forms.ModelForm):
+    """A form to upload a user-comment"""
+
+    otype = forms.CharField(label=_("Object type"), required=False)
+    objid = forms.CharField(label=_("Object id"), required=False)
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Comment
+        fields = ['content', 'profile']
+        widgets={'content':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CommentForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['profile'].required = False
+        self.fields['content'].required = False
+        self.fields['otype'].required = False
+        self.fields['objid'].required = False
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
 class UploadFileForm(forms.Form):
     """This is for uploading just one file"""
 

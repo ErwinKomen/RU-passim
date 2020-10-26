@@ -3,28 +3,53 @@
   <div class="modal-dialog">
     <!-- Modal content -->
     <div class="modal-content">
-      <!-- introduction header -->
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-        <h4 class="modal-title">User comment</h4>
-      </div>
 
-      <!-- Body of the modal-->
-      <div class="modal-body modal-dragpoint" id="view-history">
-        <!-- This is where the current user-comment shows up -->
-        <div  style='height: 300px; overflow-y: scroll;'>
-          {{comment_contents|safe}}
-        </div>
-      </div>
+      <form>
+        {% csrf_token %}
+        <div class="hidden">{{commentForm.otype}}</div>
+        <div class="hidden">{{commentForm.objid}}</div>
+        <div class="hidden">{{commentForm.profile}}</div>
 
-      <!-- Footer with the save button -->
-      <div class="modal-footer">
-        {% if is_app_editor %}
-          <a class="btn jumbo-1" data-dismiss="modal" >
-            <span class="glyphicon glyphicon-ok" title="Send comment to the Passim team">&nbsp;Send</span>
-          </a>
-        {% endif %}
-      </div>
+          <!-- introduction header -->
+          <div class="modal-header">
+            <span class="pull-right">
+              <a role="button" class=""><span class="glyphicon glyphicon-info-sign"></span>Help</a>
+              <a role="button" class=""  data-dismiss="modal"><span class="glyphicon glyphicon-remove-sign"></span></a>
+            </span>
+            <h4 class="modal-title">Submit a comment</h4>
+          </div>
+
+          <!-- Body of the modal-->
+          <div class="modal-body modal-dragpoint" id="view-history">
+            <!-- This is where the current user-comment shows up -->
+            <div  style='height: 300px; overflow-y: scroll;'>
+              <!-- Where the user can add a new comment -->
+                <div>
+                    <textarea id="id_com-content" name="com-content" rows="10" cols="50" style="width: 100%; height: 100%;"
+                            placeholder="Enter your comment here, and then press [Send] to forward it to the developers. Thanks in advance!"></textarea>
+                </div>
+
+              <!-- Previous comments made by the user -->
+              {% if comment_list != "" %}
+                <div>
+                  <h4>Previous comments:</h4>
+                  <div>{{comment_list|safe}}</div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Footer with the save button -->
+          <div class="modal-footer">
+            {% if is_app_editor %}
+              <a class="btn jumbo-1" data-dismiss="modal" 
+                 ajaxurl="{% url 'comment_send'  %}"
+                 onclick="ru.passim.seeker.comment_send(this);">
+                <span class="glyphicon glyphicon-ok" title="Send comment to the Passim team">&nbsp;Send</span>
+              </a>
+            {% endif %}
+          </div>
+      </form>
     </div>
   </div>
 </div>
