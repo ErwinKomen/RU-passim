@@ -279,7 +279,7 @@ def get_searchable(sText):
         sText = sText.strip()
     return sText
 
-def get_stype_light(stype):
+def get_stype_light(stype, usercomment=False):
     """HTML visualization of the different STYPE statuses"""
 
     sBack = ""
@@ -302,6 +302,15 @@ def get_stype_light(stype):
     # We have the color of the light: visualize it
     # sBack = "<span class=\"glyphicon glyphicon-record\" title=\"{}\" style=\"color: {};\"></span>".format(htext, light)
     sBack = traffic_light.format(htext, red, orange, green)
+
+    if usercomment:
+        # Add modal button to comment
+        html = []
+        html.append(sBack)
+        html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
+        html.append("   data-target='#modal-comment'>")
+        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span></a></span>")
+        sBack = "\n".join(html)
 
     # Return what we made
     return sBack
