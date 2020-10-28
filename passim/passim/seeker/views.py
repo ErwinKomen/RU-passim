@@ -8928,6 +8928,7 @@ class CommentSend(BasicPart):
                     objurl = reverse(url_names[otype], kwargs={'pk': obj.id})
                     context['objurl'] = self.request.build_absolute_uri(objurl)
                     context['objname'] = obj_names[otype]
+                    context['comdate'] = comment.get_created()
                     context['user'] = profile.user
                     context['objcontent'] = content
                     contents = render_to_string('seeker/comment_mail.html', context, self.request)
