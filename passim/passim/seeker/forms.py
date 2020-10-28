@@ -3470,14 +3470,16 @@ class AuthorSearchForm(forms.ModelForm):
 class CommentForm(forms.ModelForm):
     """A form to upload a user-comment"""
 
-    otype = forms.CharField(label=_("Object type"), required=False)
+    # otype = forms.CharField(label=_("Object type"), required=False)
     objid = forms.CharField(label=_("Object id"), required=False)
+    profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Comment
-        fields = ['content', 'profile']
+        fields = ['content', 'profile', 'otype']
         widgets={'content':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
 
@@ -3489,6 +3491,10 @@ class CommentForm(forms.ModelForm):
         self.fields['content'].required = False
         self.fields['otype'].required = False
         self.fields['objid'].required = False
+        self.fields['profilelist'].required = False
+
+        # Initialize querysets
+        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
 
         # Get the instance
         if 'instance' in kwargs:

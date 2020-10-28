@@ -8919,7 +8919,7 @@ class CommentSend(BasicPart):
                 content = cleaned.get("content")
                 if content != None and content != "":
                     # Yes, there is a remark
-                    comment = Comment.objects.create(profile=profile, content=content)
+                    comment = Comment.objects.create(profile=profile, content=content, otype=otype)
                     obj = get_object(otype, objid)
                     # Add a new object for this user
                     obj.comments.add(comment)
@@ -8946,7 +8946,100 @@ class CommentSend(BasicPart):
         # Send the result
         return context
 
+
+class CommentEdit(BasicDetails):
+    """The details of one comment"""
+
+    model = Comment
+
+
+class CommentDetails(CommentEdit):
+    """Like Comment Edit, but then html output"""
+    rtype = "html"
     
+
+class CommentListView(BasicList):
+    """Search and list comments"""
+
+    model = Comment
+    listform = CommentForm
+    prefix = "com"
+    paginate_by = 20
+    has_select2 = True
+    order_cols = ['created', 'profile__user__username', 'otype', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Timestamp',   'order': 'o=1', 'type': 'str', 'custom': 'created', 'main': True, 'linkdetails': True},
+        {'name': 'User name',   'order': 'o=2', 'type': 'str', 'custom': 'username'},
+        {'name': 'Item Type',   'order': 'o=3', 'type': 'str', 'custom': 'otype'},
+        {'name': 'Link',        'order': '',    'type': 'str', 'custom': 'link'},
+        ]
+    filters = [ {"name": "Item type",   "id": "filter_otype",       "enabled": False},
+                {"name": "User name",   "id": "filter_username",    "enabled": False}]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'otype',    'dbfield': 'otype',   'keyS': 'otype',           'keyList': 'otypelist' },
+            {'filter': 'username', 'fkfield': 'profile', 'keyFk': 'user__username', 'keyList': 'profilelist', 'infield': 'id'}
+            ]
+         }
+        ]
+    
+    def initializations(self):
+        """Perform some initializations"""
+
+        # Check if otype has already been taken over
+        comment_otype = Information.get_kvalue("comment_otype")
+        if comment_otype == None or comment_otype != "done":
+            # Get all the comments that have no o-type filled in yet
+            qs = Comment.objects.filter(otype="-")
+            with transaction.atomic():
+                for obj in qs:
+                    # Figure out where it belongs to
+                    if obj.comments_manuscript.count() > 0:
+                        obj.otype = "manu"
+                    elif obj.comments_sermon.count() > 0:
+                        obj.otype = "sermo"
+                    elif obj.comments_gold.count() > 0:
+                        obj.otype = "gold"
+                    elif obj.comments_super.count() > 0:
+                        obj.otype = "super"
+                    obj.save()
+            # Success
+            Information.set_kvalue("comment_otype", "done")
+
+        return None
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "username":
+            sBack = instance.profile.user.username
+        elif custom == "created":
+            sBack = instance.get_created()
+        elif custom == "otype":
+            sBack = instance.get_otype()
+        elif custom == "link":
+            url = ""
+            label = ""
+            if instance.otype == "manu":
+                obj = instance.comments_manuscript.first()
+                url = reverse("manuscript_details", kwargs={'pk': obj.id})
+                label = "manu_{}".format(obj.id)
+            elif instance.otype == "sermo":
+                obj = instance.comments_sermon.first()
+                url = reverse("sermon_details", kwargs={'pk': obj.id})
+                label = "sermo_{}".format(obj.id)
+            elif instance.otype == "gold":
+                obj = instance.comments_gold.first()
+                url = reverse("sermongold_details", kwargs={'pk': obj.id})
+                label = "gold_{}".format(obj.id)
+            elif instance.otype == "super":
+                obj = instance.comments_super.first()
+                url = reverse("equalgold_details", kwargs={'pk': obj.id})
+                label = "super_{}".format(obj.id)
+            if url != "":
+                sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+        return sBack, sTitle
 
 
 class ManuscriptEdit(BasicDetails):

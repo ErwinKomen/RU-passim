@@ -2786,6 +2786,8 @@ class Comment(models.Model):
     content = models.TextField("Comment", null=True, blank=True)
     # [1] links to a user via profile
     profile = models.ForeignKey(Profile, related_name="profilecomments", on_delete=models.CASCADE)
+    # [1] The type of comment
+    otype = models.CharField("Object type", max_length=STANDARD_LENGTH, default = "-")
     # [1] Date created (automatically done)
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -2812,6 +2814,10 @@ class Comment(models.Model):
 
         # Always return positively!!!
         return True
+
+    def get_otype(self):
+        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", super="Super Sermon Gold")
+        return otypes[self.otype]
 
 
 class Manuscript(models.Model):
