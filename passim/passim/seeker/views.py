@@ -120,17 +120,18 @@ def get_usercomments(type, instance, profile):
 
     html = []
     qs = instance.comments.filter(profile=profile).order_by("-created")
-    if qs.count() > 0:
-        html.append("<table style='width: 100%;'><tbody>")
-        for obj in qs:
-            # Add one comment into the table
-            html.append("<tr><td class='tdnowrap'>{}</td><td style='margin-left: 10px; width: 90%;'>{}</td></tr>".format(
-                get_crpp_date(obj.created, True), obj.content ))
-        html.append("</tbody></table>")
+    #if qs.count() > 0:
+    #    html.append("<table style='width: 100%;'><tbody>")
+    #    for obj in qs:
+    #        # Add one comment into the table
+    #        html.append("<tr><td class='tdnowrap'>{}</td><td style='margin-left: 10px; width: 90%;'>{}</td></tr>".format(
+    #            get_crpp_date(obj.created, True), obj.content ))
+    #    html.append("</tbody></table>")
 
-    # Combine
-    sBack = "\n".join(html)
-    return sBack
+    ## Combine
+    #sBack = "\n".join(html)
+    #return sBack
+    return qs
 
 
 def treat_bom(sHtml):
@@ -5586,6 +5587,9 @@ class SermonEdit(BasicDetails):
         context['has_select2'] = True
 
         # Add comment modal stuff
+        initial = dict(otype="sermo", objid=instance.id, profile=profile)
+        context['commentForm'] = CommentForm(initial=initial, prefix="com")
+        context['comment_list'] = get_usercomments('sermo', instance, profile)
         lhtml = []
         lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
         context['after_details'] = "\n".join(lhtml)
@@ -8881,20 +8885,30 @@ class SermonLitset(BasicPart):
 
 class CommentSend(BasicPart):
     """Receive a comment from a user"""
+
     MainModel = Comment
+    template_name = 'seeker/comment_add.html'
 
     def add_to_context(self, context):
         def get_object(otype, objid):
             obj = None
+            url = ""
+            url_name = ""
             if otype == "manu":
                 obj = Manuscript.objects.filter(id=objid).first()
+                url_name = "manuscript_details"
             elif otype == "sermo":
                 obj = SermonDescr.objects.filter(id=objid).first()
+                url_name = "sermon_details"
             elif otype == "gold":
                 obj = SermonGold.objects.filter(id=objid).first()
+                url_name = "sermongold_details"
             elif otype == "super":
                 obj = EqualGold.objects.filter(id=objid).first()
-            return obj
+                url_name = "equalgold_details"
+            if url_name != "":
+                url = reverse(url_name, kwargs={'pk': obj.id})
+            return obj, url
 
         if self.add:
             # Get the form
@@ -8909,9 +8923,25 @@ class CommentSend(BasicPart):
                 if content != None and content != "":
                     # Yes, there is a remark
                     comment = Comment.objects.create(profile=profile, content=content)
-                    obj = get_object(otype, objid)
+                    obj, url = get_object(otype, objid)
                     # Add a new object for this user
                     obj.comments.add(comment)
+
+                    # Send this comment by email
+                    context['objurl'] = url
+                    contents = render_to_string('seeker/comment_mail.html', context, self.request)
+                    comment.send_by_email()
+
+                    # Get a list of comments by this user for this item
+                    context['comment_list'] = get_usercomments(otype, obj, profile)
+                    # Translate this list into a valid string
+                    comment_list = render_to_string('seeker/comment_list.html', context, self.request)
+                    # And then pass on this string in the 'data' part of the POST response
+                    #  (this is done using the BasicPart POST handling)
+                    context['data'] = dict(comment_list=comment_list)
+
+
+        # Send the result
         return context
 
     
@@ -10504,8 +10534,10 @@ class SermonGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-
             # Add comment modal stuff
+            initial = dict(otype="gold", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
+            context['comment_list'] = get_usercomments('gold', instance, profile)
             lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['after_details'] = "\n".join(lhtml)
@@ -10873,6 +10905,9 @@ class EqualGoldEdit(BasicDetails):
             #        mainitem.pop(field, None)
 
         # Add comment modal stuff
+        initial = dict(otype="super", objid=instance.id, profile=profile)
+        context['commentForm'] = CommentForm(initial=initial, prefix="com")
+        context['comment_list'] = get_usercomments('super', instance, profile)
         lhtml = []
         lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
         context['after_details'] = "\n".join(lhtml)

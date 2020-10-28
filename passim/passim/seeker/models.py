@@ -24,6 +24,9 @@ import time
 import fnmatch
 import csv
 import math
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from difflib import SequenceMatcher
 from io import StringIO
 from pyzotero import zotero
@@ -1031,6 +1034,40 @@ def moveup(instance, tblGeneral, tblUser, ItemType):
         oErr.DoError("moveup")
         bOkay = False
     return bOkay
+
+def send_email(subject, profile, contents, add_team=False):
+    """Send an email"""
+
+    oErr = ErrHandle()
+    try:
+        # Set the sender
+        mail_from = Information.get_kvalue("mail_from")
+        mail_to = profile.user.email
+        if mail_from != "" and mail_to != "":
+            # See if the second addressee needs to be added
+            if add_team:
+                mail_team = Information.get_kvalue("mail_team")
+                if mail_team != "":
+                    mail_to = "{}; {}".format(mail_to, mail_team)
+
+            # Create message container
+            msgRoot = MIMEMultipart('related')
+            msgRoot['Subject'] = subject
+            msgRoot['From'] = mail_from
+            msgRoot['To'] = mail_to
+            msgHtml = MIMEText(contents, "html", "utf-8")
+            # Add the HTML to the root
+            msgRoot.attach(msgHtml)
+            # Convert into a string
+            message = msgRoot.as_string()
+            # Try to send this to the indicated email address rom port 25 (SMTP)
+            smtpObj = smtplib.SMTP('localhost', 25)
+            smtpObj.sendmail(mail_from, mail_to, message)
+            smtpObj.quit()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("send_mail")
+    return True
 
 
 # =================== HELPER models ===================================
@@ -2753,6 +2790,28 @@ class Comment(models.Model):
 
     def __str__(self):
         return self.content
+
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
+    def send_by_email(self):
+        """Send this comment by email to two addresses"""
+
+        oErr = ErrHandle()
+        try:
+            # Determine the contents
+            html = []
+            contents = ""
+
+            # Send this mail
+            send_email("Passim user comment {}".format(self.id), self.profile, contents, True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/send_by_email")
+
+        # Always return positively!!!
+        return True
 
 
 class Manuscript(models.Model):

@@ -1409,7 +1409,10 @@ var ru = (function ($, ru) {
       comment_send: function (elStart) {
         var frm = null,
             data = null,
+            divList = "#comment_list",
+            divContent = "#id_com-content",
             targeturl = null,
+            comment_list = null,
             target = null;
 
         try {
@@ -1430,6 +1433,14 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
+                  // Try to get the (adapted) list of comments
+                  comment_list = response.comment_list;
+                  if (comment_list !== undefined && comment_list !== null && comment_list.length > 0) {
+                    // There actually *is* a list!
+                    $(divList).html(comment_list);
+                  }
+                  // Clear the previously made comment
+                  $(divContent).val("");
                   break;
                 case "error":
                   // Show the error
