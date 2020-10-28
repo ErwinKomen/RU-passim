@@ -1043,18 +1043,19 @@ def send_email(subject, profile, contents, add_team=False):
         # Set the sender
         mail_from = Information.get_kvalue("mail_from")
         mail_to = profile.user.email
+        mail_team = None
         if mail_from != "" and mail_to != "":
             # See if the second addressee needs to be added
             if add_team:
                 mail_team = Information.get_kvalue("mail_team")
-                if mail_team != "":
-                    mail_to = "{}; {}".format(mail_to, mail_team)
 
             # Create message container
             msgRoot = MIMEMultipart('related')
             msgRoot['Subject'] = subject
             msgRoot['From'] = mail_from
             msgRoot['To'] = mail_to
+            if mail_team != None and mail_team != "":
+                msgRoot['Bcc'] = mail_team
             msgHtml = MIMEText(contents, "html", "utf-8")
             # Add the HTML to the root
             msgRoot.attach(msgHtml)
@@ -2795,14 +2796,13 @@ class Comment(models.Model):
         sCreated = get_crpp_date(self.created, True)
         return sCreated
 
-    def send_by_email(self):
+    def send_by_email(self, contents):
         """Send this comment by email to two addresses"""
 
         oErr = ErrHandle()
         try:
             # Determine the contents
             html = []
-            contents = ""
 
             # Send this mail
             send_email("Passim user comment {}".format(self.id), self.profile, contents, True)

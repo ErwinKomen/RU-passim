@@ -1242,6 +1242,10 @@ div > span.twitter-typeahead {
     width: 80%;
     margin: 30px auto;
   }
+.modal-comment {
+    width: 50%;
+    margin: 20px auto;
+  }
 .modal-header {
   cursor: move;
 }

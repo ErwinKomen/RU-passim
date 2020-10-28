@@ -8890,25 +8890,22 @@ class CommentSend(BasicPart):
     template_name = 'seeker/comment_add.html'
 
     def add_to_context(self, context):
+
+        url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
+                     "gold": "sermongold_details", "super": "equalgold_details"}
+        obj_names = {"manu": "Manuscript", "sermo": "Sermon",
+                     "gold": "Sermon Gold", "super": "Super Sermon Gold"}
         def get_object(otype, objid):
             obj = None
-            url = ""
-            url_name = ""
             if otype == "manu":
                 obj = Manuscript.objects.filter(id=objid).first()
-                url_name = "manuscript_details"
             elif otype == "sermo":
                 obj = SermonDescr.objects.filter(id=objid).first()
-                url_name = "sermon_details"
             elif otype == "gold":
                 obj = SermonGold.objects.filter(id=objid).first()
-                url_name = "sermongold_details"
             elif otype == "super":
                 obj = EqualGold.objects.filter(id=objid).first()
-                url_name = "equalgold_details"
-            if url_name != "":
-                url = reverse(url_name, kwargs={'pk': obj.id})
-            return obj, url
+            return obj
 
         if self.add:
             # Get the form
@@ -8923,14 +8920,18 @@ class CommentSend(BasicPart):
                 if content != None and content != "":
                     # Yes, there is a remark
                     comment = Comment.objects.create(profile=profile, content=content)
-                    obj, url = get_object(otype, objid)
+                    obj = get_object(otype, objid)
                     # Add a new object for this user
                     obj.comments.add(comment)
 
                     # Send this comment by email
-                    context['objurl'] = url
+                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id})
+                    context['objurl'] = self.request.build_absolute_uri(objurl)
+                    context['objname'] = obj_names[otype]
+                    context['user'] = profile.user
+                    context['objcontent'] = content
                     contents = render_to_string('seeker/comment_mail.html', context, self.request)
-                    comment.send_by_email()
+                    comment.send_by_email(contents)
 
                     # Get a list of comments by this user for this item
                     context['comment_list'] = get_usercomments(otype, obj, profile)
