@@ -72,7 +72,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
@@ -5466,6 +5466,11 @@ class SermonEdit(BasicDetails):
             if instance != None and instance.msitem != None and instance.msitem.manu != None:
                 self.afterdelurl = reverse('manuscript_details', kwargs={'pk': instance.msitem.manu.id})
 
+            # Then check if all distances have been calculated in SermonEqualDist
+            qs = SermonEqualDist.objects.filter(sermon=instance)
+            if qs.count() == 0:
+                # These distances need calculation...
+                instance.do_distance()
         return None
            
     def add_to_context(self, context, instance):
@@ -9517,7 +9522,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
                 if method == "july2020":
                     # The new July20920 method that uses different parameters and uses MsItem
-
+                    
                     # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                     head_to_id = {}
                     with transaction.atomic():

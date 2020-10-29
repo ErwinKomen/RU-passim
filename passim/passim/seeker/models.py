@@ -14,7 +14,7 @@ from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
 from passim.utils import *
-from passim.settings import APP_PREFIX, WRITABLE_DIR
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
 from passim.seeker.excel import excel_to_list
 from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 import sys, os, io, re
@@ -212,6 +212,8 @@ def get_crpp_date(dtThis, readable=False):
     """Convert datetime to string"""
 
     if readable:
+        # Convert the computer-stored timezone...
+        dtThis = dtThis.astimezone(pytz.timezone(TIME_ZONE))
         # Model: yyyy-MM-dd'T'HH:mm:ss
         sDate = dtThis.strftime("%d/%B/%Y (%H:%M)")
     else:
@@ -342,6 +344,13 @@ def get_overlap(sBack, sMatch):
     # Calculate the sBack
     sBack = "".join(html)
     return sBack, ratio
+
+def similar(a, b):
+    if a == None or b == None:
+        response = 0.00001
+    else:
+        response = SequenceMatcher(None, a, b).ratio()
+    return response
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1788,6 +1797,7 @@ class City(models.Model):
         """Find a city or create it."""
 
         errHandle = ErrHandle()
+        hit = None
         try:
             qs = City.objects.filter(Q(name__iexact=sName))
             if qs.count() == 0:
@@ -1798,13 +1808,14 @@ class City(models.Model):
                 hit.save()
             else:
                 hit = qs[0]
-            # Return what we found or created
-            return hit
         except:
             sError = errHandle.get_error_message()
             oBack['status'] = 'error'
             oBack['msg'] = sError
-            return None
+            hit = None
+
+        # Return what we found or created
+        return hit
 
 
 class Library(models.Model):
@@ -1945,9 +1956,9 @@ class Library(models.Model):
         """
 
         errHandle = ErrHandle()
+        hit = None
+        country = None
         try:
-            hit = None
-            country = None
             # Check if a country is mentioned
             if sCountry != None:
                 country = Country.objects.filter(Q(name__iexact=sCountry)).first()
@@ -1967,12 +1978,14 @@ class Library(models.Model):
                     hit.save()
                 else:
                     hit = qs[0]
-            # Return what we found or created
-            return hit
         except:
             sError = errHandle.get_error_message()
             oBack['status'] = 'error'
             oBack['msg'] = sError
+            hit = None
+
+        # Return what we found or created
+        return hit
             
     def read_json(oStatus, fname):
         """Read libraries from a JSON file"""
@@ -2013,11 +2026,12 @@ class Library(models.Model):
             oResult['status'] = "ok"
             oResult['msg'] = "Read {} library definitions".format(count)
             oResult['count'] = count
-            return oResult
         except:
             oResult['status'] = "error"
             oResult['msg'] = oErr.get_error_message()
-            return oResult
+
+        # Return the correct result
+        return oResult
 
 
 class Origin(models.Model):
@@ -6165,6 +6179,28 @@ class SermonDescr(models.Model):
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
 
+    def do_distance(self):
+        """Calculate the distance from myself (sermon) to all currently available EqualGold SSGs"""
+
+        # Get my own incipit and explicit
+        inc_s = self.srchincipit
+        exp_s = self.srchexplicit
+        # Walk all EqualGold objects
+        with transaction.atomic():
+            for super in EqualGold.objects.all():
+                # Get an object
+                obj = SermonEqualDist.objects.filter(sermon=self, super=super).first()
+                if obj == None:
+                    # Get the inc and exp for the SSG
+                    inc_eqg = super.srchincipit
+                    exp_eqg = super.srchexplicit
+                    # Calculate distances
+                    dist = 1 / ( similar(inc_s, inc_eqg) * similar(exp_s, exp_eqg))
+                    # Create object and Set this distance
+                    obj = SermonEqualDist.objects.create(sermon=self, super=super, distance=dist)
+        # No need to return anything
+        return None
+
     def do_ranges(self, lst_verses = None, force = False):
         if self.bibleref == None or self.bibleref == "":
             # Remove any existing bibrange objects
@@ -7368,6 +7404,20 @@ class SermonDescrEqual(models.Model):
         return uniques
 
 
+class SermonEqualDist(models.Model):
+    """Keep track of the 'distance' between sermons and SSGs"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonsuperdist")
+    # [1] The equal gold sermon (=SSG)
+    super = models.ForeignKey(EqualGold, related_name="sermonsuperdist")
+    # [1] Each sermon-to-equal keeps track of a distance
+    distance = models.FloatField("Distance", default=100.0)
+
+    def __str__(self):
+        return "{}".format(self.distance)
+
+
 class SermonDescrGold(models.Model):
     """Link from sermon description to gold standard"""
 
@@ -7487,6 +7537,7 @@ class SermonSignature(models.Model):
         """Get the equivalent gold-signature for me"""
 
         oErr = ErrHandle()
+        oBack = None
         try:
             if bCleanUp and self.gsig:
                 # There seems to be a gsig
@@ -7520,12 +7571,12 @@ class SermonSignature(models.Model):
                 if self.gsig:
                     self.save()
             # Return what I am in the end
-            return self.gsig
+            oBack = self.gsig
         except:
             #y = (hasattr(self,"gsig"))
             msg = oErr.get_error_message()
             oErr.DoError("get_goldsig")
-            return None
+        return oBack
 
     def adapt_gsig():
         """Make sure all the items in SermonSignature point to a gsig, if possible"""
@@ -7534,18 +7585,19 @@ class SermonSignature(models.Model):
         iTotal = qs.count()
         iCount = 0
         oErr = ErrHandle()
+        bResult = False
         try:
             with transaction.atomic():
                 for obj in qs:
                     obj.get_goldsig(bCleanUp=True)
                     iCount += 1
                     oErr.Status("adapt_gsig: id={} count={}/{}".format(obj.id, iCount, iTotal))
-            return True
+            bResult = True
         except:
             msg = oErr.get_error_message()
             oErr.DoError("adapt_gsig")
-            return False
-    
+        return bResult
+
 
 class Basket(models.Model):
     """The basket is the user's vault of search results (of sermondescr items)"""
