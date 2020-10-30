@@ -346,8 +346,11 @@ def get_overlap(sBack, sMatch):
     return sBack, ratio
 
 def similar(a, b):
-    if a == None or b == None:
-        response = 0.00001
+    if a == None:
+        if b == None:
+            response = 1
+        else:
+            response = 0.00001
     else:
         response = SequenceMatcher(None, a, b).ratio()
     return response
@@ -6066,6 +6069,9 @@ class SermonDescr(models.Model):
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_sermon")
 
+    # [m] Many-to-many: distances
+    distances = models.ManyToManyField(EqualGold, through="SermonEqualDist", related_name="distances_sermons")
+
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
@@ -6182,26 +6188,36 @@ class SermonDescr(models.Model):
     def do_distance(self):
         """Calculate the distance from myself (sermon) to all currently available EqualGold SSGs"""
 
-        # Get my own incipit and explicit
-        inc_s = self.srchincipit
-        exp_s = self.srchexplicit
-        # Walk all EqualGold objects
-        with transaction.atomic():
-            for super in EqualGold.objects.all():
-                # Get an object
-                obj = SermonEqualDist.objects.filter(sermon=self, super=super).first()
-                if obj == None:
-                    # Get the inc and exp for the SSG
-                    inc_eqg = super.srchincipit
-                    exp_eqg = super.srchexplicit
-                    # Calculate distances
-                    dist = 1 / ( similar(inc_s, inc_eqg) * similar(exp_s, exp_eqg))
-                    # Create object and Set this distance
-                    obj = SermonEqualDist.objects.create(sermon=self, super=super, distance=dist)
+        oErr = ErrHandle()
+        try:
+            # Get my own incipit and explicit
+            inc_s = self.srchincipit
+            exp_s = self.srchexplicit
+            # Walk all EqualGold objects
+            with transaction.atomic():
+                for super in EqualGold.objects.all():
+                    # Get an object
+                    obj = SermonEqualDist.objects.filter(sermon=self, super=super).first()
+                    if obj == None:
+                        # Get the inc and exp for the SSG
+                        inc_eqg = super.srchincipit
+                        exp_eqg = super.srchexplicit
+                        # Calculate distances
+                        similarity = similar(inc_s, inc_eqg) * similar(exp_s, exp_eqg)
+                        if similarity == 0.0:
+                            dist = 100000
+                        else:
+                            dist = 1 / similarity
+                        # Create object and Set this distance
+                        obj = SermonEqualDist.objects.create(sermon=self, super=super, distance=dist)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("do_distance")
         # No need to return anything
         return None
 
     def do_ranges(self, lst_verses = None, force = False):
+        bResult = True
         if self.bibleref == None or self.bibleref == "":
             # Remove any existing bibrange objects
             self.sermonbibranges.all().delete()
@@ -6252,7 +6268,8 @@ class SermonDescr(models.Model):
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
                     print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
-
+        return None
+    
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 

@@ -1813,6 +1813,8 @@ class SermonDescrSuperForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        # First get out the sermon_id
+        sermon_id = kwargs.pop('sermon_id', None)
         # Start by executing the standard handling
         super(SermonDescrSuperForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
@@ -1825,7 +1827,14 @@ class SermonDescrSuperForm(forms.ModelForm):
         self.fields['linktype'].required = False
         self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
-        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
+        # OLD: self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
+
+        # NEW: Taking the sermon as starting point and ordering them according to distance
+        sermon = SermonDescr.objects.filter(id=sermon_id).first()
+        if sermon != None:
+            qs = sermon.distances.all()
+            self.fields['newsuper'].queryset = sermon.distances.filter(moved__isnull=True).order_by('sermonsuperdist__distance', 'code', 'author__name', 'id')
+            # qs = sermon.sermonsuperdist.all()
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']

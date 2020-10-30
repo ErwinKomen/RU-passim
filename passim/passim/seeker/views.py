@@ -5472,6 +5472,14 @@ class SermonEdit(BasicDetails):
                 # These distances need calculation...
                 instance.do_distance()
         return None
+
+    def get_form_kwargs(self, prefix):
+        oBack = None
+        if prefix == 'stossg':
+            if self.object != None:
+                # Make sure that the sermon is known
+                oBack = dict(sermon_id=self.object.id)
+        return oBack
            
     def add_to_context(self, context, instance):
         """Add to the existing context"""
