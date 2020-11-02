@@ -229,6 +229,7 @@ urlpatterns = [
     url(r'^api/ssglink/$', passim.seeker.views.get_ssglink, name='api_ssglink'),
     url(r'^api/ssg2ssg/$', passim.seeker.views.get_ssg2ssg, name='api_ssg2ssg'),
     url(r'^api/ssg/$', passim.seeker.views.get_ssg, name='api_ssg'),
+    url(r'^api/ssgdist/$', passim.seeker.views.get_ssgdist, name='api_ssgdist'),
     url(r'^api/sermosig/$', passim.seeker.views.get_sermosig, name='api_sermosig'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),

@@ -1258,19 +1258,25 @@ class BasicDetails(DetailView):
                                 # Process all the correct forms in the formset
                                 for subform in formset:
                                     if subform.is_valid():
-                                        # DO the actual saving
-                                        subform.save()
+                                        # DO the actual saving - but that will only work if all is *actually* valid
+                                        try:
+                                            subform.save()
 
-                                        # Log the SAVE action
-                                        details = {'id': instance.id}
-                                        details["savetype"] = "add" # if bNew else "change"
-                                        details['model'] = subform.instance.__class__.__name__
-                                        if subform.changed_data != None and len(subform.changed_data) > 0:
-                                            details['changes'] = action_model_changes(subform, subform.instance)
-                                        self.action_add(instance, details, "add")
+                                            # Log the SAVE action
+                                            details = {'id': instance.id}
+                                            details["savetype"] = "add" # if bNew else "change"
+                                            details['model'] = subform.instance.__class__.__name__
+                                            if subform.changed_data != None and len(subform.changed_data) > 0:
+                                                details['changes'] = action_model_changes(subform, subform.instance)
+                                            self.action_add(instance, details, "add")
 
-                                        # Signal that the *FORM* needs refreshing, because the formset changed
-                                        bFormsetChanged = True
+                                            # Signal that the *FORM* needs refreshing, because the formset changed
+                                            bFormsetChanged = True
+                                        except:
+                                            msg = oErr.get_error_message()
+                                            oErr.DoError("BasicDetails/get_context_data")
+                                            context['errors'] = {'subform':  msg }
+
                                 if formset.is_valid():
                                     # Load an explicitly empty formset
                                     formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)

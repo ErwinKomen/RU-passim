@@ -1083,6 +1083,15 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * ssgdist_template
+       *    Construct the template for a Super Sermon Gold
+       *
+       */
+      ssgdist_template: function (sel_item) {
+        return private_methods.get_template(sel_item, "api/ssgdist/");
+      },
+
+      /**
        * sigs_template
        *    Construct the template for a Sermon Gold
        *

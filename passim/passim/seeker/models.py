@@ -346,8 +346,8 @@ def get_overlap(sBack, sMatch):
     return sBack, ratio
 
 def similar(a, b):
-    if a == None:
-        if b == None:
+    if a == None or a=="":
+        if b == None or b == "":
             response = 1
         else:
             response = 0.00001
@@ -6185,31 +6185,49 @@ class SermonDescr(models.Model):
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
 
-    def do_distance(self):
+    def do_distance(self, bForceUpdate = False):
         """Calculate the distance from myself (sermon) to all currently available EqualGold SSGs"""
+
+        def get_dist(inc_s, exp_s, inc_eqg, exp_eqg):
+            # Get the inc and exp for the SSG
+            #inc_eqg = super.srchincipit
+            #exp_eqg = super.srchexplicit
+            # Calculate distances
+            similarity = similar(inc_s, inc_eqg) + similar(exp_s, exp_eqg)
+            if similarity == 0.0:
+                dist = 100000
+            else:
+                dist = 2 / similarity
+            return dist
 
         oErr = ErrHandle()
         try:
             # Get my own incipit and explicit
-            inc_s = self.srchincipit
-            exp_s = self.srchexplicit
-            # Walk all EqualGold objects
-            with transaction.atomic():
-                for super in EqualGold.objects.all():
-                    # Get an object
-                    obj = SermonEqualDist.objects.filter(sermon=self, super=super).first()
-                    if obj == None:
-                        # Get the inc and exp for the SSG
-                        inc_eqg = super.srchincipit
-                        exp_eqg = super.srchexplicit
-                        # Calculate distances
-                        similarity = similar(inc_s, inc_eqg) * similar(exp_s, exp_eqg)
-                        if similarity == 0.0:
-                            dist = 100000
-                        else:
-                            dist = 1 / similarity
-                        # Create object and Set this distance
-                        obj = SermonEqualDist.objects.create(sermon=self, super=super, distance=dist)
+            inc_s = "" if self.srchincipit == None else self.srchincipit
+            exp_s = "" if self.srchexplicit == None else self.srchexplicit
+
+            # Make sure we only start doing something if it is really needed
+            count = self.distances.count()
+            if inc_s != "" or exp_s != "" or count > 0:
+                # Get a list of the current EqualGold elements in terms of id, srchinc/srchexpl
+                eqg_list = EqualGold.objects.all().values('id', 'srchincipit', 'srchexplicit')
+
+                # Walk all EqualGold objects
+                with transaction.atomic():
+                    # for super in EqualGold.objects.all():
+                    for item in eqg_list:
+                        # Get an object
+                        super_id = item['id']
+                        obj = SermonEqualDist.objects.filter(sermon=self, super=super_id).first()
+                        if obj == None:
+                            # Get the distance
+                            dist = get_dist(inc_s, exp_s, item['srchincipit'], item['srchexplicit'])
+                            # Create object and Set this distance
+                            obj = SermonEqualDist.objects.create(sermon=self, super_id=super_id, distance=dist)
+                        elif bForceUpdate:
+                            # Calculate and change the distance
+                            obj.distance = get_dist(inc_s, exp_s, item['srchincipit'], item['srchexplicit'])
+                            obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("do_distance")

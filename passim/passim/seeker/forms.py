@@ -761,6 +761,29 @@ class StypeWidget(ModelSelect2MultipleWidget):
         return FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
 
+class SuperDistWidget(ModelSelect2Widget):
+    model = SermonEqualDist
+    sermon = None
+    search_fields = ['super__code__icontains', 'super__id__icontains', 'super__author__name__icontains', 
+                     'super__srchincipit__icontains', 'super__srchexplicit__icontains',
+                     'super__equal_goldsermons__siglist__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = obj.super.get_label(do_incexpl = True)
+        return sLabel
+
+    def get_queryset(self):
+        qs = None
+        if self.sermon == None:
+            qs = SermonEqualDist.objects.filter(super__moved__isnull=True).order_by('distance', 'super__code', 'super__author__name', 'id').distinct()
+        else:
+            # Check and possibly re-calculate the set of SSG candidates
+            self.sermon.do_distance()
+            # Get the ordered set of SSG candidates
+            qs = self.sermon.sermonsuperdist.all().order_by('distance', 'super__code', 'super__author__name')
+        return qs
+
+
 class SuperOneWidget(ModelSelect2Widget):
     model = EqualGold
     search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 
@@ -1800,8 +1823,11 @@ class SermonDescrGoldForm(forms.ModelForm):
 class SermonDescrSuperForm(forms.ModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
-    newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
-                widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
+    #newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+    #            widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
+    #                                              'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+                widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
                                                   'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
@@ -1822,7 +1848,8 @@ class SermonDescrSuperForm(forms.ModelForm):
         init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
-        self.fields['newsuper'].required = False
+        #self.fields['newsuper'].required = False
+        self.fields['newsuperdist'].required = False
         self.fields['super'].required = False
         self.fields['linktype'].required = False
         self.fields['newlinktype'].initial = "uns"
@@ -1832,9 +1859,8 @@ class SermonDescrSuperForm(forms.ModelForm):
         # NEW: Taking the sermon as starting point and ordering them according to distance
         sermon = SermonDescr.objects.filter(id=sermon_id).first()
         if sermon != None:
-            qs = sermon.distances.all()
-            self.fields['newsuper'].queryset = sermon.distances.filter(moved__isnull=True).order_by('sermonsuperdist__distance', 'code', 'author__name', 'id')
-            # qs = sermon.sermonsuperdist.all()
+            qs = sermon.sermonsuperdist.all().order_by('distance', 'super__code', 'super__author__name')
+            self.fields['newsuperdist'].widget.sermon = sermon
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1844,7 +1870,12 @@ class SermonDescrSuperForm(forms.ModelForm):
                 #       self.fields['dst'].initial = instance.dst
 
                 # Make sure we exclude the instance from the queryset
-                self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('code', 'author__name', 'id')
+                # self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('code', 'author__name', 'id')
+                if instance.super_id != None:
+                    self.fields['newsuperdist'].queryset = self.fields['newsuperdist'].queryset.exclude(super__id=instance.super.id).order_by('code', 'author__name', 'id')
+                else:
+                    self.fields['newsuperdist'].queryset = self.fields['newsuperdist'].queryset.order_by('code', 'author__name', 'id')
+        return None
 
 
 class SermonDescrKeywordForm(forms.ModelForm):

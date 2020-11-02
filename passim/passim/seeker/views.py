@@ -3193,6 +3193,33 @@ def get_ssg(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_ssgdist(request):
+    """Get ONE particular short representation of a SSG"""
+    
+    data = 'fail'
+    if request.is_ajax():
+        oErr = ErrHandle()
+        try:
+            sId = request.GET.get('id', '')
+            co_json = {'id': sId}
+            lstQ = []
+            lstQ.append(Q(id=sId))
+            dist = SermonEqualDist.objects.filter(Q(id=sId)).first()
+            if dist != None:
+                ssg = EqualGold.objects.filter(Q(id=dist.super.id)).first()
+                if ssg:
+                    short = ssg.get_short()
+                    co_json['name'] = short
+                    data = json.dumps(co_json)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_ssgdist")
+    else:
+        data = "Request is not ajax"
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_manuidnos(request):
     """Get a list of manuscript identifiers for autocomplete"""
 
@@ -5570,7 +5597,7 @@ class SermonEdit(BasicDetails):
         # IN all cases
         mainitems_SSG = {'type': 'line',    'label': "Super Sermon gold links:",  'value': self.get_superlinks_markdown(instance), 
              'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
-             'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
+             'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssgdist_template'}
         context['mainitems'].append(mainitems_SSG)
         # Notes:
         # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
@@ -5702,16 +5729,20 @@ class SermonEdit(BasicDetails):
                             # Note: it will get saved with formset.save()
                     elif prefix == "stossg":
                         # SermonDescr-To-EqualGold processing
-                        if 'newsuper' in cleaned and cleaned['newsuper'] != "":
-                            newsuper = cleaned['newsuper']
+                        # Note: nov/2 went over from 'newsuper' to 'newsuperdist'
+                        if 'newsuperdist' in cleaned and cleaned['newsuperdist'] != "":
+                            newsuperdist = cleaned['newsuperdist']
                             # Take the default linktype
                             linktype = "uns"
 
-                            # Check existence
-                            obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
-                            if obj == None:
-                                super = EqualGold.objects.filter(id=newsuper).first()
-                                if super != None:
+                            # Convert from newsuperdist to actual super (SSG)
+                            superdist = SermonEqualDist.objects.filter(id=newsuperdist).first()
+                            if superdist != None:
+                                super = superdist.super
+
+                                # Check existence of link between S-SSG
+                                obj = SermonDescrEqual.objects.filter(sermon=instance, super=super, linktype=linktype).first()
+                                if obj == None:
                                     # Set the right parameters for creation later on
                                     form.instance.linktype = linktype
                                     form.instance.super = super
@@ -5808,6 +5839,9 @@ class SermonEdit(BasicDetails):
 
             ## Make sure the 'verses' field is adapted, if needed
             #bResult, msg = instance.adapt_verses()
+            # Check if instances need re-calculation
+            if 'incipit' in form.changed_data or 'explicit' in form.changed_data:
+                instance.do_distance(True)
 
         except:
             msg = oErr.get_error_message()
