@@ -59,12 +59,16 @@
                           <li role="separator" class="divider"></li>
                           <li><a href="{% url 'keyword_list' %}" title="Keywords">Keywords</a></li> 
                           <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
+                          <li><a href="{% url 'feast_list' %}" title="List of Feasts">Feasts</a></li>
                           {% if is_app_editor %}
+                            <li role="separator" class="divider"></li>
                             <li><a href="{% url 'provenance_list' %}" title="List of provenances">Provenances</a></li>
+                            <li><a href="{% url 'bibrange_list' %}" title="List of Bible references">Bible references</a></li>
                             <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
                             <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                             <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>
                             <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li> 
+                            <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li> 
                           {% endif %}
                           {% if is_app_uploader %}
                             <li role="separator" class="divider"></li>
@@ -81,6 +85,20 @@
                         </ul>
                       </li>
 
+                      {% if is_enrich_editor %}
+                        <li class="dropdown">
+                          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                             aria-haspopup="true" aria-expanded="false">Enrich<span class="caret"></span></a>
+                        
+                         <ul class="dropdown-menu">
+                            <li><a href="{% url 'speaker_list' %}">Speakers</a></li>
+                            <li><a href="{% url 'sentence_list' %}">Sentences</a></li>
+                            <li><a href="{% url 'testunit_list' %}" title="A unit combines speaker/sentence/variety">Test units</a></li>
+                            <li><a href="{% url 'testset_list' %}" title="Four rounds of 156 testsets">Test sets</a></li>
+                          </ul>
+                        </li>
+                      {% endif %}
+
                       {% if is_app_uploader %}
                         <li class="dropdown">
                           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
@@ -94,6 +112,9 @@
                             
                             <li role="separator" class="divider"></li>
                             <li><a href_was="#" href="{% url 'create_pdf_manu' %}" title="Create PDF with all manuscripts in PASSIM">Create PDF with all manuscripts in PASSIM</a></li> 
+
+                            <li role="separator" class="divider"></li>
+                            <li><a href_was="#" href="{% url 'do_huwa' %}" title="Analyse HUWA database">HUWA analysis</a></li>
                             
                            <!--
                             <li role="separator" class="divider"></li>

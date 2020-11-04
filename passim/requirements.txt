@@ -2,7 +2,7 @@ bibtexparser==1.1.0
 certifi==2018.11.29
 chardet==3.0.4
 demjson==2.2.4
-Django>=1.11.28
+Django==1.11.29
 django-appconf==1.0.3
 django-select2==6.3.1
 et-xmlfile==1.0.1
@@ -14,10 +14,9 @@ lxml==4.3.1
 Markdown==3.1
 openpyxl==2.5.14
 pathlib==1.0.1
-Pillow>=6.2.2
-pkg-resources==0.0.0
+Pillow==7.1.0
 pyparsing==2.4.0
-pytz==2018.9
+pytz>=2018.9
 Pyzotero==1.4.4
 reportlab==3.5.32
 requests==2.21.0

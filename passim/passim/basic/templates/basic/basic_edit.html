@@ -111,7 +111,7 @@
                 {% if mainitem.align %}align="{{mainitem.align}}"{% endif %}
                 {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
 
-              {% if mainitem.multiple and not 'field_list' in mainitem %}
+              {% if mainitem.multiple and not 'field_list' in mainitem and not mainitem.nolist %}
                 <!-- Multiple instances choosing using Select2 -->
                 <div class="{% if 'field_list' in mainitem and mainitem.allowing == "edit"  %}view-mode{% else %}any-mode{% endif %} ">
                   {% if mainitem.value|length > 0 %}
@@ -160,17 +160,21 @@
                       <div class="hidden">{{mainitem.field_key}}</div>
                     {% elif 'field_key' in mainitem %}
                       <div class="edit-mode hidden">{{mainitem.field_key}}</div>
-                    {% elif 'field_list' in mainitem %}
-                      <div class="edit-mode hidden" 
-                            {% if 'inline_selection' in mainitem %}select2init="{{mainitem.inline_selection}}"{% endif %}>
-                        <div class="inner">
-                          {{mainitem.field_list}}
+                    {% elif 'field_view' in mainitem %}
+                      <div class="hidden">{{mainitem.field_view}}</div>
+                    {% elif 'field_list' in mainitem or mainitem.nolist %}
+                      {% if 'field_list' in mainitem %}
+                        <div class="edit-mode hidden" 
+                              {% if 'inline_selection' in mainitem %}select2init="{{mainitem.inline_selection}}"{% endif %}>
+                          <div class="inner">
+                            {{mainitem.field_list}}
+                          </div>
                         </div>
-                      </div>
+                      {% endif %}
                       {% if 'fso' in mainitem %}
                         {% if is_app_editor or permission == "write" %}
-                          <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset" 
-                               {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
+                          <div class="new-mode hidden {% if mainitem.nolist %}edit-mode{% endif %}" id="{{mainitem.fso.prefix}}_formset" 
+                                {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
                             {% if mainitem.unique %}
                               {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
                             {% else %}
@@ -179,8 +183,6 @@
                           </div>
                         {% endif %}
                       {% endif %}
-                    {% elif 'field_view' in mainitem %}
-                      <div class="hidden">{{mainitem.field_view}}</div>
                     {% endif %}
                   </div>
                 {% endif %}

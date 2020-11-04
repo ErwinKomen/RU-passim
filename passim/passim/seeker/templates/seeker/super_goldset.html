@@ -39,11 +39,20 @@
                     <span>
                       <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.elevate_cancel(this);">Cancel</a>
                     </span>
+                    <span>&nbsp;</span>
+                    <span>
+                      <a class="btn btn-xs jumbo-3" 
+                          href="{% url 'equalgold_details' object_id %}?goldcopy={{instance.id}}&simple=t"
+                          title="Elevate this Gold Sermon to Super Sermon Gold (incipit, explicit)">
+                        Elevate basic<span class="glyphicon glyphicon-share-alt"></span>
+                      </a>
+                    </span>
+                    <span>&nbsp;</span>
                     <span>
                       <a class="btn btn-xs jumbo-4" 
-                          href="{% url 'equalgold_details' object_id %}?goldcopy={{instance.id}}"
+                          href="{% url 'equalgold_details' object_id %}?goldcopy={{instance.id}}&simple=f"
                           title="Elevate this Gold Sermon to Super Sermon Gold (Author, incipit, explicit)">
-                        Elevate <span class="glyphicon glyphicon-share-alt"></span>
+                        Elevate all<span class="glyphicon glyphicon-share-alt"></span>
                       </a>
                     </span>
                   </div>

@@ -32,6 +32,7 @@ var ru = (function ($, ru) {
     var loc_divErr = "basic_err",
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
+        loc_relatedRow = null,  // Row being dragged
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         KEYS = {
@@ -235,14 +236,17 @@ var ru = (function ($, ru) {
         var elTable = $(el).closest("table"),
             elTbody = $(elTable).find("tbody").first(),
             elTh = $(el).closest("th"),
+            elSortable = $(el).closest(".sortable"),
             rows = null,
             sDirection = "desc",
+            sSortType = "text",   // Either text or integer
             elDiv = null,
             colidx = -1;
 
         try {
           // Find out which direction is needed
           if ($(el).hasClass("fa-sort-down")) sDirection = "asc";
+          if ($(elSortable).hasClass("integer")) sSortType = "integer";
           // restore direction everywhere in headers
           $(el).closest("tr").find(".fa.sortshow").each(function (idx, elSort) {
             $(elSort).removeClass("fa-sort-down");
@@ -265,7 +269,10 @@ var ru = (function ($, ru) {
             // Get the column index 0-n
             colidx = parseInt($(elDiv).attr("colidx"), 10);
 
-            private_methods.sortTable(elTable, colidx, sDirection);
+            private_methods.sortTable(elTable, colidx, sDirection, sSortType);
+
+            // Show that changes can/need to be saved
+            $(elTable).closest("div").find(".related-save").removeClass("hidden");
 
           }
         } catch (ex) {
@@ -275,31 +282,54 @@ var ru = (function ($, ru) {
 
       /** 
        *  sortTable - sort any table on any colum into any direction
+       *              @sorttype is either 'text' or 'integer' (if defined)
        */
-      sortTable: function (elTable, colidx, direction) {
+      sortTable: function (elTable, colidx, direction, sorttype) {
         var rows = $(elTable).find('tbody  tr').get();
 
-        rows.sort(function(a, b) {
+        // Make sure to set sorttype to something
+        if (sorttype === undefined) sorttype = "text";
 
-          var A = $(a).children('td').eq(colidx).text().toUpperCase();
-          var B = $(b).children('td').eq(colidx).text().toUpperCase();
+        // The sorttype determines the sort function
+        if (sorttype == "integer") {
+          rows.sort(function (a, b) {
+            var A = 0, B = 0, sA = "", sB = "";
 
-          switch (direction) {
-            case "desc":
-              if (A < B) { return -1; }
-              else if (A > B) { return 1; }
-              else return 0;
-            case "asc":
-              if (A < B) { return 1; }
-              else if (A > B) { return -1; }
-              else return 0;
-          }
+            // Get the numerical values of A and B
+            sA = $(a).children('td').eq(colidx).text().match(/\d+/);
+            sB = $(b).children('td').eq(colidx).text().match(/\d+/);
+            if (sA !== "") A = parseInt(sA.join(''), 10);
+            if (sB !== "") B = parseInt(sB.join(''), 10);
 
-        });
+            switch (direction) {
+              case "desc":
+                if (A < B) { return -1; } else if (A > B) { return 1; } else return 0;
+              case "asc":
+                if (A < B) { return 1; } else if (A > B) { return -1; } else return 0;
+            }
 
-        $.each(rows, function(index, row) {
-          $(elTable).children('tbody').append(row);
-        });
+          });
+          $.each(rows, function (index, row) {
+            $(elTable).children('tbody').append(row);
+          });
+        } else {
+          rows.sort(function (a, b) {
+            var A = $(a).children('td').eq(colidx).text().toUpperCase();
+            var B = $(b).children('td').eq(colidx).text().toUpperCase();
+
+            switch (direction) {
+              case "desc":
+                if (A < B) { return -1; } else if (A > B) { return 1; } else return 0;
+              case "asc":
+                if (A < B) { return 1; } else if (A > B) { return -1; } else return 0;
+            }
+
+          });
+          $.each(rows, function (index, row) {
+            $(elTable).children('tbody').append(row);
+          });
+        }
+
       },
 
       /** 
@@ -964,24 +994,6 @@ var ru = (function ($, ru) {
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
 
-          //// Treat the input range elements
-          //$("input[type='range']").each(function (idx, value) {
-          //  var slider = $(this),
-          //      elTd = $(this).closest("td"),
-          //      name = "",
-          //      rangevalue = "";
-
-          //  // Possibly add an element
-          //  if ($(elTd).find(".basic-range-input").length < $(elTd).find("input[type='range']").length) {
-          //    // Get the current range value
-          //    rangevalue = $(slider).val();
-          //    // Add this element
-          //    name = $(slider)[0].name + "_value";
-          //    $(slider).after("<span>Value: <span class='basic-range-input'>" + rangevalue + "</span></span>");
-          //    // Set the range value to UNDEFINED for the moment
-          //    $(slider)[0].value = undefined;
-          //  }
-          //});
           // Make sure we catch changes
           $("input[type='range']").on("change", function (evt) {
             var el = $(this),
@@ -1163,6 +1175,22 @@ var ru = (function ($, ru) {
           $("table th .sortshow").unbind("click").on("click", function (evt) {
             var el = $(this);
             private_methods.sortshowDo(el);
+          });
+
+          // Add actions to related-remove
+          $("table td .related-remove").unbind("click").on("click", ru.basic.related_remove);
+
+          // Prepare related copies
+          $(".related-root").each(function (idx, el) {
+            var elOriginal = $(el).find(".related-original").first(),
+                elCopy = $(el).find(".related-copy").first(),
+                clone;
+
+            if (elOriginal.length > 0 && elCopy.length > 0) {
+              // Copy original to copy
+              $(elCopy).html($(elOriginal).html());
+
+            }
           });
 
         } catch (ex) {
@@ -1846,156 +1874,163 @@ var ru = (function ($, ru) {
         }
       },
 
-      related_drag: function (ev) {
-        var elTree = null,
-            divId = "",
-            sermonid = "";
-        try {
-          elTree = $(ev.target).closest(".tree");
-          sermonid = $(elTree).attr("sermonid");
-          divId = $(elTree).attr("id");
+      /**
+       * related_cancel
+       *    Cancel all sorting, deleting etc done on this related set. 
+       *
+       */
+      related_cancel: function (elStart) {
+        var elRoot = null,
+            elCopy = null,
+            elOriginal = null;
 
-          ev.dataTransfer.setData("text", divId);
+        try {
+          elRoot = $(elStart).closest(".related-root");
+          if (elRoot.length > 0) {
+            elOriginal = $(elRoot).find(".related-original").first();
+            elCopy = $(elRoot).find(".related-copy").first();
+            if (elOriginal.length > 0 && elCopy.length > 0) {
+              // Copy from copy to original
+              $(elOriginal).html($(elCopy).html());
+
+              // Resizable table columns
+              $("table.resizable").each(function (idx, el) {
+                private_methods.resizableGrid(el);
+              });
+
+              // sortable tables
+              $("table th .sortshow").unbind("click").on("click", function (evt) {
+                var el = $(this);
+                private_methods.sortshowDo(el);
+              });
+
+              // Add actions to related-remove
+              $("table td .related-remove").unbind("click").on("click", ru.basic.related_remove);
+
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("related_cancel", ex);
+        }
+      },
+
+      /**
+       * related_drag
+       *    Starting point of dragging. 
+       *    The DOM object of the <tr> as a whole is stored in [loc_relatedRow]
+       *
+       */
+      related_drag: function (ev) {
+        var row = "";
+        try {
+          loc_relatedRow = null;
+          loc_relatedRow = ev.target.parentNode;
         } catch (ex) {
           private_methods.errMsg("related_drag", ex);
         }
       },
 
+      /**
+       * related_dragenter
+       *    Dragging one row over other rows
+       * See: https://www.therogerlab.com/how-can-i/javascript/reorder-html-table-rows-using-drag-and-drop.html
+       *
+       */
       related_dragenter: function (ev) {
-        var elTree = null, sermonid = "";
+        var row = null,
+            children = null;
+
         try {
+          // Prevend the default behaviour
           ev.preventDefault();
-          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
-            //$(ev.target).addClass("dragover");
-            $(ev.target).addClass("ruler_black");
-            $(ev.target).removeClass("ruler_white");
-            // make row larger
-            $(ev.target).parent().addClass("ruler_show");
-          } else {
-            $(ev.target).closest("td").addClass("dragover");
-            $(ev.target).addClass("dragover");
-          }
+          // ev.dataTransfer.dropEffect = 'all';
+          // Get the row that is stored
+          row = loc_relatedRow;
+          // We must be going over a TD with the right class
+          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
+            // Get the <tr> children of the table
+            children = Array.from($(ev.target).closest("tbody").find("tr"));
+            // Check whether we are before or after the target
+            if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
+              // Target comes after
+              ev.target.parentNode.after(row);
+            } else {
+              // Target comes before
+              ev.target.parentNode.before(row);
+            }
+            // Show that changes can/need to be saved
+            $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+
+          } 
         } catch (ex) {
           private_methods.errMsg("related_dragenter", ex);
         }
       },
 
-      related_dragleave: function (ev) {
-        var elTree = null, sermonid = "";
+      /**
+       * related_remove
+       *    Remove this row
+       *
+       */
+      related_remove: function (ev) {
+        var elTarget = null,
+            elRow = null;
+
         try {
-          elTree = $(ev.target).closest("table");
-          $(elTree).find(".dragover").removeClass("dragover");
-          $(elTree).find(".ruler").removeClass("ruler_black");
-          $(elTree).find(".ruler").addClass("ruler_white");
-          $(elTree).find(".ruler_show").removeClass("ruler_show");
+          elTarget = $(ev.target);
+          elRow = $(ev.target).closest("tr");
+          // Show that changes can/need to be saved
+          $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+          // Remove it
+          $(elRow).remove();
         } catch (ex) {
-          private_methods.errMsg("related_dragleave", ex);
+          private_methods.errMsg("related_remove", ex);
         }
       },
 
-      related_drop: function (ev) {
-        var elTree = null,
-            divSrcId = "",
-            divDstId = "",
-            divHierarchy = "#sermon_hierarchy_element",
-            divSrc = null,
-            divDst = null,
-            bChanged = false,
-            level = 0,
-            target_under_source = false,
-            type = "under",
-            sermonid = "";
+      /**
+       * related_save
+       *    Save the revised related order, including deletions
+       *
+       */
+      related_save: function (elStart, prefix, mode) {
+        var elTable = null,
+            elForm = null,
+            elHlist = null,
+            elSavenew = null,
+            lst_row = [];
+
         try {
-          // Prevent default handling
-          ev.preventDefault();
+          elTable = $(elStart).closest(".related-original").find("table tbody").first();
+          if (elTable.length > 0 && prefix !== undefined && mode !== undefined) {
+            // Get all the rows in their current order
+            $(elTable).find("tr.form-row").each(function (idx, el) {
+              lst_row.push($(el).attr("rowid"));
+            });
+            // Get form, hlist, savenew
+            elForm = $("#save_related_" + prefix);
+            elHlist = $("#id_" + prefix + "-hlist");
+            elSavenew = $("#id_" + prefix + "-savenew");
+            // Set the parameters
+            $(elHlist).val(JSON.stringify(lst_row));
+            switch (mode) {
+              case "save":
+                $(elSavenew).val("false");
+                break;
+              case "savenew":
+                $(elSavenew).val("true");
+                break;
+            }
+            // Indicate we are waiting
+            $(elStart).closest(".related-original").find(".waiting").removeClass("hidden");
 
-          // Figure out what the source and destination is
-          elTree = $(ev.target).closest(".tree");
-          divSrcId = ev.dataTransfer.getData("text");
-          divDstId = $(elTree).attr("id");
-
-          // Reset the class of the drop element
-          $(elTree).find(".dragover").removeClass("dragover");
-          $(elTree).find(".ruler").removeClass("ruler_black");
-          $(elTree).find(".ruler").addClass("ruler_white");
-          $(elTree).find(".ruler_show").removeClass("ruler_show");
-
-          // Find the actual source div
-          if (divSrcId === "sermon_new") {
-            // Create a new element
-            divSrc = $(divHierarchy).clone(true);
-            // Adapt the @id field
-            loc_newSermonNumber += 1;
-            divSrcId = "sermon_new_" + loc_newSermonNumber;
-            $(divSrc).attr("id", divSrcId);
-            // Make a good @sermonid field to be sent to the caller
-            $(divSrc).attr("sermonid", "new_" + loc_newSermonNumber);
-            // Set the text for 'tussenkopje'
-            $(divSrc).find(".sermon-new-head").first().html('<div id="id_shead-' + loc_newSermonNumber + '" name="shead-' +
-              loc_newSermonNumber + '" contenteditable="true">(Structural element)</div>');
-            // Add a sermon number
-            $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
-            // Make sure the new element becomes visible
-            $(divSrc).removeClass("hidden");
-          } else {
-            divSrc = $("#sermon_tree").find("#" + divSrcId);
-          }
-          // The destination - that is me myself
-          divDst = elTree;
-
-          // Do we need to put the source "under" the destination or "before" it?
-          if ($(ev.target).hasClass("ruler")) {
-            type = "before";
+            // Pass this on as parameter??
+            $(elForm).submit();
           }
 
-          // Action now depends on the type
-          switch (type) {
-            case "under":   // Put src under div dst
-              // check for target under source -- that is not allowed
-              target_under_source = ($(divSrc).find("#" + divDstId).length > 0);
-
-              // Check if the target is okay to go to
-              if (divSrcId !== divDstId && !target_under_source) {
-
-                // Move source *UNDER* the destination
-                divDst.append(divSrc);
-                // Get my dst level
-                level = parseInt($(divDst).attr("level"), 10);
-                level += 1;
-                $(divSrc).attr("level", level.toString());
-
-                // Check if my parent already has a plus sign showing
-                $(divDst).children("table").find(".sermonbutton").html('<span class="glyphicon glyphicon-plus"></span>');
-                $(divDst).children("table").find(".sermonbutton").attr("onclick", "ru.passim.seeker.sermon_level(this);");
-
-                // Signal we have changed
-                bChanged = true;
-              } else {
-                console.log("not allowed to move from " + divSrcId + " to UNDER " + divDstId);
-              }
-              break;
-            case "before":  // Put src before div dst
-              // Validate
-              if (divSrcId === divDstId) {
-                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
-              } else {
-                // Move source *BEFORE* the destination
-                divSrc.insertBefore(divDst);
-                // Adapt my level to the one before me
-                $(divSrc).attr("level", $(divDst).attr("level"));
-                // SIgnal change
-                bChanged = true;
-              }
-              break;
-          }
-
-          // What if change happened?
-          if (bChanged) {
-            // Show the SAVE and RESTORE buttons
-            $("#sermon_tree").find(".edit-mode").removeClass("hidden");
-          }
         } catch (ex) {
-          private_methods.errMsg("related_drop", ex);
+          private_methods.errMsg("related_save", ex);
         }
       },
 
@@ -2164,6 +2199,7 @@ var ru = (function ($, ru) {
           private_methods.errMsg("search_start", ex);
         }
       },
+
       /**
        * search_ordered_start
        *    Perform a simple 'submit' call to search_start

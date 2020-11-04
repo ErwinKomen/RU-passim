@@ -323,10 +323,14 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             elif "*" in val:
                                 val = adapt_search(val)
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
+                            elif "$" in dbfield:
+                                val = adapt_search(val)
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
                     elif has_Q_value(keyS, oFields):
-                        s_q = oFields[keyS]
+                        if not "$" in dbfield:
+                            s_q = oFields[keyS]
+                        enable_filter(filter_type, head_id)
 
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):
@@ -496,6 +500,7 @@ class BasicList(ListView):
     use_team_group = False
     admin_editable = False
     permission = True
+    redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
     qs = None
@@ -796,7 +801,6 @@ class BasicList(ListView):
         return fields, None, None
   
     def get_queryset(self, request = None):
-        self.initializations()
 
         if request == None: request = self.request
         # Get the parameters passed on with the GET or the POST request
@@ -917,6 +921,18 @@ class BasicList(ListView):
         self.qs = qs
         return qs
 
+    def get(self, request, *args, **kwargs):
+        # FIrst do my own initializations
+        self.initializations()
+        # Then check if we have a redirect or not
+        if self.redirectpage == "":
+            # We can continue with the normal 'get()'
+            response = super(BasicList, self).get(request, *args, **kwargs)
+        else:
+            response = redirect(self.redirectpage)
+        # REturn the appropriate response
+        return response
+
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
     
@@ -940,7 +956,7 @@ class BasicDetails(DetailView):
     basic_name_prefix = ""
     basic_add = ""
     add_text = "Add a new"
-    permission = "write"    # Permission can be: (nothing), "read" and "write"
+    permission = "read"     # Permission can be: (nothing), "read" and "write"
     new_button = False
     do_not_save = False
     no_delete = False
@@ -1242,19 +1258,25 @@ class BasicDetails(DetailView):
                                 # Process all the correct forms in the formset
                                 for subform in formset:
                                     if subform.is_valid():
-                                        # DO the actual saving
-                                        subform.save()
+                                        # DO the actual saving - but that will only work if all is *actually* valid
+                                        try:
+                                            subform.save()
 
-                                        # Log the SAVE action
-                                        details = {'id': instance.id}
-                                        details["savetype"] = "add" # if bNew else "change"
-                                        details['model'] = subform.instance.__class__.__name__
-                                        if subform.changed_data != None and len(subform.changed_data) > 0:
-                                            details['changes'] = action_model_changes(subform, subform.instance)
-                                        self.action_add(instance, details, "add")
+                                            # Log the SAVE action
+                                            details = {'id': instance.id}
+                                            details["savetype"] = "add" # if bNew else "change"
+                                            details['model'] = subform.instance.__class__.__name__
+                                            if subform.changed_data != None and len(subform.changed_data) > 0:
+                                                details['changes'] = action_model_changes(subform, subform.instance)
+                                            self.action_add(instance, details, "add")
 
-                                        # Signal that the *FORM* needs refreshing, because the formset changed
-                                        bFormsetChanged = True
+                                            # Signal that the *FORM* needs refreshing, because the formset changed
+                                            bFormsetChanged = True
+                                        except:
+                                            msg = oErr.get_error_message()
+                                            oErr.DoError("BasicDetails/get_context_data")
+                                            context['errors'] = {'subform':  msg }
+
                                 if formset.is_valid():
                                     # Load an explicitly empty formset
                                     formset = formsetClass(initial=[], prefix=prefix, form_kwargs=form_kwargs)
@@ -1395,161 +1417,167 @@ class BasicDetails(DetailView):
         bNew = False
         mForm = self.mForm
         oErr = ErrHandle()
+        frm = None
         username=self.request.user.username
         team_group=app_editor
         userplus = app_userplus
 
+        try:
+            # Determine the prefix
+            if self.prefix_type == "":
+                id = "n" if instance == None else instance.id
+                prefix = "{}-{}".format(self.prefix, id)
+            else:
+                prefix = self.prefix
 
-        # Determine the prefix
-        if self.prefix_type == "":
-            id = "n" if instance == None else instance.id
-            prefix = "{}-{}".format(self.prefix, id)
-        else:
-            prefix = self.prefix
-
-        # Check if this is a POST or a GET request
-        if self.request.method == "POST" and not self.do_not_save:
-            # Determine what the action is (if specified)
-            action = ""
-            if 'action' in initial: action = initial['action']
-            if action == "delete":
-                # The user wants to delete this item
-                try:
-                    bResult, msg = self.before_delete(instance)
-                    if bResult:
-                        # Log the DELETE action
-                        details = {'id': instance.id}
-                        self.action_add(instance, details, "delete")
+            # Check if this is a POST or a GET request
+            if self.request.method == "POST" and not self.do_not_save:
+                # Determine what the action is (if specified)
+                action = ""
+                if 'action' in initial: action = initial['action']
+                if action == "delete":
+                    # The user wants to delete this item
+                    try:
+                        bResult, msg = self.before_delete(instance)
+                        if bResult:
+                            # Log the DELETE action
+                            details = {'id': instance.id}
+                            self.action_add(instance, details, "delete")
                         
-                        # Remove this sermongold instance
-                        instance.delete()
-                    else:
-                        # Removing is not possible
-                        context['errors'] = {'delete': msg }
-                except:
-                    msg = oErr.get_error_message()
-                    # Create an errors object
-                    context['errors'] = {'delete':  msg }
+                            # Remove this sermongold instance
+                            instance.delete()
+                        else:
+                            # Removing is not possible
+                            context['errors'] = {'delete': msg }
+                    except:
+                        msg = oErr.get_error_message()
+                        # Create an errors object
+                        context['errors'] = {'delete':  msg }
 
-                if 'afterdelurl' not in context or context['afterdelurl'] == "":
-                    context['afterdelurl'] = get_previous_page(self.request, True)
+                    if 'afterdelurl' not in context or context['afterdelurl'] == "":
+                        context['afterdelurl'] = get_previous_page(self.request, True)
 
-                # Make sure we are returning JSON
-                self.rtype = "json"
+                    # Make sure we are returning JSON
+                    self.rtype = "json"
 
-                # Possibly add to context by the calling function
-                if instance.id:
-                    context = self.add_to_context(context, instance)
+                    # Possibly add to context by the calling function
+                    if instance.id:
+                        context = self.add_to_context(context, instance)
 
-                # No need to retern a form anymore - we have been deleting
-                return None
+                    # No need to retern a form anymore - we have been deleting
+                    return None
             
-            # All other actions just mean: edit or new and send back
-            # Make instance available
-            context['object'] = instance
-            self.object = instance
+                # All other actions just mean: edit or new and send back
+                # Make instance available
+                context['object'] = instance
+                self.object = instance
 
-            # Do we have an existing object or are we creating?
-            if instance == None:
-                # Saving a new item
-                if self.use_team_group:
-                    frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                # Do we have an existing object or are we creating?
+                if instance == None:
+                    # Saving a new item
+                    if self.use_team_group:
+                        frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                    else:
+                        frm = mForm(initial, prefix=prefix)
+                    bNew = True
+                    self.add = True
+                elif len(initial) == 0:
+                    # Create a completely new form, on the basis of the [instance] only
+                    if self.use_team_group:
+                        frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                    else:
+                        frm = mForm(prefix=prefix, instance=instance)
                 else:
-                    frm = mForm(initial, prefix=prefix)
-                bNew = True
-                self.add = True
-            elif len(initial) == 0:
-                # Create a completely new form, on the basis of the [instance] only
-                if self.use_team_group:
-                    frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                else:
-                    frm = mForm(prefix=prefix, instance=instance)
-            else:
-                # Editing an existing one
-                if self.use_team_group:
-                    frm = mForm(initial, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                else:
-                    frm = mForm(initial, prefix=prefix, instance=instance)
-            # Both cases: validation and saving
-            if frm.is_valid():
-                # The form is valid - do a preliminary saving
-                obj = frm.save(commit=False)
-                # Any checks go here...
-                bResult, msg = self.before_save(form=frm, instance=obj)
-                if bResult:
-                    # Now save it for real
-                    obj.save()
-                    # Log the SAVE action
-                    details = {'id': obj.id}
-                    details["savetype"] = "new" if bNew else "change"
-                    if frm.changed_data != None and len(frm.changed_data) > 0:
-                        details['changes'] = action_model_changes(frm, obj)
-                    self.action_add(obj, details, "save")
+                    # Editing an existing one
+                    if self.use_team_group:
+                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                    else:
+                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
+                # Both cases: validation and saving
+                if frm.is_valid():
+                    # The form is valid - do a preliminary saving
+                    obj = frm.save(commit=False)
+                    # Any checks go here...
+                    bResult, msg = self.before_save(form=frm, instance=obj)
+                    if bResult:
+                        # Now save it for real
+                        obj.save()
+                        # Log the SAVE action
+                        details = {'id': obj.id}
+                        details["savetype"] = "new" if bNew else "change"
+                        if frm.changed_data != None and len(frm.changed_data) > 0:
+                            details['changes'] = action_model_changes(frm, obj)
+                        self.action_add(obj, details, "save")
 
-                    # Make sure the form is actually saved completely
-                    frm.save()
-                    instance = obj
+                        # Make sure the form is actually saved completely
+                        frm.save()
+                        instance = obj
                     
-                    # Any action(s) after saving
-                    bResult, msg = self.after_save(frm, obj)
+                        # Any action(s) after saving
+                        bResult, msg = self.after_save(frm, obj)
+                    else:
+                        context['errors'] = {'save': msg }
                 else:
-                    context['errors'] = {'save': msg }
-            else:
-                # We need to pass on to the user that there are errors
-                context['errors'] = frm.errors
+                    # We need to pass on to the user that there are errors
+                    context['errors'] = frm.errors
+                    oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
 
-            # Check if this is a new one
-            if bNew:
-                if self.is_basic:
-                    self.afternewurl = context['listview']
-                    if self.rtype == "html":
-                        # Make sure we do a page redirect
-                        self.newRedirect = True
-                        self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
-                # Any code that should be added when creating a new [SermonGold] instance
-                bResult, msg = self.after_new(frm, instance)
-                if not bResult:
-                    # Removing is not possible
-                    context['errors'] = {'new': msg }
-                # Check if an 'afternewurl' is specified
-                if self.afternewurl != "":
-                    context['afternewurl'] = self.afternewurl
+                # Check if this is a new one
+                if bNew:
+                    if self.is_basic:
+                        self.afternewurl = context['listview']
+                        if self.rtype == "html":
+                            # Make sure we do a page redirect
+                            self.newRedirect = True
+                            self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
+                    # Any code that should be added when creating a new [SermonGold] instance
+                    bResult, msg = self.after_new(frm, instance)
+                    if not bResult:
+                        # Removing is not possible
+                        context['errors'] = {'new': msg }
+                    # Check if an 'afternewurl' is specified
+                    if self.afternewurl != "":
+                        context['afternewurl'] = self.afternewurl
                 
-        else:
-            # Check if this is asking for a new form
-            if instance == None:
-                # Get the form for the sermon
-                if self.use_team_group:
-                    frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
-                else:
-                    frm = mForm(prefix=prefix)
             else:
-                # Get the form for the sermon
-                if self.use_team_group:
-                    frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                # Check if this is asking for a new form
+                if instance == None:
+                    # Get the form for the sermon
+                    if self.use_team_group:
+                        frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                    else:
+                        frm = mForm(prefix=prefix)
                 else:
-                    frm = mForm(instance=instance, prefix=prefix)
-            if frm.is_valid():
-                iOkay = 1
-            # Walk all the form objects
-            for formObj in self.form_objects:
-                formClass = formObj['form']
-                prefix = formObj['prefix']
-                # This is only for *NEW* forms (right now)
-                form = formClass(prefix=prefix)
-                context[prefix + "Form"] = form
-                # Get any possible typeahead parameters
-                lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                    # Get the form for the sermon
+                    if self.use_team_group:
+                        frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                    else:
+                        frm = mForm(instance=instance, prefix=prefix)
+                if frm.is_valid():
+                    iOkay = 1
+                # Walk all the form objects
+                for formObj in self.form_objects:
+                    formClass = formObj['form']
+                    prefix = formObj['prefix']
+                    # This is only for *NEW* forms (right now)
+                    form = formClass(prefix=prefix)
+                    context[prefix + "Form"] = form
+                    # Get any possible typeahead parameters
+                    lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                    if lst_form_ta != None:
+                        for item in lst_form_ta:
+                            self.lst_typeahead.append(item)
+
+            # Get any possible typeahead parameters
+            if frm != None:
+                lst_form_ta = getattr(frm, "typeaheads", None)
                 if lst_form_ta != None:
                     for item in lst_form_ta:
                         self.lst_typeahead.append(item)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasicDetails/prepare_form")
 
-        # Get any possible typeahead parameters
-        if frm != None:
-            lst_form_ta = getattr(frm, "typeaheads", None)
-            if lst_form_ta != None:
-                for item in lst_form_ta:
-                    self.lst_typeahead.append(item)
         # Return the form we made
         return frm
     

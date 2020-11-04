@@ -59,6 +59,7 @@ urlpatterns = [
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
+    url(r'^tools/huwa/$', passim.seeker.views.do_huwa, name='do_huwa'),
 
     url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -175,6 +176,18 @@ urlpatterns = [
     url(r'^provenance/details(?:/(?P<pk>\d+))?/$', ProvenanceDetails.as_view(), name='provenance_details'),
     url(r'^provenance/edit(?:/(?P<pk>\d+))?/$', ProvenanceEdit.as_view(), name='provenance_edit'),
 
+    url(r'^comment/list', CommentListView.as_view(), name='comment_list'),
+    url(r'^comment/details(?:/(?P<pk>\d+))?/$', CommentDetails.as_view(), name='comment_details'),
+    url(r'^comment/edit(?:/(?P<pk>\d+))?/$', CommentEdit.as_view(), name='comment_edit'),
+
+    url(r'^bibrange/list', BibRangeListView.as_view(), name='bibrange_list'),
+    url(r'^bibrange/details(?:/(?P<pk>\d+))?/$', BibRangeDetails.as_view(), name='bibrange_details'),
+    url(r'^bibrange/edit(?:/(?P<pk>\d+))?/$', BibRangeEdit.as_view(), name='bibrange_edit'),
+
+    url(r'^feast/list', FeastListView.as_view(), name='feast_list'),
+    url(r'^feast/details(?:/(?P<pk>\d+))?/$', FeastDetails.as_view(), name='feast_details'),
+    url(r'^feast/edit(?:/(?P<pk>\d+))?/$', FeastEdit.as_view(), name='feast_edit'),
+
     url(r'^profile/list', ProfileListView.as_view(), name='profile_list'),
     url(r'^profile/details(?:/(?P<pk>\d+))?/$', ProfileDetails.as_view(), name='profile_details'),
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
@@ -216,6 +229,7 @@ urlpatterns = [
     url(r'^api/ssglink/$', passim.seeker.views.get_ssglink, name='api_ssglink'),
     url(r'^api/ssg2ssg/$', passim.seeker.views.get_ssg2ssg, name='api_ssg2ssg'),
     url(r'^api/ssg/$', passim.seeker.views.get_ssg, name='api_ssg'),
+    url(r'^api/ssgdist/$', passim.seeker.views.get_ssgdist, name='api_ssgdist'),
     url(r'^api/sermosig/$', passim.seeker.views.get_sermosig, name='api_sermosig'),
     url(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     url(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
@@ -242,6 +256,7 @@ urlpatterns = [
     
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
+    url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
 
     # ================ Any READER APP URLs should come here =======================================
     #url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
@@ -252,6 +267,14 @@ urlpatterns = [
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================
+    url(r'^enrich/speaker/list', SpeakerListView.as_view(), name='speaker_list'),
+    url(r'^enrich/speaker/details(?:/(?P<pk>\d+))?/$', SpeakerDetails.as_view(), name='speaker_details'),
+    url(r'^enrich/speaker/edit(?:/(?P<pk>\d+))?/$', SpeakerEdit.as_view(), name='speaker_edit'),
+
+    url(r'^enrich/sentence/list', SentenceListView.as_view(), name='sentence_list'),
+    url(r'^enrich/sentence/details(?:/(?P<pk>\d+))?/$', SentenceDetails.as_view(), name='sentence_details'),
+    url(r'^enrich/sentence/edit(?:/(?P<pk>\d+))?/$', SentenceEdit.as_view(), name='sentence_edit'),
+
     url(r'^enrich/unit/list', TestunitListView.as_view(), name='testunit_list'),
     url(r'^enrich/unit/details(?:/(?P<pk>\d+))?/$', TestunitDetails.as_view(), name='testunit_details'),
     url(r'^enrich/unit/edit(?:/(?P<pk>\d+))?/$', TestunitEdit.as_view(), name='testunit_edit'),
@@ -260,6 +283,8 @@ urlpatterns = [
     url(r'^enrich/set/list', TestsetListView.as_view(), name='testset_list'),
     url(r'^enrich/set/details(?:/(?P<pk>\d+))?/$', TestsetDetails.as_view(), name='testset_details'),
     url(r'^enrich/set/edit(?:/(?P<pk>\d+))?/$', TestsetEdit.as_view(), name='testset_edit'),
+    url(r'^enrich/download', TestsetDownload.as_view(), name='testset_results'),
+    url(r'^api/enrich/testsets/$', passim.enrich.views.get_testsets, name='api_testsets'),
 
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     url(r'^select2/', include('django_select2.urls')),

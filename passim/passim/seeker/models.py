@@ -14,8 +14,9 @@ from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
 from passim.utils import *
-from passim.settings import APP_PREFIX, WRITABLE_DIR
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
 from passim.seeker.excel import excel_to_list
+from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 import sys, os, io, re
 import copy
 import json
@@ -23,6 +24,9 @@ import time
 import fnmatch
 import csv
 import math
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from difflib import SequenceMatcher
 from io import StringIO
 from pyzotero import zotero
@@ -35,6 +39,7 @@ from xml.dom import minidom
 STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
+ABBR_LENGTH = 5
 PASSIM_CODE_LENGTH = 20
 
 COLLECTION_SCOPE = "seeker.colscope"
@@ -207,6 +212,8 @@ def get_crpp_date(dtThis, readable=False):
     """Convert datetime to string"""
 
     if readable:
+        # Convert the computer-stored timezone...
+        dtThis = dtThis.astimezone(pytz.timezone(TIME_ZONE))
         # Model: yyyy-MM-dd'T'HH:mm:ss
         sDate = dtThis.strftime("%d/%B/%Y (%H:%M)")
     else:
@@ -277,7 +284,7 @@ def get_searchable(sText):
         sText = sText.strip()
     return sText
 
-def get_stype_light(stype):
+def get_stype_light(stype, usercomment=False):
     """HTML visualization of the different STYPE statuses"""
 
     sBack = ""
@@ -300,6 +307,15 @@ def get_stype_light(stype):
     # We have the color of the light: visualize it
     # sBack = "<span class=\"glyphicon glyphicon-record\" title=\"{}\" style=\"color: {};\"></span>".format(htext, light)
     sBack = traffic_light.format(htext, red, orange, green)
+
+    if usercomment:
+        # Add modal button to comment
+        html = []
+        html.append(sBack)
+        html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
+        html.append("   data-target='#modal-comment'>")
+        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span></a></span>")
+        sBack = "\n".join(html)
 
     # Return what we made
     return sBack
@@ -328,6 +344,16 @@ def get_overlap(sBack, sMatch):
     # Calculate the sBack
     sBack = "".join(html)
     return sBack, ratio
+
+def similar(a, b):
+    if a == None or a=="":
+        if b == None or b == "":
+            response = 1
+        else:
+            response = 0.00001
+    else:
+        response = SequenceMatcher(None, a, b).ratio()
+    return response
 
 def build_choice_list(field, position=None, subcat=None, maybe_empty=False):
     """Create a list of choice-tuples"""
@@ -1021,8 +1047,43 @@ def moveup(instance, tblGeneral, tblUser, ItemType):
         bOkay = False
     return bOkay
 
+def send_email(subject, profile, contents, add_team=False):
+    """Send an email"""
+
+    oErr = ErrHandle()
+    try:
+        # Set the sender
+        mail_from = Information.get_kvalue("mail_from")
+        mail_to = profile.user.email
+        mail_team = None
+        if mail_from != "" and mail_to != "":
+            # See if the second addressee needs to be added
+            if add_team:
+                mail_team = Information.get_kvalue("mail_team")
+
+            # Create message container
+            msgRoot = MIMEMultipart('related')
+            msgRoot['Subject'] = subject
+            msgRoot['From'] = mail_from
+            msgRoot['To'] = mail_to
+            if mail_team != None and mail_team != "":
+                msgRoot['Bcc'] = mail_team
+            msgHtml = MIMEText(contents, "html", "utf-8")
+            # Add the HTML to the root
+            msgRoot.attach(msgHtml)
+            # Convert into a string
+            message = msgRoot.as_string()
+            # Try to send this to the indicated email address rom port 25 (SMTP)
+            smtpObj = smtplib.SMTP('localhost', 25)
+            smtpObj.sendmail(mail_from, mail_to, message)
+            smtpObj.quit()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("send_mail")
+    return True
 
 
+# =================== HELPER models ===================================
 class Status(models.Model):
     """Intermediate loading of sync information and status of processing it"""
 
@@ -1485,6 +1546,8 @@ class Stype(models.Model):
         return self.abbr
 
 
+# ==================== Passim/Seeker models =============================
+
 class LocationType(models.Model):
     """Kind of location and level on the location hierarchy"""
 
@@ -1514,11 +1577,26 @@ class Location(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # We need to know whether a location is part of a particular city or country for 'dependent_fields'
+    # [0-1] City according to the 'Location' specification
+    lcity = models.ForeignKey("self", null=True, related_name="lcity_locations")
+    # [0-1] Library according to the 'Location' specification
+    lcountry = models.ForeignKey("self", null=True, related_name="lcountry_locations")
+
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
 
     def __str__(self):
         return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        if self != None:
+            # Check the values for [lcity] and [lcountry]
+            self.lcountry = self.partof_loctype("country")
+            self.lcity = self.partof_loctype("city")
+        # Regular saving
+        response = super(Location, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def get_loc_name(self):
         lname = "{} ({})".format(self.name, self.loctype)
@@ -1607,6 +1685,17 @@ class Location(models.Model):
     def above(self):
         return self.hierarchy(False)
 
+    def partof_loctype(self, loctype):
+        """See which country (if any) I am part of"""
+
+        lcountry = None
+        lst_above = self.hierarchy(False)
+        for obj in lst_above:
+            if obj.loctype.name == loctype:
+                lcountry = obj
+                break
+        return lcountry
+
     
 class LocationName(models.Model):
     """The name of a location in a particular language"""
@@ -1643,6 +1732,14 @@ class LocationRelation(models.Model):
     container = models.ForeignKey(Location, related_name="container_locrelations")
     # [1] Obligatory contained
     contained = models.ForeignKey(Location, related_name="contained_locrelations")
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the regular saving
+        response = super(LocationRelation, self).save(force_insert, force_update, using, update_fields)
+        # Check the [contained] element for [lcity] and [lcountry]
+        self.contained.save()
+        # Return the save response
+        return response
 
 
 class Country(models.Model):
@@ -1703,6 +1800,7 @@ class City(models.Model):
         """Find a city or create it."""
 
         errHandle = ErrHandle()
+        hit = None
         try:
             qs = City.objects.filter(Q(name__iexact=sName))
             if qs.count() == 0:
@@ -1713,13 +1811,14 @@ class City(models.Model):
                 hit.save()
             else:
                 hit = qs[0]
-            # Return what we found or created
-            return hit
         except:
             sError = errHandle.get_error_message()
             oBack['status'] = 'error'
             oBack['msg'] = sError
-            return None
+            hit = None
+
+        # Return what we found or created
+        return hit
 
 
 class Library(models.Model):
@@ -1860,9 +1959,9 @@ class Library(models.Model):
         """
 
         errHandle = ErrHandle()
+        hit = None
+        country = None
         try:
-            hit = None
-            country = None
             # Check if a country is mentioned
             if sCountry != None:
                 country = Country.objects.filter(Q(name__iexact=sCountry)).first()
@@ -1882,12 +1981,14 @@ class Library(models.Model):
                     hit.save()
                 else:
                     hit = qs[0]
-            # Return what we found or created
-            return hit
         except:
             sError = errHandle.get_error_message()
             oBack['status'] = 'error'
             oBack['msg'] = sError
+            hit = None
+
+        # Return what we found or created
+        return hit
             
     def read_json(oStatus, fname):
         """Read libraries from a JSON file"""
@@ -1928,11 +2029,12 @@ class Library(models.Model):
             oResult['status'] = "ok"
             oResult['msg'] = "Read {} library definitions".format(count)
             oResult['count'] = count
-            return oResult
         except:
             oResult['status'] = "error"
             oResult['msg'] = oErr.get_error_message()
-            return oResult
+
+        # Return the correct result
+        return oResult
 
 
 class Origin(models.Model):
@@ -2694,6 +2796,47 @@ class Keyword(models.Model):
         return qs
 
 
+class Comment(models.Model):
+    """User comment"""
+
+    # [0-1] The text of the comment itself
+    content = models.TextField("Comment", null=True, blank=True)
+    # [1] links to a user via profile
+    profile = models.ForeignKey(Profile, related_name="profilecomments", on_delete=models.CASCADE)
+    # [1] The type of comment
+    otype = models.CharField("Object type", max_length=STANDARD_LENGTH, default = "-")
+    # [1] Date created (automatically done)
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        return self.content
+
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
+    def send_by_email(self, contents):
+        """Send this comment by email to two addresses"""
+
+        oErr = ErrHandle()
+        try:
+            # Determine the contents
+            html = []
+
+            # Send this mail
+            send_email("Passim user comment {}".format(self.id), self.profile, contents, True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/send_by_email")
+
+        # Always return positively!!!
+        return True
+
+    def get_otype(self):
+        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", super="Super Sermon Gold")
+        return otypes[self.otype]
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -2714,6 +2857,8 @@ class Manuscript(models.Model):
     filename = models.CharField("Filename", max_length=LONG_STRING, null=True, blank=True)
     # [0-1] Optional link to a website with (more) information on this manuscript
     url = models.URLField("Web info", null=True, blank=True)
+    # [0-1] Notes field, which may be empty - see issue #298
+    notes = models.TextField("Notes", null=True, blank=True)
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
@@ -2759,6 +2904,8 @@ class Manuscript(models.Model):
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
 
     def __str__(self):
         return self.name
@@ -3109,8 +3256,8 @@ class Manuscript(models.Model):
             count = self.manusermons.all().count()
         return count
 
-    def get_stype_light(self):
-        sBack = get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -3438,6 +3585,13 @@ class Manuscript(models.Model):
                     if 'keyword' in msItem: sermon.keyword = msItem['keyword']  # Keyword
                     if 'edition' in msItem: sermon.edition = msItem['edition']  # Edition
 
+                    if 'feast' in msItem: 
+                        # Get object that is being referred to
+                        sermon.feast = Feast.get_one(msItem['feast'])
+                    if sermon.bibleref != None and sermon.biblref != "": 
+                        # Calculate and set BibRange and BibVerse objects
+                        sermon.do_ranges()
+
                     # Set the default status type
                     sermon.stype = STYPE_IMPORTED    # Imported
 
@@ -3468,7 +3622,7 @@ class Manuscript(models.Model):
                     if 'quote' in msItem and sermon.quote != msItem['quote']: sermon.quote = msItem['quote'] ; bNeedSaving = True
                     if 'gryson' in msItem and sermon.gryson != msItem['gryson']: sermon.gryson = msItem['gryson'] ; bNeedSaving = True
                     if 'clavis' in msItem and sermon.clavis != msItem['clavis']: sermon.clavis = msItem['clavis'] ; bNeedSaving = True
-                    if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = msItem['feast'] ; bNeedSaving = True
+                    if 'feast' in msItem and sermon.feast != msItem['feast']: sermon.feast = Feast.get_one(msItem['feast']) ; bNeedSaving = True
                     if 'keyword' in msItem and sermon.keyword != msItem['keyword']: sermon.keyword = msItem['keyword'] ; bNeedSaving = True
                     if 'bibleref' in msItem and sermon.bibleref != msItem['bibleref']: sermon.bibleref = msItem['bibleref'] ; bNeedSaving = True
                     if 'additional' in msItem and sermon.additional != msItem['additional']: sermon.additional = msItem['additional'] ; bNeedSaving = True
@@ -3484,6 +3638,10 @@ class Manuscript(models.Model):
                         else:
                             sermon.author = author
                         bNeedSaving = True
+
+                    if sermon.bibleref != None and sermon.biblref != "": 
+                        # Calculate and set BibRange and BibVerse objects
+                        sermon.do_ranges()
 
                     if bNeedSaving:
                         # Now save it
@@ -4061,6 +4219,39 @@ class Nickname(models.Model):
         return hit
 
 
+class Feast(models.Model):
+    """Christian feast commemmorated in one of the Latin texts or sermons"""
+
+    # [1] Name of the feast in English
+    name = models.CharField("Name (English)", max_length=LONG_STRING)
+    # [0-1] Name of the feast in Latin
+    latname = models.CharField("Name (Latin)", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Date of the feast
+    feastdate = models.TextField("Feast date", null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_one(sFeastName):
+        sFeastName = sFeastName.strip()
+        obj = Feast.objects.filter(name__iexact=sFeastName).first()
+        if obj == None:
+            obj = Feast.objects.create(name=sFeastName)
+        return obj
+
+    def get_latname(self):
+        sBack = ""
+        if self.latname != None and self.latname != "":
+            sBack = self.latname
+        return sBack
+
+    def get_date(self):
+        sBack = ""
+        if self.feastdate != None and self.feastdate != "":
+            sBack = self.feastdate
+        return sBack
+
+
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
 
@@ -4101,6 +4292,9 @@ class EqualGold(models.Model):
 
     # [m] Many-to-many: one sermon can be a part of a series of collections
     collections = models.ManyToManyField("Collection", through="CollectionSuper", related_name="collections_super")
+
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_super")
     
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
@@ -4110,9 +4304,14 @@ class EqualGold(models.Model):
 
         oErr = ErrHandle()
         try:
-            # Adapt the incipit and explicit
-            self.srchincipit = get_searchable(self.incipit)
-            self.srchexplicit = get_searchable(self.explicit)
+            # Adapt the incipit and explicit - if necessary
+            srchincipit = get_searchable(self.incipit)
+            if self.srchincipit != srchincipit:
+                self.srchincipit = srchincipit
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchexplicit != srchexplicit:
+                self.srchexplicit = srchexplicit
+
             # Double check the number and the code
             if self.author:
                 # Get the author number
@@ -4124,9 +4323,17 @@ class EqualGold(models.Model):
                 else:
                     # There is an author--is this different than the author we used to have?
 
-                    if not self.number:
-                        # Check the highest sermon number for this author
-                        self.number = EqualGold.sermon_number(self.author)
+                    if self.number == None:
+                        # This may be a mistake: see if there is a code already
+                        if self.code != None and "PASSIM" in self.code:
+                            # There already is a code: get the number from here
+                            arPart = re.split("\s|\.", self.code)
+                            if len(arPart) == 3 and arPart[0] == "PASSIM":
+                                # Get the author number
+                                self.number = int(arPart[2])
+                        if self.number == None:
+                            # Check the highest sermon number for this author
+                            self.number = EqualGold.sermon_number(self.author)
                     # Now we have both an author and a number...
                     passim_code = EqualGold.passim_code(auth_num, self.number)
                     if not self.code or self.code != passim_code:
@@ -4135,7 +4342,9 @@ class EqualGold(models.Model):
 
             # (Re) calculate the number of associated historical collections (for *all* users!!)
             if self.id != None:
-                self.hccount = self.collections.filter(settype="hc", scope='publ').count()
+                hccount = self.collections.filter(settype="hc", scope='publ').count()
+                if hccount != self.hccount:
+                    self.hccount = hccount
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
@@ -4420,8 +4629,9 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_stype_light(self):
-        return get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
+        return sBack
 
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
@@ -4518,9 +4728,10 @@ class EqualGold(models.Model):
         # Calculate the first signature
         first = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code').first()
         if first != None:
-            self.firstsig = first.code
-            # Save changes
-            self.save()
+            firstsig = first.code
+            if self.firstsig != firstsig:
+                # Save changes
+                self.save()
         return True
 
     def set_sgcount(self):
@@ -4574,6 +4785,9 @@ class SermonGold(models.Model):
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionGold", related_name="collections_gold")
 
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_gold")
+
     def __str__(self):
         name = self.signatures()
         if name == "":
@@ -4608,9 +4822,11 @@ class SermonGold(models.Model):
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist:
+            self.siglist = siglist
+            # And save myself
+            self.save()
 
     def editions(self):
         """Combine all editions into one string: the editions are retrieved from litrefSG"""
@@ -4817,16 +5033,23 @@ class SermonGold(models.Model):
         """Get all the keywords attached to the SSG of which I am part"""
 
         lHtml = []
-        # Get all keywords attached to these SGs
-        qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
-        # Visit all keywords
-        for keyword in qs:
-            # Determine where clicking should lead to
-            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            if self.equal != None:
+                # Get all keywords attached to these SGs
+                qs = Keyword.objects.filter(equal_kw__equal__id=self.equal.id).order_by("name").distinct()
+                # Visit all keywords
+                for keyword in qs:
+                    # Determine where clicking should lead to
+                    url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+                    # Create a display for this topic
+                    lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_keywords_ssg_markdown")
         return sBack
 
     def get_label(self, do_incexpl=False):
@@ -4926,8 +5149,9 @@ class SermonGold(models.Model):
         sBack = "".join(lHtml)
         return sBack
 
-    def get_stype_light(self):
-        return get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
+        return sBack
 
     def get_view(self):
         """Get a HTML valid view of myself similar to [sermongold_view.html]"""
@@ -5260,12 +5484,15 @@ class SermonGold(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        self.srchincipit = get_searchable(self.incipit)
-        self.srchexplicit = get_searchable(self.explicit)
+        srchincipit = get_searchable(self.incipit)
+        srchexplicit = get_searchable(self.explicit)
+        if self.srchincipit != srchincipit: self.srchincipit = srchincipit
+        if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
         lSign = []
         for item in self.goldsignatures.all().order_by('-editype'):
             lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
+        siglist = json.dumps(lSign)
+        if siglist != self.siglist: self.siglist = siglist
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
 
@@ -5420,7 +5647,7 @@ class Collection(models.Model):
     # [0-1] Number of SSG authors -- if this is a settype='hc'
     ssgauthornum = models.IntegerField("Number of SSG authors", default=0, null=True, blank=True)
 
-    # [0-n] Many-to-many: keywords per SermonGold
+    # [0-n] Many-to-many: references per collection
     litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
 
     
@@ -5468,10 +5695,55 @@ class Collection(models.Model):
         sBack = ", ".join(html)
         return sBack
 
-    def get_readonly_display(self):
-        response = "yes" if self.readonly else "no"
-        return response
-        
+    def get_created(self):
+        """REturn the creation date in a readable form"""
+
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
+    def get_copy(self, owner=None):
+        """Create a copy of myself and return it"""
+
+        oErr = ErrHandle()
+        new_copy = None
+        try:
+            # Create one, copying the existing one
+            new_owner = self.owner if owner == None else owner
+            new_copy = Collection.objects.create(
+                name = self.name, owner=new_owner, readonly=self.readonly,
+                type = self.type, settype = self.settype, descrip = self.descrip,
+                url = self.url, path = self.path, scope=self.scope)
+            # Further action depends on the type we are
+            if self.type == "manu":
+                # Copy manuscripts
+                qs = CollectionMan.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionMan.objects.create(collection=new_copy, manuscript=obj.manuscript, order=obj.order)
+            elif self.type == "sermo":
+                # Copy sermons
+                qs = CollectionSerm.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSerm.objects.create(collection=new_copy, sermon=obj.sermon, order=obj.order)
+            elif self.type == "gold":
+                # Copy gold sermons
+                qs = CollectionGold.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionGold.objects.create(collection=new_copy, gold=obj.gold, order=obj.order)
+            elif self.type == "super":
+                # Copy SSGs
+                qs = CollectionSuper.objects.filter(collection=self).order_by("order")
+                for obj in qs:
+                    CollectionSuper.objects.create(collection=new_copy, super=obj.super, order=obj.order)
+
+            # Change the name
+            new_copy.name = "{}_{}".format(new_copy.name, new_copy.id)
+            # Make sure to save it once more to process any changes in the save() function
+            new_copy.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/get_copy")
+        return new_copy
+
     def get_elevate(self):
         html = []
         url = reverse("collhist_elevate", kwargs={'pk': self.id})
@@ -5498,12 +5770,6 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_created(self):
-        """REturn the creation date in a readable form"""
-
-        sDate = self.created.strftime("%d/%b/%Y %H:%M")
-        return sDate
-
     def get_manuscript_link(self):
         """Return a piece of HTML with the manuscript link for the user"""
 
@@ -5520,39 +5786,10 @@ class Collection(models.Model):
             sBack = "\n".join(html)
         return sBack
 
-    def get_size_markdown(self):
-        """Count the items that belong to me, depending on my type
+    def get_readonly_display(self):
+        response = "yes" if self.readonly else "no"
+        return response
         
-        Create a HTML output
-        """
-
-        size = 0
-        lHtml = []
-        if self.type == "sermo":
-            size = self.freqsermo()
-            # Determine where clicking should lead to
-            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
-        elif self.type == "manu":
-            size = self.freqmanu()
-            # Determine where clicking should lead to
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
-        elif self.type == "gold":
-            size = self.freqgold()
-            # Determine where clicking should lead to
-            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
-        elif self.type == "super":
-            size = self.freqsuper()
-            # Determine where clicking should lead to
-            if self.settype == "hc":
-                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
-            else:
-                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
-        if size > 0:
-            # Create a display for this topic
-            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
-        sBack = ", ".join(lHtml)
-        return sBack
-
     def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
 
@@ -5603,6 +5840,39 @@ class Collection(models.Model):
             qs = Collection.objects.all()
         # REturn the result
         return qs
+
+    def get_size_markdown(self):
+        """Count the items that belong to me, depending on my type
+        
+        Create a HTML output
+        """
+
+        size = 0
+        lHtml = []
+        if self.type == "sermo":
+            size = self.freqsermo()
+            # Determine where clicking should lead to
+            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), self.id)
+        elif self.type == "manu":
+            size = self.freqmanu()
+            # Determine where clicking should lead to
+            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), self.id)
+        elif self.type == "gold":
+            size = self.freqgold()
+            # Determine where clicking should lead to
+            url = "{}?gold-collist_sg={}".format(reverse('gold_list'), self.id)
+        elif self.type == "super":
+            size = self.freqsuper()
+            # Determine where clicking should lead to
+            if self.settype == "hc":
+                url = "{}?ssg-collist_hist={}".format(reverse('equalgold_list'), self.id)
+            else:
+                url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), self.id)
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_template_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""
@@ -5669,8 +5939,9 @@ class MsItem(models.Model):
 
     # ========================================================================
     # [1] Every MsItem belongs to exactly one manuscript
-    #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
-    manu = models.ForeignKey(Manuscript, null=True, related_name="manuitems")
+    #     Note: when a Manuscript is removed, all its associated MsItems are also removed
+    #           and when an MsItem is removed, so is its SermonDescr or SermonHead
+    manu = models.ForeignKey(Manuscript, null=True, on_delete = models.CASCADE, related_name="manuitems")
 
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
     # [0-1] Parent sermon, if applicable
@@ -5719,7 +5990,8 @@ class SermonHead(models.Model):
 
     # [1] Every SermonHead belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
-    msitem = models.ForeignKey(MsItem, null=True, related_name="itemheads")
+    #           when the MsItem is removed, its SermonHead is too
+    msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemheads")
 
 
 class SermonDescr(models.Model):
@@ -5754,8 +6026,8 @@ class SermonDescr(models.Model):
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
     quote = models.TextField("Quote", null=True, blank=True)
-    # [0-1] The FEAST??
-    feast = models.CharField("Feast", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Christian feast like Easter etc
+    feast = models.ForeignKey(Feast, null=True, blank=True, on_delete=models.SET_NULL, related_name="feastsermons")
     # [0-1] Notes on the bibliography, literature for this sermon
     bibnotes = models.TextField("Bibliography notes", null=True, blank=True)
     # [0-1] Any notes for this sermon
@@ -5764,6 +6036,7 @@ class SermonDescr(models.Model):
     additional = models.TextField("Additional", null=True, blank=True)
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
+    verses = models.TextField("List of verses", null=True, blank=True)
 
     # [1] Every SermonDescr has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
@@ -5793,13 +6066,20 @@ class SermonDescr(models.Model):
     # [m] Many-to-many: signatures linked manually through SermonSignature
     signatures = models.ManyToManyField("Signature", through="SermonSignature", related_name="signatures_sermon")
 
+    # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_sermon")
+
+    # [m] Many-to-many: distances
+    distances = models.ManyToManyField(EqualGold, through="SermonEqualDist", related_name="distances_sermons")
+
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
-    manu = models.ForeignKey(Manuscript, null=True, related_name="manusermons")
+    manu = models.ForeignKey(Manuscript, null=True, on_delete = models.SET_NULL, related_name="manusermons")
     # [1] Every semondescr belongs to exactly one MsItem
     #     Note: one [MsItem] will have only one [SermonDescr], but using an FK is easier for processing (than a OneToOneField)
-    msitem = models.ForeignKey(MsItem, null=True, related_name="itemsermons")
+    #           when the MsItem is removed, so are we
+    msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemsermons")
 
     # Automatically created and processed fields
     # [1] Every sermondesc has a list of signatures that are automatically created
@@ -5862,6 +6142,41 @@ class SermonDescr(models.Model):
             bOkay = False
         return bOkay, msg
 
+    def adapt_verses(self):
+        """Re-calculated what should be in [verses], and adapt if needed"""
+
+        oErr = ErrHandle()
+        bStatus = True
+        msg = ""
+        try:
+            lst_verse = []
+            for obj in self.sermonbibranges.all():
+                lst_verse.append("{}".format(obj.get_fullref()))
+            refstring = "; ".join(lst_verse)
+
+            # Possibly update the field [bibleref] of the sermon
+            if self.bibleref != refstring:
+                self.bibleref = refstring
+                self.save()
+
+            oRef = Reference(refstring)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult:
+                verses = "[]" if lst_verses == None else json.dumps(lst_verses)
+                if self.verses != verses:
+                    self.verses = verses
+                    self.save()
+                    # All is well, so also adapt the ranges (if needed)
+                    self.do_ranges(lst_verses)
+            else:
+                # Unable to parse this scripture reference
+                bStatus = False
+        except:
+            msg = oErr.get_error_message()
+            bStatus = False
+        return bStatus, msg
+
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
         if self.msitem != None:
@@ -5870,6 +6185,109 @@ class SermonDescr(models.Model):
         response = super(SermonDescr, self).delete(using, keep_parents)
         return response
 
+    def do_distance(self, bForceUpdate = False):
+        """Calculate the distance from myself (sermon) to all currently available EqualGold SSGs"""
+
+        def get_dist(inc_s, exp_s, inc_eqg, exp_eqg):
+            # Get the inc and exp for the SSG
+            #inc_eqg = super.srchincipit
+            #exp_eqg = super.srchexplicit
+            # Calculate distances
+            similarity = similar(inc_s, inc_eqg) + similar(exp_s, exp_eqg)
+            if similarity == 0.0:
+                dist = 100000
+            else:
+                dist = 2 / similarity
+            return dist
+
+        oErr = ErrHandle()
+        try:
+            # Get my own incipit and explicit
+            inc_s = "" if self.srchincipit == None else self.srchincipit
+            exp_s = "" if self.srchexplicit == None else self.srchexplicit
+
+            # Make sure we only start doing something if it is really needed
+            count = self.distances.count()
+            if inc_s != "" or exp_s != "" or count > 0:
+                # Get a list of the current EqualGold elements in terms of id, srchinc/srchexpl
+                eqg_list = EqualGold.objects.all().values('id', 'srchincipit', 'srchexplicit')
+
+                # Walk all EqualGold objects
+                with transaction.atomic():
+                    # for super in EqualGold.objects.all():
+                    for item in eqg_list:
+                        # Get an object
+                        super_id = item['id']
+                        obj = SermonEqualDist.objects.filter(sermon=self, super=super_id).first()
+                        if obj == None:
+                            # Get the distance
+                            dist = get_dist(inc_s, exp_s, item['srchincipit'], item['srchexplicit'])
+                            # Create object and Set this distance
+                            obj = SermonEqualDist.objects.create(sermon=self, super_id=super_id, distance=dist)
+                        elif bForceUpdate:
+                            # Calculate and change the distance
+                            obj.distance = get_dist(inc_s, exp_s, item['srchincipit'], item['srchexplicit'])
+                            obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("do_distance")
+        # No need to return anything
+        return None
+
+    def do_ranges(self, lst_verses = None, force = False):
+        bResult = True
+        if self.bibleref == None or self.bibleref == "":
+            # Remove any existing bibrange objects
+            self.sermonbibranges.all().delete()
+        else:
+            # done = Information.get_kvalue("biblerefs")
+            if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
+                # Open a Reference object
+                oRef = Reference(self.bibleref)
+
+                # Do we have verses already?
+                if lst_verses == None:
+
+                    # Calculate the scripture verses
+                    bResult, msg, lst_verses = oRef.parse()
+                else:
+                    bResult = True
+                if bResult:
+                    # Add this range to the sermon (if it's not there already)
+                    verses = json.dumps(lst_verses)
+                    if self.verses != verses:
+                        self.verses = verses
+                        self.save()
+                    # Check and add (if needed) the corresponding BibRange object
+                    for oScrref in lst_verses:
+                        intro = oScrref.get("intro", None)
+                        added = oScrref.get("added", None)
+                        # THis is one book and a chvslist
+                        book, chvslist = oRef.get_chvslist(oScrref)
+
+                        # Possibly create an appropriate Bibrange object (or emend it)
+                        # Note: this will also add BibVerse objects
+                        obj = BibRange.get_range(self, book, chvslist, intro, added)
+
+                        # Add BibVerse objects if needed
+                        verses_new = oScrref.get("scr_refs", [])
+                        verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                        # Remove outdated verses
+                        deletable = []
+                        for item in verses_old:
+                            if item not in verses_new: deletable.append(item)
+                        if len(deletable) > 0:
+                            obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                        # Add new verses
+                        with transaction.atomic():
+                            for item in verses_new:
+                                if not item in verses_old:
+                                    verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+                    print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
+                else:
+                    print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
+        return None
+    
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
@@ -5931,6 +6349,38 @@ class SermonDescr(models.Model):
 
         # Combine all of this
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
+        return sBack
+
+    def get_bibleref(self):
+        """Interpret the BibRange objects into a proper view"""
+
+        bAutoCorrect = False
+
+        # First attempt: just show .bibleref
+        sBack = self.bibleref
+        # Or do we have BibRange objects?
+        if self.sermonbibranges.count() > 0:
+            html = []
+            for obj in self.sermonbibranges.all().order_by('book__idno', 'chvslist'):
+                # Find out the URL of this range
+                url = reverse("bibrange_details", kwargs={'pk': obj.id})
+                # Add this range
+                intro = "" 
+                if obj.intro != None and obj.intro != "":
+                    intro = "{} ".format(obj.intro)
+                added = ""
+                if obj.added != None and obj.added != "":
+                    added = " ({})".format(obj.added)
+                bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
+                    obj, url, intro, obj.book.latabbr, obj.chvslist, added)
+                html.append(bref_display)
+                sBack = "; ".join(html)
+            # Possibly adapt the bibleref
+            if bAutoCorrect and self.bibleref != sBack:
+                self.bibleref = sBack
+                self.save()
+
+        # Return what we have
         return sBack
 
     def get_collection_link(self, settype):
@@ -6066,6 +6516,13 @@ class SermonDescr(models.Model):
                     lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
         sBack = "<span class='view-mode'>,</span> ".join(lHtml)
+        return sBack
+
+    def get_feast(self):
+        sBack = ""
+        if self.feast != None:
+            url = reverse("feast_details", kwargs={'pk': self.feast.id})
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
     def get_goldlinks_markdown(self):
@@ -6311,8 +6768,8 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_stype_light(self):
-        sBack = get_stype_light(self.stype)
+    def get_stype_light(self, usercomment=False):
+        sBack = get_stype_light(self.stype, usercomment)
         return sBack
 
     def get_template_link(self, profile):
@@ -6391,6 +6848,11 @@ class SermonDescr(models.Model):
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
             bNeedSave = True
+
+        # =========== DEBUGGING ================
+        # self.do_ranges(force = True)
+        # ======================================
+
         # Make sure to save the siglist too
         if bNeedSave: 
             self.siglist = json.dumps(lSign)
@@ -6437,6 +6899,410 @@ class SermonDescr(models.Model):
         # Get the URL to edit this sermon
         sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
         return sUrl
+
+
+class Range(models.Model):
+    """A range in the bible from one place to another"""
+
+    # [1] The start of the range is bk/ch/vs
+    start = models.CharField("Start", default = "",  max_length=BKCHVS_LENGTH)
+    # [1] The end of the range also in bk/ch/vs
+    einde = models.CharField("Einde", default = "",  max_length=BKCHVS_LENGTH)
+    # [1] Each range is linked to a Sermon
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonranges")
+
+    # [0-1] Optional introducer
+    intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Optional addition
+    added = models.CharField("Addition",  null=True, blank=True, max_length=LONG_STRING)
+
+    def __str__(self):
+        sBack = ""
+        if self.start != None and self.einde != None:
+            sBack = self.get_range()
+        return sBack
+
+    def get_range(self):
+        sRange = ""
+        # a range from a bk/ch/vs to a bk/ch/vs
+        start = self.start
+        einde = self.einde
+        if len(start) == 9 and len(einde) == 9:
+            # Derive the bk/ch/vs of start
+            oStart = BkChVs(start)
+            oEinde = BkChVs(einde)
+            if oStart.book == oEinde.book:
+                # Check if they are in the same chapter
+                if oStart.ch == oEinde.ch:
+                    # Same chapter
+                    if oStart.vs == oEinde.vs:
+                        # Just one place
+                        sRange = "{} {}:{}".format(oStart.book, oStart.ch, oStart.vs)
+                    else:
+                        # From vs to vs
+                        sRange = "{} {}:{}-{}".format(oStart.book, oStart.ch, oStart.vs, oEinde.vs)
+                else:
+                    # Between different chapters
+                    if oStart.vs == 0 and oEinde.vs == 0:
+                        # Just two different chapters
+                        sRange = "{} {}-{}".format(oStart.book, oStart.ch, oEinde.ch)
+                    else:
+                        sRange = "{} {}:{}-{}:{}".format(oStart.book, oStart.ch, oStart.vs, oEinde.ch, oEinde.vs)
+            else:
+                # Between books
+                sRange = "{}-{}".format(oStart.book, oEinde.book)
+        # Return the total
+        return sRange
+
+    def parse(sermon, sRange):
+        """Parse a string into a start/einde range
+        
+        Possibilities:
+            BBB         - One book
+            BBB-DDD     - Range of books
+            BBB C       - One chapter
+            BBB C-C     - Range of chapters
+            BBB C:V     - One verse
+            BBB C:V-V   - Range of verses in one chapter
+            BBB C:V-C:V - Range of verses between chapters
+        """
+
+        SPACES = " \t\n\r"
+        NUMBER = "0123456789"
+        bStatus = True
+        introducer = ""
+        obj = None
+        msg = ""
+        pos = -1
+        oErr = ErrHandle()
+        try:
+            def skip_spaces(pos):
+                length = len(sRange)
+                while pos < length and sRange[pos] in SPACES: pos += 1
+                return pos
+
+            def is_end(pos):
+                pos_last = len(sRange)-1
+                bFinish = (pos > pos_last)
+                return bFinish
+
+            def get_number(pos):
+                number = -1
+                pos_start = pos
+                length = len(sRange)
+                while pos < length and sRange[pos] in NUMBER: pos += 1
+                # Get the chapter number
+                number = int(sRange[pos_start: pos]) # - pos_start + 1])
+                # Possibly skip following spaces
+                while pos < length and sRange[pos] in SPACES: pos += 1
+                return pos, number
+
+            def syntax_error(pos):
+                msg = "Cannot interpret at {}: {}".format(pos, sRange)
+                bStatus = False
+
+            # We will be assuming that references are divided by a semicolumn
+            arRange = sRange.split(";")
+
+            for sRange in arRange:
+                # Initializations
+                introducer = ""
+                additional = ""
+                obj = None
+                idno = -1
+
+                if bStatus == False: break
+
+                # Make sure spaces are dealt with
+                sRange = sRange.strip()
+                pos = 0
+                # Check for possible preceding text: cf. 
+                if sRange[0:3] == "cf.":
+                    # There is an introducer
+                    introducer = "cf."
+                    pos += 3
+                    pos = skip_spaces(pos)
+                elif sRange[0:3] == "or ":
+                    # There is an introducer
+                    introducer = "or"
+                    pos += 3
+                    pos = skip_spaces(pos)
+
+                # Expecting to read the first book
+                #sBook = sRange[pos:3]
+                #pos = 3
+
+                
+                # if idno < 0:
+                # Check for possible book in BOOK_NAMES
+                for item in BOOK_NAMES:
+                    length = len(item['name'])
+                    if item['name'] == sRange[pos:length]:
+                        # We have the book abbreviation
+                        abbr = item['abbr']
+                        idno = Book.get_idno(abbr)
+                        break;
+                if idno < 0:
+                    sBook = sRange[pos:3]
+                    idno = Book.get_idno(sBook)
+                    length = len(sBook)
+
+
+                if idno < 0:
+                    msg = "Cannot find book {}".format(sBook)
+                    bStatus = False
+                else:
+                    pos += length
+                    # Skip spaces
+                    pos = skip_spaces(pos)
+                    # Check what follows now
+                    sNext = sRange[pos]
+                    if sNext == "-":
+                        # Range of books
+                        pos += 1
+                        # Skip spaces
+                        pos = skip_spaces(pos)
+                        # Get the second book name
+                        if len(sRange) - pos >=3:
+                            sBook2 = sRange[pos:3]
+                            # Create the two ch/bk/vs items
+                            start = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
+                            idno2 = Book.get_idno(sBook2)
+                            if idno2 < 0:
+                                msg = "Cannot identify the second book in: {}".format(sRange)
+                                bStatus = False
+                            else:
+                                einde = "{}{:0>3d}{:0>3d}".format(idno, 0, 0)
+                                # There is a start-einde, so add a Range object for this Sermon
+                                obj = sermon.add_range(start, einde)
+                        else:
+                            msg = "Expecting book range {}".format(sRange)
+                            bStatus = False
+                    elif sNext in NUMBER:
+                        # Chapter number
+                        pos, chapter = get_number(pos)
+                        # Find out what is next
+                        sNext = sRange[pos]
+                        if sNext == "-":
+                            # Possibly skip spaces
+                            pos = skip_spaces(pos)
+                            # Find out what is next
+                            sNext = sRange[pos]
+                            if sNext in NUMBER:
+                                # Range of chapters
+                                pos, chnext = get_number(pos)
+                                # Create the two ch/bk/vs items
+                                start = "{}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                                einde = "{}{:0>3d}{:0>3d}".format(idno, chnext, 0)
+                                # There is a start-einde, so add a Range object for this Sermon
+                                obj = sermon.add_range(start, einde)
+                            else:
+                                # Syntax error
+                                syntax_error(pos)
+                        elif sNext == ":":
+                            pos += 1
+                            # A verse is following
+                            pos, verse = get_number(pos)
+                            # At least get the start
+                            start = "{:0>3d}{:0>3d}{:0>3d}".format(idno, chapter, 0)
+                            # Skip spaces
+                            pos = skip_spaces(pos)
+                            if is_end(pos):
+                                # Simple bk/ch/vs
+                                einde = start
+                                # Add the single verse as a Range object for this Sermon
+                                obj = sermon.add_range(start, einde)
+                            else:
+                                # See what is following
+                                sNext = sRange[pos]
+                                if sNext == "-":
+                                    pos += 1
+                                    # Expecting a range
+                                    pos = skip_spaces(pos)
+                                    sNext = sRange[pos]
+                                    if sNext in NUMBER:
+                                        # Read the number
+                                        pos, number = get_number(pos)
+                                        # Skip spaces
+                                        pos = skip_spaces(pos)
+                                        # See what is next
+                                        sNext = sRange[pos]
+                                        if sNext == ":":
+                                            pos += 1
+                                            # Range of verses between chapters
+                                            pos = skip_spaces(pos)
+                                            sNext = sRange[pos]
+                                            if sNext in NUMBER:
+                                                pos, verse = get_number(pos)
+                                                einde = "{}{:0>3d}{:0>3d}".format(idno, number, verse)
+                                                # Add the BBB C:V-V
+                                                obj = sermon.add_range(start, einde)
+                                            else:
+                                                syntax_error(pos)
+                                        else:
+                                            # The number is a verse
+                                            einde = "{}{:0>3d}{:0>3d}".format(idno, chapter, number)
+                                            # Add the BBB C:V-V
+                                            obj = sermon.add_range(start, einde)
+                                    else:
+                                        syntax_error(pos)
+                                else:
+                                    # This was just one single verse
+                                    einde = start
+                                    # Add the single verse as a Range object for this Sermon
+                                    obj = sermon.add_range(start, einde)
+                        else:
+                            # Syntax error
+                            syntax_error(pos)
+                    else:
+                        # Syntax error
+                        syntax_error(pos)
+                bNeedSaving = False
+                # Is there any remark following?
+                if bStatus and not is_end(pos):
+                    # Is there more stuff?
+                    additional = sRange[pos:].strip()
+                    if obj != None:
+                        obj.added = sRemark
+                        bNeedSaving = True
+                if introducer != "":
+                    obj.intro = introducer
+                    bNeedSaving = True
+                if bNeedSaving:
+                    obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Range/parse")
+            bStatus = False
+        return bStatus, msg, obj
+
+
+class BibRange(models.Model):
+    """A range of chapters/verses from one particular book"""
+
+    # [1] Each chapter belongs to a book
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookbibranges")
+    # [0-1] Optional ChVs list
+    chvslist = models.TextField("Chapters and verses", blank=True, null=True)
+    # [1] Each range is linked to a Sermon
+    sermon = models.ForeignKey(SermonDescr, on_delete=models.CASCADE, related_name="sermonbibranges")
+
+    # [0-1] Optional introducer
+    intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Optional addition
+    added = models.CharField("Addition",  null=True, blank=True, max_length=LONG_STRING)
+
+    def __str__(self):
+        html = []
+        sBack = ""
+        if getattr(self,"book") == None:
+            msg = "BibRange doesn't have a BOOK"
+        else:
+            html.append(self.book.abbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            sBack = " ".join(html)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do my own saving
+        response = super(BibRange, self).save(force_insert, force_update, using, update_fields)
+
+        # Make sure the fields in [sermon] are adapted, if needed
+        bResult, msg = self.sermon.adapt_verses()
+
+
+        ## Add BibVerse objects if needed
+        #verses_new = oScrref.get("scr_refs", [])
+        #verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+        ## Remove outdated verses
+        #deletable = []
+        #for item in verses_old:
+        #    if item not in verses_new: deletable.append(item)
+        #if len(deletable) > 0:
+        #    obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+        ## Add new verses
+        #with transaction.atomic():
+        #    for item in verses_new:
+        #        if not item in verses_old:
+        #            verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+
+        return response
+
+    def get_abbr(self):
+        """Get the official abbreviations for this book"""
+        sBack = "<span class='badge signature ot' title='English'>{}</span><span class='badge signature gr' title='Latin'>{}</span>".format(
+            self.book.abbr, self.book.latabbr)
+        return sBack
+
+    def get_book(self):
+        """Get the book for details view"""
+
+        sBack = "<span title='{}'>{}</span>".format(self.book.latname, self.book.name)
+        return sBack
+
+    def get_ref_latin(self):
+        html = []
+        sBack = ""
+        if self.book != None:
+            html.append(self.book.latabbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            sBack = " ".join(html)
+        return sBack
+
+    def get_fullref(self):
+        html = []
+        sBack = ""
+        if self.book != None:
+            if self.intro != None and self.intro != "":
+                html.append(self.intro)
+            html.append(self.book.abbr)
+            if self.chvslist != None and self.chvslist != "":
+                html.append(self.chvslist)
+            if self.added != None and self.added != "":
+                html.append(self.added)
+            sBack = " ".join(html)
+        return sBack
+
+    def get_range(sermon, book, chvslist, intro=None, added=None):
+        """Get the bk/ch range for this particular sermon"""
+
+        bNeedSaving = False
+        oErr = ErrHandle()
+        try:
+            obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
+            if obj == None:
+                obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)
+                bNeedSaving = True
+                bNeedVerses = True
+            # Double check for intro and added
+            if obj.intro != intro:
+                obj.intro = intro
+                bNeedSaving = True
+            if obj.added != added:
+                obj.added = added
+                bNeedSaving = True
+            # Possibly save the BibRange
+            if bNeedSaving:
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRange/get_range")
+            obj = None
+        return obj
+
+
+class BibVerse(models.Model):
+    """One verse that belongs to [BibRange]"""
+
+    # [1] The Bk/Ch/Vs code (9 characters)
+    bkchvs = models.CharField("Bk/Ch/Vs", max_length=BKCHVS_LENGTH)
+    # [1] Each verse is part of a BibRange
+    bibrange = models.ForeignKey(BibRange, on_delete=models.CASCADE, related_name="bibrangeverses")
+
+    def __str__(self):
+        return self.bkchvs
 
 
 class SermonDescrKeyword(models.Model):
@@ -6573,6 +7439,20 @@ class SermonDescrEqual(models.Model):
         return uniques
 
 
+class SermonEqualDist(models.Model):
+    """Keep track of the 'distance' between sermons and SSGs"""
+
+    # [1] The sermondescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonsuperdist")
+    # [1] The equal gold sermon (=SSG)
+    super = models.ForeignKey(EqualGold, related_name="sermonsuperdist")
+    # [1] Each sermon-to-equal keeps track of a distance
+    distance = models.FloatField("Distance", default=100.0)
+
+    def __str__(self):
+        return "{}".format(self.distance)
+
+
 class SermonDescrGold(models.Model):
     """Link from sermon description to gold standard"""
 
@@ -6644,6 +7524,14 @@ class Signature(models.Model):
             response = super(Signature, self).save(force_insert, force_update, using, update_fields)
             # Adapt list of signatures for the related GOLD
             self.gold.do_signatures()
+            # Check if manual signatures need to be linked to this gsig
+            qs = SermonSignature.objects.filter(code=self.code, editype=self.editype)
+            with transaction.atomic():
+                for obj in qs:
+                    if obj.gsig == None:
+                        obj.gsig = self
+                        obj.save()
+
         # Then return the super-response
         return response
 
@@ -6684,6 +7572,7 @@ class SermonSignature(models.Model):
         """Get the equivalent gold-signature for me"""
 
         oErr = ErrHandle()
+        oBack = None
         try:
             if bCleanUp and self.gsig:
                 # There seems to be a gsig
@@ -6717,12 +7606,12 @@ class SermonSignature(models.Model):
                 if self.gsig:
                     self.save()
             # Return what I am in the end
-            return self.gsig
+            oBack = self.gsig
         except:
             #y = (hasattr(self,"gsig"))
             msg = oErr.get_error_message()
             oErr.DoError("get_goldsig")
-            return None
+        return oBack
 
     def adapt_gsig():
         """Make sure all the items in SermonSignature point to a gsig, if possible"""
@@ -6731,18 +7620,19 @@ class SermonSignature(models.Model):
         iTotal = qs.count()
         iCount = 0
         oErr = ErrHandle()
+        bResult = False
         try:
             with transaction.atomic():
                 for obj in qs:
                     obj.get_goldsig(bCleanUp=True)
                     iCount += 1
                     oErr.Status("adapt_gsig: id={} count={}/{}".format(obj.id, iCount, iTotal))
-            return True
+            bResult = True
         except:
             msg = oErr.get_error_message()
             oErr.DoError("adapt_gsig")
-            return False
-    
+        return bResult
+
 
 class Basket(models.Model):
     """The basket is the user's vault of search results (of sermondescr items)"""
@@ -6966,36 +7856,48 @@ class NewsItem(models.Model):
 
 
 class CollectionSerm(models.Model):
-    """The link between a collection item and a sermon"""
+    """The link between a collection item and a S (sermon)"""
+
     # [1] The sermon to which the collection item refers
     sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionMan(models.Model):
-    """The link between a collection item and a manuscript"""
+    """The link between a collection item and a M (manuscript)"""
+
     # [1] The manuscript to which the collection item refers
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "manuscript_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionGold(models.Model):
-    """The link between a collection item and a gold sermon"""
+    """The link between a collection item and a SG (gold sermon)"""
+
     # [1] The gold sermon to which the collection item refers
     gold = models.ForeignKey(SermonGold, related_name = "gold_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "gold_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class CollectionSuper(models.Model):
-    """The link between a collection item and a gold sermon"""
+    """The link between a collection item and a SSG (super sermon gold)"""
+
     # [1] The gold sermon to which the coll
     # ection item refers
     super = models.ForeignKey(EqualGold, related_name = "super_col")
     # [1] The collection to which the context item refers to
     collection = models.ForeignKey(Collection, related_name= "super_col")
+    # [0-1] The order number for this S within the collection
+    order = models.IntegerField("Order", default = -1)
 
 
 class Template(models.Model):

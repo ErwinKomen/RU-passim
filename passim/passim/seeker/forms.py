@@ -73,10 +73,45 @@ class AutypeWidget(ModelSelect2Widget):
         return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
 
 
+class BibrefWidget(ModelSelect2MultipleWidget):
+    model = BibRange
+    search_fields = ['book__name__icontains', 'book__latname__icontains']
+    addonly = False
+
+    def label_from_instance(self, obj):
+        # Provide a suitable reference label
+        return obj.get_ref_latin()
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = BibRange.objects.none()
+        else:
+            qs = BibRange.objects.all().order_by('book__idno', 'chvslist').distinct()
+        return qs
+
+
+class BibrefAddonlyWidget(BibrefWidget):
+    addonly = True
+
+
+class BookWidget(ModelSelect2Widget):
+    model = Book
+    search_fields = [ 'name__icontains', 'latname__icontains', 'abbr__icontains', 'latabbr__icontains' ]
+
+    def label_from_instance(self, obj):
+        # Provide both the Latin as well as the English name
+        full = "{} ({})".format(obj.latname, obj.name)
+        # Determine here what to return...
+        return full
+
+    def get_queryset(self):
+        return Book.objects.all().order_by('idno').distinct()
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity_manuscripts'}
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -89,7 +124,7 @@ class CityOneWidget(ModelSelect2Widget):
 class CityMonasteryOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity_manuscripts'}
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -214,7 +249,8 @@ class CollOneHistWidget(CollOneWidget):
 class CountryOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcountry': 'lcountry_manuscripts'}
+    dependent_fields = {'lcity': 'lcity_locations'}
+    # Note: k = form field, v = model field
 
     def label_from_instance(self, obj):
         return obj.name
@@ -308,6 +344,28 @@ class EqualGoldWidget(ModelSelect2Widget):
         return qs
 
 
+class FeastOneWidget(ModelSelect2Widget):
+    model = Feast
+    search_fields = [ 'name__icontains', 'latname__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Feast.objects.all().order_by('name').distinct()
+
+
+class FeastWidget(ModelSelect2MultipleWidget):
+    model = Feast
+    search_fields = [ 'name__icontains', 'latname__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        return Feast.objects.all().order_by('name').distinct()
+
+
 class FtextlinkWidget(ModelSelect2MultipleWidget):
     model = Ftextlink
     search_fields = [ 'url__icontains' ]
@@ -385,7 +443,7 @@ class LitrefWidget(ModelSelect2Widget):
 class LibraryOneWidget(ModelSelect2Widget):
     model = Library
     search_fields = [ 'name__icontains' ]
-    dependent_fields = {'lcity': 'lcity', 'lcountry': 'lcountry'}
+    dependent_fields = {} # EG: {'lcity': 'lcity', 'lcountry': 'lcountry'}
 
     def label_from_instance(self, obj):
         return obj.name
@@ -649,7 +707,7 @@ class ManualSignatureWidget(ModelSelect2MultipleWidget):
         return obj.code
 
     def get_queryset(self):
-        return SermonSignatureSignature.objects.all().order_by('code').distinct()
+        return SermonSignature.objects.all().order_by('code').distinct()
 
 
 class SignatureWidget(ModelSelect2MultipleWidget):
@@ -701,6 +759,29 @@ class StypeWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+
+
+class SuperDistWidget(ModelSelect2Widget):
+    model = SermonEqualDist
+    sermon = None
+    search_fields = ['super__code__icontains', 'super__id__icontains', 'super__author__name__icontains', 
+                     'super__srchincipit__icontains', 'super__srchexplicit__icontains',
+                     'super__equal_goldsermons__siglist__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = obj.super.get_label(do_incexpl = True)
+        return sLabel
+
+    def get_queryset(self):
+        qs = None
+        if self.sermon == None:
+            qs = SermonEqualDist.objects.filter(super__moved__isnull=True).order_by('distance', 'super__code', 'super__author__name', 'id').distinct()
+        else:
+            # Check and possibly re-calculate the set of SSG candidates
+            self.sermon.do_distance()
+            # Get the ordered set of SSG candidates
+            qs = self.sermon.sermonsuperdist.all().order_by('distance', 'super__code', 'super__author__name')
+        return qs
 
 
 class SuperOneWidget(ModelSelect2Widget):
@@ -880,6 +961,10 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -943,6 +1028,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
@@ -1028,6 +1114,8 @@ class SermonForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    feastlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -1036,6 +1124,13 @@ class SermonForm(PassimModelForm):
                                                        'class': 'searching'}))
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
+    bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+    sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
 
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -1080,8 +1175,8 @@ class SermonForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonDescr
-        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',
-                  'feast', 'bibleref', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']
+        fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',  #  'feast', 
+                 'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1090,7 +1185,8 @@ class SermonForm(PassimModelForm):
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 #'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'feast':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -1099,7 +1195,7 @@ class SermonForm(PassimModelForm):
                  # larger areas
                  'postscriptum':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  }
@@ -1119,9 +1215,11 @@ class SermonForm(PassimModelForm):
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['mtype'].required = False
+
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -1139,6 +1237,12 @@ class SermonForm(PassimModelForm):
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+
+            # Some lists need to be initialized to NONE:
+            self.fields['bibreflist'].queryset = Daterange.objects.none()
+
+            self.fields['bibreflist'].widget.addonly = True
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1191,12 +1295,16 @@ class SermonForm(PassimModelForm):
 
                 # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
                 self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
+                self.fields['siglist_m'].initial = [x.pk for x in instance.sermonsignatures.all().order_by('-editype', 'code')]
 
                 # Note: this is the list of links between SermonDesrc-Gold
                 self.fields['superlist'].initial = [x.pk for x in instance.sermondescr_super.all().order_by('linktype', 'sermon__author__name', 'sermon__siglist')]
 
                 # Make sure the initial superlist captures exactly what we have
                 self.fields['superlist'].queryset = SermonDescrEqual.objects.filter(Q(id__in = self.fields['superlist'].initial))
+
+                self.fields['bibreflist'].initial = [x.pk for x in instance.sermonbibranges.all()]
+                self.fields['bibreflist'].queryset = BibRange.objects.filter(id__in=self.fields['bibreflist'].initial)
 
                 self.fields['autype'].initial = instance.autype
 
@@ -1438,6 +1546,10 @@ class CollectionForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Title'}))
     sermofeast  = forms.CharField(label=_("Feast"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonote  = forms.CharField(label=_("Note"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Note'}))
     sermoauthorname = forms.CharField(label=_("Author"), required=False, 
@@ -1505,6 +1617,8 @@ class CollectionForm(PassimModelForm):
         self.fields['scope'].required = False
         self.fields['url'].required = False
         self.fields['collone'].required = False
+
+        self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
         # Set the widgets correctly
         self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -1595,6 +1709,12 @@ class CollectionForm(PassimModelForm):
 
 class SermonDescrSignatureForm(forms.ModelForm):
     """The link between SermonDescr and manually identified Signature"""
+    newgr  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Gryson code...',  'style': 'width: 100%;'}))
+    newcl  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Clavis code...',  'style': 'width: 100%;'}))
+    newot  = forms.CharField(label=_("Signature"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': '...or Other code...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1615,6 +1735,47 @@ class SermonDescrSignatureForm(forms.ModelForm):
         self.fields['code'].required = False
         self.fields['editype'].required = False
         self.fields['gsig'].required = False
+
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonDescrSignatureForm, self).clean()
+        sermon = cleaned_data.get("sermon")
+        editype = cleaned_data.get("editype")
+        code = cleaned_data.get("code")
+
+        # Check if this is a new one
+        if editype == "":
+            newgr = cleaned_data.get("newgr")
+            if newgr != "":
+                code = newgr
+                editype = "gr"
+            else:
+                newcl = cleaned_data.get("newcl")
+                if newcl != "":
+                    code = newcl
+                    editype = "cl"
+                else:
+                    newot = cleaned_data.get("newot")
+                    if newot != "":
+                        code = newot
+                        editype = "ot"
+        # Do we actually have something?
+
+        # Check if any of [name] or [newkw] already exists
+        if code == "" or editype == "":
+            # No keyword chosen
+            raise forms.ValidationError(
+                    "No signature specified to attach to this Sermon manifestation"
+                )
+        else:
+            # Check if [code|editype] already exists
+            signature = SermonSignature.objects.filter(sermon=sermon, code=code, editype=editype).first()
+            if signature:
+                # This combination already exists
+                raise forms.ValidationError(
+                        "This signature already exists for this Sermon manifestation"
+                    )
 
 
 class SermonDescrGoldForm(forms.ModelForm):
@@ -1662,8 +1823,11 @@ class SermonDescrGoldForm(forms.ModelForm):
 class SermonDescrSuperForm(forms.ModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
-    newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
-                widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
+    #newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+    #            widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
+    #                                              'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+                widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
                                                   'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
@@ -1675,6 +1839,8 @@ class SermonDescrSuperForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        # First get out the sermon_id
+        sermon_id = kwargs.pop('sermon_id', None)
         # Start by executing the standard handling
         super(SermonDescrSuperForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
@@ -1682,12 +1848,19 @@ class SermonDescrSuperForm(forms.ModelForm):
         init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
-        self.fields['newsuper'].required = False
+        #self.fields['newsuper'].required = False
+        self.fields['newsuperdist'].required = False
         self.fields['super'].required = False
         self.fields['linktype'].required = False
         self.fields['newlinktype'].initial = "uns"
         # Initialize queryset
-        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
+        # OLD: self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
+
+        # NEW: Taking the sermon as starting point and ordering them according to distance
+        sermon = SermonDescr.objects.filter(id=sermon_id).first()
+        if sermon != None:
+            qs = sermon.sermonsuperdist.all().order_by('distance', 'super__code', 'super__author__name')
+            self.fields['newsuperdist'].widget.sermon = sermon
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -1697,7 +1870,12 @@ class SermonDescrSuperForm(forms.ModelForm):
                 #       self.fields['dst'].initial = instance.dst
 
                 # Make sure we exclude the instance from the queryset
-                self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('code', 'author__name', 'id')
+                # self.fields['newsuper'].queryset = self.fields['newsuper'].queryset.exclude(id=instance.id).order_by('code', 'author__name', 'id')
+                if instance.super_id != None:
+                    self.fields['newsuperdist'].queryset = self.fields['newsuperdist'].queryset.exclude(super__id=instance.super.id).order_by('code', 'author__name', 'id')
+                else:
+                    self.fields['newsuperdist'].queryset = self.fields['newsuperdist'].queryset.order_by('code', 'author__name', 'id')
+        return None
 
 
 class SermonDescrKeywordForm(forms.ModelForm):
@@ -2828,7 +3006,7 @@ class ManuscriptForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'library', 'lcity', 'lcountry', 'idno', # 'yearstart', 'yearfinish', 
+        fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -2843,6 +3021,7 @@ class ManuscriptForm(PassimModelForm):
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  # 'literature':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
+                 'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
                  'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
@@ -2865,6 +3044,14 @@ class ManuscriptForm(PassimModelForm):
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+
+            # Set the dependent fields for [lcity]
+            if self.prefix != "":
+                self.fields['lcity'].widget.dependent_fields = {
+                    '{}-lcountry'.format(self.prefix): 'lcountry'}
+                self.fields['library'].widget.dependent_fields = {
+                    '{}-lcountry'.format(self.prefix): 'lcountry',
+                    '{}-lcity'.format(self.prefix): 'lcity'}
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
@@ -3091,6 +3278,145 @@ class DaterangeForm(forms.ModelForm):
             instance = kwargs['instance']
 
 
+class FeastForm(forms.ModelForm):
+    # =========== MANUSCRIPT-specific ===========================
+    manuidno    = forms.CharField(label=_("Manuscript"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Feast
+        fields = ['name', 'latname', 'feastdate']
+        widgets={'name':        forms.TextInput(attrs={'placeholder': 'English name...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'latname':     forms.TextInput(attrs={'placeholder': 'Latin name...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'feastdate':   forms.TextInput(attrs={'placeholder': 'Date of the feast...', 'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(FeastForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Set other parameters
+            self.fields['name'].required = False
+            
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+                    pass
+                    ## Make sure the initials are taken over into new-elements
+                    #self.fields['newintro'].initial = instance.intro
+                    #self.fields['onebook'].initial = [ instance.book.id ]
+                    #self.fields['newchvs'].initial = instance.chvslist
+                    #self.fields['newadded'].initial = instance.added
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRangeForm")
+
+        # Return the response
+        return None
+
+class BibRangeForm(forms.ModelForm):
+    newintro    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Intro...',  'style': 'width: 100%;'}))
+    onebook    = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newchvs    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Chapter-verse list...',  'style': 'width: 100%;'}))
+    newadded    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Note...',  'style': 'width: 100%;'}))
+
+    # =========== SEarching for bible references ===============
+    bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+    bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+
+    # =========== MANUSCRIPT-specific ===========================
+    manuidno    = forms.CharField(label=_("Manuscript"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    libname_ta  = forms.CharField(label=_("Library"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
+    origin_ta   = forms.CharField(label=_("Origin"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+
+    action_log = ['book', 'chvslist', 'intro', 'added']
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = BibRange
+        fields = ['book', 'chvslist', 'intro', 'added']
+        widgets={'book':        BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'added':       forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(BibRangeForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Set other parameters
+            self.fields['book'].required = False
+            self.fields['chvslist'].required = False
+            self.fields['intro'].required = False
+            self.fields['added'].required = False
+            self.fields['newintro'].required = False
+            self.fields['onebook'].required = False
+            self.fields['newchvs'].required = False
+            self.fields['newadded'].required = False
+            self.fields['onebook'].queryset = Book.objects.all().order_by('idno')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+            
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+                    # Make sure the initials are taken over into new-elements
+                    self.fields['newintro'].initial = instance.intro
+                    self.fields['onebook'].initial = [ instance.book.id ]
+                    self.fields['newchvs'].initial = instance.chvslist
+                    self.fields['newadded'].initial = instance.added
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRangeForm")
+
+        # Return the response
+        return None
+
+
+
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
     city = forms.CharField(label=_("City"), required=False)
@@ -3176,6 +3502,40 @@ class AuthorSearchForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['authlist'].queryset = Author.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class CommentForm(forms.ModelForm):
+    """A form to upload a user-comment"""
+
+    # otype = forms.CharField(label=_("Object type"), required=False)
+    objid = forms.CharField(label=_("Object id"), required=False)
+    profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Comment
+        fields = ['content', 'profile', 'otype']
+        widgets={'content':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CommentForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['profile'].required = False
+        self.fields['content'].required = False
+        self.fields['otype'].required = False
+        self.fields['objid'].required = False
+        self.fields['profilelist'].required = False
+
+        # Initialize querysets
+        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
+
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
