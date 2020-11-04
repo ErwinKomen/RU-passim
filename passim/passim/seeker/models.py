@@ -3132,8 +3132,11 @@ class Manuscript(models.Model):
                     ref = " <span style='font-size: x-small;'>(see {}, {})</span>".format(obj.reference.get_full_markdown(), obj.pages)
                 else:
                     ref = " <span style='font-size: x-small;'>(see {})</span>".format(obj.reference.get_full_markdown())
-
-            item = "<div><span class='badge signature ot'>{}-{}</span>{}</div>".format(obj.yearstart, obj.yearfinish, ref)
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "<div><span class='badge signature ot'>{}</span>{}</div>".format(years, ref)
             lhtml.append(item)
 
         return "\n".join(lhtml)

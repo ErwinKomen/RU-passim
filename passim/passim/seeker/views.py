@@ -6026,8 +6026,8 @@ class SermonListView(BasicList):
             {'filter': 'library',       'fkfield': 'manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'manu__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'manu__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'datestart',     'dbfield': 'manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
@@ -6723,8 +6723,8 @@ class BibRangeListView(BasicList):
             {'filter': 'library',       'fkfield': 'sermon__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'sermon__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'sermon__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'sermon__msitem__manu__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'sermon__msitem__manu__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'datestart',     'dbfield': 'sermon__msitem__manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'sermon__msitem__manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'bibref',     'dbfield': 'id',    'keyS': 'bibref'}
@@ -6950,8 +6950,8 @@ class FeastListView(BasicList):
             {'filter': 'library',       'fkfield': 'feastsermons__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'feastsermons__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'feastsermons__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'feastsermons__msitem__manu__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'feastsermons__msitem__manu__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'datestart',     'dbfield': 'feastsermons__msitem__manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'feastsermons__msitem__manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
             ]}
         ]
 
@@ -8549,9 +8549,9 @@ class CollectionListView(BasicList):
                      'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
                     {'filter': 'manukeyword',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__keywords',               
                      'keyFk': 'name', 'keyList': 'manukwlist', 'infield': 'name' },
-                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__yearstart__gte',         
+                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__manuscript_dateranges__yearstart__gte',         
                      'keyS': 'date_from'},
-                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__yearfinish__lte',        
+                    {'filter': 'manudaterange',     'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__manuscript_dateranges__yearfinish__lte',        
                      'keyS': 'date_until'},
                     {'filter': 'manustype',         'dbfield': 'super_col__super__equalgold_sermons__msitem__manu__stype',                  
                      'keyList': 'manustypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
@@ -9283,7 +9283,10 @@ class ManuscriptEdit(BasicDetails):
                     oneref = cleaned.get('oneref', None)
                     newpages = cleaned.get('newpages', None)
 
-                    if newstart and newfinish:
+                    if newstart:
+                        # Possibly set newfinish equal to newstart
+                        if newfinish == None or newfinish == "":
+                            newfinish = newstart
                         # Double check if this one already exists for the current instance
                         obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
                         if obj == None:
@@ -9742,8 +9745,8 @@ class ManuscriptListView(BasicList):
             {'filter': 'provenance',    'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
-            {'filter': 'daterange',     'dbfield': 'yearstart__gte',         'keyS': 'date_from'},
-            {'filter': 'daterange',     'dbfield': 'yearfinish__lte',        'keyS': 'date_until'},
+            {'filter': 'daterange',     'dbfield': 'manuscript_dateranges__yearstart__gte',         'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'manuscript_dateranges__yearfinish__lte',        'keyS': 'date_until'},
             {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
