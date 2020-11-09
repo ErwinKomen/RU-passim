@@ -266,7 +266,11 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
     addonly = False
 
     def label_from_instance(self, obj):
-        return "{}-{}".format(obj.yearstart, obj.yearfinish)
+        if obj.yearstart == obj.yearfinish:
+            years = "{}".format(obj.yearstart)
+        else:
+            years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+        return years
 
     def get_queryset(self):
         if self.addonly:
@@ -3242,7 +3246,7 @@ class DaterangeForm(forms.ModelForm):
     newstart    = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Start...',  'style': 'width: 100%;'}))
     newfinish   = forms.CharField(required=False, help_text='editable', 
-                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Finish...',  'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Finish (optional)...',  'style': 'width: 100%;'}))
     oneref      = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
                 widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages    = forms.CharField(label=_("Page range"), required=False, help_text="editable", 

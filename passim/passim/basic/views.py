@@ -175,11 +175,23 @@ def has_obj_value(field, obj):
     response = (field != None and field in obj and obj[field] != None)
     return response
 
-def adapt_search(val):
+def adapt_search(val, regex_function=None):
     # First trim
     val = val.strip()
-    # Then add start and en matter 
-    val = '^' + fnmatch.translate(val) + '$'
+    # Double check whether we don't have a starting ^ and trailing $ yet
+    if len(val) > 0:
+        val = fnmatch.translate(val)
+        if val[0] != '^':
+            val = "^{}".format(val)
+        if val[-1] != "$":
+            val = "{}$".format(val)
+
+        # Is there a regex function?
+        if regex_function != None:
+            val = regex_function(val)
+
+    ## Then add start and en matter 
+    #val = '^' + fnmatch.translate(val) + '$'
     return val
 
 def make_search_list(filters, oFields, search_list, qd, lstExclude):
@@ -232,6 +244,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 keyType = get_value(search_item, "keyType")
                 filter_type = get_value(search_item, "filter")
                 code_function = get_value(search_item, "code")
+                regex_function = get_value(search_item, "regex")
                 s_q = ""
                 arFkField = []
                 if fkfield != None:
@@ -265,7 +278,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             s_q = None
                             for fkfield in arFkField:
                                 if "*" in val:
-                                    val = adapt_search(val)
+                                    val = adapt_search(val, regex_function)
                                     s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
                                 else:
                                     s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
@@ -321,10 +334,10 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             if isinstance(val, int):
                                 s_q = Q(**{"{}".format(dbfield): val})
                             elif "*" in val:
-                                val = adapt_search(val)
+                                val = adapt_search(val, regex_function)
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             elif "$" in dbfield:
-                                val = adapt_search(val)
+                                val = adapt_search(val, regex_function)
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
                     elif has_Q_value(keyS, oFields):
@@ -799,7 +812,7 @@ class BasicList(ListView):
 
     def adapt_search(self, fields):
         return fields, None, None
-  
+
     def get_queryset(self, request = None):
 
         if request == None: request = self.request
