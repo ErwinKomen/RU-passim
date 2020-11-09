@@ -5497,6 +5497,8 @@ class SermonEdit(BasicDetails):
                         'SermonDescrEqual', 'superlist']
 
     def custom_init(self, instance):
+        method = "nodistance"   # Alternative: "superdist"
+
         if instance:
             istemplate = (instance.mtype == "tem")
             if istemplate:
@@ -5508,15 +5510,19 @@ class SermonEdit(BasicDetails):
                 self.afterdelurl = reverse('manuscript_details', kwargs={'pk': instance.msitem.manu.id})
 
             # Then check if all distances have been calculated in SermonEqualDist
-            qs = SermonEqualDist.objects.filter(sermon=instance)
-            if qs.count() == 0:
-                # These distances need calculation...
-                instance.do_distance()
+            if method == "superdist":
+                qs = SermonEqualDist.objects.filter(sermon=instance)
+                if qs.count() == 0:
+                    # These distances need calculation...
+                    instance.do_distance()
         return None
 
     def get_form_kwargs(self, prefix):
+        # Determine the method
+        method = "nodistance"   # Alternative: "superdist"
+
         oBack = None
-        if prefix == 'stossg':
+        if prefix == 'stossg' and method == "superdist":
             if self.object != None:
                 # Make sure that the sermon is known
                 oBack = dict(sermon_id=self.object.id)
@@ -5685,6 +5691,8 @@ class SermonEdit(BasicDetails):
         errors = []
         bResult = True
         oErr = ErrHandle()
+        # Determine the method
+        method = "nodistance"   # Alternative: "superdist"
         try:
             instance = formset.instance
             for form in formset:
@@ -5743,23 +5751,39 @@ class SermonEdit(BasicDetails):
                             # Note: it will get saved with formset.save()
                     elif prefix == "stossg":
                         # SermonDescr-To-EqualGold processing
-                        # Note: nov/2 went over from 'newsuper' to 'newsuperdist'
-                        if 'newsuperdist' in cleaned and cleaned['newsuperdist'] != "":
-                            newsuperdist = cleaned['newsuperdist']
-                            # Take the default linktype
-                            linktype = "uns"
+                        if method == "superdist":
+                            # Note: nov/2 went over from 'newsuper' to 'newsuperdist'
+                            if 'newsuperdist' in cleaned and cleaned['newsuperdist'] != "":
+                                newsuperdist = cleaned['newsuperdist']
+                                # Take the default linktype
+                                linktype = "uns"
 
-                            # Convert from newsuperdist to actual super (SSG)
-                            superdist = SermonEqualDist.objects.filter(id=newsuperdist).first()
-                            if superdist != None:
-                                super = superdist.super
+                                # Convert from newsuperdist to actual super (SSG)
+                                superdist = SermonEqualDist.objects.filter(id=newsuperdist).first()
+                                if superdist != None:
+                                    super = superdist.super
 
-                                # Check existence of link between S-SSG
-                                obj = SermonDescrEqual.objects.filter(sermon=instance, super=super, linktype=linktype).first()
+                                    # Check existence of link between S-SSG
+                                    obj = SermonDescrEqual.objects.filter(sermon=instance, super=super, linktype=linktype).first()
+                                    if obj == None:
+                                        # Set the right parameters for creation later on
+                                        form.instance.linktype = linktype
+                                        form.instance.super = super
+                        elif method == "nodistance":
+                            if 'newsuper' in cleaned and cleaned['newsuper'] != "":
+                                newsuper = cleaned['newsuper']
+                                # Take the default linktype
+                                linktype = "uns"
+
+                                # Check existence
+                                obj = SermonDescrEqual.objects.filter(sermon=instance, super=newsuper, linktype=linktype).first()
                                 if obj == None:
-                                    # Set the right parameters for creation later on
-                                    form.instance.linktype = linktype
-                                    form.instance.super = super
+                                    obj_super = EqualGold.objects.filter(id=newsuper).first()
+                                    if obj_super != None:
+                                        # Set the right parameters for creation later on
+                                        form.instance.linktype = linktype
+                                        form.instance.super = obj_super
+
                         # Note: it will get saved with form.save()
                     elif prefix == "sbref":
                         # Processing one BibRange
@@ -5817,6 +5841,7 @@ class SermonEdit(BasicDetails):
         msg = ""
         bResult = True
         oErr = ErrHandle()
+        method = "nodistance"   # Alternative: "superdist"
         
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
@@ -5853,9 +5878,11 @@ class SermonEdit(BasicDetails):
 
             ## Make sure the 'verses' field is adapted, if needed
             #bResult, msg = instance.adapt_verses()
+
             # Check if instances need re-calculation
-            if 'incipit' in form.changed_data or 'explicit' in form.changed_data:
-                instance.do_distance(True)
+            if method == "superdist":
+                if 'incipit' in form.changed_data or 'explicit' in form.changed_data:
+                    instance.do_distance(True)
 
         except:
             msg = oErr.get_error_message()
@@ -11524,11 +11551,28 @@ class EqualGoldListView(BasicList):
                         ssg.save()
             Information.set_kvalue("hccount", "done")
 
-        #if Information.get_kvalue("ssg_number") != "done":
+        if Information.get_kvalue("scount") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                for ssg in EqualGold.objects.all():
+                    scount = ssg.equalgold_sermons.count()
+                    if scount != ssg.scount:
+                        ssg.scount = scount
+                        ssg.save()
+            Information.set_kvalue("scount", "done")
+
+        #if Information.get_kvalue("seqcount") != "done":
+        #    # Walk all SSGs
         #    with transaction.atomic():
-        #        for obj in EqualGold.objects.all():
-        #            obj.save()
-        #    Information.set_kvalue("ssg_number", "done")
+        #        # for ssg in EqualGold.objects.all():
+        #        # Walk all sermons associated with this SSG
+        #        total = SermonDescr.objects.count()
+        #        for idx, sermon in enumerate(SermonDescr.objects.all()):
+        #            if sermon.scount == 0:
+        #                # Set the scount
+        #                sermon.scount = sermon.get_scount()
+        #                sermon.save()
+        #    Information.set_kvalue("seqcount", "done")
 
         return None
     
