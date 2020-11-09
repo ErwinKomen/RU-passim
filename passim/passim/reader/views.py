@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    Library, Location, SermonSignature, Author, Feast, Project, Daterange, \
+    Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, \
     Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
@@ -1033,7 +1033,47 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 
                     # Get to sermons, hier een lijst van te maken, helaas komt scopecontents twee keer voor bij 
                     # sommige manuscripten zoals LAtin 196
-                    
+                    # Find notes/comments in scopecontents only when there is a <c> element with manifestations
+                    # Example Latin 196, werkt dit?
+
+                    check_on_c_element = manu.findall("./c")
+                   
+                    if len(check_on_c_element) > 0: 
+                        for unit_p in manu.findall("./scopecontent/p"):
+                            if len(unit_p) > 0:   
+                                note = ElementTree.tostring(unit_p, encoding="unicode")
+                                print(note)
+                                # Maybe clean string from elements and stuff
+                                # Maybe change the sequence
+                                note_1 = re.sub("[\n\s]+"," ", note)
+                                note_2 = note_1.replace('<p>', '')
+                                note_3 = note_2.replace('</p>', '')
+
+                                # Get profile TH: dit werkt nog niet
+                                profile = Profile.get_user_profile(username)
+                                # Dit lijkt mij niet de juiste methode...                                                             
+                                otype = "sermo"
+                                # Create new Manuscript Comment and the comment or comments
+                                # Heb een profile nodig, en otype
+                                # [m] Many-to-many: one manuscript can have a series of user-supplied comments
+                                # comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
+                                Comment_obj = Comment.objects.create(profile=profile, content=note_3, otype=otype)
+                                # (2)	Voeg die comment toe aan de comments van het manuscript:
+                                manuscript_object.comments.add(comment_obj)
+
+                                
+                                # Dit moet anders want zoals Provenance
+                                #manu_comment = Comment.objects.create(manuscript = manu_obj, comments_id = note_3)
+                                                           
+
+                    else:
+                        continue
+                        
+
+                    # Gebruik technieken van andere scopece
+
+
+
 
                     # Hier nu ook met msitem rekening houden, hier zit de structuur in. 
                     # Elke manifestatie of sermhead heeft een eigen msitem, meer niet. 
@@ -1055,122 +1095,65 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Moet dan niet hier naar scopecontent op het hoogste niveau gekeken worden?
                     #Eigenlijk moet voor bijv Latin 113 hier worden ingesprongen
                     # Aangezien er in Latin 196 ook een scopecontent staat moet die genegeerd worden want er moet dan naar
+                    # Zie aantekening shari, die moet wel meegenomen worden in notes oid, ok, geen punt aanpassen maar
                     # de <c> elementen gekeken worden
                     
-                    # Kan ik hiermee checken
+                    # Kan ik hiermee checken? EK zegt dat het via een if statemten zou moeten kunnen..
                     check_on_c_element = manu.findall("./c")
-                    scopecontent_p = manu.find("./scopecontent/p")
-                    if check_on_c_element is None: 
-                        scopecontent_p = None
-                            
-                    for unit_p in manu.findall("./scopecontent/p"):
-                        sermon_manif_titles_1 = ElementTree.tostring(unit_p, encoding="unicode")
-                        if unit_p is None:
-                            continue
+                    # Dit lijkt te werken
+                    if len(check_on_c_element) == 0: 
+                                                   
+                        for unit_p in manu.findall("./scopecontent/p"):
+                            sermon_manif_titles_1 = ElementTree.tostring(unit_p, encoding="unicode")
+                            if unit_p is None:
+                                continue
                         # In case in the <p> element the manifestations are separated by a <lb> as a 
                         # selfclosing element         
-                        elif '<lb />' in sermon_manif_titles_1:
-                            #print("This works!!!")    
-                            sermon_manif_titles_3 = []
-                            sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
+                            elif '<lb />' in sermon_manif_titles_1:
+                                #print("This works!!!")    
+                                sermon_manif_titles_3 = []
+                                sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
                             # Clean titles and store in new list
                             # is dit nodig??
-                            for title in sermon_manif_titles_2:
-                                title_1 = re.sub("[\n\s]+"," ", title)
-                                print(title_1)
-                                title_2 = title_1.strip()
-                                print(title_2)
-                                sermon_manif_titles_3.append(title_2)   
-                            for title in sermon_manif_titles_3:
-                                # Opslaan van de inhoud van de lijst
-                                # Create new Sermon Description TH: werkt het nou goed?
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
-                                print(serm_obj)
+                                for title in sermon_manif_titles_2:
+                                    title_1 = re.sub("[\n\s]+"," ", title)
+                                    print(title_1)
+                                    title_2 = title_1.strip()
+                                    print(title_2)
+                                    sermon_manif_titles_3.append(title_2)   
+                                for title in sermon_manif_titles_3:
+                                    # Opslaan van de inhoud van de lijst
+                                    # Create new Sermon Description TH: werkt het nou goed?
+                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
+                                    print(serm_obj)
 
-                        else:
+                            else:
                         # In case the manifestations are better described for instance Latin 309 and 330
                         # Find folio
-                            sermon_head = unit_p.find("./num")
-                            serm_folio = sermon_head.text
-                            print(serm_folio)
+                                sermon_head = unit_p.find("./num")
+                                serm_folio = sermon_head.text
+                                print(serm_folio)
 
                             # Find title / complete manifestation
                             # split up later on?
                             serm_manif_title_join = ''.join(unit_p.itertext())
                             serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
                     
-                    # for instance Latin 196                    
-                    for unit_c in manu.findall("./c"):
-                        # Find folio
-                        sermon_head = unit_c.find("./head")
-                        serm_folio = sermon_head.text
-                        print(serm_folio)
-                        # Dit moet ook in sermhead, folio opgeslagen worden. Die in sermdescr moet leeg gelaten worden!
+                    # Check if the manuscript is structured as Latin 196 (with manifestations within the <c> elements)
+                    elif len(check_on_c_element) > 0:            
+                    
+                        for unit_c in manu.findall("./c"):
+                            # Find folio
+                            sermon_head = unit_c.find("./head")
+                            serm_folio = sermon_head.text
+                            print(serm_folio)
+                            # Dit moet ook in sermhead, folio opgeslagen worden. 
+                            # Die in sermdescr moet leeg gelaten worden!
 
-                        # Find SECTION title TH: idealiter niet dat folio meenemen, check hoe het anders moet
-                        # voorlopig wel even goed zo 
-                        # Let op, deze titles moeten bij title van de sermonhead table komen volgens Erwin 
-                  
-                        sermon_unittitle = unit_c.find("./did/unittitle")
-                        sermon_title_1 = ''.join(sermon_unittitle.itertext())
-                        print(sermon_title_1)
-                        # Second clean the string
-                        sermon_title_2 = re.sub("[\n\s]+"," ", sermon_title_1)
-                        print(sermon_title_2)
-                        # Third strip string of spaces TH: is dit nodig?
-                        sermon_title_3 = sermon_title_2.strip()
-                        print(sermon_title_3)
-                            
-                        # Store title and folio in sermhead:
-                        #sermhead_obj = SermonHead.objects.create(msitem_id = ??, title = sermon_title_3)
-                        #print(sermhead_obj)                          
-    
-                        # Grab contents in p under scopecontent in order to
-                        # later on store the sermon manifestations
-                        scopecontent_p = unit_c.find("./scopecontent/p")
-                            
-                        # Zie ook 1788 dit is eigenlijk hetzelfde als boven, 
-                                              
-                        # Create sermon manifestation title 
-                        # (store only if there are no multiple sermon manifestations)
-                        # Moeten die %% er nog uit?
-                        serm_manif_title = '%%'.join(scopecontent_p.itertext())
-                        sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode")
-                            
-                        # Onderscheid maken tussen scopecontent_p met 1 of meer manifestaties:
-                        if '<lb />' not in sermon_manif_titles_1:
-                                print(serm_manif_title)
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, title = serm_manif_title)
-                                print(serm_obj)
-                        # Dit lijkt goed te gaan maar is niet ideaal want er 
-                        # blijven soms codes in de sermon zitten                            
-                            
-                        elif '<lb />' in sermon_manif_titles_1:
-                            print("This works!!!")
-                            # Split up the string maar er komt geen list uit. TH: werkt nog niet, wordt niet gesplitst!
-                            sermon_manif_titles_3 = []
-                            sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
-                            # Clean titles and store in new list
-                            # is dit nodig??
-                            for title in sermon_manif_titles_2:
-                                title_1 = re.sub("[\n\s]+"," ", title)
-                                print(title_1)
-                                title_2 = title_1.strip()
-                                print(title_2)
-                                sermon_manif_titles_3.append(title_2)
-                                # Delete the last one (should be empty) in case of more than 1 record   
-                                # Dit moet pas aan het einde...                             
-                                if len(sermon_manif_titles_3) > 1:
-                                    # Delete last in list when more than 1. TH: moet dat? soms juist niet                                    
-                                    del sermon_manif_titles_3[-1]
-                                    for title in sermon_manif_titles_3:
-                                    # Opslaan van de inhoud van de lijst
-                                    # Create new Sermon Description TH: werkt het nou goed?
-                                        serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
-                                        print(serm_obj)
-                            
-                            # Find date if available (store in Daterange (Manu))
+                            # Find date TH: hier mee verder maandag en dat deel onderin weg
+
                             sermon_date = unit_c.find("./did/unitdate")
+
                             if sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
                                 sermon_date_complete = sermon_date.text
                                 if "-" not in sermon_date_complete:
@@ -1205,93 +1188,114 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                              
                             elif sermon_date is None:
                                 continue
+
+                            # Create new Daterange object, store yearstart and year finish
+                            # Dit lijkt te werken
+                            drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
+                            print(drange)
+
+                            # Find SECTION title TH: idealiter niet dat folio meenemen, check hoe het anders moet
+                            # voorlopig wel even goed zo 
+                            # Let op, deze titles moeten bij title van de sermonhead table komen volgens
+                              
+                  
+                            sermon_unittitle = unit_c.find("./did/unittitle")
+                            sermon_title_1 = ''.join(sermon_unittitle.itertext())
+                            print(sermon_title_1)
+                            # Second clean the string
+                            sermon_title_2 = re.sub("[\n\s]+"," ", sermon_title_1)
+                            print(sermon_title_2)
+                            # Third strip string of spaces TH: is dit nodig?
+                            sermon_title_3 = sermon_title_2.strip()
+                            print(sermon_title_3)
+                            
+                            # Store title and folio in sermhead met msitem:
+                            # sermhead_obj = SermonHead.objects.create(msitem_id = ??, title = sermon_title_3, locus = serm_head)
+                            # print(sermhead_obj)                          
+                                                        
+                            # Grab contents in p under scopecontent in order to
+                            # later on store the sermon manifestations
+                            scopecontent_p = unit_c.find("./scopecontent/p")
+                            
+                            # Zie ook 1788 dit is eigenlijk hetzelfde als boven, 
+                                              
+                            # Create sermon manifestation title 
+                            # (store only if there are no multiple sermon manifestations)
+                            # Moeten die %% er nog uit?
+                            serm_manif_title = '%%'.join(scopecontent_p.itertext())
+                            sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode")
+                            
+                            # Onderscheid maken tussen scopecontent_p met 1 of meer manifestaties:
+                            if '<lb />' not in sermon_manif_titles_1:
+                                print(serm_manif_title)
+                                serm_obj = SermonDescr.objects.create(manu = manu_obj, title = serm_manif_title)
+                                print(serm_obj)
+                        # Dit lijkt goed te gaan maar is niet ideaal want er 
+                        # blijven soms codes in de sermon zitten                            
+                            
+                            elif '<lb />' in sermon_manif_titles_1:
+                                print("This works!!!")
+                                # Split up the string maar er komt geen list uit. TH: werkt nog niet, wordt niet gesplitst!
+                                sermon_manif_titles_3 = []
+                                sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
+                                # Clean titles and store in new list
+                                # is dit nodig??
+                                for title in sermon_manif_titles_2:
+                                    title_1 = re.sub("[\n\s]+"," ", title)
+                                    print(title_1)
+                                    title_2 = title_1.strip()
+                                    print(title_2)
+                                    sermon_manif_titles_3.append(title_2)
+                                    # Opslaan van de inhoud van de lijst
+                                    # Create new Sermon Description TH: werkt het nou goed?
+                                    for title in sermon_manif_titles_3:
+                                        serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
+                                        print(serm_obj)
+                            
+                            # Find date if available, aanpassen want dit moet op in <c> gebeuren
+                            # loop (store in Daterange (Manu))
+                            # Moet dit niet naar boven?
+                            #sermon_date = unit_c.find("./did/unitdate")
+                            #if sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
+                            #    sermon_date_complete = sermon_date.text
+                            #    if "-" not in sermon_date_complete:
+                            #        date_split = sermon_date_complete.split('e ')
+                            #        # Why less than 3? Means two in these cases right?
+                            #        if len(date_split) < 3:  
+                            #            sermon_century = date_split[0]
+                            #            if sermon_century == "V":
+                            #                sermon_yearstart = "400"
+                            #                sermon_yearfinish = "500"
+                            #            elif sermon_century == "VI":
+                            #                sermon_yearstart = "500"
+                            #                sermon_yearfinish = "600"
+                            #            elif sermon_century == "VII":
+                            #                sermon_yearstart = "700"
+                            #                sermon_yearfinish = "800"
+                            #            elif sermon_century == "IX":
+                            #                sermon_yearstart = "800"
+                            #                sermon_yearfinish = "900"
+                            #            elif sermon_century == "X":
+                            #                sermon_yearstart = "900"
+                            #                sermon_yearfinish = "1000"
+                            #            elif sermon_century == "XI":
+                            #                sermon_yearstart = "1000"
+                            #                sermon_yearfinish = "1100"
+                            #            elif sermon_century == "XII":
+                            #                sermon_yearstart = "1100"
+                            #                sermon_yearfinish = "1200"
+                            #            elif sermon_century == "XIII":
+                            #                sermon_yearstart = "1200"
+                            #                sermon_yearfinish = "1300"
+                             
+                            #elif sermon_date is None:
+                            #    continue
                             # Create new SermonDescr object and store
                             # serm_obj = SermonDescr.objects.create(sermon=serm_obj, title =  , locus = sermfolie sermontitle = sermon_title_3)
                             # Create new Daterange object, store yearstart and year finish
                             drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
                             print(drange)
-                    # Alleen als er één of meer zijn...TH: dit werkt
-                    #if len(unit_c) > 0:
-                     #   sermon_head = unit_c.find("./head")
-                        # Hieronder gaat het mis, als <head> niet wordt gevonden, hoe dan verder?
-                      #  if sermon_head != None and sermon_head != "":
-                       #     serm_folio = sermon_head.text
-                        #    print(serm_folio)
-                
-                        #sermon_unittitle = sermon.find("./did/unittitle")
-                        #if sermon_unittitle != None and sermon_unittitle != "":
-                        #    sermon_title = sermon_unittitle.text
-                        #    print(sermon_title)
-                    # unitsermons = manu.find("./scopecontent/p[2]")
-
-                    #tree = ET.parse('/tmp/mozilla_micha0/XMLFile1.xml')
-                    # root = tree.getroot()  # root is het scopecontent-element
-                
-                    # Komt direct in tweede scopecontent (maar klopt dit voor de rest van de f
-                    #unitsermons = manu.find("./scopecontent[2]")
-                
-                    #unit_scopecontent = manu.find("./scopecontent")
-                    #if unit_scopecontent is None:
-                     #   continue             
-                    # Nu gaat het per <p> in tweede scopecontent, maar hier moet nog binnen geïtereerd worden. WEG 
-                    # Na latin 152 gaat het mis op dit moment, wel scopecontent en p in Latin 153 maar zie Latin 153 niet in de output             
-                
-                    #for element_p in unit_scopecontent.findall("./p"):
-                    #    if element_p is None or len(element_p)==1:
-                    #        print(element_p.text)
-                    #        continue             
-                    #    # oppikken folio? saven in db wil nog niet
-                    #    unitfolio = element_p.find("./num")
-                    #    if unitfolio is None:
-                    #        continue
-                    #    serm_folio = unitfolio.text
-                    #    print(serm_folio)
                     
-                    #    print(re.sub(r'\s+', ' ', "".join(element_p.itertext()).strip()))
-                        # Create a new Sermon
-                        #serm_obj = SermonDescr.objects.create()
-                        # slaat hem niet op?
-                        #serm_obj.locus = unitfolio.text
-                      
-                        #print(serm_obj.locus)
-
-                        # wat hier onder staat is
-                    
-                    
-                        #for element_emph in element_p.findall("./emph"):    
-                        #party = event.find('party')
-                        #if party is None:
-                        #continue
-                        #parties = party.text
-                        #children = event.get('value') 
-
-                        # emph als soort van title
-                        # print(element_emph.text)
-                        
-                        # What serm elements are in the A+M manu's? 
-                        # 
-                        #     
-                            #sermemph_bold = element.find("./emph[@render='bold']")
-                            #sermemph_italic = element.find("./emph[@render='italic']")
-                            #sermo_title = sermemph_bold.text
-                            #print(sermo_title)
-                    
-                        #for emph in element.findall("./emph"):
-
-     
-                    # unitreliure = manu.find("./emph[@render='bold']")
-                
-                    # <emph render="bold">Préface et tables (1r-8v)</emph>
-                
-                    # unitsermons = manu.find("./scopecontent/p[2]")
-                    #[re.sub(r'\s+', ' ', "".join(element.itertext()).strip()) for element in root.findall("./p")]
-                
-                    #if unitsermons != None and unitsermons != "":
-                     #   sermo_title = unitsermons.text
-                
-                      #  print(sermo_title)
-                
-                
                 
                     # Save the results
                     manu_obj.save()
