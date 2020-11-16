@@ -675,7 +675,7 @@ class BasicList(ListView):
                                 fitem['keyList'] = frm[item['keyList']]
                                 fitem['has_keylist'] = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
-                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
+                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data and item['keyS'] != item['dbfield']:
                                     fitem['dbfield'] = frm[item['dbfield']]
                                     if fitem['dbfield'].value(): 
                                         bHasValue = True ; bHasItemValue = True
@@ -974,6 +974,7 @@ class BasicDetails(DetailView):
     do_not_save = False
     no_delete = False
     afterdelurl = None
+    custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
@@ -1211,6 +1212,14 @@ class BasicDetails(DetailView):
                 context['afterdelurl'] = self.afterdelurl
             else:
                 context['afterdelurl'] = context['listview']
+
+        # Custom buttons
+        if len(self.custombuttons) > 0:
+            for item in self.custombuttons:
+                if 'template_name' in item:
+                    # get the code of the template
+                    pass
+            context['custombuttons'] = self.custombuttons
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST

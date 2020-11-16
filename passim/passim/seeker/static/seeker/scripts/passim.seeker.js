@@ -1830,6 +1830,257 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * scount_histogram_show
+       *    Show histogram using D3
+       *
+       *  The data is expected to be: 'count', 'freq'
+       *
+       */
+      scount_histogram_show: function (lst_data, divid) {
+        var margin = null,
+            width = null,
+            height = null,
+            parseDate = null,
+            data = [],
+            x = null,
+            y = null,
+            i = 0,
+            max_scount = 0,
+            max_freq = 0,
+            freq = 0,
+            targeturl = null,
+            found = null,
+            xAxis = null,
+            yAxis = null,
+            histo = null,
+            oBin = null,
+            bins = null,
+            tooltip = null, showTooltip=null, moveTooltip = null, hideTooltip = null,
+            svg = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 30, left: 50 }
+          width = 960 - margin.left - margin.right;
+          height = 500 - margin.top - margin.bottom;
+
+          // Create an SVG top node
+          svg = d3.select("#" + divid).append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+          // Calculate the maximum [scount] and the maximum [freq]
+          max_scount = d3.max(lst_data, function (d) { return +d.scount });
+          max_freq = d3.max(lst_data, function (d) { return +d.freq });
+
+          // Set up the x scale
+          x = d3.scaleLinear().domain([0, max_scount]).range([0, width]);
+
+          // Convert the lst_data into data bins
+          for (i = 0; i < max_scount; i++) {
+            // Find out what the frequency is
+            found = lst_data.find(function (el) {
+              return (el.scount == i);
+            });
+            if (found === undefined) {
+              found = {scount: i, freq: 0};
+            }
+
+            // Append frequency to one-dimensional array
+            targeturl = ('targeturl' in found) ? found.targeturl : '#';
+            data.push({ x1: i + 1, x0: found.scount, length: found.freq, targeturl: targeturl });
+          }
+
+          // Set the histogram parameter
+          histo = d3.histogram()
+            .value(function (d) { return +d.freq; })
+            .domain(x.domain())
+            .thresholds(x.ticks(max_scount));
+
+          //Apply the function to data to get the bins
+          //bins = histo(data);
+          // bins = histo(lst_data);
+          bins = data
+
+          // Y axis: scale
+          y = d3.scaleLinear().range([height, 0]);
+          y.domain([0, d3.max(bins, function (d) { return d.length; })]);
+
+          // Draw X axis
+          svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x))
+            .append("text").attr("y", 30).attr("x", width - 100).text("Sermons per SSG");
+
+          // Draw Y axis
+          svg.append("g").attr("class", "y axis")
+            .call(d3.axisLeft(y))
+            .append("text")
+              .attr("transform", "rotate(-90)")
+              .attr("y", -50)
+              .attr("dy", ".71em")
+              .style("text-anchor", "end")
+              .text("SSG frequency");
+
+          // Add a tooltip <div>
+          tooltip = d3.select("#" + divid)
+            .append("div").attr("class", "tooltip").style("opacity", 0);;
+
+          // Tooltip data respond function
+          showTooltip = function (event, d) {
+            tooltip.transition().duration(100).style("opacity", 0.9);
+            tooltip.html(d.length + " SSGs have a set of " + d.x0 + " sermon(s)")
+              .style("left", (event.x + 10 ) + "px")
+              .style("top", (event.y - 35) + "px");
+          };
+          // Make sure the tooltip shows about where the user hovers
+          moveTooltip = function (event, d) {
+            tooltip.style("left", (event.x + 10) + "px")
+                   .style("top", (event.y - 35) + "px");
+          };
+          // Change the opacity again
+          hideTooltip = function (event, d) {
+            tooltip.transition().duration(300).style("opacity", 0);
+          };
+
+          // Append the bar rectangles to the SVG element
+          svg.selectAll("rect").data(bins).enter()
+              //.append("g")
+              //  .attr("href", function (d) { return d.targeturl;})
+              .append("rect")
+                .attr("x", 1)
+                .attr("transform", function (d) { return "translate(" + x(d.x0) + "," + y(d.length) + ")"; })
+                .attr("width", function (d) { return x(d.x1) - x(d.x0) - 1; })
+                .attr("height", function (d) { return height - y(d.length); })
+                .attr("class", "histogram-bar")
+                .attr("tabindex", 0)
+                .on("mouseover", showTooltip)
+                .on("mousemove", moveTooltip)
+                .on("mouseleave", hideTooltip)
+                .on("click", ru.passim.seeker.histogram_click);
+          
+          // THis should have drawn the histogram correctly
+        } catch (ex) {
+          private_methods.errMsg("scount_histogram_show", ex);
+        }
+      },
+
+      /**
+       * histogram_click
+       *    What happens when the user clicks through on a histogram bar
+       *
+       */
+      histogram_click: function (event, d) {
+        var scount = 0,
+            elStart = null;
+
+        try {
+          // Check if this is one with targeturl specified or not
+          if ('targeturl' in d) {
+            // Click through to the targeturl
+            window.location.href = d.targeturl;
+          } else {
+            // Extract the scount from the [d]
+            scount = d.x0;
+
+            // Set the correct form values
+            $("#id_ssg-soperator option[value='exact']").attr("selected", true);
+            $("#id_ssg-scount").val(scount);
+            $("#id_ssg-scount")[0].value = scount;
+
+            // Get the start element
+            elStart = $("#tab_filter .search-button").first();
+
+            // Call the usual 'search' function with this additional parameter
+            ru.basic.search_start(elStart);
+
+          }
+          // THis should have drawn the histogram correctly
+        } catch (ex) {
+          private_methods.errMsg("histogram_click", ex);
+        }
+      },
+
+      /**
+       * d3_lineplot_show
+       *    Show lineplot using D3
+       *
+       *  The data is expected to be: 'count', 'freq'
+       *
+       */
+      d3_lineplot_show: function (data, divid) {
+        var margin = null,
+            width = null,
+            height = null,
+            parseDate = null,
+            x = null,
+            y = null,
+            xAxis = null,
+            yAxis = null,
+            line = null,
+            svg = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 30, left: 50 }
+          width = 960 - margin.left - margin.right;
+          height = 500 - margin.top - margin.bottom;
+
+          // Set up the x and y scales
+          x = d3.scaleLinear().range([0, width]);
+          y = d3.scaleLinear().range([height, 0]);
+
+          // Set up the axes (d3 v6)
+          xAxis = d3.axisBottom(x);
+          yAxis = d3.axisLeft(y);
+
+          // How the line is being made
+          line = d3.line()
+            .x(function (d) { return x(d.scount); })
+            .y(function (d) { return y(d.freq); });
+
+          // Create an SVG top node
+          svg = d3.select("#" + divid).append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+          //domain specifications
+          x.domain(d3.extent(data, function (d) {
+            return d.scount;
+          }));
+          y.domain(d3.extent(data, function (d) {
+            return d.freq;
+          }));
+
+          // Draw the axes
+          svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")")
+            .call(xAxis)
+            .append("text").attr("y", 30).attr("x", width - 100).text("Frequency");
+
+          svg.append("g").attr("class", "y axis")
+            .call(yAxis)
+            .append("text")
+              .attr("transform", "rotate(-90)")
+              .attr("y", -50)
+              .attr("dy", ".71em")
+              .style("text-anchor", "end")
+              .text("Sermons per SSG");
+
+          svg.append("path")
+            .datum(data)
+            .attr("class", "line")
+            .attr("d", line);
+
+          // THis should have drawn the lineplot correctly
+        } catch (ex) {
+          private_methods.errMsg("d3_lineplot_show", ex);
+        }
+      },
+
+      /**
        * add_new_select2
        *    Show [table_new] element
        *

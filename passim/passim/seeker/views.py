@@ -39,6 +39,8 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
+import lxml
+import pygal
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -8142,6 +8144,8 @@ class CollPublDetails(CollPrivDetails):
 class CollHistDetails(CollHistEdit):
     """Like CollHistEdit, but then with html"""
     rtype = "html"
+    custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def custom_init(self, instance):
         # First do the original custom init
@@ -8348,10 +8352,49 @@ class CollHistDetails(CollHistEdit):
             related_objects.append(sermons)
 
         context['related_objects'] = related_objects
+        context['histogram_data'] = self.get_histogram_data(instance, 'd3')
 
         # Return the context we have made
         return context
 
+    def get_histogram_data(self, instance=None, method='d3'):
+        """Get data to make a histogram"""
+
+        oErr = ErrHandle()
+        histogram_data = []
+        b_chart = None
+        try:
+            # Get the queryset for this view
+            if instance != None:
+                # Get the base url
+                baseurl = reverse('equalgold_list')
+                # Determine the list
+                qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
+                scount_index = {}
+                frequency = None
+                for item in qs:
+                    scount = item['scount']
+                    if frequency == None or frequency != scount:
+                        # Initialize the frequency
+                        frequency = scount
+                        # Add to the histogram data
+                        histogram_data.append(dict(scount=scount, freq=1))
+                    else:
+                        histogram_data[-1]['freq'] += 1
+
+                # Determine the targeturl for each histogram bar
+                for item in histogram_data:
+                    targeturl = "{}?ssg-collist_hist={}&ssg-soperator=exact&ssg-scount={}".format(baseurl, instance.id, item['scount'])
+                    item['targeturl'] = targeturl
+                # D3-specific
+                if method == "d3":
+                    histogram_data = json.dumps(histogram_data)
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_histogram_data")
+        return histogram_data
+        
 
 class CollHistCompare(CollHistDetails):
     """Compare the SSGs in a historical collection with the sermons in a manuscript"""
@@ -8786,7 +8829,7 @@ class CollectionListView(BasicList):
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?ssg-collist_ssg={}'>".format(url, instance.id))
+                html.append("<a href='{}?ssg-collist_hist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
@@ -11536,7 +11579,7 @@ class EqualGoldListView(BasicList):
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
-        {"name": "Sermoun count",   "id": "filter_scount",            "enabled": False},
+        {"name": "Sermon count",    "id": "filter_scount",            "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -11574,6 +11617,8 @@ class EqualGoldListView(BasicList):
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' }
             ]}
         ]
+    custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def initializations(self):
         if Information.get_kvalue("author_anonymus") != "done":
@@ -11658,7 +11703,35 @@ class EqualGoldListView(BasicList):
         context['basketsize'] = 0 if profile == None else profile.basketsize_super
         context['basket_show'] = reverse('basket_show_super')
         context['basket_update'] = reverse('basket_update_super')
+        context['histogram_data'] = self.get_histogram_data('d3')
         return context
+
+    def get_histogram_data(self, method='d3'):
+        """Get data to make a histogram"""
+
+        oErr = ErrHandle()
+        histogram_data = []
+        b_chart = None
+        try:
+            # Get the queryset for this view
+            qs = self.get_queryset().order_by('scount').values('scount', 'id')
+            scount_index = {}
+            frequency = None
+            for item in qs:
+                scount = item['scount']
+                if frequency == None or frequency != scount:
+                    frequency = scount
+                    histogram_data.append(dict(scount=scount, freq=1))
+                else:
+                    histogram_data[-1]['freq'] += 1
+
+            if method == "d3":
+                histogram_data = json.dumps(histogram_data)
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_histogram_data")
+        return histogram_data
         
     def get_basketqueryset(self):
         if self.basketview:
