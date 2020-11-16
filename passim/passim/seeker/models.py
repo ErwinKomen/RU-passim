@@ -4285,6 +4285,8 @@ class EqualGold(models.Model):
     firstsig = models.CharField("Code", max_length=LONG_STRING, blank=True, null=True)
     # [1] The number of associated Historical Collections
     hccount = models.IntegerField("Historical Collection count", default=0)
+    # [1] The number of SermonDescr linked to me
+    scount = models.IntegerField("Sermon set size", default=0)
 
     # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
@@ -6051,7 +6053,11 @@ class SermonDescr(models.Model):
     # [1] Every SermonDescr may be a manifestation (default) or a template (optional)
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
-    # ================ MANYTOMANY relations ============================
+    ## ================ Calculated fields ===============================
+    ## [1] Number of sermons 'equal' to me
+    #scount = models.IntegerField("Equal sermon count", default=0)
+
+    ## ================ MANYTOMANY relations ============================
 
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
@@ -6729,6 +6735,14 @@ class SermonDescr(models.Model):
     def get_quote_markdown(self):
         """Get the contents of the quote field using markdown"""
         return adapt_markdown(self.quote)
+
+    def get_scount(self):
+        """Calculate how many sermons are associated with the same SSGs that I am associated with"""
+
+        scount = 0
+        scount_lst = self.equalgolds.values('scount')
+        for item in scount_lst: scount += item['scount']
+        return scount
 
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
@@ -7429,6 +7443,40 @@ class SermonDescrEqual(models.Model):
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
         combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.super.__str__())
         return combi
+
+    def do_scount(self, super):
+        # Now calculate the adapted scount for the SSG
+        scount = super.equalgold_sermons.count()
+        # Check if adaptation is needed
+        if scount != super.scount:
+            # Adapt the scount in the SSG
+            super.scount = scount
+            super.save()
+        return None
+
+    def delete(self, using = None, keep_parents = False):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Remember the current SSG for a moment
+            obj_ssg = self.super
+            # Remove the connection
+            response = super(SermonDescrEqual, self).delete(using, keep_parents)
+            # Perform the scount
+            self.do_scount(obj_ssg)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrEqual/delete")
+        # Return the proper response
+        return response
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the saving
+        response = super(SermonDescrEqual, self).save(force_insert, force_update, using, update_fields)
+        # Perform the scount
+        self.do_scount(self.super)
+        # Return the proper response
+        return response
 
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))

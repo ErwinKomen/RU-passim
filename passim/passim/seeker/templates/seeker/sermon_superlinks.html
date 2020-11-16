@@ -48,8 +48,9 @@
                     </span>
                     <span>
                       <a class="btn btn-xs jumbo-4" 
-                          href="{% url 'sermon_details' object_id %}?supercopy={{instance.super.id}}"
-                          title="Copy information from this Super Sermon Gold to this Sermon manifestation (Author, incipit, explicit)">
+                         onclick="ru.passim.seeker.elevate_confirm(this)"
+                         href="{% url 'sermon_details' object_id %}?supercopy={{instance.super.id}}"
+                         title="Copy information from this Super Sermon Gold to this Sermon manifestation (Author, incipit, explicit)">
                         Copy <span class="glyphicon glyphicon-share-alt"></span>
                       </a>
                     </span>
