@@ -3918,7 +3918,11 @@ var ru = (function ($, ru) {
               // Try goint to the next <tr>
               elDiv = $(el).closest("tr").next("tr.elevate-confirm");
             }
-            $(elDiv).removeClass("hidden");
+            if ($(elDiv).hasClass("hidden")) {
+              $(elDiv).removeClass("hidden");
+            } else {
+              $(elDiv).html(loc_sWaiting);
+            }
           } else {
 
           }

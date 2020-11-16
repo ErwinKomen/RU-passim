@@ -35,6 +35,7 @@ def user_is_in_team(username, team_group, userplus=None):
     return bResult
 
 CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+SCOUNT_OPERATOR = [('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 
 
 # ================= WIDGETS =====================================
@@ -2179,6 +2180,10 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    scount      = forms.IntegerField(min_value=-1, required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Sermon set size'}))
+    soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,
+                widget=forms.Select())
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -2222,6 +2227,8 @@ class SuperSermonGoldForm(PassimModelForm):
             # Some fields are not required
             self.fields['authorname'].required = False
             self.fields['stype'].required = False
+            self.fields['soperator'].initial = 2
+            self.fields['scount'].initial = -1
 
             # Initialize querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")

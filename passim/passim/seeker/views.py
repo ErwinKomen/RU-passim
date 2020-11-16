@@ -55,7 +55,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 from reportlab.rl_config import defaultPageSize  
 
 # ======= imports from my own application ======
-from passim.settings import APP_PREFIX, MEDIA_DIR
+from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
@@ -1809,6 +1809,8 @@ def do_huwa(request):
     """Analyse Huwa SQLite database"""
 
     oErr = ErrHandle()
+    bCreateExcel = True
+    excel_output = "huwa_tables.xlsx"
     try:
         assert isinstance(request, HttpRequest)
         # Specify the template
@@ -1829,6 +1831,10 @@ def do_huwa(request):
 
         count_tbl = 0
         lst_total = []
+
+        if bCreateExcel:
+            # Set the excel output to the Media directory
+            excel_output = os.path.abspath(os.path.join(WRITABLE_DIR, excel_output))
 
         # Connect to the Huwa database
         huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
@@ -1858,6 +1864,11 @@ def do_huwa(request):
                     oInfo[field_name] = field_info
                 oInfo['fields'] = fields
                 oInfo['links'] = []
+
+                # Read the table
+                table_contents = cursor.execute("SELECT * FROM {}".format(table_name)).fetchall()
+                oInfo['contents'] = table_contents
+
                 table_info[table_name] = oInfo
 
             # Close the database again
@@ -1881,8 +1892,20 @@ def do_huwa(request):
         # Create list to be returned
         result_list = []
 
+        # If needed: start creating Excel
+        if bCreateExcel:
+            # Start workbook
+            wb = openpyxl.Workbook()
+            ws = wb.get_active_sheet()
+            ws.title="Intro"
+            c = ws.cell(row=1, column=1)
+            c.value = "Automatically generated list of HUWA database tables"
+
+
         # Create a result to be shown
+        table_num = 0
         for table_name in tables:
+            table_num += 1
             oTable = table_info[table_name]
             field_reg = []
             field_fk = []
@@ -1913,11 +1936,57 @@ def do_huwa(request):
 
             result_list.append({'part': table_name, 'result': "\n".join(lst_total)})
 
+            # What about showing some Excel output?
+            if bCreateExcel:
+                # Debugging: show where we are
+                oErr.Status("Doing table {} of {}: {}".format(table_num, count_tbl, table_name))
+
+                # Add a Sheet for this Table
+                ws = wb.create_sheet(table_name)
+                row_num = 1
+
+                # Set the column header names in bold
+                for col_num in range(len(oTable['fields'])):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = oTable['fields'][col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0   
+                
+                # Walk through the contents of this table
+                for table_row in table_info[table_name]['contents']:
+                    # Keep track of the EXCEL row we are in
+                    row_num += 1
+                    # Prepare the elements
+                    table_str = []
+                    for item in table_row:
+                        if isinstance(item, int):
+                            table_str.append(item)
+                        elif isinstance(item, str):
+                            table_str.append("'{}'".format(item.replace("'", '"')))
+                        else:
+                            table_str.append(item)
+                    # WRite all the elements of one row (faster)
+                    ws.append(table_str)
+                      
+                    
+        if bCreateExcel:
+            # Debugging: show where we are
+            oErr.Status("Saving to: {}".format(excel_output))
+            # Save the excel
+            wb.save(excel_output)   
+
         context['result_list'] = result_list
     
+        if bCreateExcel:
+            # Debugging: show where we are
+            oErr.Status("Returning render")
         # Render and return the page
         return render(request, template_name, context)
     except:
+        if bCreateExcel:
+            # Debugging: show where we are
+            oErr.Status("Error being caught")
         msg = oErr.get_error_message()
         oErr.DoError("huwa")
         return reverse('home')
@@ -11435,7 +11504,7 @@ class EqualGoldListView(BasicList):
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
     # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'sgcount', 'hccount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'hccount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -11450,11 +11519,13 @@ class EqualGoldListView(BasicList):
          'title': "The incipit...explicit that has been chosen for this Super Sermon Gold"},
         {'name': 'HC', 'title': "Historical collections associated with this Super Sermon Gold", 
          'order': '', 'allowwrap': True, 'type': 'str', 'custom': 'hclist'},
-        {'name': 'Size',                    'order': 'o=6'   , 'type': 'int', 'custom': 'size',
+        {'name': 'Sermons',                 'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
+         'title': "Number of Sermon (manifestation)s that are connected with this Super Sermon Gold"},
+        {'name': 'Gold',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
-        {'name': 'HCs',                    'order': 'o=7'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'HCs',                    'order': 'o=8'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Super Sermon Gold"},
-        {'name': 'Status',                  'order': 'o=8',   'type': 'str', 'custom': 'status'}
+        {'name': 'Status',                  'order': 'o=9',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -11465,6 +11536,7 @@ class EqualGoldListView(BasicList):
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
+        {"name": "Sermoun count",   "id": "filter_scount",            "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -11477,7 +11549,11 @@ class EqualGoldListView(BasicList):
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code', 'keyList': 'passimlist', 'infield': 'id'},
-            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number'},
+            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
+             'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
+            {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
+            {'filter': 'scount',    'dbfield': 'scount',            'keyS': 'scount',
+             'title': 'The number of sermons (manifestations) belonging to this Super Sermon Gold'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
@@ -11607,9 +11683,12 @@ class EqualGoldListView(BasicList):
         #    sNumber = "-" if instance.number  == None else instance.number
         #    html.append("{}".format(sNumber))
         elif custom == "size":
-            # iSize = instance.equal_goldsermons.all().count()
             iSize = instance.sgcount
             html.append("{}".format(iSize))
+        elif custom == "scount":
+            sCount = instance.scount
+            if sCount == None: sCount = 0
+            html.append("{}".format(sCount))
         elif custom == "hccount":
             html.append("{}".format(instance.hccount))
         elif custom == "hclist":
@@ -11654,6 +11733,12 @@ class EqualGoldListView(BasicList):
                 # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
+
+        scount = fields.get('scount', -1)
+        soperator = fields.pop('soperator', None)
+        if scount != None and scount >= 0 and soperator != None:
+            # Action depends on the operator
+            fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
 
         return fields, lstExclude, qAlternative
 

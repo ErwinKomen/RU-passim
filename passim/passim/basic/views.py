@@ -901,7 +901,7 @@ class BasicList(ListView):
                         # qs = self.model.objects.filter(*lstQ).exclude(*lstExclude).distinct()
                         qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
                     else:
-                        # qs = self.model.objects.filter(*lstQ).distinct()
+                        # qs = self.model.objects.filter(Q(scount__gte=4))
                         qs = self.model.objects.filter(filter).distinct()
                     # Only set the [bFilter] value if there is an overt specified filter
                     for filter in self.filters:
