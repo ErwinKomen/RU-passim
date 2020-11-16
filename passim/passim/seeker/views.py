@@ -7727,6 +7727,45 @@ class CollAnyEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
+    def get_histogram_data(self, instance=None, qs=None, listview="collist_hist", method='d3'):
+        """Get data to make a histogram"""
+
+        oErr = ErrHandle()
+        histogram_data = []
+        # b_chart = None
+        try:
+            # Get the queryset for this view
+            if instance != None and qs != None:
+                # Get the base url
+                baseurl = reverse('equalgold_list')
+                # Determine the list
+                qs = qs.order_by('scount').values('scount', 'id')
+                # qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
+                scount_index = {}
+                frequency = None
+                for item in qs:
+                    scount = item['scount']
+                    if frequency == None or frequency != scount:
+                        # Initialize the frequency
+                        frequency = scount
+                        # Add to the histogram data
+                        histogram_data.append(dict(scount=scount, freq=1))
+                    else:
+                        histogram_data[-1]['freq'] += 1
+
+                # Determine the targeturl for each histogram bar
+                for item in histogram_data:
+                    targeturl = "{}?ssg-{}={}&ssg-soperator=exact&ssg-scount={}".format(baseurl, listview, instance.id, item['scount'])
+                    item['targeturl'] = targeturl
+                # D3-specific
+                if method == "d3":
+                    histogram_data = json.dumps(histogram_data)
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_histogram_data")
+        return histogram_data
+
 
 class CollPrivEdit(CollAnyEdit):
     prefix = "priv"
@@ -7787,6 +7826,7 @@ class CollPrivDetails(CollAnyEdit):
     basic_name = "collpriv"
     title = "My Dataset"
     rtype = "html"
+    custombuttons = []
 
     def custom_init(self, instance):
         if instance != None:
@@ -7799,6 +7839,11 @@ class CollPrivDetails(CollAnyEdit):
             elif instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+
+            if instance.type == "super":
+                self.custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
+
             # Check for hlist saving
             self.check_hlist(instance)
         return None
@@ -8065,6 +8110,11 @@ class CollPrivDetails(CollAnyEdit):
                     ]
                 related_objects.append(supers)
 
+                context['histogram_data'] = self.get_histogram_data(instance, 
+                                                                    instance.collections_super.all(), 
+                                                                    'collist_{}'.format(self.prefix), 
+                                                                    'd3')
+
             context['related_objects'] = related_objects
         except:
             msg = oErr.get_error_message()
@@ -8136,6 +8186,9 @@ class CollPublDetails(CollPrivDetails):
             elif instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+            if instance.type == "super":
+                self.custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
             # Check for hlist saving
             self.check_hlist(instance)
         return None
@@ -8352,49 +8405,11 @@ class CollHistDetails(CollHistEdit):
             related_objects.append(sermons)
 
         context['related_objects'] = related_objects
-        context['histogram_data'] = self.get_histogram_data(instance, 'd3')
+        context['histogram_data'] = self.get_histogram_data(instance, instance.collections_super.all(), 'collist_hist', 'd3')
 
         # Return the context we have made
         return context
 
-    def get_histogram_data(self, instance=None, method='d3'):
-        """Get data to make a histogram"""
-
-        oErr = ErrHandle()
-        histogram_data = []
-        b_chart = None
-        try:
-            # Get the queryset for this view
-            if instance != None:
-                # Get the base url
-                baseurl = reverse('equalgold_list')
-                # Determine the list
-                qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
-                scount_index = {}
-                frequency = None
-                for item in qs:
-                    scount = item['scount']
-                    if frequency == None or frequency != scount:
-                        # Initialize the frequency
-                        frequency = scount
-                        # Add to the histogram data
-                        histogram_data.append(dict(scount=scount, freq=1))
-                    else:
-                        histogram_data[-1]['freq'] += 1
-
-                # Determine the targeturl for each histogram bar
-                for item in histogram_data:
-                    targeturl = "{}?ssg-collist_hist={}&ssg-soperator=exact&ssg-scount={}".format(baseurl, instance.id, item['scount'])
-                    item['targeturl'] = targeturl
-                # D3-specific
-                if method == "d3":
-                    histogram_data = json.dumps(histogram_data)
-            
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("get_histogram_data")
-        return histogram_data
-        
 
 class CollHistCompare(CollHistDetails):
     """Compare the SSGs in a historical collection with the sermons in a manuscript"""
@@ -11713,6 +11728,8 @@ class EqualGoldListView(BasicList):
         histogram_data = []
         b_chart = None
         try:
+            # Get the base url
+            baseurl = reverse('equalgold_list')
             # Get the queryset for this view
             qs = self.get_queryset().order_by('scount').values('scount', 'id')
             scount_index = {}
@@ -11724,6 +11741,16 @@ class EqualGoldListView(BasicList):
                     histogram_data.append(dict(scount=scount, freq=1))
                 else:
                     histogram_data[-1]['freq'] += 1
+
+            # Determine the targeturl for each histogram bar
+            other_list = []
+            for item in self.param_list:
+                if "-soperator" not in item and "-scount" not in item:
+                    other_list.append(item)
+            other_filters = "&".join(other_list)
+            for item in histogram_data:
+                targeturl = "{}?ssg-soperator=exact&ssg-scount={}".format(baseurl, item['scount'], other_filters)
+                item['targeturl'] = targeturl
 
             if method == "d3":
                 histogram_data = json.dumps(histogram_data)
@@ -11751,10 +11778,6 @@ class EqualGoldListView(BasicList):
                 html.append(instance.author.name)
             else:
                 html.append("<i>(not specified)</i>")
-        # Issue #212: remove sermon number
-        #elif custom == "number":
-        #    sNumber = "-" if instance.number  == None else instance.number
-        #    html.append("{}".format(sNumber))
         elif custom == "size":
             iSize = instance.sgcount
             html.append("{}".format(iSize))

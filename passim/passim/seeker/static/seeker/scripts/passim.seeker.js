@@ -1854,6 +1854,7 @@ var ru = (function ($, ru) {
             yAxis = null,
             histo = null,
             oBin = null,
+            viewbox = "",
             bins = null,
             tooltip = null, showTooltip=null, moveTooltip = null, hideTooltip = null,
             svg = null;
@@ -1863,11 +1864,14 @@ var ru = (function ($, ru) {
           margin = { top: 20, right: 20, bottom: 30, left: 50 }
           width = 960 - margin.left - margin.right;
           height = 500 - margin.top - margin.bottom;
+          viewbox = "0 0 970 510";
 
           // Create an SVG top node
           svg = d3.select("#" + divid).append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
+            .attr("width", "100%").attr("height", "100%")
+            .attr("viewBox", viewbox)
+            //.attr("width", width + margin.left + margin.right)
+            //.attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
@@ -1876,10 +1880,10 @@ var ru = (function ($, ru) {
           max_freq = d3.max(lst_data, function (d) { return +d.freq });
 
           // Set up the x scale
-          x = d3.scaleLinear().domain([0, max_scount]).range([0, width]);
+          x = d3.scaleLinear().domain([0, max_scount+1]).range([0, width]);
 
           // Convert the lst_data into data bins
-          for (i = 0; i < max_scount; i++) {
+          for (i = 0; i <= max_scount; i++) {
             // Find out what the frequency is
             found = lst_data.find(function (el) {
               return (el.scount == i);
@@ -1918,7 +1922,7 @@ var ru = (function ($, ru) {
             .call(d3.axisLeft(y))
             .append("text")
               .attr("transform", "rotate(-90)")
-              .attr("y", -50)
+              .attr("y", -40)
               .attr("dy", ".71em")
               .style("text-anchor", "end")
               .text("SSG frequency");
@@ -1946,8 +1950,8 @@ var ru = (function ($, ru) {
 
           // Append the bar rectangles to the SVG element
           svg.selectAll("rect").data(bins).enter()
-              //.append("g")
-              //  .attr("href", function (d) { return d.targeturl;})
+              .append("g")
+              .append("a").attr("href", function (d) { return d.targeturl; })
               .append("rect")
                 .attr("x", 1)
                 .attr("transform", function (d) { return "translate(" + x(d.x0) + "," + y(d.length) + ")"; })
@@ -1957,8 +1961,8 @@ var ru = (function ($, ru) {
                 .attr("tabindex", 0)
                 .on("mouseover", showTooltip)
                 .on("mousemove", moveTooltip)
-                .on("mouseleave", hideTooltip)
-                .on("click", ru.passim.seeker.histogram_click);
+                .on("mouseleave", hideTooltip);
+                //.on("click", ru.passim.seeker.histogram_click);
           
           // THis should have drawn the histogram correctly
         } catch (ex) {

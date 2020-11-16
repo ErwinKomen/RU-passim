@@ -171,6 +171,17 @@ def has_Q_value(field, obj):
     
     return response
 
+def isempty(value):
+    response = True
+    if value != None:
+        if isinstance(value, str):
+            response = (value == "")
+        elif isinstance(value, int):
+            response = False
+        else:
+            response = (len(value) == 0)
+    return response
+
 def has_obj_value(field, obj):
     response = (field != None and field in obj and obj[field] != None)
     return response
@@ -516,6 +527,7 @@ class BasicList(ListView):
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
+    param_list = ""
     qs = None
     page_function = "ru.basic.search_paged_start"
 
@@ -876,9 +888,16 @@ class BasicList(ListView):
                 # Process the criteria for this form
                 oFields = thisForm.cleaned_data
 
+                # Set the param_list variable
+                self.param_list = []
+                lookfor = "{}-".format(prefix)
+                for k,v in self.qd.items():
+                    if lookfor in k and not isempty(v):
+                        self.param_list.append("{}={}".format(k,v))
+                
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
-                
+
                 self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
                 
                 # Calculate the final qs
