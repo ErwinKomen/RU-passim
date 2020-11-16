@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, \
+    Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, Profile, MsItem, SermonHead, \
     Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
@@ -139,6 +139,17 @@ def user_is_ingroup(request, sGroup):
     # Evaluate the list
     bIsInGroup = (sGroup in glist)
     return bIsInGroup
+
+def get_user_profile(username):
+        # Sanity check
+        if username == "":
+            # Rebuild the stack
+            return None
+        # Get the user
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        profile = Profile.objects.filter(user=user).first()
+        return profile
 
 def read_ecodex(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
     """Import an XML from e-codices with manuscript data and add it to the DB
@@ -737,8 +748,49 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # Die moeten in een nieuwe table/veld?
             # Alleen hier processen wanneer de shelfmark in sm_set staan
             # Alleen gedigitaliseerde manuscripten
+            
             unitid = manu.find("./did/unitid[@type='cote']")
-            if unitid != None and unitid != "":
+            
+            # First option: seek out combined shelfmarkset, for instance 2013-2023
+            # These have to be handled in a different way because the titel is on the highest level 
+            # and should be used for all of the manuscripst described in the lower <c> elements
+            # MAANDAG mee verder!
+            manuidno = unitid.text
+            if unitid != None and unitid != "" and "-" in manuidno: 
+                # Get the title that is to be used for all the manuscripts in the combined shelfmark 
+                # Find the <did> element
+                unit_did = manu.find("./did")
+                if unit_did is None:
+                    continue
+                # Make a list of all <unittitle> tags from within the <did> element and iterate over the list
+                for element_unittitle in unit_did.findall("./unittitle"): 
+                        # First grab ALL text from within the <unittitle> tage
+                        unittitle_1 = ''.join(element_unittitle.itertext())
+                        # print(unittitle_1)
+                        # Second clean the string
+                        unittitle_2 = re.sub("[\n\s]+"," ", unittitle_1)
+                        # print(unittitle_2)
+                        # Third strip string of spaces 
+                        unittitle_3 = unittitle_2.strip()
+                        # print(unittitle_3)
+                    
+                        # Add all available cleaned up text from the list of the unittitles parts to a string
+                        # and add an underscore for usage later on
+                        title_temp += unittitle_3 + "_"
+                        # print(title)
+
+                # When all <unittitle> tags in the list are handled and placed in one string
+                # the underscores are replaced by a comma
+                title_temp_comma = ', '.join(title_temp.split("_"))
+                # The last part is getting rid of the last comma at the end of the string
+                unittitle_final = title_temp_comma.rstrip(", ")
+                #print(unittitle_final)
+                # Now the title can be stored in the database TH: werkt dit?? NEE
+                manu_obj.name = unittitle_final
+
+                
+            # Secong seek out combined shelfmarkset
+            elif unitid != None and unitid != "":
                 # This is the shelfmark
                 manuidno = unitid.text
                 # print(manuidno)
@@ -817,25 +869,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     #print(unittitle_final)
                     # Now the title can be stored in the database TH: werkt dit?? NEE
                     manu_obj.name = unittitle_final
-                    # print(manu_obj.name)
-                   
-                    # TH: jammer maar dit kan weg denk ik zo. Zie latin 45, die moet nog anders. igv <title> dus onderstaande nog
-                    # te integreren.
-                
-                    #unittitle_1 = manu.find("./did/unittitle")
-                    #unittitle_2 = manu.find("./did/unittitle/title")
-                    #unittitle_1a = ''.join(unittitle_1.itertext())
-                    #unittitle_1a_clean = re.sub("[\n\s]+"," ", unittitle_1a)
-                    #if unittitle_1 != None and unittitle_1 != "":
-                    #    if unittitle_1a_clean != None and unittitle_1a_clean != "":
-                    #        manu_obj.name = unittitle_1a_clean
-                    #    elif unittitle_2 != None and unittitle_2 != "":
-                    #        manu_obj.name = unittitle_2.text
-                    #    else: 
-                    #        manu_obj.name = unittitle_1.text
-             
-                
-            
+                               
                     # Get the support and binding of the manuscript - if it is exists 
                     # TH: combine both, check if wanted
                     # (<physfacet type="support">  # <physfacet type="reliure">)                
@@ -1031,16 +1065,20 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Add country id to the manuscript
                     manu_obj.lcountry_id = unitcountry_id
                 
+                    # NOTES/COMMENTS    
+                    
                     # Get to sermons, hier een lijst van te maken, helaas komt scopecontents twee keer voor bij 
                     # sommige manuscripten zoals LAtin 196
                     # Find notes/comments in scopecontents only when there is a <c> element with manifestations
-                    # Example Latin 196, werkt dit?
 
+                    # First get the contents 
                     check_on_c_element = manu.findall("./c")
-                   
+                    # See if there are nested <c> elements...
                     if len(check_on_c_element) > 0: 
+                        # and if there are, pick up the <p> elements in scopecontents, these are not manifestations
+                        # but should be considerend as notes/comments.
                         for unit_p in manu.findall("./scopecontent/p"):
-                            if len(unit_p) > 0:   
+                            if len(unit_p) > 0: 
                                 note = ElementTree.tostring(unit_p, encoding="unicode")
                                 print(note)
                                 # Maybe clean string from elements and stuff
@@ -1049,32 +1087,21 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                 note_2 = note_1.replace('<p>', '')
                                 note_3 = note_2.replace('</p>', '')
 
-                                # Get profile TH: dit werkt nog niet
-                                profile = Profile.get_user_profile(username)
-                                # Dit lijkt mij niet de juiste methode...                                                             
+                                # Get profile 
+                                # profile = get_user_profile(username)  TH methode                                    
+                                profile = Profile.get_user_profile(username) # EK methode
                                 otype = "sermo"
-                                # Create new Manuscript Comment and the comment or comments
-                                # Heb een profile nodig, en otype
-                                # [m] Many-to-many: one manuscript can have a series of user-supplied comments
-                                # comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
-                                Comment_obj = Comment.objects.create(profile=profile, content=note_3, otype=otype)
-                                # (2)	Voeg die comment toe aan de comments van het manuscript:
-                                manuscript_object.comments.add(comment_obj)
-
-                                
-                                # Dit moet anders want zoals Provenance
-                                #manu_comment = Comment.objects.create(manuscript = manu_obj, comments_id = note_3)
-                                                           
+                                                                
+                                # Create new Comment, add profile, otype and the comment
+                                comment_obj = Comment.objects.create(profile=profile, content=note_3, otype=otype)
+                                # Add new comment to the manuscript                            
+                                manu_obj.comments.add(comment_obj)
 
                     else:
-                        continue
+                        pass
                         
-
-                    # Gebruik technieken van andere scopece
-
-
-
-
+                    # MANIFESTATIONS
+                     
                     # Hier nu ook met msitem rekening houden, hier zit de structuur in. 
                     # Elke manifestatie of sermhead heeft een eigen msitem, meer niet. 
                     # Eerst alles op orde brengen en de msitems aanmaken, dan nog een ronde over de
@@ -1093,24 +1120,27 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Dit voorleggen aan EK, eerst ff synchen
                     # Misschien eerst de variant zonder <c> check doen?
                     # Moet dan niet hier naar scopecontent op het hoogste niveau gekeken worden?
-                    #Eigenlijk moet voor bijv Latin 113 hier worden ingesprongen
+                    # Eigenlijk moet voor bijv Latin 113 hier worden ingesprongen
                     # Aangezien er in Latin 196 ook een scopecontent staat moet die genegeerd worden want er moet dan naar
                     # Zie aantekening shari, die moet wel meegenomen worden in notes oid, ok, geen punt aanpassen maar
                     # de <c> elementen gekeken worden
                     
-                    # Kan ik hiermee checken? EK zegt dat het via een if statemten zou moeten kunnen..
-                    check_on_c_element = manu.findall("./c")
-                    # Dit lijkt te werken
-                    if len(check_on_c_element) == 0: 
-                                                   
+                    # Kan ik hiermee checken? TH: hiermee verder op woensdag. Volgens mij werkt dit niet goed. 
+                    # Dit op orde krijgen en dan msitems waar nodig toevoegen. 
+                    # Check werkt nu, boven continue aangepast, verder met MsItems
+                    
+                    
+                    # Check if there are titles, heads and manuscripts in nested <c> elements
+                    # First if the above is not the case:
+                    if len(check_on_c_element) < 1: 
+                        print("This part works!")
                         for unit_p in manu.findall("./scopecontent/p"):
                             sermon_manif_titles_1 = ElementTree.tostring(unit_p, encoding="unicode")
                             if unit_p is None:
-                                continue
-                        # In case in the <p> element the manifestations are separated by a <lb> as a 
-                        # selfclosing element         
+                                pass
+                        # In case in the <p> element the manifestations are separated by a <lb/> as a 
+                        # selfclosing element, for example with Latin 113:        
                             elif '<lb />' in sermon_manif_titles_1:
-                                #print("This works!!!")    
                                 sermon_manif_titles_3 = []
                                 sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
                             # Clean titles and store in new list
@@ -1122,45 +1152,70 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     print(title_2)
                                     sermon_manif_titles_3.append(title_2)   
                                 for title in sermon_manif_titles_3:
-                                    # Opslaan van de inhoud van de lijst
-                                    # Create new Sermon Description TH: werkt het nou goed?
-                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
-                                    print(serm_obj)
+                                    
+                                    # Create MsItem to store the correct sequence of title, head and manifestations
+                                    # Use order to count the number of MsItems
+                                    msitem = MsItem.objects.create(manu=manu_obj, order=order)
+                                    # Add 1 to order
+                                    order += 1
+                                    # Store manifestations in title in SermDescr with MsItems:
+                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
+                        
+                            # In case the manifestations are better described in scopecontent 
+                            # for instance Latin 309 and 330, 1788 example?):
+                            # TH: dit werkt
+                            elif '<lb />' not in sermon_manif_titles_1:
+                                # First go through all manifesations (all <p> elements)
+                                sermon_manif_titles_3 = []
 
-                            else:
-                        # In case the manifestations are better described for instance Latin 309 and 330
-                        # Find folio
+                                serm_manif_title_join = ''.join(unit_p.itertext())
+                                serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
+                                sermon_manif_titles_3.append(serm_manif_title)
+
+                                # Check if there is also a head/folio
+                                # Hoe werkt dit in de bestaande loop? bekijkt dus al elk <p> element
+                                # dus steeds in dat element kijken?? Hoe kan ik dat <num> deel uit serm_manif_title halen?
                                 sermon_head = unit_p.find("./num")
-                                serm_folio = sermon_head.text
-                                print(serm_folio)
-
-                            # Find title / complete manifestation
-                            # split up later on?
-                            serm_manif_title_join = ''.join(unit_p.itertext())
-                            serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
-                    
-                    # Check if the manuscript is structured as Latin 196 (with manifestations within the <c> elements)
-                    elif len(check_on_c_element) > 0:            
-                    
+                                if sermon_head != None and sermon_head != "":
+                                    serm_folio = sermon_head.text
+                                    print(serm_folio)
+                                else: 
+                                    serm_folio = ''
+                                
+                                # Create MsItem to store the correct sequence of title, head and manifestations
+                                # Use order to count the number of MsItems
+                                msitem = MsItem.objects.create(manu=manu_obj, order=order)
+                                # Add 1 to order
+                                order += 1
+                                # Store manifestations in title in SermDescr with MsItem:
+                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = serm_manif_title, locus = serm_folio)
+                                      
+                    # IN CASE OF NESTED <c> ELEMENTS (SermHead, DateRange, SermDescr)
+                    # Check if the manuscript is structured as Latin 196 (with one or more 
+                    # manifestations within the <c> elements)
+                    elif len(check_on_c_element) > 0: 
+                        # Loop trough all <c> elements
                         for unit_c in manu.findall("./c"):
-                            # Find folio
+                            # First: find folio
                             sermon_head = unit_c.find("./head")
                             serm_folio = sermon_head.text
-                            print(serm_folio)
-                            # Dit moet ook in sermhead, folio opgeslagen worden. 
-                            # Die in sermdescr moet leeg gelaten worden!
-
-                            # Find date TH: hier mee verder maandag en dat deel onderin weg
-
+                                                        
+                            # Second: find date 
+                            # Date should be stored at the Manuscript level (in Daterange) 
                             sermon_date = unit_c.find("./did/unitdate")
-
+                            # Find out if there is a date and in what way the date is structured.
                             if sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
                                 sermon_date_complete = sermon_date.text
+                                # See if there is an indication of a range in the date
+                                # If there is no range, we assume for know Roman numerals are used
                                 if "-" not in sermon_date_complete:
                                     date_split = sermon_date_complete.split('e ')
-                                    # Why less than 3? Means two in these cases right?
                                     if len(date_split) < 3:  
+                                        # Take the first of the list
                                         sermon_century = date_split[0]
+                                        # See what century in Roman numerals is refered to and
+                                        # store the beginning of that century in yearstart and the
+                                        # end in yearfinish
                                         if sermon_century == "V":
                                             sermon_yearstart = "400"
                                             sermon_yearfinish = "500"
@@ -1189,16 +1244,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             elif sermon_date is None:
                                 continue
 
-                            # Create new Daterange object, store yearstart and year finish
-                            # Dit lijkt te werken
+                            # Create new Daterange object, store yearstart and year finish with a link to the manuscript
                             drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
-                            print(drange)
-
-                            # Find SECTION title TH: idealiter niet dat folio meenemen, check hoe het anders moet
-                            # voorlopig wel even goed zo 
-                            # Let op, deze titles moeten bij title van de sermonhead table komen volgens
-                              
-                  
+                            
+                            # Third: find section title
+                            # TH: idealiter niet dat folio meenemen, check hoe het anders moet voorlopig wel even goed zo 
+                                                        
                             sermon_unittitle = unit_c.find("./did/unittitle")
                             sermon_title_1 = ''.join(sermon_unittitle.itertext())
                             print(sermon_title_1)
@@ -1209,30 +1260,60 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             sermon_title_3 = sermon_title_2.strip()
                             print(sermon_title_3)
                             
-                            # Store title and folio in sermhead met msitem:
-                            # sermhead_obj = SermonHead.objects.create(msitem_id = ??, title = sermon_title_3, locus = serm_head)
-                            # print(sermhead_obj)                          
+                            # Now we have the folio/head and the title we can store them in SermHead
+
+                            # Implementatie van de rest van msitems systeem, firstchild, next, parent
+
+                            # next: de msitem id van het daaropvolgende MANIFESTATIE moet in principe bij 
+                            # alle items geplaatst worden, behalve bij de één na laatste van een sectie
+
+                            # beetje onduidelijk hoe dat bij manu 1773 zit, bij msitem 21352 en zit 21592
+
+                            # firstchild: 1 keer per sectie aangeven, dus bij sermonhead locus/title verwijzende 
+                            # naar 1e manifestatie (1e "child" dus) 
+                            
+                            # parent: dit moet bij ELKE onderliggende manifestatie aangeven worden, verwijst naar de 
+                            # bovenliggende sermonhead locus/title  
+                           
+                            # Create MsItem to store the correct sequence of title, head and manifestations 
+                            # Use order to count the number of MsItems 
+                            msitem = MsItem.objects.create(manu=manu_obj, order=order) 
+                            # Add 1 to order
+                            order += 1 
+                           
+                            # Store title and folio in SermHead with MsItem:                            
+                            sermhead_obj = SermonHead.objects.create(msitem = msitem, title = sermon_title_3, locus = serm_folio)
+                                                    
+                            # MANIFESTATIONS (with <c> element)
                                                         
                             # Grab contents in p under scopecontent in order to
                             # later on store the sermon manifestations
                             scopecontent_p = unit_c.find("./scopecontent/p")
                             
                             # Zie ook 1788 dit is eigenlijk hetzelfde als boven, 
-                                              
+
                             # Create sermon manifestation title 
                             # (store only if there are no multiple sermon manifestations)
                             # Moeten die %% er nog uit?
                             serm_manif_title = '%%'.join(scopecontent_p.itertext())
                             sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode")
                             
-                            # Onderscheid maken tussen scopecontent_p met 1 of meer manifestaties:
+                            # Differentiatie between scopecontent_p with 1 or more manifestaties, 
+                            # separated with an <lb/> element, first 1 manifestation:
                             if '<lb />' not in sermon_manif_titles_1:
                                 print(serm_manif_title)
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, title = serm_manif_title)
-                                print(serm_obj)
-                        # Dit lijkt goed te gaan maar is niet ideaal want er 
-                        # blijven soms codes in de sermon zitten                            
-                            
+                                # Create MsItem to store the correct sequence of title, head and manifestations
+                                # Use order to count the number of MsItems next parent child
+                                msitem = MsItem.objects.create(manu=manu_obj, order=order)
+                                # Add 1 to order
+                                order += 1
+                                # Store manifestations in title in SermDescr with MsItem:
+                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = serm_manif_title)
+                                
+                            # Dit lijkt goed te gaan maar is niet ideaal want er 
+                            # blijven soms codes in de sermon zitten
+
+                            # Second, with multiple manifesations:                                                        
                             elif '<lb />' in sermon_manif_titles_1:
                                 print("This works!!!")
                                 # Split up the string maar er komt geen list uit. TH: werkt nog niet, wordt niet gesplitst!
@@ -1249,53 +1330,18 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     # Opslaan van de inhoud van de lijst
                                     # Create new Sermon Description TH: werkt het nou goed?
                                     for title in sermon_manif_titles_3:
-                                        serm_obj = SermonDescr.objects.create(manu = manu_obj, title = title)
-                                        print(serm_obj)
-                            
-                            # Find date if available, aanpassen want dit moet op in <c> gebeuren
-                            # loop (store in Daterange (Manu))
-                            # Moet dit niet naar boven?
-                            #sermon_date = unit_c.find("./did/unitdate")
-                            #if sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
-                            #    sermon_date_complete = sermon_date.text
-                            #    if "-" not in sermon_date_complete:
-                            #        date_split = sermon_date_complete.split('e ')
-                            #        # Why less than 3? Means two in these cases right?
-                            #        if len(date_split) < 3:  
-                            #            sermon_century = date_split[0]
-                            #            if sermon_century == "V":
-                            #                sermon_yearstart = "400"
-                            #                sermon_yearfinish = "500"
-                            #            elif sermon_century == "VI":
-                            #                sermon_yearstart = "500"
-                            #                sermon_yearfinish = "600"
-                            #            elif sermon_century == "VII":
-                            #                sermon_yearstart = "700"
-                            #                sermon_yearfinish = "800"
-                            #            elif sermon_century == "IX":
-                            #                sermon_yearstart = "800"
-                            #                sermon_yearfinish = "900"
-                            #            elif sermon_century == "X":
-                            #                sermon_yearstart = "900"
-                            #                sermon_yearfinish = "1000"
-                            #            elif sermon_century == "XI":
-                            #                sermon_yearstart = "1000"
-                            #                sermon_yearfinish = "1100"
-                            #            elif sermon_century == "XII":
-                            #                sermon_yearstart = "1100"
-                            #                sermon_yearfinish = "1200"
-                            #            elif sermon_century == "XIII":
-                            #                sermon_yearstart = "1200"
-                            #                sermon_yearfinish = "1300"
-                             
-                            #elif sermon_date is None:
-                            #    continue
-                            # Create new SermonDescr object and store
-                            # serm_obj = SermonDescr.objects.create(sermon=serm_obj, title =  , locus = sermfolie sermontitle = sermon_title_3)
+                                        # Create MsItem to store the correct sequence of title, head and manifestations
+                                        # Use order to count the number of MsItems
+                                        msitem = MsItem.objects.create(manu=manu_obj, order=order)
+                                        # Add 1 to order
+                                        order += 1
+                                        # Store manifestations in title in SermDescr with MsItems:
+                                        # order moet ook hier erin komen te staan volgens mij
+                                        serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
+                                    
                             # Create new Daterange object, store yearstart and year finish
                             drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
-                            print(drange)
-                    
+                                           
                 
                     # Save the results
                     manu_obj.save()
@@ -1308,10 +1354,13 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         if url != None:
                             # Create new ManuscriptExt
                             mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
-                            #print(mext)
-                 
+            
+            # Take care of collection of manuscripts under one shelfmark for example: Latin 2013-2023
+
+            
             pass
             
+             
      #def read_msitem(msItem, oParent, lMsItem, level=0):
      #   """Recursively process one <msItem> and return in an object"""
         
