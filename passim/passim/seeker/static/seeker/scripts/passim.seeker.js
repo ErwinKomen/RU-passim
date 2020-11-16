@@ -1868,10 +1868,12 @@ var ru = (function ($, ru) {
 
           // Create an SVG top node
           svg = d3.select("#" + divid).append("svg")
-            .attr("width", "100%").attr("height", "100%")
-            .attr("viewBox", viewbox)
-            //.attr("width", width + margin.left + margin.right)
-            //.attr("height", height + margin.top + margin.bottom)
+            //.attr("width", "100%").attr("height", "100%")
+            //.attr("viewBox", viewbox)
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 

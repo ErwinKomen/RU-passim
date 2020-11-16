@@ -4034,6 +4034,26 @@ class BasicPart(View):
                         sContentType = "application/json"
                     elif self.dtype == "xlsx":
                         sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    elif self.dtype == "hist-svg":
+                        sContentType = "application/svg"
+                        sData = self.qd['downloaddata']
+                        # Set the filename correctly
+                        sDbName = "passim_{}_{}.svg".format(modelname, obj_id)
+                    elif self.dtype == "hist-png":
+                        sContentType = "image/png"
+                        # Read the base64 encoded part
+                        sData = self.qd['downloaddata']
+                        arPart = sData.split(";")
+                        if len(arPart) > 1:
+                            dSecond = arPart[1]
+                            # Strip off preceding base64 part
+                            sData = dSecond.replace("base64,", "")
+                            # Convert string to bytestring
+                            sData = sData.encode()
+                            # Decode base64 into binary
+                            sData = base64.decodestring(sData)
+                            # Set the filename correctly
+                            sDbName = "passim_{}_{}.png".format(modelname, obj_id)
 
                     # Excel needs additional conversion
                     if self.dtype == "xlsx":
@@ -12036,6 +12056,76 @@ class EqualGoldLinkset(BasicPart):
 
         added, lst_res = add_ssg_equal2equal(self.obj, instance.dst, instance.linktype)
         return True
+
+
+class EqualGoldScountDownload(BasicPart):
+    MainModel = EqualGold
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_queryset(self, prefix):
+
+        # Construct the QS
+        qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
+            'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
+            'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+
+        return qs
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop over all round/number combinations (testsets)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')               # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                row = dict(round=round, testset=number, speaker=speaker, gender=gender,
+                    filename=fname, sentence=sentence, ntype=ntype)
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData, indent=2)
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = [round, number, speaker, gender, fname, sentence, ntype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
 
 
 class AuthorEdit(PassimDetails):

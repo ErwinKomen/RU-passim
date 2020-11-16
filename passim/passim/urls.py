@@ -99,6 +99,7 @@ urlpatterns = [
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
     url(r'^ssg/eqset(?:/(?P<pk>\d+))?/$', EqualGoldEqualset.as_view(), name='equalgold_eqset'),
     url(r'^ssg/linkset(?:/(?P<pk>\d+))?/$', EqualGoldLinkset.as_view(), name='equalgold_linkset'),
+    url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
@@ -252,8 +253,8 @@ urlpatterns = [
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 
-    url(r'^api/import/pdf_manu/$', passim.seeker.views.do_create_pdf_manu, name='create_pdf_manu'), 
-    
+    url(r'^api/import/pdf_manu/$', passim.seeker.views.do_create_pdf_manu, name='create_pdf_manu'),
+     
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
     url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
