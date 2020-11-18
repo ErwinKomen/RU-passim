@@ -6,6 +6,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
     <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
+    <script src="{% static 'basic/scripts/html2canvas.js' %}"></script>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -44,6 +45,15 @@
                   {% endif %}
                   {% if title_right %}
                     <span class="pull-right">{{title_right|safe}}</span>
+                  {% elif custombuttons and not new_button %}
+                    <span style="margin-left: 100px;">
+                      {% for citem in custombuttons %}
+                        <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_{{citem.name}}" 
+                           role="button" title="{{citem.title}}">
+                          <span class="glyphicon glyphicon-{{citem.icon}}"></span>
+                        </a>
+                      {% endfor %}
+                    </span>
                   {% elif is_app_editor and new_button %}
                     <span id="add_{{new_button_name}}" class="pull-right">
                       {% csrf_token %}
@@ -67,6 +77,17 @@
                     {% endif %}
                   </form>
                 </div>
+
+                <!-- Custom button processing -->
+                {% if custombuttons and is_app_editor %}
+                  {% for citem in custombuttons %}
+                    <div id="tab_{{citem.name}}" class="inert collapse">
+                      {% if "template_name" in citem %}
+                        {% include citem.template_name %}
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                {% endif %}
 
                 {% block detailsview %}{% endblock detailsview %}
 

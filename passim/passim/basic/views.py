@@ -171,6 +171,17 @@ def has_Q_value(field, obj):
     
     return response
 
+def isempty(value):
+    response = True
+    if value != None:
+        if isinstance(value, str):
+            response = (value == "")
+        elif isinstance(value, int):
+            response = False
+        else:
+            response = (len(value) == 0)
+    return response
+
 def has_obj_value(field, obj):
     response = (field != None and field in obj and obj[field] != None)
     return response
@@ -516,6 +527,7 @@ class BasicList(ListView):
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
+    param_list = ""
     qs = None
     page_function = "ru.basic.search_paged_start"
 
@@ -675,7 +687,7 @@ class BasicList(ListView):
                                 fitem['keyList'] = frm[item['keyList']]
                                 fitem['has_keylist'] = True
                             if 'keyS' in item and item['keyS'] in frm.cleaned_data: 
-                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data:
+                                if 'dbfield' in item and item['dbfield'] in frm.cleaned_data and item['keyS'] != item['dbfield']:
                                     fitem['dbfield'] = frm[item['dbfield']]
                                     if fitem['dbfield'].value(): 
                                         bHasValue = True ; bHasItemValue = True
@@ -876,9 +888,16 @@ class BasicList(ListView):
                 # Process the criteria for this form
                 oFields = thisForm.cleaned_data
 
+                # Set the param_list variable
+                self.param_list = []
+                lookfor = "{}-".format(prefix)
+                for k,v in self.qd.items():
+                    if lookfor in k and not isempty(v):
+                        self.param_list.append("{}={}".format(k,v))
+                
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
-                
+
                 self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
                 
                 # Calculate the final qs
@@ -974,6 +993,7 @@ class BasicDetails(DetailView):
     do_not_save = False
     no_delete = False
     afterdelurl = None
+    custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
@@ -1211,6 +1231,14 @@ class BasicDetails(DetailView):
                 context['afterdelurl'] = self.afterdelurl
             else:
                 context['afterdelurl'] = context['listview']
+
+        # Custom buttons
+        if len(self.custombuttons) > 0:
+            for item in self.custombuttons:
+                if 'template_name' in item:
+                    # get the code of the template
+                    pass
+            context['custombuttons'] = self.custombuttons
 
         # Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST

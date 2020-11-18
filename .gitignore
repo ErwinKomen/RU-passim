@@ -316,3 +316,4 @@ ModelManifest.xml
 /passimproject/media/Boodts.pdf
 /passim/passim/enrich/migrations
 /passim/passim/bible/migrations
+/passim/passim/seeker/static/seeker/scripts/d3.v6.js

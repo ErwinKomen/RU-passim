@@ -110,6 +110,99 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * prepend_styles
+       *    Get the html in sDiv, but prepend styles that are used in it
+       * 
+       * @param {el} HTML dom element
+       * @returns {string}
+       */
+      prepend_styles: function (sDiv, sType) {
+        var lData = [],
+            el = null,
+            i, j,
+            sheets = document.styleSheets,
+            used = "",
+            elems = null,
+            tData = [],
+            rules = null,
+            rule = null,
+            s = null,
+            sSvg = "",
+            defs = null;
+
+        try {
+          // Get the correct element
+          if (sType === "svg") { sSvg = " svg"; }
+          el = $(sDiv + sSvg).first().get(0);
+          // Get all the styles used 
+          for (i = 0; i < sheets.length; i++) {
+            try {
+              rules = sheets[i].cssRules;
+            } catch (ex) {
+              // Just continue
+            }
+            for (j = 0; j < rules.length; j++) {
+              rule = rules[j];
+              if (typeof (rule.style) !== "undefined") {
+                elems = el.querySelectorAll(rule.selectorText);
+                if (elems.length > 0) {
+                  used += rule.selectorText + " { " + rule.style.cssText + " }\n";
+                }
+              }
+            }
+          }
+
+          // Get the styles
+          s = document.createElement('style');
+          s.setAttribute('type', 'text/css');
+          switch (sType) {
+            case "html":
+              s.innerHTML = used;
+
+              // Get the table
+              tData.push("<table class=\"func-view\">");
+              tData.push($(el).find("thead").first().get(0).outerHTML);
+              tData.push("<tbody>");
+              $(el).find("tr").each(function (idx) {
+                if (idx > 0 && !$(this).hasClass("hidden")) {
+                  tData.push(this.outerHTML);
+                }
+              });
+              tData.push("</tbody></table>");
+
+              // Turn into a good HTML
+              lData.push("<html><head>");
+              lData.push(s.outerHTML);
+              lData.push("</head><body>");
+              // lData.push(el.outerHTML);
+              lData.push(tData.join("\n"));
+
+              lData.push("</body></html>");
+              break;
+            case "svg":
+              s.innerHTML = "<![CDATA[\n" + used + "\n]]>";
+
+              defs = document.createElement('defs');
+              defs.appendChild(s);
+              el.insertBefore(defs, el.firstChild);
+
+              el.setAttribute("version", "1.1");
+              el.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+              el.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+              lData.push("<?xml version=\"1.0\" standalone=\"no\"?>");
+              lData.push("<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\" >");
+              lData.push(el.outerHTML);
+              break;
+          }
+
+          return lData.join("\n");
+        } catch (ex) {
+          private_methods.showError("prepend_styles", ex);
+          return "";
+        }
+      },
+
+      /**
        * resizableGrid
        *    Set the table to have resizable columns
        *    
@@ -1797,6 +1890,7 @@ var ru = (function ($, ru) {
         var ajaxurl = "",
             contentid = null,
             response = null,
+            scaleFactor = 4,  // Scaling of images to make sure the result is not blurry
             frm = null,
             el = null,
             sHtml = "",
@@ -1854,6 +1948,26 @@ var ru = (function ($, ru) {
               if (contentid !== undefined && contentid !== null && contentid !== "") {
                 // Process download data
                 switch (dtype) {
+                  case "hist-png":  // Download histogram as PNG
+                    // Convert the HTML into a canvas and turn the canvas into a PNG
+                    el = $(contentid).first().get(0);
+
+                    html2canvas(el, { scale: scaleFactor })
+                      .then(function (canvas) {
+                        // Convert to data
+                        var imageData = canvas.toDataURL("image/png");
+                        $(frm).find("#downloaddata").val(imageData);
+                        // Now submit the form
+                        oBack = frm.submit();
+                      });
+                    break;
+                  case "hist-svg":
+                    sHtml = private_methods.prepend_styles(contentid, "svg");
+                    // Set it
+                    $(frm).find("#downloaddata").val(sHtml);
+                    // Now submit the form
+                    oBack = frm.submit();
+                    break;
                   default:
                     // TODO: add error message here
                     return;

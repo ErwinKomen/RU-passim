@@ -39,6 +39,8 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
+import lxml
+import pygal
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -4032,6 +4034,26 @@ class BasicPart(View):
                         sContentType = "application/json"
                     elif self.dtype == "xlsx":
                         sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    elif self.dtype == "hist-svg":
+                        sContentType = "application/svg"
+                        sData = self.qd['downloaddata']
+                        # Set the filename correctly
+                        sDbName = "passim_{}_{}.svg".format(modelname, obj_id)
+                    elif self.dtype == "hist-png":
+                        sContentType = "image/png"
+                        # Read the base64 encoded part
+                        sData = self.qd['downloaddata']
+                        arPart = sData.split(";")
+                        if len(arPart) > 1:
+                            dSecond = arPart[1]
+                            # Strip off preceding base64 part
+                            sData = dSecond.replace("base64,", "")
+                            # Convert string to bytestring
+                            sData = sData.encode()
+                            # Decode base64 into binary
+                            sData = base64.decodestring(sData)
+                            # Set the filename correctly
+                            sDbName = "passim_{}_{}.png".format(modelname, obj_id)
 
                     # Excel needs additional conversion
                     if self.dtype == "xlsx":
@@ -7725,6 +7747,45 @@ class CollAnyEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
+    def get_histogram_data(self, instance=None, qs=None, listview="collist_hist", method='d3'):
+        """Get data to make a histogram"""
+
+        oErr = ErrHandle()
+        histogram_data = []
+        # b_chart = None
+        try:
+            # Get the queryset for this view
+            if instance != None and qs != None:
+                # Get the base url
+                baseurl = reverse('equalgold_list')
+                # Determine the list
+                qs = qs.order_by('scount').values('scount', 'id')
+                # qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
+                scount_index = {}
+                frequency = None
+                for item in qs:
+                    scount = item['scount']
+                    if frequency == None or frequency != scount:
+                        # Initialize the frequency
+                        frequency = scount
+                        # Add to the histogram data
+                        histogram_data.append(dict(scount=scount, freq=1))
+                    else:
+                        histogram_data[-1]['freq'] += 1
+
+                # Determine the targeturl for each histogram bar
+                for item in histogram_data:
+                    targeturl = "{}?ssg-{}={}&ssg-soperator=exact&ssg-scount={}".format(baseurl, listview, instance.id, item['scount'])
+                    item['targeturl'] = targeturl
+                # D3-specific
+                if method == "d3":
+                    histogram_data = json.dumps(histogram_data)
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_histogram_data")
+        return histogram_data
+
 
 class CollPrivEdit(CollAnyEdit):
     prefix = "priv"
@@ -7785,6 +7846,7 @@ class CollPrivDetails(CollAnyEdit):
     basic_name = "collpriv"
     title = "My Dataset"
     rtype = "html"
+    custombuttons = []
 
     def custom_init(self, instance):
         if instance != None:
@@ -7797,6 +7859,11 @@ class CollPrivDetails(CollAnyEdit):
             elif instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+
+            if instance.type == "super":
+                self.custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
+
             # Check for hlist saving
             self.check_hlist(instance)
         return None
@@ -8063,6 +8130,11 @@ class CollPrivDetails(CollAnyEdit):
                     ]
                 related_objects.append(supers)
 
+                context['histogram_data'] = self.get_histogram_data(instance, 
+                                                                    instance.collections_super.all(), 
+                                                                    'collist_{}'.format(self.prefix), 
+                                                                    'd3')
+
             context['related_objects'] = related_objects
         except:
             msg = oErr.get_error_message()
@@ -8134,6 +8206,9 @@ class CollPublDetails(CollPrivDetails):
             elif instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
+            if instance.type == "super":
+                self.custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
             # Check for hlist saving
             self.check_hlist(instance)
         return None
@@ -8142,6 +8217,8 @@ class CollPublDetails(CollPrivDetails):
 class CollHistDetails(CollHistEdit):
     """Like CollHistEdit, but then with html"""
     rtype = "html"
+    custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def custom_init(self, instance):
         # First do the original custom init
@@ -8348,6 +8425,7 @@ class CollHistDetails(CollHistEdit):
             related_objects.append(sermons)
 
         context['related_objects'] = related_objects
+        context['histogram_data'] = self.get_histogram_data(instance, instance.collections_super.all(), 'collist_hist', 'd3')
 
         # Return the context we have made
         return context
@@ -8786,7 +8864,7 @@ class CollectionListView(BasicList):
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?ssg-collist_ssg={}'>".format(url, instance.id))
+                html.append("<a href='{}?ssg-collist_hist={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
@@ -11536,7 +11614,7 @@ class EqualGoldListView(BasicList):
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
-        {"name": "Sermoun count",   "id": "filter_scount",            "enabled": False},
+        {"name": "Sermon count",    "id": "filter_scount",            "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -11574,6 +11652,8 @@ class EqualGoldListView(BasicList):
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' }
             ]}
         ]
+    custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
+                      "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def initializations(self):
         if Information.get_kvalue("author_anonymus") != "done":
@@ -11658,7 +11738,47 @@ class EqualGoldListView(BasicList):
         context['basketsize'] = 0 if profile == None else profile.basketsize_super
         context['basket_show'] = reverse('basket_show_super')
         context['basket_update'] = reverse('basket_update_super')
+        context['histogram_data'] = self.get_histogram_data('d3')
         return context
+
+    def get_histogram_data(self, method='d3'):
+        """Get data to make a histogram"""
+
+        oErr = ErrHandle()
+        histogram_data = []
+        b_chart = None
+        try:
+            # Get the base url
+            baseurl = reverse('equalgold_list')
+            # Get the queryset for this view
+            qs = self.get_queryset().order_by('scount').values('scount', 'id')
+            scount_index = {}
+            frequency = None
+            for item in qs:
+                scount = item['scount']
+                if frequency == None or frequency != scount:
+                    frequency = scount
+                    histogram_data.append(dict(scount=scount, freq=1))
+                else:
+                    histogram_data[-1]['freq'] += 1
+
+            # Determine the targeturl for each histogram bar
+            other_list = []
+            for item in self.param_list:
+                if "-soperator" not in item and "-scount" not in item:
+                    other_list.append(item)
+            other_filters = "&".join(other_list)
+            for item in histogram_data:
+                targeturl = "{}?ssg-soperator=exact&ssg-scount={}".format(baseurl, item['scount'], other_filters)
+                item['targeturl'] = targeturl
+
+            if method == "d3":
+                histogram_data = json.dumps(histogram_data)
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_histogram_data")
+        return histogram_data
         
     def get_basketqueryset(self):
         if self.basketview:
@@ -11678,10 +11798,6 @@ class EqualGoldListView(BasicList):
                 html.append(instance.author.name)
             else:
                 html.append("<i>(not specified)</i>")
-        # Issue #212: remove sermon number
-        #elif custom == "number":
-        #    sNumber = "-" if instance.number  == None else instance.number
-        #    html.append("{}".format(sNumber))
         elif custom == "size":
             iSize = instance.sgcount
             html.append("{}".format(iSize))
@@ -11940,6 +12056,76 @@ class EqualGoldLinkset(BasicPart):
 
         added, lst_res = add_ssg_equal2equal(self.obj, instance.dst, instance.linktype)
         return True
+
+
+class EqualGoldScountDownload(BasicPart):
+    MainModel = EqualGold
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_queryset(self, prefix):
+
+        # Construct the QS
+        qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
+            'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
+            'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+
+        return qs
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop over all round/number combinations (testsets)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')               # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                row = dict(round=round, testset=number, speaker=speaker, gender=gender,
+                    filename=fname, sentence=sentence, ntype=ntype)
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData, indent=2)
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = [round, number, speaker, gender, fname, sentence, ntype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
 
 
 class AuthorEdit(PassimDetails):
