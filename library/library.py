@@ -4,6 +4,10 @@ Combine the output into a grand list
 
 This version created by Erwin R. Komen
 Date: 14/jan/2019
+
+Usage:
+    python library.py -i "d:/data files/passim/data/LLTA_Names.xml" -o "d:/data files/passim/data/authors.json"
+
 """
 
 import sys, getopt, os.path, importlib
