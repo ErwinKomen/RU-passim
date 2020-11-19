@@ -44,7 +44,7 @@ from itertools import chain
 # Imports needed for working with XML and other file formats
 from xml.dom import minidom
 # See: http://effbot.org/zone/celementtree.htm
-import xml.etree.cElementTree as ElementTree
+import xml.etree.ElementTree as ElementTree
 
 
 # ======= imports from my own application ======
@@ -713,8 +713,15 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         # manu_list stores the "highest" manuscripts, on the first <c> tag
         # This is the highest "c" level, there is at least one level "c" lower
 
-        manu_list = xmldoc.find("//dsc").getchildren()
+        # manu_list = xmldoc.find("//dsc").getchildren()
+        # With this list we pick up ALL c elements, also when they are nested (for instance Latin 2013-2023).
+        # dit werkt nog niet "prefix 'child' not found in prefix map at line 718"
+        # let op vragen lxml en pygal, welke precies installeren?
+        # manu_list = xmldoc.find("//c[count(child::did/child::unitid[type='cote']] > 0")
+        # manu_list = xmldoc.find("//c[count(child::did/child::unitid[@type='cote'] ) > 0]")
+        # https://stackoverflow.com/questions/35526724/getting-all-nested-children-within-xml-tag-in-python
         
+        manu_list = xmldoc.find("//c[count(did/unitid[@type='cote']) > 0]")
         manu_info = xmldoc.find("//eadheader")
 
         manu_reliure_emph = xmldoc.find("//physfacet/emph")             
@@ -762,25 +769,56 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                        
             # This is the shelfmark
             manuidno = unitid.text
-            #if "-" not in manuidno_temp: 
-            #    manuidno = manuidno_temp
-            #elif "-" in manuidno_temp: 
-            #    manuidno_high_temp = manuidno_temp
-                
+            
+            # TITLE of a COMBINED MANUSCRIPT
+            
+            # Hier testje bouwen om bovenliggende element op te halen (igv Latin 2013-2023), unitttitle dus van 2013-2023
+            # Check if there is a <unittitle> on a higher level, get the title, add it later to the titles of the manuscripts 
+            # that are combined TH: moet dit hier staan?
 
+            if "-" in manuidno: 
+                print("This works")
+                manudino_list = manuidno.split("/")
+                manudidno_start = manudino_list[0] 
+                manuidno_end = manudino_list[1]
+
+                # Create a new string to add all parts of the title to later on
+                title_high_temp = ""
+
+                unit_did = manu.find("./did")
+                               
+                if unit_did is None:
+                    continue                
+                else:
+                    # Probably only one title, maybe more, keep it
+                    for unittitle_high in unit_did.findall("./unittitle"): 
+                        # First grab ALL text from within the <unittitle> tage
+                        unittitle_high_1 = ''.join(unittitle_high.itertext())                    
+                        # Second clean the string
+                        unittitle_high_2 = re.sub("[\n\s]+"," ", unittitle_high_1)                      
+                        # Third strip string of spaces 
+                        unittitle_high_3 = unittitle_high_2.strip()                      
+                    
+                        # Add all available cleaned up text from the list of the unittitles parts to a string
+                        # and add an underscore for usage later on
+                        title_high_temp += unittitle_high_3 + "_"
+
+                    # When all <unittitle> tags in the list are handled and placed in one string
+                    # the underscores are replaced by a comma
+                    title_high_temp_comma = ', '.join(title_high_temp.split("_"))
+                    
+                    # The last part is getting rid of the last comma at the end of the string
+                    # Keep the title in case there are underlying manuscripts and 
+                    # place the title before the <unittitle> in those manuscripts (for instance "I")
+                    unittitle_high_combined = title_high_temp_comma.rstrip(", ")
+                              
             # Check if this is a shelfmark that is listed in "shelfmark_set"
             if manuidno in shelfmark_set:
             # Create a new Manuscript
                 manu_obj = Manuscript.objects.create()
                 manu_obj.idno = manuidno
                 print(manu_obj.idno)            
-
-                # Hier zou misschien de opsplitsing moeten komen te staan igv bijvoorbeeld 2013-2023 
-                # if "-" in manuidno:
-
-                # titel (enauteur?) naar de onderliggende manu's
-                # else: wat hieronder komt, en alles opschuiven maar kan dit niet intelligenter? EK vragen
-
+                          
                 # TITLE(S) of the manuscript
                 # Get the name of the manuscript - if it exists
                 # E.g: <unittitle>Biblia sacra, pars.</unittitle>      
@@ -793,9 +831,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 # TH: there are manuscripts that have manuscripts nested within the manuscripts, for instance
                 # Latin 2013-2023, the first <did> element contains only the title (and author), that is to be used for the underlying manuscripts
                 # manuscripts, which are in lower <did> element
-
-                # In case of combined manuscript, en dan langs alle did's gaan natuurlijk, dus dit moet hoger gebeuren
-                unit_did_2 = manu.findall("./did/c/did")
+                             
                 
                 unit_did = manu.find("./did")
                 
@@ -832,7 +868,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Now the title can be stored in the database TH: werkt dit?? Wel toch?
                     manu_obj.name = unittitle_final
                 
-                                
+                    # TH: hierboven nog een stap toevoegen
+                    # Als de manuidno in between first and last is van bepaalde set 2013-2023
+                    # if manuidno => manuidno_start and <= manuidno_end:
+                    # unittitle_high_low = unittitle_high_combined + ", "+ unittitle_final
+                    # manu_obj.name = unittitle_high_low
+                    # else: de rest, zoals boven             
 
                 # ANCIENNE COTES of the manuscript
 
