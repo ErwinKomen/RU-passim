@@ -721,9 +721,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         # manu_list = xmldoc.find("//c[count(child::did/child::unitid[@type='cote'] ) > 0]")
         # https://stackoverflow.com/questions/35526724/getting-all-nested-children-within-xml-tag-in-python
         
-        manu_list = xmldoc.find("//c[count(did/unitid[@type='cote']) > 0]")
+        manu_list = xmldoc.findall("//c[count(did/unitid[@type='cote']) > 0]")
         manu_info = xmldoc.find("//eadheader")
-
+        manu_list = xmldoc.findall("//c[did]")
         manu_reliure_emph = xmldoc.find("//physfacet/emph")             
 
         # Import wishlist.csv that holds the shelfmarks of the selected A+M manuscripts        

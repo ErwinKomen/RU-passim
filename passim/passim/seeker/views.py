@@ -7752,7 +7752,6 @@ class CollAnyEdit(BasicDetails):
 
         oErr = ErrHandle()
         histogram_data = []
-        # b_chart = None
         try:
             # Get the queryset for this view
             if instance != None and qs != None:
@@ -7760,7 +7759,6 @@ class CollAnyEdit(BasicDetails):
                 baseurl = reverse('equalgold_list')
                 # Determine the list
                 qs = qs.order_by('scount').values('scount', 'id')
-                # qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
                 scount_index = {}
                 frequency = None
                 for item in qs:
