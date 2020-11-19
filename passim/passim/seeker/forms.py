@@ -3374,6 +3374,7 @@ class FeastForm(forms.ModelForm):
         # Return the response
         return None
 
+
 class BibRangeForm(forms.ModelForm):
     newintro    = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Intro...',  'style': 'width: 100%;'}))
@@ -3455,8 +3456,7 @@ class BibRangeForm(forms.ModelForm):
 
         # Return the response
         return None
-
-
+    
 
 class SearchCollectionForm(forms.Form):
     country = forms.CharField(label=_("Country"), required=False)
