@@ -1580,22 +1580,23 @@ class BasicDetails(DetailView):
                     if self.afternewurl != "":
                         context['afternewurl'] = self.afternewurl
                 
-            elif frm != None:
-                # Check if this is asking for a new form
-                if instance == None:
-                    # Get the form for the sermon
-                    if self.use_team_group:
-                        frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+            else:
+                if mForm != None:
+                    # Check if this is asking for a new form
+                    if instance == None:
+                        # Get the form for the sermon
+                        if self.use_team_group:
+                            frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(prefix=prefix)
                     else:
-                        frm = mForm(prefix=prefix)
-                else:
-                    # Get the form for the sermon
-                    if self.use_team_group:
-                        frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(instance=instance, prefix=prefix)
-                if frm.is_valid():
-                    iOkay = 1
+                        # Get the form for the sermon
+                        if self.use_team_group:
+                            frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(instance=instance, prefix=prefix)
+                    if frm.is_valid():
+                        iOkay = 1
                 # Walk all the form objects
                 for formObj in self.form_objects:
                     formClass = formObj['form']
