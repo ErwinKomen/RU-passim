@@ -14,66 +14,68 @@
   <table style="width: 100%;">
     <tbody>
       <!-- The row with buttons -->
-      <tr>
-        <td colspan="2"  class="ms editable table">
-          <!-- Provide the necessary buttons: edit, cancel and save -->
-          <div>
-            {% if is_app_userplus or is_app_editor or permission == "write" %}
-              <!-- Edit button -->
-              <a mode="edit" class="view-mode btn btn-xs jumbo-1"><span class="glyphicon glyphicon-pencil" title="Edit these data"></span></a>
-            {% endif %}
+      {% if is_app_moderator or permission != "readonly" %}
+        <tr>
+          <td colspan="2"  class="ms editable table">
+            <!-- Provide the necessary buttons: edit, cancel and save -->
+            <div>
+              {% if is_app_userplus or is_app_editor or permission == "write" %}
+                <!-- Edit button -->
+                <a mode="edit" class="view-mode btn btn-xs jumbo-1"><span class="glyphicon glyphicon-pencil" title="Edit these data"></span></a>
+              {% endif %}
 
-            <!-- Cancel button -->
-            <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
-              <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
-            </a>
-
-            {% if is_app_userplus or is_app_editor or permission == "write"  %}
-              <!-- Save button -->
-              <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
-                 targeturl="{% if basic_form.instance.id %}{{editview}}{% else %}{{addview}}{% endif %}" >
-                <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+              <!-- Cancel button -->
+              <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+                <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
               </a>
-            {% endif %}
 
-            <!-- Waiting symbol-->
-            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
-
-            <!-- Little error message room -->
-            <span id="gold_err_msg" class="err-msg"></span>
-
-            {% if not no_delete %}
-              {% if is_app_editor  or permission == "write" %}
-                <!-- Put the delete button completely to the right-->
-                <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
-                   onclick="ru.basic.delete_confirm(this);">
-                  <span class="glyphicon glyphicon-remove" title="Delete this item"></span>
+              {% if is_app_userplus or is_app_editor or permission == "write"  %}
+                <!-- Save button -->
+                <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
+                   targeturl="{% if basic_form.instance.id %}{{editview}}{% else %}{{addview}}{% endif %}" >
+                  <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
                 </a>
               {% endif %}
-            {% endif %}
-          </div>
 
-          <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-          {% if is_app_editor or permission == "write"  %}
-            <div class="delete-confirm hidden selected">
-              <span>Are you sure you would like to delete this item?</span>
-              <span>
-                <!-- The button to cancel deletion -->
-                <a title="Cancel deletion" class="btn btn-xs jumbo-1"
-                   onclick="ru.basic.delete_cancel(this);">Cancel</a>
-                <!-- The actual delete button-->
-                <a mode="delete" title="Delete this item" class="btn btn-xs jumbo-3"
-                   afterurl="{{afterdelurl}}"
-                   targetid="sermon_edit"
-                   targeturl="{% if basic_form.instance.id %}{{editview}}{% endif %}">
-                  Delete
-                </a>
-              </span>
+              <!-- Waiting symbol-->
               <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+
+              <!-- Little error message room -->
+              <span id="gold_err_msg" class="err-msg"></span>
+
+              {% if not no_delete %}
+                {% if is_app_editor  or permission == "write" %}
+                  <!-- Put the delete button completely to the right-->
+                  <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+                     onclick="ru.basic.delete_confirm(this);">
+                    <span class="glyphicon glyphicon-remove" title="Delete this item"></span>
+                  </a>
+                {% endif %}
+              {% endif %}
             </div>
-          {% endif %}
-        </td>
-      </tr>
+
+            <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+            {% if is_app_editor or permission == "write"  %}
+              <div class="delete-confirm hidden selected">
+                <span>Are you sure you would like to delete this item?</span>
+                <span>
+                  <!-- The button to cancel deletion -->
+                  <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+                     onclick="ru.basic.delete_cancel(this);">Cancel</a>
+                  <!-- The actual delete button-->
+                  <a mode="delete" title="Delete this item" class="btn btn-xs jumbo-3"
+                     afterurl="{{afterdelurl}}"
+                     targetid="sermon_edit"
+                     targeturl="{% if basic_form.instance.id %}{{editview}}{% endif %}">
+                    Delete
+                  </a>
+                </span>
+                <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+      {% endif %}
 
       <!-- Walk all the fields in mainitems -->
       {% for mainitem in mainitems %}

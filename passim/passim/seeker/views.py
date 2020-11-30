@@ -39,8 +39,6 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
-#import lxml
-#import pygal
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -118,21 +116,18 @@ app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
 
 def get_usercomments(type, instance, profile):
-    """Get a HTML list of user-made comments"""
+    """Get a HTML list of comments made by this user and possible users in the same group"""
 
     html = []
-    qs = instance.comments.filter(profile=profile).order_by("-created")
-    #if qs.count() > 0:
-    #    html.append("<table style='width: 100%;'><tbody>")
-    #    for obj in qs:
-    #        # Add one comment into the table
-    #        html.append("<tr><td class='tdnowrap'>{}</td><td style='margin-left: 10px; width: 90%;'>{}</td></tr>".format(
-    #            get_crpp_date(obj.created, True), obj.content ))
-    #    html.append("</tbody></table>")
+    lstQ = []
+    if not username_is_ingroup(profile.user, app_editor):
+        # App editors have permission to see *all* comments from all users
+        lstQ.append(Q(profile=profile))
 
-    ## Combine
-    #sBack = "\n".join(html)
-    #return sBack
+    # Calculate the list
+    qs = instance.comments.filter(*lstQ).order_by("-created")
+
+    # REturn the list
     return qs
 
 
@@ -332,6 +327,10 @@ def user_is_authenticated(request):
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
     user = User.objects.filter(username=request.user.username).first()
+    response = username_is_ingroup(user, sGroup)
+    return response
+
+def username_is_ingroup(user, sGroup):
     # glist = user.groups.values_list('name', flat=True)
 
     # Only look at group if the user is known
@@ -9184,6 +9183,58 @@ class CommentEdit(BasicDetails):
     """The details of one comment"""
 
     model = Comment
+    mForm = None        # We are not using a form here!
+    prefix = 'com'
+    new_button = False
+    # no_delete = True
+    permission = "readonly"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_created(),    },
+                {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
+                {'type': 'plain', 'label': "Comment:",      'value': instance.content,     },
+                {'type': 'plain', 'label': "Item type:",    'value': instance.get_otype()},
+                {'type': 'safe', 'label': "Link:",          'value': self.get_link(instance)}
+                ]
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_link(self, instance):
+        url = ""
+        label = ""
+        sBack = ""
+        if instance.otype == "manu":
+            obj = instance.comments_manuscript.first()
+            url = reverse("manuscript_details", kwargs={'pk': obj.id})
+            label = "manu_{}".format(obj.id)
+        elif instance.otype == "sermo":
+            obj = instance.comments_sermon.first()
+            url = reverse("sermon_details", kwargs={'pk': obj.id})
+            label = "sermo_{}".format(obj.id)
+        elif instance.otype == "gold":
+            obj = instance.comments_gold.first()
+            url = reverse("sermongold_details", kwargs={'pk': obj.id})
+            label = "gold_{}".format(obj.id)
+        elif instance.otype == "super":
+            obj = instance.comments_super.first()
+            url = reverse("equalgold_details", kwargs={'pk': obj.id})
+            label = "super_{}".format(obj.id)
+        if url != "":
+            sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+ 
+        return sBack
 
 
 class CommentDetails(CommentEdit):

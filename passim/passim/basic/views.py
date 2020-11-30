@@ -988,7 +988,7 @@ class BasicDetails(DetailView):
     basic_name_prefix = ""
     basic_add = ""
     add_text = "Add a new"
-    permission = "read"     # Permission can be: (nothing), "read" and "write"
+    permission = "read"     # Permission can be: (nothing), "read", "readonly", "write"
     new_button = False
     do_not_save = False
     no_delete = False
@@ -1580,7 +1580,7 @@ class BasicDetails(DetailView):
                     if self.afternewurl != "":
                         context['afternewurl'] = self.afternewurl
                 
-            else:
+            elif frm != None:
                 # Check if this is asking for a new form
                 if instance == None:
                     # Get the form for the sermon
