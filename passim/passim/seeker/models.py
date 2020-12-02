@@ -284,7 +284,7 @@ def get_searchable(sText):
         sText = sText.strip()
     return sText
 
-def get_stype_light(stype, usercomment=False):
+def get_stype_light(stype, usercomment=False, count=-1):
     """HTML visualization of the different STYPE statuses"""
 
     sBack = ""
@@ -311,10 +311,14 @@ def get_stype_light(stype, usercomment=False):
     if usercomment:
         # Add modal button to comment
         html = []
+        count_code = ""
+        if count > 0:
+            # Add an indication of the number of comments
+            count_code = "<span style='color: red;'> {}</span>".format(count)
         html.append(sBack)
         html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
         html.append("   data-target='#modal-comment'>")
-        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span></a></span>")
+        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
         sBack = "\n".join(html)
 
     # Return what we made
@@ -3260,7 +3264,10 @@ class Manuscript(models.Model):
         return count
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -4635,7 +4642,10 @@ class EqualGold(models.Model):
         return "".join(lHtml)
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_superlinks_markdown(self):
@@ -5155,7 +5165,10 @@ class SermonGold(models.Model):
         return sBack
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_view(self):
@@ -6786,7 +6799,10 @@ class SermonDescr(models.Model):
         return sBack
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_template_link(self, profile):
