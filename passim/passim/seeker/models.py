@@ -3095,14 +3095,17 @@ class Manuscript(models.Model):
             oErr.DoError("get_city")
         return city
 
-    def get_collections_markdown(self, username, team_group, settype = None):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=False):
 
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('manu', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
+            if plain:
+                lHtml.append(col.name)
+            else:
+                url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
 
@@ -3145,35 +3148,44 @@ class Manuscript(models.Model):
 
         return "\n".join(lhtml)
 
-    def get_external_markdown(self):
+    def get_external_markdown(self, plain=False):
         lHtml = []
         for obj in self.manuscriptexternals.all().order_by('url'):
             url = obj.url
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
+            if plain:
+                lHtml.append(obj.url)
+            else:
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self):
+    def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile):
+    def get_keywords_user_markdown(self, profile, plain=False):
         lHtml = []
         # Visit all keywords
         for kwlink in self.manu_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
-            # Determine where clicking should lead to
-            url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -3193,14 +3205,17 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, lib)
         return sBack
 
-    def get_litrefs_markdown(self):
+    def get_litrefs_markdown(self, plain=False):
         lHtml = []
         # Visit all literature references
         for litref in self.manuscript_litrefs.all().order_by('reference__short'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+            if plain:
+                lHtml.append(litref.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -3239,18 +3254,24 @@ class Manuscript(models.Model):
             sBack = '<span class="project">{}</span>'.format(self.project.name)
         return sBack
 
-    def get_provenance_markdown(self):
+    def get_provenance_markdown(self, plain=False):
         lHtml = []
         # Visit all literature references
         for prov in self.provenances.all().order_by('name'):
             # Get the URL
             url = reverse("provenance_details", kwargs = {'pk': prov.id})
             if prov.location == None:
-                # Create a display for this item
-                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
+                if plain:
+                    lHtml.append(prov.name)
+                else:
+                    # Create a display for this item
+                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
             else:
-                # Create a display for this item
-                lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
+                if plain:
+                    lHtml.append("{}: {}".format(prov.name, prov.location.name))
+                else:
+                    # Create a display for this item
+                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -6377,7 +6398,7 @@ class SermonDescr(models.Model):
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
         return sBack
 
-    def get_bibleref(self):
+    def get_bibleref(self, plain=False):
         """Interpret the BibRange objects into a proper view"""
 
         bAutoCorrect = False
@@ -6397,8 +6418,11 @@ class SermonDescr(models.Model):
                 added = ""
                 if obj.added != None and obj.added != "":
                     added = " ({})".format(obj.added)
-                bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
-                    obj, url, intro, obj.book.latabbr, obj.chvslist, added)
+                if plain:
+                    bref_display = "{}{} {}{}".format(intro, obj.book.latabbr, obj.chvslist, added)
+                else:
+                    bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
+                        obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
                 sBack = "; ".join(html)
             # Possibly adapt the bibleref
@@ -6433,15 +6457,18 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
     
-    def get_collections_markdown(self, username, team_group, settype = None):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=True):
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
-            # Create a display for this topic
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+            if plain:
+                lHtml.append(col.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
+                # Create a display for this topic
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -6489,7 +6516,7 @@ class SermonDescr(models.Model):
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
-    def get_eqsetsignatures_markdown(self, type="all"):
+    def get_eqsetsignatures_markdown(self, type="all", plain=True):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
         # Initialize
@@ -6625,27 +6652,33 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self):
+    def get_keywords_markdown(self, plain=True):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile):
+    def get_keywords_user_markdown(self, profile, plain=True):
         lHtml = []
         # Visit all keywords
         for kwlink in self.sermo_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
-            # Determine where clicking should lead to
-            url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -6686,7 +6719,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_litrefs_markdown(self):
+    def get_litrefs_markdown(self, plain=True):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
         lHtml = []
@@ -6694,11 +6727,14 @@ class SermonDescr(models.Model):
         # manu = self.manu
         # lref_list = []
         for item in LitrefMan.objects.filter(manuscript=self.get_manuscript()).order_by('reference__short', 'pages'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
-                url,item.get_short_markdown()))
+            if plain:
+                lHtml.append(item.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
+                    url,item.get_short_markdown()))
        
         # (2) The literature references available in all the SGs that are part of the SSG
         ssg_id = self.equalgolds.all().values('id')
@@ -6707,11 +6743,14 @@ class SermonDescr(models.Model):
         gold_id = SermonGold.objects.filter(equal__id__in=ssg_id).values('id')
         # Visit all the litrefSGs
         for item in LitrefSG.objects.filter(sermon_gold__id__in = gold_id).order_by('reference__short', 'pages'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
-                url,item.get_short_markdown()))
+            if plain:
+                lHtml.append(item.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
+                    url,item.get_short_markdown()))
 
         sBack = ", ".join(lHtml)
         return sBack
@@ -6788,16 +6827,19 @@ class SermonDescr(models.Model):
         # Return the sermon signature
         return sermonsig
 
-    def get_sermonsignatures_markdown(self):
+    def get_sermonsignatures_markdown(self, plain=True):
         lHtml = []
         # Visit all signatures
         for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
-            # Determine where clicking should lead to
-            url = ""
-            if sig.gsig:
-                url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
-            # Create a display for this topic
-            lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            if plain:
+                lHtml.append(sig.code)
+            else:
+                # Determine where clicking should lead to
+                url = ""
+                if sig.gsig:
+                    url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
+                # Create a display for this topic
+                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
         sBack = ", ".join(lHtml)
         return sBack

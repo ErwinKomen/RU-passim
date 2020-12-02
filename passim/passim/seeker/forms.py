@@ -2346,31 +2346,40 @@ class EqualGoldLinkForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        # Read the super_id
-        super_id = kwargs.pop("super_id")
-        # Start by executing the standard handling
-        super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
-        # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
-        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
-        # Make sure to set required and optional fields
-        self.fields['linktype'].required = False
-        self.fields['newlinktype'].required = False
-        self.fields['dst'].required = False
-        self.fields['newsuper'].required = False
-        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=super_id).order_by('code')
-        # Adapt the widget QS
-        self.fields['newsuper'].widget.exclude = super_id
-        # self.fields['target_list'].queryset = EqualGold.objects.none()
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            if instance != None:
-                #  NOTE: the following has no effect because we use bound fields
-                #       self.fields['linktype'].initial = instance.linktype
-                #       self.fields['dst'].initial = instance.dst
+        oErr = ErrHandle()
+        try:
+            # Read the super_id
+            super_id = kwargs.pop("super_id", "")
+            # Start by executing the standard handling
+            super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
+            # Initialize choices for linktype
+            init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
+            init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
+            # Make sure to set required and optional fields
+            self.fields['linktype'].required = False
+            self.fields['newlinktype'].required = False
+            self.fields['dst'].required = False
+            self.fields['newsuper'].required = False
 
-                self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=instance.id).order_by('code')
+            if super_id != None and super_id != "":
+                self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=super_id).order_by('code')
+                # Adapt the widget QS
+                self.fields['newsuper'].widget.exclude = super_id
+            else:
+                self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code')
+            # self.fields['target_list'].queryset = EqualGold.objects.none()
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+                    #  NOTE: the following has no effect because we use bound fields
+                    #       self.fields['linktype'].initial = instance.linktype
+                    #       self.fields['dst'].initial = instance.dst
+
+                    self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=instance.id).order_by('code')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldLinkForm")
 
         # REturn nothing
         return None

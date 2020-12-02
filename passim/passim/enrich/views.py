@@ -1084,7 +1084,7 @@ class TestsetDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize

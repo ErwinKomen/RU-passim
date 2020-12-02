@@ -4022,7 +4022,9 @@ class BasicPart(View):
                     sType = "csv" if (self.dtype == "xlsx") else self.dtype
 
                     # Get the data
-                    sData = self.get_data('', self.dtype)
+                    sData = ""
+                    if self.dtype != "excel":
+                        sData = self.get_data('', self.dtype)
                     # Decode the data and compress it using gzip
                     bUtf8 = (self.dtype != "db")
                     bUsePlain = (self.dtype in plain_type)
@@ -4066,11 +4068,11 @@ class BasicPart(View):
                         response = HttpResponse(content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
                         response = csv_to_excel(sData, response)
-                    elif self.dtype == "xlsx":
+                    elif self.dtype == "excel":
                         # Convert 'compressed_content' to an Excel worksheet
                         response = HttpResponse(content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = sData
+                        response = self.get_data('', self.dtype, response)
                     else:
                         response = HttpResponse(sData, content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
@@ -4313,7 +4315,7 @@ class BasicPart(View):
     def get_form_kwargs(self, prefix):
         return None
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         return ""
 
     def before_save(self, prefix, request, instance=None, form=None):
@@ -10282,6 +10284,53 @@ class ManuscriptDownload(BasicPart):
     template_name = "seeker/download_status.html"
     action = "download"
     dtype = "excel"       # downloadtype
+    manuitems = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name'},
+        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name'},
+        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},
+        {'name': 'Title',               'type': 'field', 'path': 'name'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Support',             'type': 'field', 'path': 'support'},
+        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        ]
+    sermoitems = [
+        {'name': 'Order',               'type': ''},
+        {'name': 'Parent',              'type': ''},
+        {'name': 'FirstChild',          'type': ''},
+        {'name': 'Next',                'type': ''},
+        {'name': 'Type',                'type': ''},
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Locus',               'type': 'field', 'path': 'locus'},
+        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
+        {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
+        {'name': 'Title',               'type': 'field', 'path': 'title'},
+        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
+        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
+        {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
+        {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
+        {'name': 'Note',                'type': 'field', 'path': 'note'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Gryson/Clavis',       'type': 'func',  'path': 'signatures'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'SSG links',           'type': 'field', 'path': 'note'},
+        ]
 
     def custom_init(self):
         """Calculate stuff"""
@@ -10290,74 +10339,151 @@ class ManuscriptDownload(BasicPart):
         if dt != None and dt != '':
             self.dtype = dt
 
-    def get_data(self, prefix, dtype):
+    def get_func(self, instance, path, profile, username, team_group):
+        sBack = ""
+        if path == "dateranges":
+            qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            dates = []
+            for obj in qs:
+                dates.append(obj.__str__())
+            sBack = ", ".join(dates)
+        elif path == "keywords":
+            sBack = instance.get_keywords_markdown(plain=True)
+        elif path == "keywordsU":
+            sBack =  instance.get_keywords_user_markdown(profile, plain=True)
+        elif path == "datasets":
+            sBack = instance.get_collections_markdown(username, team_group, settype="pd", plain=True)
+        elif path == "literature":
+            sBack = instance.get_litrefs_markdown(plain=True)
+        elif path == "origin":
+            sBack = instance.get_origin()
+        elif path == "provenances":
+            sBack = instance.get_provenance_markdown(plain=True)
+        elif path == "external":
+            sBack = instance.get_external_markdown(plain=True)
+        elif path == "brefs":
+            sBack = instance.get_bibleref(plain=True)
+        elif path == "signatures":
+            sBack = instance.get_sermonsignatures_markdown(plain=True)
+        elif path == "ssglinks":
+            sBack = instance.get_eqsetsignatures_markdown(plain=True)
+        return sBack
+
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
+
+        def get_item_value(item, instance):
+            key = item['name']
+            value = ""
+            if instance != None:
+                if item['type'] == 'field':
+                    value = getattr(instance, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(instance, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.get_func(instance, item['path'], profile, username, team_group)
+            return key, value
 
         # Initialize
         lData = []
         sData = ""
         manu_fields = []
+        oErr = ErrHandle()
 
-        # Start workbook
-        wb = openpyxl.Workbook()
-        ws = wb.get_active_sheet()
-        ws.title="Manuscript"
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
 
-        # Read the header cells and make a header row in the MANUSCRIPT worksheet
-        headers = ["Field", "Value"]
-        for col_num in range(len(headers)):
-            c = ws.cell(row=1, column=col_num+1)
-            c.value = headers[col_num]
-            c.font = openpyxl.styles.Font(bold=True)
-            # Set width to a fixed size
-            ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+            # Start workbook
+            wb = openpyxl.Workbook()
 
-        # Get the manuscript fields as a dict
-        manu_dict = model_to_dict(self.obj)
-        manu_keys = [k for k,v in manu_dict.items()]
-        manu_keys.sort()
-        # Walk through the manuscript fields
-        row_num = 1
-        for key in manu_keys:
-            value = manu_dict[key]
+            # First worksheet: MANUSCRIPT itself
+            ws = wb.get_active_sheet()
+            ws.title="Manuscript"
 
-        if dtype == "json":
-            # Loop over all round/number combinations (testsets)
-            for obj in self.get_queryset(prefix):
-                round = obj.get('testset__round')               # obj.testset.round
-                number = obj.get('testset__number')             # obj.testset.number
-                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
-                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
-                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
-                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
-                fname = obj.get('testunit__fname')              # Pre-calculated filename
-                row = dict(round=round, testset=number, speaker=speaker, gender=gender,
-                    filename=fname, sentence=sentence, ntype=ntype)
-                lData.append(row)
-            # convert to string
-            sData = json.dumps(lData, indent=2)
-        elif dtype == "csv" or dtype == "xlsx":
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
-            csvwriter.writerow(headers)
-            for obj in self.get_queryset(prefix):
-                round = obj.get('testset__round')                # obj.testset.round
-                number = obj.get('testset__number')             # obj.testset.number
-                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
-                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
-                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
-                fname = obj.get('testunit__fname')              # Pre-calculated filename
-                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
-                row = [round, number, speaker, gender, fname, sentence, ntype]
-                csvwriter.writerow(row)
+            # Read the header cells and make a header row in the MANUSCRIPT worksheet
+            headers = ["Field", "Value"]
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+            # Walk the mainitems
+            row_num = 2
+            for item in self.manuitems:
+                key, value = get_item_value(item, self.obj)
+                # Add the K/V row
+                ws.cell(row=row_num, column = 1).value = key
+                ws.cell(row=row_num, column = 2).value = value
+                row_num += 1
+
+            # Second worksheet: ALL SERMONS in the manuscript
+            ws = wb.create_sheet("Sermons")
+
+            # Read the header cells and make a header row in the MANUSCRIPT worksheet
+            headers = [x['name'] for x in self.sermoitems ]
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+            row_num = 1
+            # Walk all msitems of this manuscript
+            for msitem in self.obj.manuitems.all().order_by('order'):
+                row_num += 1
+                col_num = 1
+                ws.cell(row=row_num, column=col_num).value = msitem.order
+                # Get other stuff
+                parent = "" if msitem.parent == None else msitem.parent.order
+                firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
+                next = "" if msitem.next == None else msitem.next.order
+
+                # Process the structural elements
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = parent
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = firstchild
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = next
+
+                # What kind of item is this?
+                col_num += 1
+                if msitem.itemheads.count() > 0:
+                    sermonhead = msitem.itemheads.first()
+                    # This is a SermonHead
+                    ws.cell(row=row_num, column=col_num).value = "Structural"
+                    col_num += 2
+                    ws.cell(row=row_num, column=col_num).value = sermonhead.locus
+                    col_num += 4
+                    ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
+                else:
+                    # This is a SermonDescr
+                    ws.cell(row=row_num, column=col_num).value = "Plain"
+                    col_num += 1
+                    sermon = msitem.itemsermons.first()
+                    # Walk the items
+                    for item in self.sermoitems:
+                        if item['type'] != "":
+                            key, value = get_item_value(item, sermon)
+                            ws.cell(row=row_num, column=col_num).value = value
+                            col_num += 1
+                
+
+            # Save it
+            wb.save(response)
+            sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptDownload/get_data")
+
 
         return sData
 
@@ -12260,7 +12386,7 @@ class EqualGoldScountDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12584,7 +12710,7 @@ class LibraryListDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12798,7 +12924,7 @@ class AuthorListDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12939,7 +13065,7 @@ class ReportDownload(BasicPart):
         if dt != None and dt != '':
             self.dtype = dt
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
