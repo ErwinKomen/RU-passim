@@ -335,6 +335,7 @@ class EqualGoldWidget(ModelSelect2Widget):
     search_fields = [ 'code__icontains', 'author__name__icontains', 'srchincipit__icontains', 'srchexplicit__icontains', 'equal_goldsermons__siglist__icontains' ]
     addonly = False
     order = [F('code').asc(nulls_last=True), 'firstsig']
+    exclude = None
 
     def label_from_instance(self, obj):
         # Determine the full text
@@ -347,7 +348,10 @@ class EqualGoldWidget(ModelSelect2Widget):
             qs = EqualGold.objects.none()
         else:
             # qs = EqualGold.objects.all().order_by('code', 'firstsig').distinct()
-            qs = EqualGold.objects.filter(moved__isnull=True).order_by(*self.order).distinct()
+            if self.exclude == None:
+                qs = EqualGold.objects.filter(moved__isnull=True).order_by(*self.order).distinct()
+            else:
+                qs = EqualGold.objects.filter(moved__isnull=True).exclude(id=self.exclude).order_by(*self.order).distinct()
         return qs
 
 
@@ -2342,6 +2346,8 @@ class EqualGoldLinkForm(forms.ModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        # Read the super_id
+        super_id = kwargs.pop("super_id")
         # Start by executing the standard handling
         super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
@@ -2352,7 +2358,9 @@ class EqualGoldLinkForm(forms.ModelForm):
         self.fields['newlinktype'].required = False
         self.fields['dst'].required = False
         self.fields['newsuper'].required = False
-        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code')
+        self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=super_id).order_by('code')
+        # Adapt the widget QS
+        self.fields['newsuper'].widget.exclude = super_id
         # self.fields['target_list'].queryset = EqualGold.objects.none()
         # Get the instance
         if 'instance' in kwargs:

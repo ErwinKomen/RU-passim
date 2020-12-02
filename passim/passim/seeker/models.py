@@ -5545,8 +5545,12 @@ class EqualGoldLink(models.Model):
         return combi
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Perform the actual save() method on [self]
-        response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+        # Check for identical links
+        if self.src == self.dst:
+            response = None
+        else:
+            # Perform the actual save() method on [self]
+            response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
         # Return the actual save() method response
         return response
 

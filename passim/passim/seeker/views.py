@@ -11486,6 +11486,17 @@ class EqualGoldEdit(BasicDetails):
                 bResult = False
         return None
 
+    def get_form_kwargs(self, prefix):
+        # This is for ssglink
+
+        oBack = None
+        if prefix == "ssglink":
+            if self.object != None:
+                # Make sure to return the ID of the EqualGold
+                oBack = dict(super_id=self.object.id)
+
+        return oBack
+           
     def before_save(self, form, instance):
         # Check for author
         if instance.author == None:
@@ -11515,13 +11526,14 @@ class EqualGoldEdit(BasicDetails):
                       added=super_added, deleted=super_deleted)
             # Check for partial links in 'deleted'
             for obj in super_deleted:
-                if obj.linktype in LINK_BIDIR:
-                    # First find and remove the other link
-                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
-                    if reverse != None:
-                        reverse.delete()
-                    # Then remove myself
-                    obj.delete()
+                # This if-clause is not needed: anything that needs deletion should be deleted
+                # if obj.linktype in LINK_BIDIR:
+                # First find and remove the other link
+                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                if reverse != None:
+                    reverse.delete()
+                # Then remove myself
+                obj.delete()
             # Make sure to add the reverse link in the bidirectionals
             for obj in super_added:
                 if obj.linktype in LINK_BIDIR:
@@ -11884,18 +11896,19 @@ class EqualGoldListView(BasicList):
                         ssg.save()
             Information.set_kvalue("scount", "done")
 
-        #if Information.get_kvalue("seqcount") != "done":
-        #    # Walk all SSGs
-        #    with transaction.atomic():
-        #        # for ssg in EqualGold.objects.all():
-        #        # Walk all sermons associated with this SSG
-        #        total = SermonDescr.objects.count()
-        #        for idx, sermon in enumerate(SermonDescr.objects.all()):
-        #            if sermon.scount == 0:
-        #                # Set the scount
-        #                sermon.scount = sermon.get_scount()
-        #                sermon.save()
-        #    Information.set_kvalue("seqcount", "done")
+        if Information.get_kvalue("ssgselflink") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                must_delete = []
+                # Walk all SSG links
+                for ssglink in EqualGoldLink.objects.all():
+                    # Is this a self-link?
+                    if ssglink.src == ssglink.dst:
+                        # Add it to must_delete
+                        must_delete.append(ssglink.id)
+                # Remove all self-links
+                EqualGoldLink.objects.filter(id__in=must_delete).delete()
+            Information.set_kvalue("ssgselflink", "done")
 
         return None
     
