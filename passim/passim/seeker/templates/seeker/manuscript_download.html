@@ -1,0 +1,12 @@
+<div class="hidden container-small">
+  <form>
+    {% csrf_token %}
+    <input type="text" id="downloadtype" name="downloadtype" value="" />
+    <div id="manuscript_download"
+         onclick="ru.basic.post_download(this);"
+         ajaxurl="{{ajaxurl}}"
+         downloadtype="excel">
+
+    </div>
+  </form>
+</div>

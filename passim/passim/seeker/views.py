@@ -884,7 +884,12 @@ def search_generic(s_view, cls, form, qd, username=None, team_group=None):
                         lstExclude = []
                         lstExclude.append(Q(equal__isnull=True))
                     # Reset the codetype
-                    oFields['codetype'] = ""   
+                    oFields['codetype'] = ""  
+                    
+                # Adapt search for soperator/scount
+                if 'soperator' in oFields:
+                    if not 'scount' in oFields or oFields['soperator'] == "-":
+                        oFields.pop('soperator') 
                                  
                 # Create the search based on the specification in searches
                 filters, lstQ, qd, lstExclude = make_search_list(filters, oFields, searches, qd, lstExclude)
@@ -4011,6 +4016,7 @@ class BasicPart(View):
             elif self.action == "download":
                 # We are being asked to download something
                 if self.dtype != "":
+                    plain_type = ["xlsx", "csv", "excel"]
                     # Initialise return status
                     oBack = {'status': 'ok'}
                     sType = "csv" if (self.dtype == "xlsx") else self.dtype
@@ -4019,7 +4025,7 @@ class BasicPart(View):
                     sData = self.get_data('', self.dtype)
                     # Decode the data and compress it using gzip
                     bUtf8 = (self.dtype != "db")
-                    bUsePlain = (self.dtype == "xlsx" or self.dtype == "csv")
+                    bUsePlain = (self.dtype in plain_type)
 
                     # Create name for download
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
@@ -4031,7 +4037,7 @@ class BasicPart(View):
                         sContentType = "text/tab-separated-values"
                     elif self.dtype == "json":
                         sContentType = "application/json"
-                    elif self.dtype == "xlsx":
+                    elif self.dtype == "xlsx" or self.dtype == "excel":
                         sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     elif self.dtype == "hist-svg":
                         sContentType = "application/svg"
@@ -4060,6 +4066,11 @@ class BasicPart(View):
                         response = HttpResponse(content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
                         response = csv_to_excel(sData, response)
+                    elif self.dtype == "xlsx":
+                        # Convert 'compressed_content' to an Excel worksheet
+                        response = HttpResponse(content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        response = sData
                     else:
                         response = HttpResponse(sData, content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
@@ -9447,8 +9458,14 @@ class ManuscriptEdit(BasicDetails):
                 lbuttons = []
                 template_import_button = "import_template_button"
                 has_sermons = (instance.manuitems.count() > 0)
+
                 # Action depends on template/not
                 if not istemplate:
+                    # Button to download this manuscript
+                    downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
+                    lbuttons.append(dict(title="Download manuscript as Excel file", 
+                                         click="manuscript_download", label="Download"))
+
                     # Add a button so that the user can import sermons + hierarchy from an existing template
                     if not has_sermons:
                         lbuttons.append(dict(title="Import sermon manifestations from a template", 
@@ -9465,7 +9482,9 @@ class ManuscriptEdit(BasicDetails):
                 lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
                 for item in lbuttons:
                     idfield = ""
-                    if 'submit' in item:
+                    if 'click' in item:
+                        ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
+                    elif 'submit' in item:
                         ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
                     elif 'open' in item:
                         ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
@@ -9481,6 +9500,10 @@ class ManuscriptEdit(BasicDetails):
                     # Add HTML to allow for the *creation* of a template from this manuscript
                     local_context = dict(manubase=instance.id)
                     lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+
+                    # Also add the manuscript download code
+                    local_context = dict(ajaxurl = reverse("manuscript_download", kwargs={'pk': instance.id}))
+                    lhtml.append(render_to_string('seeker/manuscript_download.html', local_context, self.request))
 
                     # Add HTML to allow the user to choose sermons from a template
                     local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
@@ -10253,6 +10276,91 @@ class ManuscriptListView(BasicList):
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
   
+
+class ManuscriptDownload(BasicPart):
+    MainModel = Manuscript
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "excel"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        manu_fields = []
+
+        # Start workbook
+        wb = openpyxl.Workbook()
+        ws = wb.get_active_sheet()
+        ws.title="Manuscript"
+
+        # Read the header cells and make a header row in the MANUSCRIPT worksheet
+        headers = ["Field", "Value"]
+        for col_num in range(len(headers)):
+            c = ws.cell(row=1, column=col_num+1)
+            c.value = headers[col_num]
+            c.font = openpyxl.styles.Font(bold=True)
+            # Set width to a fixed size
+            ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+        # Get the manuscript fields as a dict
+        manu_dict = model_to_dict(self.obj)
+        manu_keys = [k for k,v in manu_dict.items()]
+        manu_keys.sort()
+        # Walk through the manuscript fields
+        row_num = 1
+        for key in manu_keys:
+            value = manu_dict[key]
+
+        if dtype == "json":
+            # Loop over all round/number combinations (testsets)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')               # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                row = dict(round=round, testset=number, speaker=speaker, gender=gender,
+                    filename=fname, sentence=sentence, ntype=ntype)
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData, indent=2)
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = [round, number, speaker, gender, fname, sentence, ntype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
 
 class ManuscriptProvset(BasicPart):
     """The set of provenances from one manuscript"""
@@ -11566,8 +11674,10 @@ class EqualGoldDetails(EqualGoldEdit):
 
                     # Location number and link to the correct point in the manuscript details view...
                     itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
+                    link_on_manu_page = "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)
+                    link_to_sermon = reverse('sermon_details', kwargs={'pk': sermon.id})
                     rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
-                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+                                     'link': link_to_sermon })
 
                     # Folio number of the item
                     rel_item.append({'value': sermon.locus, 'initial': 'small'})
