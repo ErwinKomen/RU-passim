@@ -6516,6 +6516,20 @@ class SermonDescr(models.Model):
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
+    def get_eqset(self):
+        """GEt a list of SSGs linked to this SermonDescr"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            ssg_list = self.equalgolds.all().values('code')
+            code_list = [x['code'] for x in ssg_list]
+            sBack = ", ".join(code_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_eqset")
+        return sBack
+
     def get_eqsetsignatures_markdown(self, type="all", plain=True):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 

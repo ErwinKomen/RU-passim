@@ -4033,7 +4033,8 @@ class BasicPart(View):
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
                     modelname = self.MainModel.__name__
                     obj_id = "n" if self.obj == None else self.obj.id
-                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, self.dtype)
+                    extension = "xlsx" if self.dtype == "excel" else self.dtype
+                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":
                         sContentType = "text/tab-separated-values"
@@ -10329,7 +10330,7 @@ class ManuscriptDownload(BasicPart):
         {'name': 'Gryson/Clavis',       'type': 'func',  'path': 'signatures'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        {'name': 'SSG links',           'type': 'field', 'path': 'note'},
+        {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
         ]
 
     def custom_init(self):
@@ -10366,7 +10367,7 @@ class ManuscriptDownload(BasicPart):
         elif path == "signatures":
             sBack = instance.get_sermonsignatures_markdown(plain=True)
         elif path == "ssglinks":
-            sBack = instance.get_eqsetsignatures_markdown(plain=True)
+            sBack = instance.get_eqset()
         return sBack
 
     def get_data(self, prefix, dtype, response=None):
