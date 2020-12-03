@@ -12,7 +12,8 @@
     <OutputPath>.</OutputPath>
     <Name>gallica</Name>
     <RootNamespace>gallica</RootNamespace>
-    <InterpreterId>MSBuild|{ba6d4edd-4695-404f-b469-27d62ecd5efe}|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>{7ba77989-2685-4c85-840e-b3f27623030d}</InterpreterId>
+    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

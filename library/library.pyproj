@@ -5,17 +5,18 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>fe44b9d4-3a09-4292-8d93-21bc9e3e4757</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>authnames.py</StartupFile>
+    <StartupFile>interche.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>library</Name>
     <RootNamespace>library</RootNamespace>
-    <InterpreterId>MSBuild|{c850f0da-b556-4eff-b6ee-df7ce36720c5}|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>{c850f0da-b556-4eff-b6ee-df7ce36720c5}</InterpreterId>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-i "d:/data files/passim/data/LLTA_Names.xml" -o "d:/data files/passim/data/authors.json"</CommandLineArguments>
+    <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/storiesP.xml"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -27,6 +28,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="authnames.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="interche.py" />
+    <Compile Include="latinbats.py" />
+    <Compile Include="cs_to_xlsx.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="library.py" />
