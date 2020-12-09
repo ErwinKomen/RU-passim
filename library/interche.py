@@ -26,6 +26,7 @@ trans_phonemic = [
     {"latin": "cw", "phoneme":  "ʦħ"},
     {"latin": "c", "phoneme":  "ʦ"},
     {"latin": "d", "phoneme":  "d"},
+    {"latin": "ev", "phoneme":  "ey"},
     {"latin": "e", "phoneme":  "e"},
     {"latin": "gh", "phoneme":  "ʁ"},
     {"latin": "g", "phoneme":  "g"},
@@ -39,6 +40,7 @@ trans_phonemic = [
     {"latin": "l", "phoneme":  "l"},
     {"latin": "m", "phoneme":  "m"},
     {"latin": "n", "phoneme":  "n"},
+    {"latin": "ov", "phoneme":  "ou"},
     {"latin": "o", "phoneme":  "o"},
     {"latin": "p'", "phoneme":  "p’"},
     {"latin": "pw", "phoneme":  "pħ"},
@@ -213,6 +215,11 @@ def interlinear2phonemic(oArgs):
                 # Add the child to the <m:e> gloss
                 gloss.append(child_mr)
 
+        # Find all the <m:rSp m:val="3" /> instances and change the value into 2 (vertical spacing within formula's)
+        vert_spacing = xmldoc.xpath("//m:rSp[@m:val]", namespaces=namespaces)
+        for vert in vert_spacing:
+            # Change the value of the m:val attribute
+            vert.attrib['{' + namespaces['m'] + '}val'] = '2'
 
         # Write the result to the new XML file
         str_output = etree.tostring(xmldoc, xml_declaration=True, encoding="utf-8", pretty_print=True).decode("utf-8")

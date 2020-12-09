@@ -14,7 +14,7 @@
     <RootNamespace>library</RootNamespace>
     <InterpreterId>{c850f0da-b556-4eff-b6ee-df7ce36720c5}</InterpreterId>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/storiesP.xml"</CommandLineArguments>
+    <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29P.xml"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>

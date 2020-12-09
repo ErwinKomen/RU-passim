@@ -588,6 +588,9 @@ def home(request):
     context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
     context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
 
+    # Gather pie-chart data
+    context['pie_data'] = get_pie_data()
+
     # Render and return the page
     return render(request, template_name, context)
 
@@ -621,18 +624,42 @@ def more(request):
     return render(request,'more.html', context)
 
 def technical(request):
-    """Renders the technical-information page."""
+    """Renders the technical information page."""
     assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'technical.html'
     context =  {'title':'Technical',
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
 
-    return render(request,'technical.html', context)
+    return render(request,template_name, context)
+
+def guide(request):
+    """Renders the user-manual (guide) page."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'guide.html'
+    context =  {'title':'User manual',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
+
+    return render(request,template_name, context)
 
 def bibliography(request):
     """Renders the more page."""
@@ -3785,6 +3812,51 @@ def import_authors(request):
     # Return the information
     return JsonResponse(data)
 
+def get_pie_data():
+    """Fetch data for a particular type of pie-chart for the home page
+    
+    Current types: 'sermo', 'super', 'manu'
+    """
+
+    oErr = ErrHandle()
+    red = 0
+    orange = 0
+    green = 0
+    combidata = {}
+    ptypes = ['sermo', 'super', 'manu']
+    try:
+        for ptype in ptypes:
+            qs = None
+            if ptype == "sermo":
+                qs = SermonDescr.objects.filter(msitem__isnull=False).order_by('stype').values('stype')
+            elif ptype == "super":
+                qs = EqualGold.objects.filter(moved__isnull=True).order_by('stype').values('stype')
+            elif ptype == "manu":
+                qs = Manuscript.objects.filter(mtype='man').order_by('stype').values('stype')
+            # Calculate the different stype values
+            if qs != None:
+                app = sum(x['stype'] == "app" for x in qs)  # Approved
+                edi = sum(x['stype'] == "edi" for x in qs)  # Edited
+                imp = sum(x['stype'] == "imp" for x in qs)  # Imported
+                man = sum(x['stype'] == "man" for x in qs)  # Manually created
+                und = sum(x['stype'] == "-" for x in qs)    # Undefined
+                red = imp + und + man
+                orange = edi
+                green = app
+            total = red + green + orange
+            # Create a list of data
+            data = []
+            data.append({'name': 'Initial', 'value': red, 'total': total})
+            data.append({'name': 'Edited', 'value': orange, 'total': total})
+            data.append({'name': 'Approved', 'value': green, 'total': total})
+            combidata[ptype] = data
+    except:
+        msg = oErr.get_error_message()
+        combidata['msg'] = msg
+        combidata['status'] = "error"
+    return combidata 
+
+
 
 class BasicPart(View):
     """This is my own versatile handling view.
@@ -4297,7 +4369,7 @@ class BasicPart(View):
         # Find out what the Main Model instance is, if any
         if self.add:
             self.obj = None
-        else:
+        elif self.MainModel != None:
             # Get the instance of the Main Model object
             self.obj =  self.MainModel.objects.filter(pk=object_id).first()
             # NOTE: if the object doesn't exist, we will NOT get an error here
@@ -13582,3 +13654,10 @@ class BasketUpdateSuper(BasketUpdate):
         return basketsize
 
 
+class DrawPieChart(BasicPart):
+    """Fetch data for a particular type of pie-chart for the home page
+    
+    Current types: 'sermo', 'super', 'manu'
+    """
+
+    pass

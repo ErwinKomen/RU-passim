@@ -22,6 +22,7 @@ from passim.settings import APP_PREFIX
 from django.core import urlresolvers
 from django.shortcuts import redirect
 from django.core.urlresolvers import reverse, reverse_lazy
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import RedirectView
 
 admin.autodiscover()
@@ -40,6 +41,7 @@ urlpatterns = [
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
+    url(r'^guide', passim.seeker.views.guide, name='guide'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),

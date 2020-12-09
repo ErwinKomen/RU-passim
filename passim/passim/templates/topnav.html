@@ -149,6 +149,7 @@
                          aria-haspopup="true" aria-expanded="false">Extra... <span class="caret"></span></a>
                       <ul class="dropdown-menu">
                         <li><a href="{% url 'about' %}">About</a></li>
+                        <li><a href="{% url 'guide' %}">Guide</a></li>
                         <li><a href="{% url 'contact' %}">Contact</a></li>
                         {% if user.is_authenticated %}
                           <form id="logoutForm" action="{% url 'logout' %}" method="post" class="navbar-right">
