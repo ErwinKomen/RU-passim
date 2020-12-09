@@ -11799,7 +11799,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 if gold != None:
                     # Copy all relevant information to the EqualGold obj (which as a SSG)
                     obj = self.object
-                    exclude_authors = ['Anonymus','Undecided']
+                    # Issue #313: <Anonymus> *may* be copied, but not <Undecided>
+                    exclude_authors = ['Undecided']  # ['Anonymus','Undecided']
                     if simple == "f" and gold.author != None and not gold.author.name in exclude_authors:
                         # (1) copy author - only if not simple
                         if gold.author != None: obj.author = gold.author
