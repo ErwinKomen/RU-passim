@@ -6523,7 +6523,7 @@ class SermonDescr(models.Model):
         sBack = ""
         try:
             ssg_list = self.equalgolds.all().values('code')
-            code_list = [x['code'] for x in ssg_list]
+            code_list = [x['code'] for x in ssg_list if x['code'] != None]
             sBack = ", ".join(code_list)
         except:
             msg = oErr.get_error_message()
@@ -6572,17 +6572,23 @@ class SermonDescr(models.Model):
             # Get an ordered set of signatures - automatically linked
             for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
                 # Create a display for this topic
-                if type == "first":
-                    # Determine where clicking should lead to
-                    url = reverse('gold_details', kwargs={'pk': sig.gold.id})
-                    lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
-                    break
+                if plain:
+                    lHtml.append(sig.code)
                 else:
-                    # Determine where clicking should lead to
-                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+                    if type == "first":
+                        # Determine where clicking should lead to
+                        url = reverse('gold_details', kwargs={'pk': sig.gold.id})
+                        lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
+                        break
+                    else:
+                        # Determine where clicking should lead to
+                        url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                        lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = "<span class='view-mode'>,</span> ".join(lHtml)
+        if plain:
+            sBack = ", ".join(lHtml)
+        else:
+            sBack = "<span class='view-mode'>,</span> ".join(lHtml)
         return sBack
 
     def get_feast(self):

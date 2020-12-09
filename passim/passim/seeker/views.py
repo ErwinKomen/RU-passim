@@ -10399,7 +10399,8 @@ class ManuscriptDownload(BasicPart):
         {'name': 'Note',                'type': 'field', 'path': 'note'},
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
-        {'name': 'Gryson/Clavis',       'type': 'func',  'path': 'signatures'},
+        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
+        {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
         {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
@@ -10436,8 +10437,10 @@ class ManuscriptDownload(BasicPart):
             sBack = instance.get_external_markdown(plain=True)
         elif path == "brefs":
             sBack = instance.get_bibleref(plain=True)
-        elif path == "signatures":
+        elif path == "signaturesM":
             sBack = instance.get_sermonsignatures_markdown(plain=True)
+        elif path == "signaturesA":
+            sBack = instance.get_eqsetsignatures_markdown(plain=True)
         elif path == "ssglinks":
             sBack = instance.get_eqset()
         return sBack
