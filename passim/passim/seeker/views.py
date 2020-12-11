@@ -6389,8 +6389,9 @@ class KeywordEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Name:",      'value': instance.name,                    'field_key': 'name'},
-            {'type': 'plain', 'label': "Visibility:",'value': instance.get_visibility_display(), 'field_key': 'visibility'}
+            {'type': 'plain', 'label': "Name:",       'value': instance.name,                     'field_key': 'name'},
+            {'type': 'plain', 'label': "Visibility:", 'value': instance.get_visibility_display(), 'field_key': 'visibility'},
+            {'type': 'plain', 'label': "Description:",'value': instance.description,              'field_key': 'description'}
             ]
         # Return the context we have made
         return context
@@ -10117,6 +10118,20 @@ class ManuscriptListView(BasicList):
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def initializations(self):
+        # Possibly add to 'uploads'
+        bHasExcel = False
+        for item in self.uploads:
+            if item['title'] == "excel":
+                bHasExcel = True
+        if not bHasExcel:
+            # Add a reference to the Excel upload method
+            oExcel = dict(title="excel", label="Excel",
+                          url=reverse('manuscript_upload_excel'),
+                          type="multiple",
+                          msg="Import one manuscript from an Excel file")
+            self.uploads.append(oExcel)
+
+        # ======== One-time adaptations ==============
         # Check if signature adaptation is needed
         sh_done = Information.get_kvalue("sermonhierarchy")
         if sh_done == None or sh_done == "":

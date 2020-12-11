@@ -1876,8 +1876,7 @@ class ReaderImport(View):
             # Remove previous status object for this user
             Status.objects.filter(user=username).delete()
             # Create a status object
-            oStatus = Status(user=username, type=self.import_type, status="preparing")
-            oStatus.save()
+            oStatus = Status.objects.create(user=username, type=self.import_type, status="preparing")
             # Make sure the status is available
             self.oStatus = oStatus
 

@@ -1,6 +1,7 @@
 """Models for the SEEKER app.
 
 """
+from django.apps.config import AppConfig
 from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
@@ -2743,6 +2744,8 @@ class Keyword(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
+    # [0-1] Further details are perhaps required too
+    description = models.TextField("Description", blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -2846,10 +2849,6 @@ class Manuscript(models.Model):
 
     # [1] Name of the manuscript (that is the TITLE)
     name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
-    # [1] Date estimate: starting from this year
-    yearstart = models.IntegerField("Year from", null=False, default=100)
-    # [1] Date estimate: finishing with this year
-    yearfinish = models.IntegerField("Year until", null=False, default=100)
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -2863,6 +2862,13 @@ class Manuscript(models.Model):
     url = models.URLField("Web info", null=True, blank=True)
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
+
+    # =============== OVERTAKEN BY DATERANGE ==============================
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
+    # =====================================================================
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
@@ -2976,6 +2982,139 @@ class Manuscript(models.Model):
             msg = oErr.get_error_message()
             bResult = False
         return bResult, msg
+
+    def add_one(oManu):
+        """Add a manuscript according to the specifications provided"""
+
+        oErr = ErrHandle
+        manu = None
+        lst_msg = []
+
+        def add_one_custom(type, value, islist):
+            """Add a custom type"""
+
+            lst_value = []
+
+            try:
+                # Is this a list?
+                if islist:
+                    lst_value = json.loads(value)
+
+                if type == "origin":
+                    # Check if there is an origin with this name
+                    origin = Origin.objects.filter(Q(name__iexact=value)).first()
+                    if origin == None:
+                        # Check for an origin pointing to a location with this name
+                        origin = Origin.objects.filter(Q(location__name__iexact=value)).first()
+                        if origin == None:
+                            lst_msg.append("Please add origina manually: {}".format(value))
+                    if origin != None:
+                        # Add the origin to the manuscript
+                        manu.origin = origin
+                elif type == "keywords":
+                    # Add m2m links for the identified keywords
+                    for kw in lst_value:
+                        keyword = Keyword.objects.filter(name=kw).first()
+                        if keyword == None:
+                            keyword = Keyword.objects.create(name=kw)
+                        # Link the kw to the manuscript
+                        manu.keywords.add(keyword)
+                elif type == "litrefs":
+                    for lref_txt in lst_value:
+                        # The lref_txt should consist of a main type and possibly pages
+                        arLref = lref_txt.split(", pp")
+                        pages = ""
+                        short = arLref[0].replace("<em>", "_").replace("</em>", "_")
+                        if len(arLref) > 0:
+                            pages = arLref[1]
+                        # Get to the correct litref 
+                        lref = Litref.objects.filter(short__iexact = short).first() 
+                        if lref == None:
+                            # Sorry, cannot work with this
+                            lst_msg.append("Please add the reference manually. I cannot find it: {}".format(short))
+                        else:
+                            # We have the reference, now create the right LitrefMan
+                            litrefman = LitrefMan.objects.create(manuscript=manu, reference=lref, pages=pages)
+                elif type == "datasets":
+                    pass
+                elif type == "provenances":
+                    # Add all provenance locations
+                    for prov_loc in lst_value:
+                        # First try a provenance with this name
+                        prov = Provenance.objects.filter(Q(name__iexact=prov_loc)).first()
+                        if prov == None:
+                            # Check if there is a provenance that points to a location with this name?
+                            prov = Provenance.objects.filter(Q(location__name__iexact=prov_loc)).first()
+                            if prov == None:
+                                # Create a new provenance
+                                prov = Provenance.objects.create(name=prov_loc)
+                        # Add the provenance to this manuscript
+                        manu.provenances.add(prov)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("Manuscript/add_one_custom")
+
+        manu_attrib = [
+            {'field': 'title',      'type': 'plain', 'path': 'title'},
+            {'field': 'support',    'type': 'plain', 'path': 'support'},
+            {'field': 'extent',     'type': 'plain', 'path': 'extent'},
+            {'field': 'format',     'type': 'plain', 'path': 'format'},
+            {'field': 'notes',      'type': 'plain', 'path': 'notes'},
+            {'field': 'country',    'type': 'fk',    'path': 'lcountry', 'model': 'Location',   'fk': 'name'},
+            {'field': 'city',       'type': 'fk',    'path': 'lcity',    'model': 'Location',   'fk': 'name'},
+            {'field': 'library',    'type': 'fk',    'path': 'library',  'model': 'Library',    'fk': 'name'},
+            {'field': 'project',    'type': 'fk',    'path': 'project',  'model': 'Project',    'fk': 'name'},
+            {'field': 'external links','type': 'm2o','path': 'url',      'model': "ManuscriptExt"},
+            {'field': 'origin',     'type': 'plain', 'path': 'origin',   'custom': 'origin'},
+            {'field': 'keywords',   'type': 'plain', 'path': 'keywords', 'custom': 'keywords', 'islist': True},
+            {'field': 'literature', 'type': 'plain', 'path': 'litrefs',  'custom': 'litrefs',   'islist': True},
+            {'field': 'personal datasets',  'path': 'collections',      'custom': 'datasets',   'islist': True},
+            {'field': 'provenances',        'path': 'provenances',      'custom': 'provenances', 'islist': True},
+            ]
+        try:
+            # First get the shelf mark
+            idno = oManu.get('shelf mark')
+            if idno == None:
+                oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
+            else:
+                # Create a new manuscript with default values
+                manu = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                # Process all fields in manu_attrib
+                for oField in manu_attrib:
+                    field = oField.get("field")
+                    value = oManu.get(field)
+                    if value != None and value != "":
+                        path = oField.get("path")
+                        type = oField.get("type")
+                        if type == "plain":
+                            # Set the correct field's value
+                            setattr(manu, path, value)
+                        elif type == "fk":
+                            fk = oField.get("fk")
+                            model = oField.get("model")
+                            if fk != None and model != None:
+                                # Find an item with the name for the particular model
+                                cls = AppConfig.get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fk): value}).first()
+                                if instance != None:
+                                    setattr(manu, path, instance)
+                        elif type == "m2o":
+                            model = oField.get("model")
+                            if model != None:
+                                # Create a new instance of the other thing
+                                cls = AppConfig.get_model(model)
+                                instance = cls.objects.create(**{"{}".format(path): value, "manuscript": manu})
+                        elif type == "custom":
+                            custom = oField.get("custom")
+                            # Custom processing
+                            add_one_custom(custom, value, oField.get("islist"))
+                        
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/add_one")
+        return manu
 
     def find_sermon(self, oDescr):
         """Find a sermon within a manuscript"""
@@ -3106,7 +3245,10 @@ class Manuscript(models.Model):
             else:
                 url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
                 lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_country(self):
@@ -3156,7 +3298,10 @@ class Manuscript(models.Model):
                 lHtml.append(obj.url)
             else:
                 lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_markdown(self, plain=False):
@@ -3171,7 +3316,10 @@ class Manuscript(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_user_markdown(self, profile, plain=False):
@@ -3187,7 +3335,10 @@ class Manuscript(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_library(self):
@@ -3217,7 +3368,10 @@ class Manuscript(models.Model):
                 # Create a display for this item
                 lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_origin(self):
@@ -3273,7 +3427,10 @@ class Manuscript(models.Model):
                     # Create a display for this item
                     lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
@@ -6470,7 +6627,10 @@ class SermonDescr(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_editions_markdown(self):
@@ -6586,7 +6746,7 @@ class SermonDescr(models.Model):
                         lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
         if plain:
-            sBack = ", ".join(lHtml)
+            sBack = json.dumps(lHtml)
         else:
             sBack = "<span class='view-mode'>,</span> ".join(lHtml)
         return sBack
@@ -6684,7 +6844,10 @@ class SermonDescr(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_user_markdown(self, profile, plain=True):
@@ -6700,7 +6863,10 @@ class SermonDescr(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_ssg_markdown(self):
@@ -6772,7 +6938,10 @@ class SermonDescr(models.Model):
                 lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
                     url,item.get_short_markdown()))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_locus(self):
@@ -6861,7 +7030,10 @@ class SermonDescr(models.Model):
                 # Create a display for this topic
                 lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_stype_light(self, usercomment=False):
