@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, Profile, MsItem, SermonHead, \
+    Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Report, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
@@ -706,28 +706,20 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # Read and parse the data into a DOM element
             xmldoc = ElementTree.parse(data_file)                
             
-        # Eerst de algemene info in de XML? Nee, beter eerst de specifieke en dan steeds terug naar de bovenste
-        # algemene delen van de XML 
+        # First the manuscript data will be extracted, then the parts about of specific XML in which each manuscript is stored 
+        # last the data on the sermons
      
-        # (1) Find all the manuscripts in this XML document   
-        # manu_list stores the "highest" manuscripts, on the first <c> tag
-        # This is the highest "c" level, there is at least one level "c" lower
-
-        # manu_list = xmldoc.find("//dsc").getchildren()
-        # With this list we pick up ALL c elements, also when they are nested (for instance Latin 2013-2023).
-        # dit werkt nog niet "prefix 'child' not found in prefix map at line 718"
-        # let op vragen lxml en pygal, welke precies installeren?
-        # manu_list = xmldoc.find("//c[count(child::did/child::unitid[type='cote']] > 0")
-        # manu_list = xmldoc.find("//c[count(child::did/child::unitid[@type='cote'] ) > 0]")
-        # https://stackoverflow.com/questions/35526724/getting-all-nested-children-within-xml-tag-in-python
-        
-        manu_list = xmldoc.findall("//c[count(did/unitid[@type='cote']) > 0]")
-        manu_info = xmldoc.find("//eadheader")
+        # (1) Find all the MANUSCRIPTS in this XML document 
+        # The list manu_list stores ALL manuscripts (both the ones on the highest level and the ones on the lower level, 
+        # that are part of combined manuscripts).                       
         manu_list = xmldoc.findall("//c[did]")
-        manu_reliure_emph = xmldoc.find("//physfacet/emph")             
 
-        # Import wishlist.csv that holds the shelfmarks of the selected A+M manuscripts        
-        with open('d:/wishlist.csv') as f:
+        # Here the information on the XML is extracted
+        manu_info = xmldoc.find("//eadheader")
+        manuidno_end = "0"
+        # Import wishlist.csv that holds the shelfmarks of the selected A+M manuscripts
+        # Check shelfmarks in csv want Latin 1913 was latin 1913 en werd niet meegenomen.        
+        with open('d:/wishlist_final.csv') as f:
             reader = csv.reader(f, dialect='excel', delimiter=';')
             
             # Make list of strings (instead of lists)
@@ -740,114 +732,279 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # sm_shelfmark is to be used to compare the shelfmark in all A+M XML's to
             shelfmark_set = set(shelfmark_list)  
 
-        # Go through list of manuscripts (highest level) each 
-        # manuscript, make sure to do ALL manuscripts 
+        # Iterate through the list of ALL manuscripts          
         for manu in manu_list:
-            # x are the underlying tags of the above mentioned tags, for instance <did> with: <unitid> (3x),
+            # x are the underlying tags of the above mentioned tags, for instance <did> with: <unitid> (3x), KAN WEG
             # <unittitle>, <physdesc>, <langmaterial> and <unitdate>
-            x = str(manu.getchildren()) #  wat doet "str"?
-            y = manu.getchildren() # is dit okay? wat is het verschil?
-            z = manu.attrib 
-            print(z)
+            # x = str(manu.getchildren()) #  wat doet "str"?
+            # y = manu.getchildren() # is dit okay? wat is het verschil?
+            # z = manu.attrib 
+            # print(z) TOT HIER
 
             # SHELFMARK of the manuscript
-
             # Get the shelfmark of this manuscript (assuming this level represents a whole manuscript)
-            # TH: oude shelfmarks <unitid type="ancienne cote">Colbert 1</unitid> mogelijk ook meenemen 
-            # Die moeten in een nieuwe table/veld?
-            # Alleen hier processen wanneer de shelfmark in sm_set staan
-            # Alleen gedigitaliseerde manuscripten
-            
             unitid = manu.find("./did/unitid[@type='cote']")
             if unitid is None:
                 continue
-            
-            # First option: seek out combined shelfmarkset, for instance 2013-2023
-            # These have to be handled in a different way because the titel is on the highest level 
-            # and should be used for all of the manuscripst described in the lower <c> elements
-            # Hehe, het werkt weer. 
-                       
+                        
             # This is the shelfmark
-            manuidno = unitid.text
+            manuidno = unitid.text         
+            print(manuidno)
+
+            # NUMBER of the SHELFMARK of the manuscript
+            # Store only the NUMBER of the shelfmark to aid in the adding 
+            # of the higher level title (if this is the case) TH: check how this works when shelmarks are combined with letter
+            # or "(1-2)" and so on and with a space for instance Latin 2445 A, maybe split on "Latin " TH: vooralsnog niet nodig
+            # want het gaat om een nummer in een reeks, even zo laten zou ik zeggen
+
+            if "-" not in manuidno:
+                manuidno_list_2 = manuidno.split()         
+                manuidno_number = manuidno_list_2[1]              
             
+            # FIRST STORE DATA OF COMBINED MANUSCRIPTS
+
             # TITLE of a COMBINED MANUSCRIPT
+        
+            # Here the title of a combined manuscript (consisting of multiple manuscripts) is extracted. 
+            # This title will later on be placed in front of the titles of manuscripts that are part of this combined
+            # manuscript.      
             
-            # Hier testje bouwen om bovenliggende element op te halen (igv Latin 2013-2023), unitttitle dus van 2013-2023
-            # Check if there is a <unittitle> on a higher level, get the title, add it later to the titles of the manuscripts 
-            # that are combined TH: moet dit hier staan?
+            # Create a new string to add all parts of the title later in the process
+            title_high_temp = ""
+            #manuidno_end = "0" # dit werkt wel springt steeds op nul
+            # Seek out the combined manuscripts (but steer away from manuscripts like "Latin 646B (1-2"
+            if "-" in manuidno and not "(" in manuidno:
+                # Store start and end shelfmarks to help check when the title of the 
+                # combined manuscript must be added to the titles lower level manuscripts.  
+                # Check on 646-646A, can go wrong...with the A
+                # Also check on for instance Latin 760A (1), part of Latin 760A (1-3), same concept? Hier ook unitdate..
+                # zie ook Latin 774A-C...maybe first check the contents of the wishlist
+                manudino_1 = manuidno.replace('-', ' ')
+                manudino_list = manudino_1.split()         
+                manudidno_start = manudino_list[-2] # Probably not necessary
+                manuidno_end = manudino_list[-1]
 
-            if "-" in manuidno: 
-                print("This works")
-                manudino_list = manuidno.split("/")
-                manudidno_start = manudino_list[0] 
-                manuidno_end = manudino_list[1]
-
-                # Create a new string to add all parts of the title to later on
-                title_high_temp = ""
-
+                # Find the <did> element in which <unittitle> is placed
                 unit_did = manu.find("./did")
-                               
-                if unit_did is None:
-                    continue                
-                else:
-                    # Probably only one title, maybe more, keep it
-                    for unittitle_high in unit_did.findall("./unittitle"): 
-                        # First grab ALL text from within the <unittitle> tage
-                        unittitle_high_1 = ''.join(unittitle_high.itertext())                    
-                        # Second clean the string
-                        unittitle_high_2 = re.sub("[\n\s]+"," ", unittitle_high_1)                      
-                        # Third strip string of spaces 
-                        unittitle_high_3 = unittitle_high_2.strip()                      
-                    
-                        # Add all available cleaned up text from the list of the unittitles parts to a string
-                        # and add an underscore for usage later on
-                        title_high_temp += unittitle_high_3 + "_"
+                # List all <unittitle> elements and iterate over them
+                for unittitle_high in unit_did.findall("./unittitle"): 
+                    # First: grab ALL text from within the <unittitle> tage
+                    unittitle_high_1 = ''.join(unittitle_high.itertext())                    
+                    # Second: clean the string
+                    unittitle_high_2 = re.sub("[\n\s]+"," ", unittitle_high_1)                      
+                    # Third: strip string of spaces 
+                    unittitle_high_3 = unittitle_high_2.strip()                      
+                    # Add all available cleaned up text from the list of the 
+                    # unittitles parts to a string and add an underscore 
+                    # for usage later on
+                    title_high_temp += unittitle_high_3 + "_"
 
-                    # When all <unittitle> tags in the list are handled and placed in one string
-                    # the underscores are replaced by a comma
-                    title_high_temp_comma = ', '.join(title_high_temp.split("_"))
+                # When all <unittitle> elements in the list are handled and placed in one string
+                # split them up using the underscores added above and use a comma to separate
+                # the multiple title parts
+                title_high_temp_comma = ', '.join(title_high_temp.split("_"))
                     
-                    # The last part is getting rid of the last comma at the end of the string
-                    # Keep the title in case there are underlying manuscripts and 
-                    # place the title before the <unittitle> in those manuscripts (for instance "I")
-                    unittitle_high_combined = title_high_temp_comma.rstrip(", ")
-                              
-            # Check if this is a shelfmark that is listed in "shelfmark_set"
+                # The last part is getting rid of the last comma at the end of the string
+                # The title is used in case there are underlying manuscripts and then
+                # the title is placed before the <unittitle> in those manuscripts (for instance "I")
+                unittitle_high_combined = title_high_temp_comma.rstrip(", ")
+                
+                # SUPPORT and BINDING of the manuscript (HIGH)
+                # Get the support and binding of the manuscript - if it is exists 
+                # Support and binding are combined (<physfacet type="support"> / <physfacet type="reliure">)                
+                unitsupport_high = manu.find("./did/physdesc/physfacet[@type='support']")
+                if unitsupport_high != None and unitsupport_high != "":
+                    manusupport_high = unitsupport_high.text                
+                else:
+                    manusupport_high = ""
+                    
+                # Get the part in between the two parts of the reliure - if it exists  
+                # <emph render="super">e</emph>
+                unitreliure_emph_high = manu.find("./did/physdesc/physfacet/emph")
+                if unitreliure_emph_high != None and unitreliure_emph_high != "":
+                    manureliure_emph_high = unitreliure_emph_high.text
+                else: 
+                    manureliure_emph_high = ""
+                
+                # Get the binding - if it exists
+                # <physfacet type="reliure">) = binding
+                # Hier loopt het nog niet voor die opgesplitste physfascets, niet alles wordt überhaupt 
+                # meegenomen TH: moeten die meegenomen worden? 
+                unitreliure_high = manu.find("./did/physdesc/physfacet[@type='reliure']")
+                if unitreliure_high != None and unitreliure_high != "" and manureliure_emph_high == "":
+                    manureliure_high = unitreliure_high.text
+                elif unitreliure_high != None and unitreliure_high != "" and manureliure_emph_high != "":
+                    unitreliure_join_high = ''.join(unitreliure_high.itertext()) 
+                    manureliure_high = re.sub("[\n\s]+"," ", unitreliure_join_high) 
+                else:
+                    manureliure_high = ""
+                
+                # This is the complete support, combinining support and binding       
+                unitsupport_high_combined = manusupport_high + " " + manureliure_high
+                                
+                # FORMAT of the manuscript (HIGH)
+                # Look for the format of the manuscript - if it is exists 
+                # (<dimensions>) 
+                unitdimensions_high = manu.find("./did/physdesc/dimensions")
+                if unitdimensions_high != None and unitdimensions_high != "":
+                    unitdimensions_high_combined = unitdimensions_high.text
+                # If there is no element here than the one from the former 
+                # CM (combined manuscript) should be deleted
+                else:
+                    unitdimensions_high_combined = ""
+                
+                # EXTENT of the manuscript (HIGH)
+                # Look for the extent of the manuscrpt - if it is exists 
+                unitextent_high = manu.find("./did/physdesc/extent")
+                if unitextent_high != None and unitextent_high != "":
+                    unitextent_high_combined = unitextent_high.text
+                # If there is no element here than the one from the former 
+                # CM (combined manuscript) should be deleted
+                else:
+                    unitextent_high_combined = ""
+                
+                # ORIGIN of the manuscript (HIGH)                  
+                # Look for the origin of the manuscript - if it exists                    
+                unitorigin_high = manu.find("./did/physdesc/geogname")
+                if unitorigin_high != None and unitorigin_high != "":
+                    unitorigin_high_combined = unitorigin_high.text
+                else:
+                    unitorigin_high_combined = ""                    
+                
+                # DATE of the manuscript (HIGH) 
+                unitdate_high = manu.find("./did/unitdate")
+                    
+                # in case of no unitdate on manuscript level, skippen (Latin 196)
+                # Unitdate moet eigenlijk niet eens worden ingevoerd in Manuscript, dat moet via DateRange
+                if unitdate_high is None:
+                    unit_yearstart_high = "9999"
+                    unit_yearfinish_high = "9999"
+                    pass
+
+                elif unitdate_high != None and unitdate_high != "" and 'normal' in unitdate_high.attrib:
+                    unitdate_normal_high = unitdate_high.attrib.get('normal')
+                    ardate_high = unitdate_normal_high.split("/")
+                    if len(ardate_high) == 1:
+                        unit_yearstart_high = int(unitdate_normal_high)
+                        unit_yearfinish_high = int(unitdate_normal_high)
+                    else:
+                        unit_yearstart_high = int(ardate[0])
+                        unit_yearfinish_high = int(ardate[1])
+
+                elif unitdate_high != None and unitdate_high != "" and 'normal' not in unitdate_high.attrib:
+                    unitdate_complete_high = unitdate.text
+                    if "-" in unitdate_complete_high:
+                        # use regex to split up string, will result in list with 4 items. 
+                        ardate_high = re.split('[\-\(\)]', unitdate_complete_high)
+                    
+                        # use positions 3 and to to grab the first and last year
+                        unit_yearstart_high = int(ardate[-3]) 
+                        unit_yearfinish_high = int(ardate[-2])
+                        # use the century indication in Roman numerals to create "virtual" 
+                        # start and finish years TH: dit lijkt te werken                    
+                    elif "-" not in unitdate_complete_high:
+                        ardate_high = unitdate_complete_high.split('e ')
+                        if len(ardate_high) < 3:  
+                            unit_century_high = ardate_high[0]
+                            if unit_century_high == "IX":
+                                unit_yearstart_high = "800"
+                                unit_yearfinish_high = "900"
+                            elif unit_century_high == "X":
+                                 unit_yearstart_high = "900"
+                                 unit_yearfinish_high = "1000"
+                            elif unit_century_high == "XI":
+                                 unit_yearstart_high = "1000"
+                                 unit_yearfinish_high = "1100"
+                            elif unit_century_high == "XII":
+                                 unit_yearstart_high = "1100"
+                                 unit_yearfinish_high = "1200"
+                            elif unit_century_high == "XIII":
+                                 unit_yearstart_high = "1200"
+                                 unit_yearfinish_high = "1300"
+                                                                              
+                # ANCIENNE COTES of the manuscript (HIGH)               
+                # The old shelfmarks of the manuscript need to be stored in the notes section
+                # of the manuscript
+                # Create a new string for the storage of ancienne cotes
+                old_sm_temp_high = ""
+                # Find all old shelfmarks and store them in a string
+                for unit_anccote_high in manu.findall("./did/unitid[@type='ancienne cote']"): 
+                    old_sm_high = unit_anccote_high.text
+                    old_sm_temp_high += old_sm_high + "_"
+                                       
+                # When all ancienne cotes in the list are handled and placed in one string
+                # the underscores are replaced by a comma
+                old_sm_temp_comma_high = ', '.join(old_sm_temp_high.split("_"))
+                   
+                # The last part is getting rid of the last comma at the end of the string
+                unit_anccote_final_high = old_sm_temp_comma_high.rstrip(", ")      
+
+                # PROVENANCE of the manuscript (HIGH)
+
+                # Look for the provenance of the manuscript in both <custodhist> 
+                # and <origination> elements met Erwin naar kijken
+
+                # Provenance in ORIGINATION (HIGH) TO DO??
+
+                # Provenance in CUSTODHIST (HIGH)
+                # Look for the <custodhist> element of the manuscript - if it exists 
+                unit_custodhist_high = manu.find("./custodhist/p")
+                if unit_custodhist_high != None and unit_custodhist_high != "":
+                    # First get all the text from <custodhist>
+                    unit_custh_1_high = ''.join(unit_custodhist_high.itertext())                        
+                    # Second clean the string
+                    unit_custh_2_high = re.sub("[\n\s]+"," ", unit_custh_1_high)                        
+                    # Third strip string of spaces 
+                    unit_custh_3_high = unit_custh_2_high.strip()                        
+                else:
+                    unit_custh_3_high = ""
+                                
+                # Location(s??) (role=4010) in custodhist
+                # Store in list, later to be used in the lower manuscripts
+                prov_custh_high_list=[]
+                for prov_custh_high in manu.findall("./custodhist/p/corpname[@role='4010']"):
+                        provtemp_custh_high = prov_custh_high.text 
+                        prov_custh_high_list.append(provtemp_custh_high)
+                # URL of the manuscript (HIGH) TH: check
+                            
+                # Look for URL of the manuscript - if it exists                                        
+                # Attrib techniek ook voor persname in scopecontent?
+                # The URL needs to be added to the manuscript  TH: Ook in HIGH?
+                uniturl_high = manu.find("./dao")
+                if uniturl_high != None and uniturl_high != "":
+                    url_high = uniturl_high.attrib.get('href')
+                         
+            # Now we return the iteration process
+            # Check if the shelfmark that is listed in "shelfmark_set"
             if manuidno in shelfmark_set:
-            # Create a new Manuscript
+            # Create a new Manuscript if this is the case TH: deze werkwijze voor manifestaties gebruiken?
                 manu_obj = Manuscript.objects.create()
                 manu_obj.idno = manuidno
-                print(manu_obj.idno)            
-                          
+                # Add shelfmark to list of processed manuscripts
+                lst_manus.append(manuidno)
+                
                 # TITLE(S) of the manuscript
                 # Get the name of the manuscript - if it exists
                 # E.g: <unittitle>Biblia sacra, pars.</unittitle>      
 
-                # Create a new string to add all parts of the title to later on
+                # Create a new string to add all parts of the title to later on, 
+                # since there can be multiple <unittitle> elements
                 title_temp = ""
-
-                # Get the title that is to be used for all the manuscripts in the combined shelfmark 
-                # Find the <did> element
-                # TH: there are manuscripts that have manuscripts nested within the manuscripts, for instance
-                # Latin 2013-2023, the first <did> element contains only the title (and author), that is to be used for the underlying manuscripts
-                # manuscripts, which are in lower <did> element
                              
-                
-                unit_did = manu.find("./did")
-                
-                # Dit aanpassen 
+                # Find the <did> element in which the <unittitle> element is nested
+                unit_did = manu.find("./did")                
+      
                 if unit_did is None:
                     continue
-                # elif len(unit_did_2) >0: 
-                #  
+                
                 else:
                 # Make a list of all <unittitle> tags from within the <did> element and iterate over the list
                     for element_unittitle in unit_did.findall("./unittitle"): 
-                        # First grab ALL text from within the <unittitle> tage
+                        # First: grab ALL text from within the <unittitle> tage
                         unittitle_1 = ''.join(element_unittitle.itertext())                    
-                        # Second clean the string
+                        # Second: clean the string
                         unittitle_2 = re.sub("[\n\s]+"," ", unittitle_1)                      
-                        # Third strip string of spaces 
+                        # Third: strip string of spaces 
                         unittitle_3 = unittitle_2.strip()                      
                     
                         # Add all available cleaned up text from the list of the unittitles parts to a string
@@ -859,26 +1016,30 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     title_temp_comma = ', '.join(title_temp.split("_"))
                     
                     # The last part is getting rid of the last comma at the end of the string
-                    unittitle_final = title_temp_comma.rstrip(", ")
+                    unittitle_stripped = title_temp_comma.rstrip(", ")
 
-                    # Keep the title in case there are underlying manuscripts and 
-                    # place the title before the <unittitle> in those manuscripts (for instance "I")
-                    title_part_1 = unittitle_final
-                
-                    # Now the title can be stored in the database TH: werkt dit?? Wel toch?
+                    # Check if there is a higher level title available, in case of combined manuscripts.
+                    # The number part of the shelfmark of each individual manuscript is used to check if
+                    # it belongs to a combined manuscript. If not: only the title(s) of the manuscript itself
+                    # will be stored. TH: let op, het kan zijn dat er helemaal geen sprake is van gecombineerde
+                    # manuscripten, dan blijft manuidno_end leeg
+                    
+                    if manuidno_number <= manuidno_end:                     
+                        unittitle_final = unittitle_high_combined + ", " + unittitle_stripped                    
+                    else:
+                        unittitle_final = unittitle_stripped
+                        
+                    # Now the title of the manuscript can be stored in the database
                     manu_obj.name = unittitle_final
-                
-                    # TH: hierboven nog een stap toevoegen
-                    # Als de manuidno in between first and last is van bepaalde set 2013-2023
-                    # if manuidno => manuidno_start and <= manuidno_end:
-                    # unittitle_high_low = unittitle_high_combined + ", "+ unittitle_final
-                    # manu_obj.name = unittitle_high_low
-                    # else: de rest, zoals boven             
-
-                # ANCIENNE COTES of the manuscript
+                        
+                    
+                # ANCIENNE COTES of the manuscript                
+                # The old shelfmarks of the manuscript need to be stored in the notes section
+                # of the manuscript
 
                 # Create a new string for the storage of ancienne cotes
                     old_sm_temp = ""
+                    unit_anccote_final_low = ""
                 # Find all old shelfmarks and store them in a string
                     for unit_anccote in manu.findall("./did/unitid[@type='ancienne cote']"): 
                         old_sm = unit_anccote.text
@@ -888,23 +1049,33 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # the underscores are replaced by a comma
                     old_sm_temp_comma = ', '.join(old_sm_temp.split("_"))
                     
-                # The last part is getting rid of the last comma at the end of the string
-                    unit_anccote_final = old_sm_temp_comma.rstrip(", ")
-                    print(unit_anccote_final)
+                    # The last part is getting rid of the last comma at the end of the string
+                    unit_anccote_final_low = old_sm_temp_comma.rstrip(", ")       
                     
-                # Now the combined old shelfmarks can be stored in the database as notes
+                    # Check if there is a CM, if so use the cotes from the CM 
+                    # otherwise use the one from the manuscript itself TH: dit werkt
+                    if manuidno_number <= manuidno_end:                     
+                        if unit_anccote_final_low == "":
+                            unit_anccote_final = unit_anccote_final_high
+                        elif unit_anccote_final_low != "":
+                            unit_anccote_final = unit_anccote_final_low
+                    else:
+                        unit_anccote_final = unit_anccote_final_low
+
+                    # Now the combined old shelfmarks can be stored in the database as notes
                     manu_obj.notes = unit_anccote_final
-                    print(manu_obj.notes)     
-                                        
+                                                            
                     # SUPPORT and BINDING of the manuscript
 
                     # Get the support and binding of the manuscript - if it is exists 
-                    # TH: combine both, check if wanted
+                    # Support and binding are combined 
                     # (<physfacet type="support">  # <physfacet type="reliure">)                
                     unitsupport = manu.find("./did/physdesc/physfacet[@type='support']")
                     if unitsupport != None and unitsupport != "":
                         manusupport = unitsupport.text
-                
+                    else:
+                        manusupport = ""
+
                     # Get the part in between the two parts of the reliure - if it exists  
                     # <emph render="super">e</emph>
                     unitreliure_emph = manu.find("./did/physdesc/physfacet/emph")
@@ -916,46 +1087,153 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Get the binding - if it exists
                     # <physfacet type="reliure">) = binding
                     # Hier loopt het nog niet voor die opgesplitste physfascets, niet alles wordt überhaupt 
-                    # meegenomen
+                    # meegenomen TH: moeten die meegenomen worden? 
                     unitreliure = manu.find("./did/physdesc/physfacet[@type='reliure']")
                     if unitreliure != None and unitreliure != "" and manureliure_emph == "":
                         manureliure = unitreliure.text
                     elif unitreliure != None and unitreliure != "" and manureliure_emph != "":
                         unitreliure_join = ''.join(unitreliure.itertext()) 
-                        manureliure = re.sub("[\n\s]+"," ", unitreliure_join) # dit werkt nu nog de spaces eruit
-                                      
+                        manureliure = re.sub("[\n\s]+"," ", unitreliure_join) 
+                    else:
+                        manureliure = ""
+                        
                     # This is the complete support, combinining support and binding       
-                    manu_obj.support = manusupport + " " + manureliure 
-                                 
+                    unitsupport_low = manusupport + " " + manureliure 
+                    
+                    # Check if there is a higher level extent available, in case of combined manuscripts.              
+                    if manuidno_number <= manuidno_end:                     
+                        unitsupport_final = unitsupport_high_combined + ", " + unitsupport_low                    
+                    else:
+                        unitsupport_final = unitsupport_low  
+                    
+                    # Now the extent of the manuscript can be stored in the database
+                    manu_obj.support = unitsupport_final
+
+
+                    # Check if there is a higher level extent available, in case of combined manuscripts.
+                    # TO DO Latin 813-814 is interessant, allerlei info op beide niveaus...ook origin, misschien dat dus ook mee
+                    # nemen naar de lagere niveaus...
                     # FORMAT of the manuscript
 
                     # Look for the format of the manuscript - if it is exists 
                     # (<dimensions>) 
-                    # TH: igv meer dan 1 horen ze bij de onderliggende manuscripts? 
                     unitdimensions = manu.find("./did/physdesc/dimensions")
                     if unitdimensions != None and unitdimensions != "":
-                        manu_obj.format = unitdimensions.text
+                        unitdimensions_low = unitdimensions.text
+                    else:
+                        unitdimensions_low = ""
                     
-                    # EXTENT of the manuscript
+                    # Check if there is a higher level format available, in case of combined manuscripts.
+                    # Onzeker of de eerste statement werkt als er wel een high maar geen unitdimensions_low is...
+                    if manuidno_number <= manuidno_end:                     
+                        unitdimensions_final = unitdimensions_high_combined + ", " + unitdimensions_low                 
+                    else:
+                        unitdimensions_final = unitdimensions_low  
+                    
+                    # Now the dimenssions of the manuscript can be stored in the database
+                    manu_obj.format = unitdimensions_final
 
-                    # Look for the extent of the manuscrpt - if it is exists 
-                    # TH: igv meer dan 1 horen ze bij de onderliggende manuscripts? 
+                    # EXTENT of the manuscript
+                    # Look for the extent of the manuscript - if it is exists 
                     unitextent = manu.find("./did/physdesc/extent")
                     if unitextent != None and unitextent != "":
-                        manu_obj.extent = unitextent.text
+                        unitextent_low = unitextent.text
+                    else:
+                        unitextent_low = ""
+
+                    # Check if there is a higher level extent available, in case of combined manuscripts.              
+                    if manuidno_number <= manuidno_end:                     
+                        unitextent_final = unitextent_high_combined + ", " + unitextent_low                    
+                    else:
+                        unitextent_final = unitextent_low  
                     
+                    # Now the extent of the manuscript can be stored in the database
+                    manu_obj.extent = unitextent_final
+                    
+                    # ORIGIN of the manuscript 
+                    # Look for the origin of the manuscript - if it exists                    
+                    unitorigin = manu.find("./did/physdesc/geogname")
+                    if unitorigin != None and unitorigin != "":
+                       unitorigin_low = unitorigin.text
+                    else:
+                        unitorigin_low = ""
+                    
+                    # Check if there is a higher level origin available, in case of combined manuscripts.              
+                    if manuidno_number <= manuidno_end:                     
+                        unitorigin_final = unitorigin_high_combined + " " + unitorigin_low                    
+                    else:
+                        unitorigin_final = unitorigin_low  
+                  
+                    # Check if unitorigin is not empty TH: moet dit niet overal gebeuren?
+                    if unitorigin_final != None and unitorigin_final != "":
+                                       
+                        # Store the origin in a new Origin record, possibly add notes TH: overleg Erwin over link met LOCATION
+                        origin = Origin.objects.create(name = unitorigin_final)
+
+                        # Store the id of the origin in Manuscript
+                        manu_obj.origin_id = origin
+
                     # PROVENANCE of the manuscript
 
-                    # Look for the provenance of the manuscript
-                    # <origination id="correspond">Le manuscrit provient de l'abbaye
-                    # <corpname role="4010">Saint-Martial de Limoges</corpname>
-                    # Kunnen meerdere zijn...hoe op te slaan?
-                    # Dit lijkt een beetje te werken
-                    #
-                    # eerst maar eens de corpnames doen en toevoegen shelfmark
-                    # en in provman de link leggen
-                    # dan de complete origination in notes zetten
-                    # dan de name in location opzoeken en location_id in Provenance opslaan
+                    # Look for the provenance of the manuscript in both <custodhist> 
+                    # and <origination> elements met Erwin naar kijken
+
+                    # Provenance in CUSTODHIST 
+
+                    # Look for the <custodhist> element of the manuscript - if it exists 
+                    unit_custodhist = manu.find("./custodhist/p")
+                    if unit_custodhist != None and unit_custodhist != "":
+                        # First get all the text from <custodhist>
+                        unit_custh_1 = ''.join(unit_custodhist.itertext())
+                        
+                        # Second clean the string
+                        unit_custh_2 = re.sub("[\n\s]+"," ", unit_custh_1)
+                        
+                        # Third strip string of spaces 
+                        unit_custh_3 = unit_custh_2.strip()
+                        
+                    else:
+                        unit_custh_3 = ""                                 
+
+                    # Location(s??) (role=4010) in custodhist
+                    # Dit werkt maar moet nog laten werken zonder locatie?                                                                
+                    for prov_custh in manu.findall("./custodhist/p/corpname[@role='4010']"):
+                        provtemp_custh = prov_custh.text                       
+                        
+                        if provtemp_custh != None:
+                            # Create new Provenance with shelfmark added to it
+                            prov_shelfmark = provtemp_custh + " " + manu_obj.idno
+
+                            # Look for existing location first match?? Is dat wijselijk? Laten we dit maar even uitstellen
+                            # Overleg Erwin TH: dit hier houden
+                           
+                            # Store the combination in a new provenances record and add notes if they exist
+                            prov = Provenance.objects.create(name = prov_shelfmark, note = unit_custh_3)
+                           
+                            # Create new ProvenanceMan object to link manuscript to provenance(s)                       
+                            prov_man = ProvenanceMan.objects.create(manuscript = manu_obj, provenance = prov)
+
+                    # Take care of the provenances and notes from <custodhist> element from the CM if available
+                    # unit_custh_3_high, prov_custh_high_list HIGH       
+                    # see if there are provenances from the CM if there is one
+                    if manuidno_number <= manuidno_end:
+                        for prov_custh_high in prov_custh_high_list:
+                            
+                            prov_shelfmark_high = prov_custh_high + " " + manu_obj.idno
+                        
+                            # Store the combination in a new provenances record and add notes if they exist
+                            prov = Provenance.objects.create(name = prov_shelfmark_high, note = unit_custh_3_high)
+                        
+                            # Create new ProvenanceMan object to link manuscript to provenance(s)                       
+                            prov_man = ProvenanceMan.objects.create(manuscript = manu_obj, provenance = prov)
+                            
+                            
+                    # Provenance in ORIGINATION 
+
+                    # Look for the <origination> element of the manuscript - if it exists
+                    # Bijvoorbeeld Latin 113, er is origination maar wordt niet opgeslagen omdat er geen locatie is?
+                    # vraag voor SB Ik zou zeggen alles opslaan als er orignation is EVENTUEEL locatie apart als dat er
+                    # maar niet van laten afhangen dus
 
                     unit_origination = manu.find("./did/origination")
                     if unit_origination != None and unit_origination != "":
@@ -970,15 +1248,16 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                  
                     else:
                         unit_orig_3 = ""
-                    # First location (role=4010)                                                
+                    
+                    # Locations (role=4010) in origination                                                
                     for prov in manu.findall("./did/origination/corpname[@role='4010']"):
                         provtemp = prov.text
-
-                        #print(provtemp)
+               
                         if provtemp != None:
-                            # We moeten kijken of de provenance niet bestaat, dan pas een nieuwe toevoegen
-                            # Wat te doen met notes? Wellicht alles tussen de <origination> tags?
-                            # Create new Provenance with shelfmark added to it
+                           # We moeten kijken of de provenance niet bestaat, dan pas een nieuwe toevoegen
+                           # Wat te doen met notes? Wellicht alles tussen de <origination> tags?
+                            
+                           # Create new Provenance with shelfmark added to it
                            prov_shelfmark = provtemp + " " + manu_obj.idno
 
                            # Look for existing location first match?? Is dat wijselijk? Laten we dit maar even uitstellen
@@ -999,15 +1278,17 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     
                     # URL of the manuscript
                             
-                    # Look for URL of the manuscript - if it exists                    
-                    # When there is no URL, the URL can (possibly) be found in 
-                    # the sub-manuscripts. TH: hier gaat het niet goed
+                    # Look for URL of the manuscript - if it exists                                        
+                    # Attrib techniek ook voor persname in scopecontent?
+                    # The URL needs to be added to the manuscript  TH: Ook in HIGH?
                     uniturl = manu.find("./dao")
                     if uniturl != None and uniturl != "":
                         url = uniturl.attrib.get('href')
-                        manu_obj.url = url
+                        manu_obj.url = url                    
                    
-                   # DATE of the manuscript                        
+                   # DATE(s) of the manuscript
+                   # DONDERDAG mee verder, goed testen eerst Latin 196
+                   # De if statement is niet juist volgens mij                      
                    # Try to get the date, e.g:
                    # <unitdate normal="1101/1200" era="ce" calendar="gregorian">XIIe siècle</unitdate>
 
@@ -1016,18 +1297,28 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                    # <unitdate calendar="gregorian" era="ce">IXe s. (845-851)</unitdate>
                    # <unitdate calendar="gregorian" era="ce">IXe s. (fin?)</unitdate>
                    # <unitdate calendar="gregorian" era="ce">Ve s. (f. 9-16); VIIe s. (f. 1-8); IXe s. (f. 17-31)</unitdate>
-                   # Hier gaat nog eea mis bijvoorbeeld bij Latin 152 en 2223
-                   # Let op: het is mogelijk om meer dan 1 datum range op te slaan
+                  
+                    # Let op: het is mogelijk om meer dan 1 datum range op te slaan
+                    print(manuidno)
                     unitdate = manu.find("./did/unitdate")
-                    if unitdate != None and unitdate != "" and 'normal' in unitdate.attrib:
+                    # start with unitdate = None
+                    # in case of no unitdate on manuscript level, skippen (Latin 196)
+                    # Unitdate moet eigenlijk niet eens worden ingevoerd in Manuscript, dat moet via DateRange
+                    if unitdate is None:
+                        unit_yearstart_low = ""
+                        unit_yearfinish_low = ""
+                        pass
+
+                    elif unitdate != None and unitdate != "" and 'normal' in unitdate.attrib:
                         unitdate_normal = unitdate.attrib.get('normal')
                         ardate = unitdate_normal.split("/")
                         if len(ardate) == 1:
-                            unit_yearstart = int(unitdate_normal)
-                            unit_yearfinish = int(unitdate_normal)
+                            unit_yearstart_low = int(unitdate_normal)
+                            unit_yearfinish_low = int(unitdate_normal)
                         else:
-                            unit_yearstart = int(ardate[0])
-                            unit_yearfinish = int(ardate[1])
+                            unit_yearstart_low = int(ardate[0])
+                            unit_yearfinish_low = int(ardate[1])
+
                     elif unitdate != None and unitdate != "" and 'normal' not in unitdate.attrib:
                         unitdate_complete = unitdate.text
                         if "-" in unitdate_complete:
@@ -1035,43 +1326,49 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             ardate = re.split('[\-\(\)]', unitdate_complete)
                     
                             # use positions 3 and to to grab the first and last year
-                            unit_yearstart = ardate[-3] 
-                            unit_yearfinish = ardate[-2]
+                            unit_yearstart_low = ardate[-3] 
+                            unit_yearfinish_low = ardate[-2]
                             # use the century indication in Roman numerals to create "virtual" 
                             # start and finish years TH: dit lijkt te werken                    
                         elif "-" not in unitdate_complete:
                             ardate = unitdate_complete.split('e ')
                             if len(ardate) < 3:  
-                                unit_century = ardate[0]
-                                if unit_century == "IX":
-                                    unit_yearstart = "800"
-                                    unit_yearfinish = "900"
-                                elif unit_century == "X":
-                                    unit_yearstart = "900"
-                                    unit_yearfinish = "1000"
-                                elif unit_century == "XI":
-                                    unit_yearstart = "1000"
-                                    unit_yearfinish = "1100"
-                                elif unit_century == "XII":
-                                    unit_yearstart = "1100"
-                                    unit_yearfinish = "1200"
-                                elif unit_century == "XIII":
-                                    unit_yearstart = "1200"
-                                    unit_yearfinish = "1300"
+                                unit_century_low = ardate[0]
+                                if unit_century_low == "IX":
+                                    unit_yearstart_low = "800"
+                                    unit_yearfinish_low = "900"
+                                elif unit_century_low == "X":
+                                    unit_yearstart_low = "900"
+                                    unit_yearfinish_low = "1000"
+                                elif unit_century_low == "XI":
+                                    unit_yearstart_low = "1000"
+                                    unit_yearfinish_low = "1100"
+                                elif unit_century_low == "XII":
+                                    unit_yearstart_low = "1100"
+                                    unit_yearfinish_low = "1200"
+                                elif unit_century_low == "XIII":
+                                    unit_yearstart_low = "1200"
+                                    unit_yearfinish_low = "1300"
                     
-                    # in case of no unitdate on manuscript level, skippen (Latin 196)
-                    # Unitdate moet eigenlijk niet eens worden ingevoerd in Manuscript, dat moet via DateRange
-                    elif unitdate is None:
-                        unit_yearstart = "9999"
-                        unit_yearfinish = "9999"
-                         # hoe gaan we om met een onbekende hoeveelheid eeuwen? TH: dit nog op te lossen
-                        # elif len(ardate) > 3: eerste kiezen? 
-                        
-                    # Create new Daterange object, store yearstart and year finish
-                    drange = Daterange.objects.create(manuscript=manu_obj, yearstart = unit_yearstart, yearfinish = unit_yearfinish)
-                    print(drange)
-                            
-                    # print(manu_obj.yearstart, manu_obj.yearfinish)
+                    # Check if there is a higher level date available, in case of combined manuscripts.      
+                    # Hier anders aanpakken        
+                    if manuidno_number <= manuidno_end:
+                        if unit_yearstart_low == "":
+                            unit_yearstart = unit_yearstart_high
+                            unit_yearfinish = unit_yearfinish_high
+                        elif unit_yearstart_low != "":
+                            unit_yearstart = unit_yearstart_low
+                            unit_yearfinish = unit_yearfinish_low
+                    else:
+                        unit_yearstart = unit_yearstart_low
+                        unit_yearfinish = unit_yearfinish_low
+                                                            
+                    # Create new Daterange object, store yearstart and year finish, only if there is a unitdate available. 
+                    # Dit gaat goed, ook igv de lager gelegen unitdates, in manuscript wordt vermoedelijk de eerste getoond van de 
+                    # bijbehorende records in Daterange.
+                    if unit_yearstart != "":
+                        drange = Daterange.objects.create(manuscript=manu_obj, yearstart = unit_yearstart, yearfinish = unit_yearfinish)
+                        print(drange)
                 
                     # Add the id's of the project, library, lcountry and lcity:
                     unitproject_id = 1
@@ -1159,6 +1456,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Zie aantekening shari, die moet wel meegenomen worden in notes oid, ok, geen punt aanpassen maar
                     # de <c> elementen gekeken worden
                     
+                    # zie Latin 2027, nog een variant? Nu wordt de complete inhoud meegenomen, inclusief de elements, beter alleen
+                    #  de tekst
+
                     # IN CASE THERE ARE NO NESTED <c> ELEMENTS (SermDescr)
                     # Check if there are titles, heads and manuscripts in nested <c> elements
                     # First if the above is not the case:
@@ -1177,18 +1477,38 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             if unit_p is None:
                                 pass
                         # In case in the <p> element the manifestations are separated by a <lb/> as a 
-                        # selfclosing element, for example with Latin 113:        
+                        # selfclosing element, for example with Latin 113:     WOENSDAG mee verder  
+                        # # https://stackoverflow.com/questions/57622731/python-extract-attributes-from-a-self-closing-element-with-same-name-as-other-e  
                             elif '<lb />' in sermon_manif_titles_1:  
+                                # DIT IS NIEUW
+                                #for unit_lb in unit_p.findall(".//lb"):
+                                #    lb_serm_manif_title_join = ''.join(unit_lb.itertext())
+                                #    print (lb_serm_manif_title_join)
+
+                                # DIT IS OUD, met NIEUW te integreren
+                                
+                                # Here a list is made by splitting up sermon_manif_titles_1
                                 sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
-                            # Clean titles and store in new list
-                            # is dit nodig??
+                            # Clean titles and store in new list 
+                            # is dit nodig?? Would it be possible to see if some parts could be extracted?
+                            # Folia, author,title inc en expl? Terwijl elk deel langskomt? Dus alleen als er aan bepaalde
+                            # voorwaarden wordt voldaan. Als er een ":" is, split en deel[0] is folio? 
                                 for title in sermon_manif_titles_2:
                                     title_1 = re.sub("[\n\s]+"," ", title)
-                                    print(title_1)
+                                    #title_2 = re.sub('<[^>]+>', '', title_2)
                                     title_2 = title_1.strip()
-                                    print(title_2)
+                                    
+                                    # Store the titles in a new list
                                     sermon_manif_titles_3.append(title_2)   
-                                for title in sermon_manif_titles_3:
+                                #for title in sermon_manif_titles_3:
+                                    # How to extract the folio?
+                                 #   titles_spaced = title.split("ff. ")
+                                  #  title_folio = titles_spaced[0]
+                                   # print(title_folio)
+                                        # how to extract the inc?
+                                        # my_string="hello python world , i'm a beginner "
+                                # print my_string.split("world",1)[1] 
+                                # Menna: dat wat uit de string voor title gehaald kan worden kan ook uit string weggehaald worden
                                     
                                     # Create MsItem to store the correct sequence of title, head and manifestations
                                     # Use order to count the number of MsItems
@@ -1204,17 +1524,19 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         
                             # In case the manifestations are better described in scopecontent 
                             # for instance Latin 309 and 330, 1788 example?):
-                            # TH: dit werkt
+                            # TH: dit werkt maar hoe de folio eruit? 
                             elif '<lb />' not in sermon_manif_titles_1:
                                 
                                 # First go through all manifestations (all <p> elements)
                                 serm_manif_title_join = ''.join(unit_p.itertext())
                                 serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
                                 sermon_manif_titles_3.append(serm_manif_title)
+                                
 
                                 # Check if there is also a head/folio
                                 # Hoe werkt dit in de bestaande loop? bekijkt dus al elk <p> element
-                                # dus steeds in dat element kijken?? Hoe kan ik dat <num> deel uit serm_manif_title halen?
+                                # dus steeds in dat element kijken?? Hoe kan ik dat <num> deel uit serm_manif_title halen? 
+                                # Overleg met Erwin na eerst zelf te kijken
                                 sermon_head = unit_p.find("./num")
                                 if sermon_head != None and sermon_head != "":
                                     serm_folio = sermon_head.text
@@ -1254,14 +1576,35 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         for unit_c in manu.findall("./c"):
                             
                             # First: find folio
+                            # Bij Latin 1970 gaat dit mis, is sowieso een aparte zo te zien
+                            # ook geen unittitle en gedoe met jaartal ff uit de lijst
                             sermon_head = unit_c.find("./head")
-                            serm_folio = sermon_head.text
+
+                            if sermon_head != None and sermon_head != "":
+                                serm_folio = sermon_head.text
                                                         
                             # Second: find date 
                             # Date should be stored at the Manuscript level (in Daterange) 
                             sermon_date = unit_c.find("./did/unitdate")
                             # Find out if there is a date and in what way the date is structured.
-                            if sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
+                            if sermon_date is None:
+                                sermon_yearstart = "9999"
+                                sermon_yearfinish = "9999"
+                                pass
+                            
+                            # HIER MOET NOG DE ANDERE OPTIE KOMEN, 'normal' in sermon_date.attrib:
+                            # HIER DONDERDAG mee verder! aanpassen unitdate TH: Latin 1970 lijkt te werken
+                            elif sermon_date != None and sermon_date != "" and 'normal' in sermon_date.attrib:
+                                sermon_date_normal = sermon_date.attrib.get('normal')
+                                ardate = sermon_date_normal.split("/")
+                                if len(ardate) == 1:
+                                    sermon_yearstart = int(unitdate_normal)
+                                    sermon_yearfinish = int(unitdate_normal)
+                                else:
+                                    sermon_yearstart = int(ardate[0])
+                                    sermon_yearfinish = int(ardate[1])
+
+                            elif sermon_date != None and sermon_date != "" and 'normal' not in sermon_date.attrib:
                                 sermon_date_complete = sermon_date.text
                                 # See if there is an indication of a range in the date
                                 # If there is no range, we assume for know Roman numerals are used
@@ -1297,13 +1640,11 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                         elif sermon_century == "XIII":
                                             sermon_yearstart = "1200"
                                             sermon_yearfinish = "1300"
-                             
-                            elif sermon_date is None:
-                                continue
 
                             # Create new Daterange object, store yearstart and year finish with a link to the manuscript
-                            drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
-                            
+                            if sermon_yearstart != "9999":
+                                drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
+                                print(drange)
                             # Third: find section title
                             # TH: idealiter niet dat folio meenemen, check hoe het anders moet voorlopig wel even goed zo 
                                                         
@@ -1876,7 +2217,8 @@ class ReaderImport(View):
             # Remove previous status object for this user
             Status.objects.filter(user=username).delete()
             # Create a status object
-            oStatus = Status.objects.create(user=username, type=self.import_type, status="preparing")
+            oStatus = Status(user=username, type=self.import_type, status="preparing")
+            oStatus.save()
             # Make sure the status is available
             self.oStatus = oStatus
 
