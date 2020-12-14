@@ -1,14 +1,12 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 {% load staticfiles %}
 
 
 {% block content %}
 
 <div class="container body-content">
+  <h2>{{ title }}</h2>
   <div class="row">
-
-    <h2>{{ title }}</h2>
-
     <div class="col-md-6">
       <h3>Background</h3>
       <p>The PASSIM web application is being developed as part of the ERC <a href="https://cordis.europa.eu/project/rcn/218691/en" target="_blank">PASSIM project</a>.</p>
@@ -49,6 +47,7 @@
       <p>
         <a class="btn btn-default" href="mailto:e.komen@let.ru.nl">Request assistance &raquo;</a>
         <span class="pull-right">
+          <a class="btn btn-primary" href="{% url 'guide' %}" target="_blank">Short guide</a>
           <a class="btn btn-primary" href="{% static 'browser/content/PassimManual.pdf' %}" target="_blank">Manual (pdf)</a>
           <a class="btn btn-primary" href="{% url 'technical' %}">Technical information</a>
         </span>

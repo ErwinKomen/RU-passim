@@ -2225,6 +2225,13 @@ var ru = (function ($, ru) {
             data = null;
 
         try {
+          // If there is a sort order, we need to process it
+          if (sOrder !== undefined) {
+            $(elStart).find("input[name=o]").each(function (el) {
+              $(this).val(sOrder);
+            });
+          }
+
           // Get to the form
           frm = $(elStart).closest('form');
           // Get the data from the form
@@ -2247,12 +2254,6 @@ var ru = (function ($, ru) {
               if (iPage !== undefined) {
                 $(elStart).find("input[name=page]").each(function (el) {
                   $(this).val(iPage);
-                });
-              }
-              // If there is a sort order, we need to process it
-              if (sOrder !== undefined) {
-                $(elStart).find("input[name=o]").each(function (el) {
-                  $(this).val(sOrder);
                 });
               }
               // Now submit the form
@@ -2325,6 +2326,7 @@ var ru = (function ($, ru) {
         try {
           // And then go to the first element within the form that is of any use
           elStart = $(".search_ordered_start").first();
+          // Only now continue
           ru.basic.search_start(elStart, 'submit', 1, order)
         } catch (ex) {
           private_methods.errMsg("search_ordered_start", ex);

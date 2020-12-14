@@ -10,7 +10,6 @@ feedparser==5.2.1
 future==0.17.1
 idna==2.8
 jdcal==1.4
-lxml==4.3.1
 Markdown==3.1
 openpyxl==2.5.14
 pathlib==1.0.1

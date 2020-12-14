@@ -1,4 +1,4 @@
-﻿var django = {
+var django = {
   "jQuery": jQuery.noConflict(true)
 };
 var jQuery = django.jQuery;
@@ -12,6 +12,14 @@ String.prototype.format = function () {
   return formatted;
 };
 
+(function ($) {
+  $(function () {
+    $(document).ready(function () {
+      // Initialize event listeners
+      ru.passim.seeker.init_charts();
+    });
+  });
+})(django.jQuery);
 
 var ru = (function ($, ru) {
   "use strict";
@@ -449,8 +457,7 @@ var ru = (function ($, ru) {
           return [];
         }
       },
-
-
+      
       /**
        * sermon_tree
        *    Convert [elTable] into a correct TREE structure
@@ -1162,6 +1169,211 @@ var ru = (function ($, ru) {
           private_methods.errMsg("var_move", ex);
         }
       },
+
+      /**
+       * draw_hpie_chart
+       *    Show a pie-chart using Highcharts
+       *
+       */
+      draw_hpie_chart: function (divid, data) {
+        var chartformat = null,
+            i = 0,
+            title = {
+              'hpie_sermo': 'Sermons',
+              'hpie_manu': 'Manuscripts',
+              'hpie_super': 'SSGs'};
+
+        try {
+          chartformat = {
+            chart: { plotBackgroundColor: null, plotBorderWidth: null, plotShadow: false, type: 'pie' },
+            title: { text: title[divid] },
+            tooltip: { pointFormat: '{series.name}: <b>{point.y}</b>' },
+            plotOptions: { pie: { allowPointSelect: true, cursor: 'pointer', dataLabels: { enabled: false } } },
+            series: [{
+              name: title[divid], colorByPoint: true, data: []
+            }]
+          };
+          for (i = 0; i < data.length; i++) {
+            chartformat.series[0].data.push({name: data[i].name, y: data[i].value});
+          }
+
+          Highcharts.chart(divid, chartformat);
+        } catch (ex) {
+          private_methods.errMsg("draw_hpie_chart", ex);
+        }
+      },
+
+        /**
+       * draw_pie_chart
+       *    Show a pie-chart using D3
+       *
+       *  The data is expected to be: 'count', 'freq'
+       *  See: https://observablehq.com/@d3/pie-chart
+       *
+       */
+      draw_pie_chart: function (divid, data) {
+        var margin = null,
+            width_g = 200,
+            height_g = 200,
+            translate_h = 0,
+            width = 0,
+            height = 0,
+            viewbox = "",
+            svg = null,
+            pie = null,
+            path = null,
+            label = null,
+            arcLabel = null,
+            arc = null,
+            arcs = null,
+            radius = null,
+            arcRadius = null,
+            title = {
+              'pie_sermo': 'Sermon manifestations',
+              'pie_manu': 'Manuscripts',
+              'pie_super': 'SSGs'},
+            g = null,
+            color = null,
+            colidx = -1,    // COlor index into array [color]
+            i = 0,
+            showGuide = null,
+            tooltip = null, showTooltip = null, moveTooltip = null, hideTooltip = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 20, left: 20 }
+          width = width_g - margin.left - margin.right;
+          height = height_g - margin.top - margin.bottom;
+
+          // Do *NOT* use a viewbox, otherwise downloading as PNG doesn't work
+          // viewbox = "0 0 970 510";
+
+          // Create an SVG top node
+          svg = d3.select("#" + divid).append("svg")
+            //.attr("width", "100%").attr("height", "100%")
+            //.attr("viewBox", viewbox)
+            .attr("width", width_g)
+            .attr("height", height_g)
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+          // Create an over-arching <g> element
+          translate_h = width_g / 2 - 20;
+          g = svg
+            .append("g")
+            .attr("transform", "translate(" + translate_h + "," + height_g / 2 + ")");
+
+          // Define the colors that we want to use
+          color = d3.scaleOrdinal(['red', 'orange', 'green']);
+
+          // Calculate the radius
+          radius = Math.min(width, height) / 2;
+          arcRadius = Math.min(width, height) / 2 * 0.7;
+
+          // Generate the pie
+          pie = d3.pie().value(function (d) {
+            return d.value;
+          });
+
+          // Tooltip data respond function
+          showTooltip = function (event, d) {
+            var ptc = Math.round( parseInt(d.data.value, 10) * 100 / parseInt(d.data.total, 10));
+            tooltip.transition().duration(100).style("opacity", 1.0);
+            // tooltip.html(d.length + " SSGs have a set of " + d.x0 + " sermon(s)")
+            tooltip.html(d.data.name +
+              ":</br> <b>" + d.data.value.toLocaleString() + "</b> (" + ptc + "%)")
+              .style("left", (event.x + 10) + "px")
+              .style("top", (event.y - 35) + "px");
+            // All arcs become transparent
+            $(event.target).closest("svg").find(".arc > path").attr("opacity", "0.2");
+            // I myself become my *FULL* color
+            $(event.target).attr("opacity", "1.0");
+          };
+          // Make sure the tooltip shows about where the user hovers
+          moveTooltip = function (event, d) {
+            tooltip.style("left", (event.x + 10) + "px")
+                   .style("top", (event.y - 35) + "px");
+          };
+          // Change the opacity again
+          hideTooltip = function (event, d) {
+            tooltip.transition().duration(300).style("opacity", 0);
+            // Restore all colors to their original
+            $(event.target).closest("svg").find(".arc > path").each(function () {
+              $(this).attr("opacity", "0.8");
+            });
+          };
+          // Act on the CLICK function
+          showGuide = function (event, d) {
+            var elDiv = null;
+            elDiv = $(event.target).closest("div[targeturl]");
+            window.location.href = $(elDiv).attr("targeturl");
+          };
+
+          path = d3.arc().outerRadius(radius - 10).innerRadius(0);
+          label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
+          arcLabel = d3.arc().innerRadius(arcRadius).outerRadius(arcRadius);
+          arcs = pie(data);
+
+          // Generate the arcs
+          arc = g.selectAll("arc")
+                 .data(arcs)
+                 .enter()
+                 .append("g")
+                 .attr("class", "arc passim-pie-arc")
+                 .on("click", showGuide)
+                 .on("mouseover", showTooltip)
+                 .on("mousemove", moveTooltip)
+                 .on("mouseleave", hideTooltip);
+
+          // Draw the arc paths
+          arc.append("path")
+              .attr("d", path)
+              .attr("fill", function (d, i) {
+                return color(i);
+              })
+              .attr("opacity", "0.8");
+
+          console.log(arc);
+
+          // Add a label to each of the arcs
+
+          svg.append("g")
+             .attr("transform", "translate(" + translate_h + "," + height_g / 2 + ")")
+             .attr("font-family", "sans-serif").attr("font-size", 10).attr("text-anchor", "middle")
+             .selectAll("text")
+             .data(arcs)
+             .join("text")
+             .attr("transform", function (d) {
+               return "translate(" + arcLabel.centroid(d) + ")";
+             });
+            /* This would have been to add a <tspan> with the number to the pie
+            .call(text => text.append("tspan")
+               //.attr("x", 0)
+               .attr("y", "0.1em")
+               .attr("font-weight", "bold")
+               .text(function (d) {
+                 return d.data.value.toLocaleString();
+               })
+               ); */
+
+          svg.append("g")
+              .attr("transform", "translate(" + translate_h + "," + 10 + ")")
+              .attr("text-anchor", "middle")
+              .append("text")
+              .text(title[divid])
+              .attr("class", "title");
+
+          // Add a tooltip <div>
+          tooltip = d3.select("#" + divid)
+            .append("div").attr("class", "tooltip").style("opacity", 0);
+
+
+          // THis should have drawn the pie-chart correctly
+        } catch (ex) {
+          private_methods.errMsg("draw_pie_chart", ex);
+        }
+      },
+
       errMsg: function (sMsg, ex, bNoCode) {
         var sHtml = "",
             bCode = true;
@@ -1181,22 +1393,26 @@ var ru = (function ($, ru) {
         console.log(sHtml);
         $("#" + loc_divErr).html(sHtml);
       },
+
       errClear: function () {
         $("#" + loc_divErr).html("");
         loc_bExeErr = false;
       },
+
       mainWaitStart : function() {
         var elWait = $(".main-wait").first();
         if (elWait !== undefined && elWait !== null) {
           $(elWait).removeClass("hidden");
         }
       },
+
       mainWaitStop: function () {
         var elWait = $(".main-wait").first();
         if (elWait !== undefined && elWait !== null) {
           $(elWait).addClass("hidden");
         }
       },
+
       waitInit: function (el) {
         var elResPart = null,
             elWait = null;
@@ -1212,11 +1428,13 @@ var ru = (function ($, ru) {
           private_methods.errMsg("waitInit", ex);
         }
       },
+
       waitStart: function(el) {
         if (el !== null) {
           $(el).removeClass("hidden");
         }
       },
+
       waitStop: function (el) {
         if (el !== null) {
           $(el).addClass("hidden");
@@ -1226,6 +1444,36 @@ var ru = (function ($, ru) {
 
     // Public methods
     return {
+
+      /**
+       *  init_charts
+       *      Check if this is the homepage and then supply charts
+       *
+       */
+      init_charts: function () {
+        var charts = ['sermo', 'super', 'manu'],
+            elStart = null,
+            divid = null,
+            data = null,
+            ptype = "",
+            i = 0;
+        try {
+
+          // Check if this is the HOME Page, for which the pie charts need to be drawn
+          for (i = 0; i < charts.length; i++) {
+            ptype = charts[i];
+            divid = "pie_" + ptype;
+            elStart = "#" + divid;
+            if ($(elStart).length > 0 && g_pie_data !== undefined && ptype in g_pie_data) {
+              data = g_pie_data[ptype];
+              private_methods.draw_pie_chart(divid, data);
+            }
+          }
+
+         } catch (ex) {
+          private_methods.errMsg("init_charts", ex);
+        }
+      },
 
       /**
        *  init_events
@@ -1394,8 +1642,7 @@ var ru = (function ($, ru) {
           //  snapTolerance: 20
           //});
 
-
-        } catch (ex) {
+         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
       },
@@ -1931,7 +2178,7 @@ var ru = (function ($, ru) {
 
           // Add a tooltip <div>
           tooltip = d3.select("#" + divid)
-            .append("div").attr("class", "tooltip").style("opacity", 0);;
+            .append("div").attr("class", "tooltip").style("opacity", 0);
 
           // Tooltip data respond function
           showTooltip = function (event, d) {
@@ -1971,6 +2218,7 @@ var ru = (function ($, ru) {
           private_methods.errMsg("scount_histogram_show", ex);
         }
       },
+
 
       /**
        * histogram_click

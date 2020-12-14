@@ -39,8 +39,6 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
-#import lxml
-#import pygal
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -118,21 +116,18 @@ app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
 
 def get_usercomments(type, instance, profile):
-    """Get a HTML list of user-made comments"""
+    """Get a HTML list of comments made by this user and possible users in the same group"""
 
     html = []
-    qs = instance.comments.filter(profile=profile).order_by("-created")
-    #if qs.count() > 0:
-    #    html.append("<table style='width: 100%;'><tbody>")
-    #    for obj in qs:
-    #        # Add one comment into the table
-    #        html.append("<tr><td class='tdnowrap'>{}</td><td style='margin-left: 10px; width: 90%;'>{}</td></tr>".format(
-    #            get_crpp_date(obj.created, True), obj.content ))
-    #    html.append("</tbody></table>")
+    lstQ = []
+    if not username_is_ingroup(profile.user, app_editor):
+        # App editors have permission to see *all* comments from all users
+        lstQ.append(Q(profile=profile))
 
-    ## Combine
-    #sBack = "\n".join(html)
-    #return sBack
+    # Calculate the list
+    qs = instance.comments.filter(*lstQ).order_by("-created")
+
+    # REturn the list
     return qs
 
 
@@ -332,6 +327,10 @@ def user_is_authenticated(request):
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
     user = User.objects.filter(username=request.user.username).first()
+    response = username_is_ingroup(user, sGroup)
+    return response
+
+def username_is_ingroup(user, sGroup):
     # glist = user.groups.values_list('name', flat=True)
 
     # Only look at group if the user is known
@@ -589,6 +588,9 @@ def home(request):
     context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
     context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
 
+    # Gather pie-chart data
+    context['pie_data'] = get_pie_data()
+
     # Render and return the page
     return render(request, template_name, context)
 
@@ -622,18 +624,42 @@ def more(request):
     return render(request,'more.html', context)
 
 def technical(request):
-    """Renders the technical-information page."""
+    """Renders the technical information page."""
     assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'technical.html'
     context =  {'title':'Technical',
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
 
-    return render(request,'technical.html', context)
+    return render(request,template_name, context)
+
+def guide(request):
+    """Renders the user-manual (guide) page."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'guide.html'
+    context =  {'title':'User manual',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
+
+    return render(request,template_name, context)
 
 def bibliography(request):
     """Renders the more page."""
@@ -885,7 +911,12 @@ def search_generic(s_view, cls, form, qd, username=None, team_group=None):
                         lstExclude = []
                         lstExclude.append(Q(equal__isnull=True))
                     # Reset the codetype
-                    oFields['codetype'] = ""   
+                    oFields['codetype'] = ""  
+                    
+                # Adapt search for soperator/scount
+                if 'soperator' in oFields:
+                    if not 'scount' in oFields or oFields['soperator'] == "-":
+                        oFields.pop('soperator') 
                                  
                 # Create the search based on the specification in searches
                 filters, lstQ, qd, lstExclude = make_search_list(filters, oFields, searches, qd, lstExclude)
@@ -3781,6 +3812,51 @@ def import_authors(request):
     # Return the information
     return JsonResponse(data)
 
+def get_pie_data():
+    """Fetch data for a particular type of pie-chart for the home page
+    
+    Current types: 'sermo', 'super', 'manu'
+    """
+
+    oErr = ErrHandle()
+    red = 0
+    orange = 0
+    green = 0
+    combidata = {}
+    ptypes = ['sermo', 'super', 'manu']
+    try:
+        for ptype in ptypes:
+            qs = None
+            if ptype == "sermo":
+                qs = SermonDescr.objects.filter(msitem__isnull=False).order_by('stype').values('stype')
+            elif ptype == "super":
+                qs = EqualGold.objects.filter(moved__isnull=True).order_by('stype').values('stype')
+            elif ptype == "manu":
+                qs = Manuscript.objects.filter(mtype='man').order_by('stype').values('stype')
+            # Calculate the different stype values
+            if qs != None:
+                app = sum(x['stype'] == "app" for x in qs)  # Approved
+                edi = sum(x['stype'] == "edi" for x in qs)  # Edited
+                imp = sum(x['stype'] == "imp" for x in qs)  # Imported
+                man = sum(x['stype'] == "man" for x in qs)  # Manually created
+                und = sum(x['stype'] == "-" for x in qs)    # Undefined
+                red = imp + und + man
+                orange = edi
+                green = app
+            total = red + green + orange
+            # Create a list of data
+            data = []
+            data.append({'name': 'Initial', 'value': red, 'total': total})
+            data.append({'name': 'Edited', 'value': orange, 'total': total})
+            data.append({'name': 'Approved', 'value': green, 'total': total})
+            combidata[ptype] = data
+    except:
+        msg = oErr.get_error_message()
+        combidata['msg'] = msg
+        combidata['status'] = "error"
+    return combidata 
+
+
 
 class BasicPart(View):
     """This is my own versatile handling view.
@@ -4012,27 +4088,31 @@ class BasicPart(View):
             elif self.action == "download":
                 # We are being asked to download something
                 if self.dtype != "":
+                    plain_type = ["xlsx", "csv", "excel"]
                     # Initialise return status
                     oBack = {'status': 'ok'}
                     sType = "csv" if (self.dtype == "xlsx") else self.dtype
 
                     # Get the data
-                    sData = self.get_data('', self.dtype)
+                    sData = ""
+                    if self.dtype != "excel":
+                        sData = self.get_data('', self.dtype)
                     # Decode the data and compress it using gzip
                     bUtf8 = (self.dtype != "db")
-                    bUsePlain = (self.dtype == "xlsx" or self.dtype == "csv")
+                    bUsePlain = (self.dtype in plain_type)
 
                     # Create name for download
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
                     modelname = self.MainModel.__name__
                     obj_id = "n" if self.obj == None else self.obj.id
-                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, self.dtype)
+                    extension = "xlsx" if self.dtype == "excel" else self.dtype
+                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":
                         sContentType = "text/tab-separated-values"
                     elif self.dtype == "json":
                         sContentType = "application/json"
-                    elif self.dtype == "xlsx":
+                    elif self.dtype == "xlsx" or self.dtype == "excel":
                         sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     elif self.dtype == "hist-svg":
                         sContentType = "application/svg"
@@ -4061,6 +4141,11 @@ class BasicPart(View):
                         response = HttpResponse(content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
                         response = csv_to_excel(sData, response)
+                    elif self.dtype == "excel":
+                        # Convert 'compressed_content' to an Excel worksheet
+                        response = HttpResponse(content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        response = self.get_data('', self.dtype, response)
                     else:
                         response = HttpResponse(sData, content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
@@ -4284,7 +4369,7 @@ class BasicPart(View):
         # Find out what the Main Model instance is, if any
         if self.add:
             self.obj = None
-        else:
+        elif self.MainModel != None:
             # Get the instance of the Main Model object
             self.obj =  self.MainModel.objects.filter(pk=object_id).first()
             # NOTE: if the object doesn't exist, we will NOT get an error here
@@ -4303,7 +4388,7 @@ class BasicPart(View):
     def get_form_kwargs(self, prefix):
         return None
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         return ""
 
     def before_save(self, prefix, request, instance=None, form=None):
@@ -6304,8 +6389,9 @@ class KeywordEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'plain', 'label': "Name:",      'value': instance.name,                    'field_key': 'name'},
-            {'type': 'plain', 'label': "Visibility:",'value': instance.get_visibility_display(), 'field_key': 'visibility'}
+            {'type': 'plain', 'label': "Name:",       'value': instance.name,                     'field_key': 'name'},
+            {'type': 'plain', 'label': "Visibility:", 'value': instance.get_visibility_display(), 'field_key': 'visibility'},
+            {'type': 'plain', 'label': "Description:",'value': instance.description,              'field_key': 'description'}
             ]
         # Return the context we have made
         return context
@@ -7752,7 +7838,6 @@ class CollAnyEdit(BasicDetails):
 
         oErr = ErrHandle()
         histogram_data = []
-        # b_chart = None
         try:
             # Get the queryset for this view
             if instance != None and qs != None:
@@ -7760,7 +7845,6 @@ class CollAnyEdit(BasicDetails):
                 baseurl = reverse('equalgold_list')
                 # Determine the list
                 qs = qs.order_by('scount').values('scount', 'id')
-                # qs = instance.collections_super.all().order_by('scount').values('scount', 'id')
                 scount_index = {}
                 frequency = None
                 for item in qs:
@@ -9186,6 +9270,58 @@ class CommentEdit(BasicDetails):
     """The details of one comment"""
 
     model = Comment
+    mForm = None        # We are not using a form here!
+    prefix = 'com'
+    new_button = False
+    # no_delete = True
+    permission = "readonly"
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_created(),    },
+                {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
+                {'type': 'plain', 'label': "Comment:",      'value': instance.content,     },
+                {'type': 'plain', 'label': "Item type:",    'value': instance.get_otype()},
+                {'type': 'safe', 'label': "Link:",          'value': self.get_link(instance)}
+                ]
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_link(self, instance):
+        url = ""
+        label = ""
+        sBack = ""
+        if instance.otype == "manu":
+            obj = instance.comments_manuscript.first()
+            url = reverse("manuscript_details", kwargs={'pk': obj.id})
+            label = "manu_{}".format(obj.id)
+        elif instance.otype == "sermo":
+            obj = instance.comments_sermon.first()
+            url = reverse("sermon_details", kwargs={'pk': obj.id})
+            label = "sermo_{}".format(obj.id)
+        elif instance.otype == "gold":
+            obj = instance.comments_gold.first()
+            url = reverse("sermongold_details", kwargs={'pk': obj.id})
+            label = "gold_{}".format(obj.id)
+        elif instance.otype == "super":
+            obj = instance.comments_super.first()
+            url = reverse("equalgold_details", kwargs={'pk': obj.id})
+            label = "super_{}".format(obj.id)
+        if url != "":
+            sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+ 
+        return sBack
 
 
 class CommentDetails(CommentEdit):
@@ -9398,8 +9534,14 @@ class ManuscriptEdit(BasicDetails):
                 lbuttons = []
                 template_import_button = "import_template_button"
                 has_sermons = (instance.manuitems.count() > 0)
+
                 # Action depends on template/not
                 if not istemplate:
+                    # Button to download this manuscript
+                    downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
+                    lbuttons.append(dict(title="Download manuscript as Excel file", 
+                                         click="manuscript_download", label="Download"))
+
                     # Add a button so that the user can import sermons + hierarchy from an existing template
                     if not has_sermons:
                         lbuttons.append(dict(title="Import sermon manifestations from a template", 
@@ -9416,7 +9558,9 @@ class ManuscriptEdit(BasicDetails):
                 lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
                 for item in lbuttons:
                     idfield = ""
-                    if 'submit' in item:
+                    if 'click' in item:
+                        ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
+                    elif 'submit' in item:
                         ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
                     elif 'open' in item:
                         ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
@@ -9432,6 +9576,10 @@ class ManuscriptEdit(BasicDetails):
                     # Add HTML to allow for the *creation* of a template from this manuscript
                     local_context = dict(manubase=instance.id)
                     lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
+
+                    # Also add the manuscript download code
+                    local_context = dict(ajaxurl = reverse("manuscript_download", kwargs={'pk': instance.id}))
+                    lhtml.append(render_to_string('seeker/manuscript_download.html', local_context, self.request))
 
                     # Add HTML to allow the user to choose sermons from a template
                     local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
@@ -9970,6 +10118,20 @@ class ManuscriptListView(BasicList):
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
     def initializations(self):
+        # Possibly add to 'uploads'
+        bHasExcel = False
+        for item in self.uploads:
+            if item['title'] == "excel":
+                bHasExcel = True
+        if not bHasExcel:
+            # Add a reference to the Excel upload method
+            oExcel = dict(title="excel", label="Excel",
+                          url=reverse('manuscript_upload_excel'),
+                          type="multiple",
+                          msg="Import one manuscript from an Excel file")
+            self.uploads.append(oExcel)
+
+        # ======== One-time adaptations ==============
         # Check if signature adaptation is needed
         sh_done = Information.get_kvalue("sermonhierarchy")
         if sh_done == None or sh_done == "":
@@ -10204,6 +10366,218 @@ class ManuscriptListView(BasicList):
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
   
+
+class ManuscriptDownload(BasicPart):
+    MainModel = Manuscript
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "excel"       # downloadtype
+    manuitems = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name'},
+        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name'},
+        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},
+        {'name': 'Title',               'type': 'field', 'path': 'name'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Support',             'type': 'field', 'path': 'support'},
+        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        ]
+    sermoitems = [
+        {'name': 'Order',               'type': ''},
+        {'name': 'Parent',              'type': ''},
+        {'name': 'FirstChild',          'type': ''},
+        {'name': 'Next',                'type': ''},
+        {'name': 'Type',                'type': ''},
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Locus',               'type': 'field', 'path': 'locus'},
+        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
+        {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
+        {'name': 'Title',               'type': 'field', 'path': 'title'},
+        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
+        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
+        {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
+        {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
+        {'name': 'Note',                'type': 'field', 'path': 'note'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
+        {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
+        ]
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_func(self, instance, path, profile, username, team_group):
+        sBack = ""
+        if path == "dateranges":
+            qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            dates = []
+            for obj in qs:
+                dates.append(obj.__str__())
+            sBack = ", ".join(dates)
+        elif path == "keywords":
+            sBack = instance.get_keywords_markdown(plain=True)
+        elif path == "keywordsU":
+            sBack =  instance.get_keywords_user_markdown(profile, plain=True)
+        elif path == "datasets":
+            sBack = instance.get_collections_markdown(username, team_group, settype="pd", plain=True)
+        elif path == "literature":
+            sBack = instance.get_litrefs_markdown(plain=True)
+        elif path == "origin":
+            sBack = instance.get_origin()
+        elif path == "provenances":
+            sBack = instance.get_provenance_markdown(plain=True)
+        elif path == "external":
+            sBack = instance.get_external_markdown(plain=True)
+        elif path == "brefs":
+            sBack = instance.get_bibleref(plain=True)
+        elif path == "signaturesM":
+            sBack = instance.get_sermonsignatures_markdown(plain=True)
+        elif path == "signaturesA":
+            sBack = instance.get_eqsetsignatures_markdown(plain=True)
+        elif path == "ssglinks":
+            sBack = instance.get_eqset()
+        return sBack
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        def get_item_value(item, instance):
+            key = item['name']
+            value = ""
+            if instance != None:
+                if item['type'] == 'field':
+                    value = getattr(instance, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(instance, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.get_func(instance, item['path'], profile, username, team_group)
+            return key, value
+
+        # Initialize
+        lData = []
+        sData = ""
+        manu_fields = []
+        oErr = ErrHandle()
+
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
+
+            # Start workbook
+            wb = openpyxl.Workbook()
+
+            # First worksheet: MANUSCRIPT itself
+            ws = wb.get_active_sheet()
+            ws.title="Manuscript"
+
+            # Read the header cells and make a header row in the MANUSCRIPT worksheet
+            headers = ["Field", "Value"]
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+            # Walk the mainitems
+            row_num = 2
+            for item in self.manuitems:
+                key, value = get_item_value(item, self.obj)
+                # Add the K/V row
+                ws.cell(row=row_num, column = 1).value = key
+                ws.cell(row=row_num, column = 2).value = value
+                row_num += 1
+
+            # Second worksheet: ALL SERMONS in the manuscript
+            ws = wb.create_sheet("Sermons")
+
+            # Read the header cells and make a header row in the MANUSCRIPT worksheet
+            headers = [x['name'] for x in self.sermoitems ]
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+            row_num = 1
+            # Walk all msitems of this manuscript
+            for msitem in self.obj.manuitems.all().order_by('order'):
+                row_num += 1
+                col_num = 1
+                ws.cell(row=row_num, column=col_num).value = msitem.order
+                # Get other stuff
+                parent = "" if msitem.parent == None else msitem.parent.order
+                firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
+                next = "" if msitem.next == None else msitem.next.order
+
+                # Process the structural elements
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = parent
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = firstchild
+                col_num += 1
+                ws.cell(row=row_num, column=col_num).value = next
+
+                # What kind of item is this?
+                col_num += 1
+                if msitem.itemheads.count() > 0:
+                    sermonhead = msitem.itemheads.first()
+                    # This is a SermonHead
+                    ws.cell(row=row_num, column=col_num).value = "Structural"
+                    col_num += 2
+                    ws.cell(row=row_num, column=col_num).value = sermonhead.locus
+                    col_num += 4
+                    ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
+                else:
+                    # This is a SermonDescr
+                    ws.cell(row=row_num, column=col_num).value = "Plain"
+                    col_num += 1
+                    sermon = msitem.itemsermons.first()
+                    # Walk the items
+                    for item in self.sermoitems:
+                        if item['type'] != "":
+                            key, value = get_item_value(item, sermon)
+                            ws.cell(row=row_num, column=col_num).value = value
+                            col_num += 1
+                
+
+            # Save it
+            wb.save(response)
+            sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptDownload/get_data")
+
+
+        return sData
+
 
 class ManuscriptProvset(BasicPart):
     """The set of provenances from one manuscript"""
@@ -11329,6 +11703,17 @@ class EqualGoldEdit(BasicDetails):
                 bResult = False
         return None
 
+    def get_form_kwargs(self, prefix):
+        # This is for ssglink
+
+        oBack = None
+        if prefix == "ssglink":
+            if self.object != None:
+                # Make sure to return the ID of the EqualGold
+                oBack = dict(super_id=self.object.id)
+
+        return oBack
+           
     def before_save(self, form, instance):
         # Check for author
         if instance.author == None:
@@ -11358,13 +11743,14 @@ class EqualGoldEdit(BasicDetails):
                       added=super_added, deleted=super_deleted)
             # Check for partial links in 'deleted'
             for obj in super_deleted:
-                if obj.linktype in LINK_BIDIR:
-                    # First find and remove the other link
-                    reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
-                    if reverse != None:
-                        reverse.delete()
-                    # Then remove myself
-                    obj.delete()
+                # This if-clause is not needed: anything that needs deletion should be deleted
+                # if obj.linktype in LINK_BIDIR:
+                # First find and remove the other link
+                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                if reverse != None:
+                    reverse.delete()
+                # Then remove myself
+                obj.delete()
             # Make sure to add the reverse link in the bidirectionals
             for obj in super_added:
                 if obj.linktype in LINK_BIDIR:
@@ -11417,146 +11803,157 @@ class EqualGoldDetails(EqualGoldEdit):
         # Start by executing the standard handling
         super(EqualGoldDetails, self).add_to_context(context, instance)
 
-        # Are we copying information?? (only allowed if we are the app_editor)
-        if 'goldcopy' in self.qd and context['is_app_editor']:
-            # Get the ID of the gold sermon from which information is to be copied to the SSG
-            goldid = self.qd['goldcopy']
-            # Also get the simple value
-            simple = self.qd.get("simple", "f")
-            # Get the GOLD SERMON instance
-            gold = SermonGold.objects.filter(id=goldid).first()
+        oErr = ErrHandle()
+        try:
+            # Are we copying information?? (only allowed if we are the app_editor)
+            if 'goldcopy' in self.qd and context['is_app_editor']:
+                # Get the ID of the gold sermon from which information is to be copied to the SSG
+                goldid = self.qd['goldcopy']
+                # Also get the simple value
+                simple = self.qd.get("simple", "f")
+                # Get the GOLD SERMON instance
+                gold = SermonGold.objects.filter(id=goldid).first()
 
-            if gold != None:
-                # Copy all relevant information to the EqualGold obj (which as a SSG)
-                obj = self.object
-                if simple == "f":
-                    # (1) copy author - only if not simple
-                    if gold.author != None: obj.author = gold.author
-                # (2) copy incipit
-                if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
-                # (3) copy explicit
-                if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
+                if gold != None:
+                    # Copy all relevant information to the EqualGold obj (which as a SSG)
+                    obj = self.object
+                    # Issue #313: <Anonymus> *may* be copied, but not <Undecided>
+                    exclude_authors = ['Undecided']  # ['Anonymus','Undecided']
+                    if simple == "f" and gold.author != None and not gold.author.name in exclude_authors:
+                        # (1) copy author - only if not simple
+                        if gold.author != None: obj.author = gold.author
+                    # (2) copy incipit
+                    if gold.incipit != None and gold.incipit != "": obj.incipit = gold.incipit ; obj.srchincipit = gold.srchincipit
+                    # (3) copy explicit
+                    if gold.explicit != None and gold.explicit != "": obj.explicit = gold.explicit ; obj.srchexplicit = gold.srchexplicit
 
-                # Now save the adapted EqualGold obj
-                obj.save()
+                    # Now save the adapted EqualGold obj
+                    obj.save()
 
-                # Mark these changes, which are done outside the normal 'form' system
-                actiontype = "save"
-                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
-                details = dict(savetype="change", id=obj.id, changes=changes)
-                passim_action_add(self, obj, details, actiontype)
+                    # Mark these changes, which are done outside the normal 'form' system
+                    actiontype = "save"
+                    changes = dict(incipit=obj.incipit, explicit=obj.explicit)
+                    if simple == "f" and obj.author != None:
+                        changes['author'] = obj.author.id
+                    details = dict(savetype="change", id=obj.id, changes=changes)
+                    passim_action_add(self, obj, details, actiontype)
 
-            # And in all cases: make sure we redirect to the 'clean' GET page
-            self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
-        else:
-            context['sections'] = []
+                # And in all cases: make sure we redirect to the 'clean' GET page
+                self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
+            else:
+                context['sections'] = []
 
-            # Lists of related objects
-            related_objects = []
+                # Lists of related objects
+                related_objects = []
 
-            username = self.request.user.username
-            team_group = app_editor
+                username = self.request.user.username
+                team_group = app_editor
 
-            # List of manuscripts related to the SSG via sermon descriptions
-            manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
+                # List of manuscripts related to the SSG via sermon descriptions
+                manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
 
-            # WAS: Get all SermonDescr instances linking to the correct eqg instance
-            # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+                # WAS: Get all SermonDescr instances linking to the correct eqg instance
+                # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
 
-            # New: Get all the SermonDescr instances linked with equality to SSG:
-            # But make sure the EXCLUDE those with `mtype` = `tem`
-            qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
-            rel_list =[]
-            method = "FourColumns"
-            method = "Issue216"
-            for sermonlink in qs_s:
-                sermon = sermonlink.sermon
-                # Get the 'item': the manuscript
-                item = sermon.manu
-                rel_item = []
+                # New: Get all the SermonDescr instances linked with equality to SSG:
+                # But make sure the EXCLUDE those with `mtype` = `tem`
+                qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
+                rel_list =[]
+                method = "FourColumns"
+                method = "Issue216"
+                for sermonlink in qs_s:
+                    sermon = sermonlink.sermon
+                    # Get the 'item': the manuscript
+                    item = sermon.manu
+                    rel_item = []
                 
+                    if method == "FourColumns":
+                        # Name as CITY - LIBRARY - IDNO + Name
+                        manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
+                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                         'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+
+                        # Location number and link to the correct point in the manuscript details view...
+                        itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
+                        rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
+                                         'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
+
+                        # date range
+                        daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                        rel_item.append({'value': daterange, 'align': "right"})
+
+                        # Sermon Locus + Title + link
+                        sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
+                        rel_item.append({'value': sermon.locus, 'title': sermo_name, 
+                                         'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                    elif method == "Issue216":
+                        # Shelfmark = IDNO
+                        manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
+                        manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                        # Name as CITY - LIBRARY - IDNO + Name
+                        manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
+                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                                         'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+
+                        # Origin
+                        or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+                        rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
+
+                        # date range
+                        daterange = "{}-{}".format(item.yearstart, item.yearfinish)
+                        rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
+
+                        # Collection(s)
+                        coll_info = item.get_collections_markdown(username, team_group)
+                        rel_item.append({'value': coll_info, 'initial': 'small'})
+
+                        # Location number and link to the correct point in the manuscript details view...
+                        itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
+                        link_on_manu_page = "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)
+                        link_to_sermon = reverse('sermon_details', kwargs={'pk': sermon.id})
+                        rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
+                                         'link': link_to_sermon })
+
+                        # Folio number of the item
+                        rel_item.append({'value': sermon.locus, 'initial': 'small'})
+
+                        # Attributed author
+                        rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
+
+                        # Incipit
+                        rel_item.append({'value': sermon.get_incipit_markdown(), 'initial': 'small'})
+
+                        # Explicit
+                        rel_item.append({'value': sermon.get_explicit_markdown(), 'initial': 'small'})
+
+                        # Keywords
+                        rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
+
+                    # Add this Manu/Sermon line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
+                manuscripts['rel_list'] = rel_list
+
                 if method == "FourColumns":
-                    # Name as CITY - LIBRARY - IDNO + Name
-                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.library.lcity.name, item.library.name, item.idno, item.name)
-                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
-
-                    # Location number and link to the correct point in the manuscript details view...
-                    itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
-                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript',
-                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
-
-                    # date range
-                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                    rel_item.append({'value': daterange, 'align': "right"})
-
-                    # Sermon Locus + Title + link
-                    sermo_name = "<span class='signature'>{}</span>".format(sermon.locus)
-                    rel_item.append({'value': sermon.locus, 'title': sermo_name, 
-                                     'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
+                    manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
                 elif method == "Issue216":
-                    # Shelfmark = IDNO
-                    manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
-                    manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
-                    # Name as CITY - LIBRARY - IDNO + Name
-                    manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
-                    rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-                                     'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+                    manuscripts['columns'] = [
+                        'Shelfmark', 
+                        '<span title="Origin/Provenance">or./prov.</span>', 
+                        '<span title="Date range">date</span>', 
+                        '<span title="Collection name">coll.</span>', 
+                        '<span title="Item">item</span>', 
+                        '<span title="Folio number">ff.</span>', 
+                        '<span title="Attributed author">auth.</span>', 
+                        '<span title="Incipit">inc.</span>', 
+                        '<span title="Explicit">expl.</span>', 
+                        '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
+                        ]
+                related_objects.append(manuscripts)
 
-                    # Origin
-                    or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
-                    rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
-
-                    # date range
-                    daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                    rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
-
-                    # Collection(s)
-                    coll_info = item.get_collections_markdown(username, team_group)
-                    rel_item.append({'value': coll_info, 'initial': 'small'})
-
-                    # Location number and link to the correct point in the manuscript details view...
-                    itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
-                    rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
-                                     'link': "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)  })
-
-                    # Folio number of the item
-                    rel_item.append({'value': sermon.locus, 'initial': 'small'})
-
-                    # Attributed author
-                    rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
-
-                    # Incipit
-                    rel_item.append({'value': sermon.get_incipit_markdown(), 'initial': 'small'})
-
-                    # Explicit
-                    rel_item.append({'value': sermon.get_explicit_markdown(), 'initial': 'small'})
-
-                    # Keywords
-                    rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
-
-                # Add this Manu/Sermon line to the list
-                rel_list.append(dict(id=item.id, cols=rel_item))
-            manuscripts['rel_list'] = rel_list
-
-            if method == "FourColumns":
-                manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
-            elif method == "Issue216":
-                manuscripts['columns'] = [
-                    'Shelfmark', 
-                    '<span title="Origin/Provenance">or./prov.</span>', 
-                    '<span title="Date range">date</span>', 
-                    '<span title="Collection name">coll.</span>', 
-                    '<span title="Item">item</span>', 
-                    '<span title="Folio number">ff.</span>', 
-                    '<span title="Attributed author">auth.</span>', 
-                    '<span title="Incipit">inc.</span>', 
-                    '<span title="Explicit">expl.</span>', 
-                    '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
-                    ]
-            related_objects.append(manuscripts)
-
-            context['related_objects'] = related_objects
+                context['related_objects'] = related_objects
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldDetails/add_to_context")
 
         # Return the context we have made
         return context
@@ -11717,18 +12114,19 @@ class EqualGoldListView(BasicList):
                         ssg.save()
             Information.set_kvalue("scount", "done")
 
-        #if Information.get_kvalue("seqcount") != "done":
-        #    # Walk all SSGs
-        #    with transaction.atomic():
-        #        # for ssg in EqualGold.objects.all():
-        #        # Walk all sermons associated with this SSG
-        #        total = SermonDescr.objects.count()
-        #        for idx, sermon in enumerate(SermonDescr.objects.all()):
-        #            if sermon.scount == 0:
-        #                # Set the scount
-        #                sermon.scount = sermon.get_scount()
-        #                sermon.save()
-        #    Information.set_kvalue("seqcount", "done")
+        if Information.get_kvalue("ssgselflink") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                must_delete = []
+                # Walk all SSG links
+                for ssglink in EqualGoldLink.objects.all():
+                    # Is this a self-link?
+                    if ssglink.src == ssglink.dst:
+                        # Add it to must_delete
+                        must_delete.append(ssglink.id)
+                # Remove all self-links
+                EqualGoldLink.objects.filter(id__in=must_delete).delete()
+            Information.set_kvalue("ssgselflink", "done")
 
         return None
     
@@ -12080,7 +12478,7 @@ class EqualGoldScountDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12404,7 +12802,7 @@ class LibraryListDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12618,7 +13016,7 @@ class AuthorListDownload(BasicPart):
 
         return qs
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -12759,7 +13157,7 @@ class ReportDownload(BasicPart):
         if dt != None and dt != '':
             self.dtype = dt
 
-    def get_data(self, prefix, dtype):
+    def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
         # Initialize
@@ -13275,3 +13673,10 @@ class BasketUpdateSuper(BasketUpdate):
         return basketsize
 
 
+class DrawPieChart(BasicPart):
+    """Fetch data for a particular type of pie-chart for the home page
+    
+    Current types: 'sermo', 'super', 'manu'
+    """
+
+    pass

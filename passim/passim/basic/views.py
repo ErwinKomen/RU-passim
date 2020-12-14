@@ -988,7 +988,7 @@ class BasicDetails(DetailView):
     basic_name_prefix = ""
     basic_add = ""
     add_text = "Add a new"
-    permission = "read"     # Permission can be: (nothing), "read" and "write"
+    permission = "read"     # Permission can be: (nothing), "read", "readonly", "write"
     new_button = False
     do_not_save = False
     no_delete = False
@@ -1581,21 +1581,22 @@ class BasicDetails(DetailView):
                         context['afternewurl'] = self.afternewurl
                 
             else:
-                # Check if this is asking for a new form
-                if instance == None:
-                    # Get the form for the sermon
-                    if self.use_team_group:
-                        frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                if mForm != None:
+                    # Check if this is asking for a new form
+                    if instance == None:
+                        # Get the form for the sermon
+                        if self.use_team_group:
+                            frm = mForm(prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(prefix=prefix)
                     else:
-                        frm = mForm(prefix=prefix)
-                else:
-                    # Get the form for the sermon
-                    if self.use_team_group:
-                        frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(instance=instance, prefix=prefix)
-                if frm.is_valid():
-                    iOkay = 1
+                        # Get the form for the sermon
+                        if self.use_team_group:
+                            frm = mForm(instance=instance, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(instance=instance, prefix=prefix)
+                    if frm.is_valid():
+                        iOkay = 1
                 # Walk all the form objects
                 for formObj in self.form_objects:
                     formClass = formObj['form']

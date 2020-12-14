@@ -1,6 +1,7 @@
 """Models for the SEEKER app.
 
 """
+from django.apps.config import AppConfig
 from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
@@ -284,7 +285,7 @@ def get_searchable(sText):
         sText = sText.strip()
     return sText
 
-def get_stype_light(stype, usercomment=False):
+def get_stype_light(stype, usercomment=False, count=-1):
     """HTML visualization of the different STYPE statuses"""
 
     sBack = ""
@@ -311,10 +312,14 @@ def get_stype_light(stype, usercomment=False):
     if usercomment:
         # Add modal button to comment
         html = []
+        count_code = ""
+        if count > 0:
+            # Add an indication of the number of comments
+            count_code = "<span style='color: red;'> {}</span>".format(count)
         html.append(sBack)
         html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
         html.append("   data-target='#modal-comment'>")
-        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span></a></span>")
+        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
         sBack = "\n".join(html)
 
     # Return what we made
@@ -2739,6 +2744,8 @@ class Keyword(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
+    # [0-1] Further details are perhaps required too
+    description = models.TextField("Description", blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -2842,10 +2849,6 @@ class Manuscript(models.Model):
 
     # [1] Name of the manuscript (that is the TITLE)
     name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
-    # [1] Date estimate: starting from this year
-    yearstart = models.IntegerField("Year from", null=False, default=100)
-    # [1] Date estimate: finishing with this year
-    yearfinish = models.IntegerField("Year until", null=False, default=100)
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -2859,6 +2862,13 @@ class Manuscript(models.Model):
     url = models.URLField("Web info", null=True, blank=True)
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
+
+    # =============== OVERTAKEN BY DATERANGE ==============================
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
+    # =====================================================================
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
@@ -2972,6 +2982,139 @@ class Manuscript(models.Model):
             msg = oErr.get_error_message()
             bResult = False
         return bResult, msg
+
+    def add_one(oManu):
+        """Add a manuscript according to the specifications provided"""
+
+        oErr = ErrHandle
+        manu = None
+        lst_msg = []
+
+        def add_one_custom(type, value, islist):
+            """Add a custom type"""
+
+            lst_value = []
+
+            try:
+                # Is this a list?
+                if islist:
+                    lst_value = json.loads(value)
+
+                if type == "origin":
+                    # Check if there is an origin with this name
+                    origin = Origin.objects.filter(Q(name__iexact=value)).first()
+                    if origin == None:
+                        # Check for an origin pointing to a location with this name
+                        origin = Origin.objects.filter(Q(location__name__iexact=value)).first()
+                        if origin == None:
+                            lst_msg.append("Please add origina manually: {}".format(value))
+                    if origin != None:
+                        # Add the origin to the manuscript
+                        manu.origin = origin
+                elif type == "keywords":
+                    # Add m2m links for the identified keywords
+                    for kw in lst_value:
+                        keyword = Keyword.objects.filter(name=kw).first()
+                        if keyword == None:
+                            keyword = Keyword.objects.create(name=kw)
+                        # Link the kw to the manuscript
+                        manu.keywords.add(keyword)
+                elif type == "litrefs":
+                    for lref_txt in lst_value:
+                        # The lref_txt should consist of a main type and possibly pages
+                        arLref = lref_txt.split(", pp")
+                        pages = ""
+                        short = arLref[0].replace("<em>", "_").replace("</em>", "_")
+                        if len(arLref) > 0:
+                            pages = arLref[1]
+                        # Get to the correct litref 
+                        lref = Litref.objects.filter(short__iexact = short).first() 
+                        if lref == None:
+                            # Sorry, cannot work with this
+                            lst_msg.append("Please add the reference manually. I cannot find it: {}".format(short))
+                        else:
+                            # We have the reference, now create the right LitrefMan
+                            litrefman = LitrefMan.objects.create(manuscript=manu, reference=lref, pages=pages)
+                elif type == "datasets":
+                    pass
+                elif type == "provenances":
+                    # Add all provenance locations
+                    for prov_loc in lst_value:
+                        # First try a provenance with this name
+                        prov = Provenance.objects.filter(Q(name__iexact=prov_loc)).first()
+                        if prov == None:
+                            # Check if there is a provenance that points to a location with this name?
+                            prov = Provenance.objects.filter(Q(location__name__iexact=prov_loc)).first()
+                            if prov == None:
+                                # Create a new provenance
+                                prov = Provenance.objects.create(name=prov_loc)
+                        # Add the provenance to this manuscript
+                        manu.provenances.add(prov)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("Manuscript/add_one_custom")
+
+        manu_attrib = [
+            {'field': 'title',      'type': 'plain', 'path': 'title'},
+            {'field': 'support',    'type': 'plain', 'path': 'support'},
+            {'field': 'extent',     'type': 'plain', 'path': 'extent'},
+            {'field': 'format',     'type': 'plain', 'path': 'format'},
+            {'field': 'notes',      'type': 'plain', 'path': 'notes'},
+            {'field': 'country',    'type': 'fk',    'path': 'lcountry', 'model': 'Location',   'fk': 'name'},
+            {'field': 'city',       'type': 'fk',    'path': 'lcity',    'model': 'Location',   'fk': 'name'},
+            {'field': 'library',    'type': 'fk',    'path': 'library',  'model': 'Library',    'fk': 'name'},
+            {'field': 'project',    'type': 'fk',    'path': 'project',  'model': 'Project',    'fk': 'name'},
+            {'field': 'external links','type': 'm2o','path': 'url',      'model': "ManuscriptExt"},
+            {'field': 'origin',     'type': 'plain', 'path': 'origin',   'custom': 'origin'},
+            {'field': 'keywords',   'type': 'plain', 'path': 'keywords', 'custom': 'keywords', 'islist': True},
+            {'field': 'literature', 'type': 'plain', 'path': 'litrefs',  'custom': 'litrefs',   'islist': True},
+            {'field': 'personal datasets',  'path': 'collections',      'custom': 'datasets',   'islist': True},
+            {'field': 'provenances',        'path': 'provenances',      'custom': 'provenances', 'islist': True},
+            ]
+        try:
+            # First get the shelf mark
+            idno = oManu.get('shelf mark')
+            if idno == None:
+                oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
+            else:
+                # Create a new manuscript with default values
+                manu = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                # Process all fields in manu_attrib
+                for oField in manu_attrib:
+                    field = oField.get("field")
+                    value = oManu.get(field)
+                    if value != None and value != "":
+                        path = oField.get("path")
+                        type = oField.get("type")
+                        if type == "plain":
+                            # Set the correct field's value
+                            setattr(manu, path, value)
+                        elif type == "fk":
+                            fk = oField.get("fk")
+                            model = oField.get("model")
+                            if fk != None and model != None:
+                                # Find an item with the name for the particular model
+                                cls = AppConfig.get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fk): value}).first()
+                                if instance != None:
+                                    setattr(manu, path, instance)
+                        elif type == "m2o":
+                            model = oField.get("model")
+                            if model != None:
+                                # Create a new instance of the other thing
+                                cls = AppConfig.get_model(model)
+                                instance = cls.objects.create(**{"{}".format(path): value, "manuscript": manu})
+                        elif type == "custom":
+                            custom = oField.get("custom")
+                            # Custom processing
+                            add_one_custom(custom, value, oField.get("islist"))
+                        
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/add_one")
+        return manu
 
     def find_sermon(self, oDescr):
         """Find a sermon within a manuscript"""
@@ -3091,15 +3234,21 @@ class Manuscript(models.Model):
             oErr.DoError("get_city")
         return city
 
-    def get_collections_markdown(self, username, team_group, settype = None):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=False):
 
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('manu', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
-        sBack = ", ".join(lHtml)
+            if plain:
+                lHtml.append(col.name)
+            else:
+                url = "{}?manu-collist_m={}".format(reverse('manuscript_list'), col.id)
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_country(self):
@@ -3141,37 +3290,55 @@ class Manuscript(models.Model):
 
         return "\n".join(lhtml)
 
-    def get_external_markdown(self):
+    def get_external_markdown(self, plain=False):
         lHtml = []
         for obj in self.manuscriptexternals.all().order_by('url'):
             url = obj.url
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
-        sBack = ", ".join(lHtml)
+            if plain:
+                lHtml.append(obj.url)
+            else:
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(obj.url, obj.url))
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self):
+    def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?manu-kwlist={}".format(reverse('manuscript_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile):
+    def get_keywords_user_markdown(self, profile, plain=False):
         lHtml = []
         # Visit all keywords
         for kwlink in self.manu_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
-            # Determine where clicking should lead to
-            url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?manu-ukwlist={}".format(reverse('manuscript_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_library(self):
@@ -3189,16 +3356,22 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, lib)
         return sBack
 
-    def get_litrefs_markdown(self):
+    def get_litrefs_markdown(self, plain=False):
         lHtml = []
         # Visit all literature references
         for litref in self.manuscript_litrefs.all().order_by('reference__short'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+            if plain:
+                lHtml.append(litref.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_origin(self):
@@ -3235,20 +3408,29 @@ class Manuscript(models.Model):
             sBack = '<span class="project">{}</span>'.format(self.project.name)
         return sBack
 
-    def get_provenance_markdown(self):
+    def get_provenance_markdown(self, plain=False):
         lHtml = []
         # Visit all literature references
         for prov in self.provenances.all().order_by('name'):
             # Get the URL
             url = reverse("provenance_details", kwargs = {'pk': prov.id})
             if prov.location == None:
-                # Create a display for this item
-                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
+                if plain:
+                    lHtml.append(prov.name)
+                else:
+                    # Create a display for this item
+                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
             else:
-                # Create a display for this item
-                lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
+                if plain:
+                    lHtml.append("{}: {}".format(prov.name, prov.location.name))
+                else:
+                    # Create a display for this item
+                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
@@ -3260,7 +3442,10 @@ class Manuscript(models.Model):
         return count
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -4635,7 +4820,10 @@ class EqualGold(models.Model):
         return "".join(lHtml)
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_superlinks_markdown(self):
@@ -5155,7 +5343,10 @@ class SermonGold(models.Model):
         return sBack
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_view(self):
@@ -5532,8 +5723,12 @@ class EqualGoldLink(models.Model):
         return combi
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Perform the actual save() method on [self]
-        response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+        # Check for identical links
+        if self.src == self.dst:
+            response = None
+        else:
+            # Perform the actual save() method on [self]
+            response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
         # Return the actual save() method response
         return response
 
@@ -6360,7 +6555,7 @@ class SermonDescr(models.Model):
         sBack = "<span class='glyphicon glyphicon-flag' title='{}' style='color: {};'></span>".format(title, color)
         return sBack
 
-    def get_bibleref(self):
+    def get_bibleref(self, plain=False):
         """Interpret the BibRange objects into a proper view"""
 
         bAutoCorrect = False
@@ -6380,8 +6575,11 @@ class SermonDescr(models.Model):
                 added = ""
                 if obj.added != None and obj.added != "":
                     added = " ({})".format(obj.added)
-                bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
-                    obj, url, intro, obj.book.latabbr, obj.chvslist, added)
+                if plain:
+                    bref_display = "{}{} {}{}".format(intro, obj.book.latabbr, obj.chvslist, added)
+                else:
+                    bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
+                        obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
                 sBack = "; ".join(html)
             # Possibly adapt the bibleref
@@ -6416,17 +6614,23 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
     
-    def get_collections_markdown(self, username, team_group, settype = None):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=True):
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
-            # Create a display for this topic
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+            if plain:
+                lHtml.append(col.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
+                # Create a display for this topic
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_editions_markdown(self):
@@ -6472,7 +6676,21 @@ class SermonDescr(models.Model):
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
-    def get_eqsetsignatures_markdown(self, type="all"):
+    def get_eqset(self):
+        """GEt a list of SSGs linked to this SermonDescr"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            ssg_list = self.equalgolds.all().values('code')
+            code_list = [x['code'] for x in ssg_list if x['code'] != None]
+            sBack = ", ".join(code_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_eqset")
+        return sBack
+
+    def get_eqsetsignatures_markdown(self, type="all", plain=True):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
         # Initialize
@@ -6514,17 +6732,23 @@ class SermonDescr(models.Model):
             # Get an ordered set of signatures - automatically linked
             for sig in Signature.objects.filter(gold__in=gold_list).order_by('-editype', 'code'):
                 # Create a display for this topic
-                if type == "first":
-                    # Determine where clicking should lead to
-                    url = reverse('gold_details', kwargs={'pk': sig.gold.id})
-                    lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
-                    break
+                if plain:
+                    lHtml.append(sig.code)
                 else:
-                    # Determine where clicking should lead to
-                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+                    if type == "first":
+                        # Determine where clicking should lead to
+                        url = reverse('gold_details', kwargs={'pk': sig.gold.id})
+                        lHtml.append("<span class='badge jumbo-1'><a href='{}' title='Go to the Sermon Gold'>{}</a></span>".format(url,sig.code))
+                        break
+                    else:
+                        # Determine where clicking should lead to
+                        url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                        lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = "<span class='view-mode'>,</span> ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = "<span class='view-mode'>,</span> ".join(lHtml)
         return sBack
 
     def get_feast(self):
@@ -6608,29 +6832,41 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self):
+    def get_keywords_markdown(self, plain=True):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-kwlist={}".format(reverse('sermon_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile):
+    def get_keywords_user_markdown(self, profile, plain=True):
         lHtml = []
         # Visit all keywords
         for kwlink in self.sermo_userkeywords.filter(profile=profile).order_by('keyword__name'):
             keyword = kwlink.keyword
-            # Determine where clicking should lead to
-            url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?sermo-ukwlist={}".format(reverse('sermon_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_ssg_markdown(self):
@@ -6669,7 +6905,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_litrefs_markdown(self):
+    def get_litrefs_markdown(self, plain=True):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
         lHtml = []
@@ -6677,11 +6913,14 @@ class SermonDescr(models.Model):
         # manu = self.manu
         # lref_list = []
         for item in LitrefMan.objects.filter(manuscript=self.get_manuscript()).order_by('reference__short', 'pages'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
-                url,item.get_short_markdown()))
+            if plain:
+                lHtml.append(item.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature gr' title='Manuscript literature'><a href='{}'>{}</a></span>".format(
+                    url,item.get_short_markdown()))
        
         # (2) The literature references available in all the SGs that are part of the SSG
         ssg_id = self.equalgolds.all().values('id')
@@ -6690,13 +6929,19 @@ class SermonDescr(models.Model):
         gold_id = SermonGold.objects.filter(equal__id__in=ssg_id).values('id')
         # Visit all the litrefSGs
         for item in LitrefSG.objects.filter(sermon_gold__id__in = gold_id).order_by('reference__short', 'pages'):
-            # Determine where clicking should lead to
-            url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
-            # Create a display for this item
-            lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
-                url,item.get_short_markdown()))
+            if plain:
+                lHtml.append(item.get_short_markdown())
+            else:
+                # Determine where clicking should lead to
+                url = "{}#lit_{}".format(reverse('literature_list'), item.reference.id)
+                # Create a display for this item
+                lHtml.append("<span class='badge signature cl' title='(Related) sermon gold literature'><a href='{}'>{}</a></span>".format(
+                    url,item.get_short_markdown()))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_locus(self):
@@ -6771,22 +7016,31 @@ class SermonDescr(models.Model):
         # Return the sermon signature
         return sermonsig
 
-    def get_sermonsignatures_markdown(self):
+    def get_sermonsignatures_markdown(self, plain=True):
         lHtml = []
         # Visit all signatures
         for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
-            # Determine where clicking should lead to
-            url = ""
-            if sig.gsig:
-                url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
-            # Create a display for this topic
-            lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            if plain:
+                lHtml.append(sig.code)
+            else:
+                # Determine where clicking should lead to
+                url = ""
+                if sig.gsig:
+                    url = "{}?sermo-siglist={}".format(reverse('sermon_list'), sig.gsig.id)
+                # Create a display for this topic
+                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_stype_light(self, usercomment=False):
-        sBack = get_stype_light(self.stype, usercomment)
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
     def get_template_link(self, profile):

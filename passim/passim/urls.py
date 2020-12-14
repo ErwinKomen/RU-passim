@@ -14,6 +14,7 @@ import passim.reader.views
 from passim.seeker.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -22,6 +23,7 @@ from passim.settings import APP_PREFIX
 from django.core import urlresolvers
 from django.shortcuts import redirect
 from django.core.urlresolvers import reverse, reverse_lazy
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import RedirectView
 
 admin.autodiscover()
@@ -40,6 +42,7 @@ urlpatterns = [
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
+    url(r'^guide', passim.seeker.views.guide, name='guide'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
@@ -75,6 +78,9 @@ urlpatterns = [
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
     url(r'^manuscript/hierarchy(?:/(?P<pk>\d+))?/$', ManuscriptHierarchy.as_view(), name='manuscript_hierarchy'),
+    url(r'^manuscript/download(?:/(?P<pk>\d+))?/$', ManuscriptDownload.as_view(), name='manuscript_download'),
+    url(r'^mauscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
+    url(r'^mauscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
 
     url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
     url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),

@@ -6,7 +6,8 @@
     <tbody>
       {% for item in comment_list %}
         <tr>
-          <td valign="top" class='tdnowrap' style="font-size: small; color: darkblue;">{{item.get_created}}</td>
+          <td valign="top" class='tdnowrap' style="font-size: small; color: darkred;">[{{item.profile.user.username}}] </td>
+          <td valign="top" class='tdnowrap' style="font-size: small; color: darkblue;">{{item.get_created}} </td>
           <td valign="top"  style='margin-left: 20px; width: 80%;'>{{item.content}}</td>
         </tr>
       {% endfor %}
