@@ -39,8 +39,8 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
-import lxml
-import pygal
+#import lxml
+#import pygal
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
