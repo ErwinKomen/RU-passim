@@ -939,7 +939,7 @@ var ru = (function ($, ru) {
           private_methods.waitStart(elWait);
 
           // Now initiate any possible progress calling
-          if (progrurl !== null) {
+          if (progrurl !== null && progrurl !== undefined) {
             loc_progr = [];
             window.setTimeout(function () { ru.basic.check_progress(progrurl, sTargetDiv); }, 2000);
           }

@@ -2,6 +2,7 @@
 
 """
 from django.apps.config import AppConfig
+from django.apps import apps
 from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
@@ -225,6 +226,15 @@ def get_crpp_date(dtThis, readable=False):
 def get_now_time():
     """Get the current time"""
     return time.clock()
+
+def get_json_list(value):
+    oBack = []
+    if value != None and value != "":
+        if value[0] == '[' and value[-1] == ']':
+            oBack = json.loads(value)
+        else:
+            oBack = [ value ]
+    return oBack
 
 def obj_text(d):
     stack = list(d.items())
@@ -2917,6 +2927,29 @@ class Manuscript(models.Model):
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
 
+    # Scheme for downloading and uploading
+    specification = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
+        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
+        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
+        {'name': 'Title',               'type': 'field', 'path': 'name'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Support',             'type': 'field', 'path': 'support'},
+        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        ]
+
     def __str__(self):
         return self.name
 
@@ -2983,95 +3016,17 @@ class Manuscript(models.Model):
             bResult = False
         return bResult, msg
 
-    def add_one(oManu):
+    def custom_add(oManu, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
-        oErr = ErrHandle
+        oErr = ErrHandle()
         manu = None
         lst_msg = []
 
-        def add_one_custom(type, value, islist):
-            """Add a custom type"""
-
-            lst_value = []
-
-            try:
-                # Is this a list?
-                if islist:
-                    lst_value = json.loads(value)
-
-                if type == "origin":
-                    # Check if there is an origin with this name
-                    origin = Origin.objects.filter(Q(name__iexact=value)).first()
-                    if origin == None:
-                        # Check for an origin pointing to a location with this name
-                        origin = Origin.objects.filter(Q(location__name__iexact=value)).first()
-                        if origin == None:
-                            lst_msg.append("Please add origina manually: {}".format(value))
-                    if origin != None:
-                        # Add the origin to the manuscript
-                        manu.origin = origin
-                elif type == "keywords":
-                    # Add m2m links for the identified keywords
-                    for kw in lst_value:
-                        keyword = Keyword.objects.filter(name=kw).first()
-                        if keyword == None:
-                            keyword = Keyword.objects.create(name=kw)
-                        # Link the kw to the manuscript
-                        manu.keywords.add(keyword)
-                elif type == "litrefs":
-                    for lref_txt in lst_value:
-                        # The lref_txt should consist of a main type and possibly pages
-                        arLref = lref_txt.split(", pp")
-                        pages = ""
-                        short = arLref[0].replace("<em>", "_").replace("</em>", "_")
-                        if len(arLref) > 0:
-                            pages = arLref[1]
-                        # Get to the correct litref 
-                        lref = Litref.objects.filter(short__iexact = short).first() 
-                        if lref == None:
-                            # Sorry, cannot work with this
-                            lst_msg.append("Please add the reference manually. I cannot find it: {}".format(short))
-                        else:
-                            # We have the reference, now create the right LitrefMan
-                            litrefman = LitrefMan.objects.create(manuscript=manu, reference=lref, pages=pages)
-                elif type == "datasets":
-                    pass
-                elif type == "provenances":
-                    # Add all provenance locations
-                    for prov_loc in lst_value:
-                        # First try a provenance with this name
-                        prov = Provenance.objects.filter(Q(name__iexact=prov_loc)).first()
-                        if prov == None:
-                            # Check if there is a provenance that points to a location with this name?
-                            prov = Provenance.objects.filter(Q(location__name__iexact=prov_loc)).first()
-                            if prov == None:
-                                # Create a new provenance
-                                prov = Provenance.objects.create(name=prov_loc)
-                        # Add the provenance to this manuscript
-                        manu.provenances.add(prov)
-            except:
-                msg = oErr.get_error_message()
-                oErr.DoError("Manuscript/add_one_custom")
-
-        manu_attrib = [
-            {'field': 'title',      'type': 'plain', 'path': 'title'},
-            {'field': 'support',    'type': 'plain', 'path': 'support'},
-            {'field': 'extent',     'type': 'plain', 'path': 'extent'},
-            {'field': 'format',     'type': 'plain', 'path': 'format'},
-            {'field': 'notes',      'type': 'plain', 'path': 'notes'},
-            {'field': 'country',    'type': 'fk',    'path': 'lcountry', 'model': 'Location',   'fk': 'name'},
-            {'field': 'city',       'type': 'fk',    'path': 'lcity',    'model': 'Location',   'fk': 'name'},
-            {'field': 'library',    'type': 'fk',    'path': 'library',  'model': 'Library',    'fk': 'name'},
-            {'field': 'project',    'type': 'fk',    'path': 'project',  'model': 'Project',    'fk': 'name'},
-            {'field': 'external links','type': 'm2o','path': 'url',      'model': "ManuscriptExt"},
-            {'field': 'origin',     'type': 'plain', 'path': 'origin',   'custom': 'origin'},
-            {'field': 'keywords',   'type': 'plain', 'path': 'keywords', 'custom': 'keywords', 'islist': True},
-            {'field': 'literature', 'type': 'plain', 'path': 'litrefs',  'custom': 'litrefs',   'islist': True},
-            {'field': 'personal datasets',  'path': 'collections',      'custom': 'datasets',   'islist': True},
-            {'field': 'provenances',        'path': 'provenances',      'custom': 'provenances', 'islist': True},
-            ]
         try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
             # First get the shelf mark
             idno = oManu.get('shelf mark')
             if idno == None:
@@ -3079,42 +3034,213 @@ class Manuscript(models.Model):
             else:
                 # Create a new manuscript with default values
                 manu = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
-                # Process all fields in manu_attrib
-                for oField in manu_attrib:
-                    field = oField.get("field")
+                        
+                # Process all fields in the Specification
+                for oField in Manuscript.specification:
+                    field = oField.get("name").lower()
                     value = oManu.get(field)
-                    if value != None and value != "":
+                    readonly = oField.get('readonly', False)
+                    if value != None and value != "" and not readonly:
                         path = oField.get("path")
                         type = oField.get("type")
-                        if type == "plain":
+                        if type == "field":
                             # Set the correct field's value
                             setattr(manu, path, value)
                         elif type == "fk":
-                            fk = oField.get("fk")
+                            fkfield = oField.get("fkfield")
                             model = oField.get("model")
-                            if fk != None and model != None:
+                            if fkfield != None and model != None:
                                 # Find an item with the name for the particular model
-                                cls = AppConfig.get_model(model)
-                                instance = cls.objects.filter(**{"{}".format(fk): value}).first()
+                                cls = apps.app_configs['seeker'].get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
                                 if instance != None:
                                     setattr(manu, path, instance)
-                        elif type == "m2o":
-                            model = oField.get("model")
-                            if model != None:
-                                # Create a new instance of the other thing
-                                cls = AppConfig.get_model(model)
-                                instance = cls.objects.create(**{"{}".format(path): value, "manuscript": manu})
-                        elif type == "custom":
-                            custom = oField.get("custom")
-                            # Custom processing
-                            add_one_custom(custom, value, oField.get("islist"))
-                        
+                        elif type == "func":
+                            # Set the KV in a special way
+                            manu.custom_set(path, value, **kwargs)
 
 
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/add_one")
         return manu
+
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                dates = []
+                for obj in qs:
+                    dates.append(obj.__str__())
+                sBack = json.dumps(dates)
+            elif path == "keywords":
+                sBack = self.get_keywords_markdown(plain=True)
+            elif path == "keywordsU":
+                sBack =  self.get_keywords_user_markdown(profile, plain=True)
+            elif path == "datasets":
+                sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
+            elif path == "literature":
+                sBack = self.get_litrefs_markdown(plain=True)
+            elif path == "origin":
+                sBack = self.get_origin()
+            elif path == "provenances":
+                sBack = self.get_provenance_markdown(plain=True)
+            elif path == "external":
+                sBack = self.get_external_markdown(plain=True)
+            elif path == "brefs":
+                sBack = self.get_bibleref(plain=True)
+            elif path == "signaturesM":
+                sBack = self.get_sermonsignatures_markdown(plain=True)
+            elif path == "signaturesA":
+                sBack = self.get_eqsetsignatures_markdown(plain=True)
+            elif path == "ssglinks":
+                sBack = self.get_eqset()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_get")
+        return sBack
+
+    def custom_getkv(self, item, **kwargs):
+        """Get key and value from the manuitem entry"""
+
+        oErr = ErrHandle()
+        key = ""
+        value = ""
+        try:
+            key = item['name']
+            if self != None:
+                if item['type'] == 'field':
+                    value = getattr(self, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(self, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.custom_get(item['path'], kwargs=kwargs)
+                    # Adaptation for empty lists
+                    if value == "[]": value = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_getkv")
+        return key, value
+
+    def custom_set(self, path, value, **kwargs):
+        """Set related items"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                # TRanslate the string into a list
+                dates = json.loads(value)
+                # Possibly add each item from the list, if it doesn't yet exist
+                for date_item in dates:
+                    years = date_item.split("-")
+                    yearstart = years[0]
+                    yearfinish = yearstart
+                    if len(years) > 0: yearfinish = years[1]
+                    obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
+                    if obj == None:
+                        # Doesn't exist, so create it
+                        obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
+            elif path == "keywordsU":
+                # Get the list of keywords
+                user_keywords = json.loads(value)
+                for kw in user_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the manuscript for this user
+                        UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
+            elif path == "datasets":
+                # Walk the personal datasets
+                datasets = json.loads(value)
+                for ds_name in datasets:
+                    # Get the actual dataset
+                    collection = Collection.objects.filter(name=ds_name, owner=profile, type="manu", settype="pd").first()
+                    # Does it exist?
+                    if collection == None:
+                        # Create this set
+                        collection = Collection.objects.create(name=ds_name, owner=profile, type="manu", settype="pd")
+                    # Add manuscript to collection
+                    highest = CollectionMan.objects.filter(collection=collection).order_by('-order').first()
+                    if highest != None and highest.order >= 0:
+                        order = highest.order + 1
+                    else:
+                        order = 1
+                    CollectionMan.objects.create(collection=collection, manuscript=self, order=order)
+            elif path == "literature":
+                # Go through the items to be added
+                litrefs_full = json.loads(value)
+                for litref_full in litrefs_full:
+                    # Divide into pages
+                    arLitref = litref_full.split(", pp")
+                    litref_short = arLitref[0]
+                    pages = ""
+                    if len(arLitref)>1: pages = arLitref[1].strip()
+                    # Find the short reference
+                    litref = Litref.objects.filter(short__iexact = litref_short).first()
+                    if litref != None:
+                        # Create an appropriate LitrefMan object
+                        obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
+            elif path == "origin":
+                if value != "" and value != "-":
+                    # THere is an origin specified
+                    origin = Origin.objects.filter(name__iexact=value).first()
+                    if origin == None:
+                        # Try find it through location
+                        origin = Origin.objects.filter(location__name__iexact=value).first()
+                    if origin == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually origin [{}]".format(intro, value)
+                        self.save()
+                    else:
+                        # The origin can be tied to me
+                        self.origin = origin
+                        self.save()
+                sBack = self.get_origin()
+            elif path == "provenances":
+                provenance_names = json.loads(value)
+                for pname in provenance_names:
+                    pname = pname.strip()
+                    # Try find this provenance
+                    provenance = Provenance.objects.filter(name__iexact=pname).first()
+                    if provenance == None:
+                        provenance = Provenance.objects.filter(location__name__iexact=pname).first()
+                    if provenance == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
+                        self.save()
+                    else:
+                        # Make link between provenance and manuscript
+                        ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
+                # Ready
+            elif path == "external":
+                link_names = json.loads(value)
+                for link_name in link_names:
+                    # Create this stuff
+                    ManuscriptExt.objects.create(manuscript=self, url=link_name)
+                # Ready
+            else:
+                # Figure out what to do in this case
+                pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_set")
+            bResult = False
+        return bResult
 
     def find_sermon(self, oDescr):
         """Find a sermon within a manuscript"""
@@ -6302,6 +6428,35 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
+    # SPecification for download/upload
+    specification = [
+        {'name': 'Order',               'type': ''},
+        {'name': 'Parent',              'type': ''},
+        {'name': 'FirstChild',          'type': ''},
+        {'name': 'Next',                'type': ''},
+        {'name': 'Type',                'type': ''},
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Locus',               'type': 'field', 'path': 'locus'},
+        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
+        {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
+        {'name': 'Title',               'type': 'field', 'path': 'title'},
+        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
+        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
+        {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
+        {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
+        {'name': 'Note',                'type': 'field', 'path': 'note'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
+        {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
+        ]
+
     def __str__(self):
         if self.author:
             sAuthor = self.author.name
@@ -6380,6 +6535,196 @@ class SermonDescr(models.Model):
             msg = oErr.get_error_message()
             bStatus = False
         return bStatus, msg
+
+    def custom_add(oSermo, manuscript, order=None):
+        """Add a manuscript according to the specifications provided"""
+
+        oErr = ErrHandle
+        obj = None
+        lst_msg = []
+
+        try:
+            # Create a MsItem
+            msitem = MsItem(manu=manuscript)
+            # Possibly add order, parent, firstchild, next
+            if order != None: msitem.order = order
+            # Save the msitem
+            msitem.save()
+
+            # Create a new SermonDescr with default values, tied to the msitem
+            obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
+                        
+            # Process all fields in the Specification
+            for oField in SermonDescr.specification:
+                field = oField.get("field").lower()
+                value = oSermo.get(field)
+                if value != None and value != "":
+                    path = oField.get("path")
+                    type = oField.get("type")
+                    if type == "field":
+                        # Set the correct field's value
+                        setattr(obj, path, value)
+                    elif type == "fk":
+                        fkfield = oField.get("fkfield")
+                        model = oField.get("model")
+                        if fk != None and model != None:
+                            # Find an item with the name for the particular model
+                            cls = apps.app_configs['seeker'].get_model(model)
+                            instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                            if instance != None:
+                                setattr(obj, path, instance)
+                    elif type == "func":
+                        # Set the KV in a special way
+                        obj.custom_set(path, value)
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_add")
+        return obj
+
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                dates = []
+                for obj in qs:
+                    dates.append(obj.__str__())
+                sBack = json.dumps(dates)
+            elif path == "keywords":
+                sBack = self.get_keywords_markdown(plain=True)
+            elif path == "keywordsU":
+                sBack =  self.get_keywords_user_markdown(profile, plain=True)
+            elif path == "datasets":
+                sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
+            elif path == "literature":
+                sBack = self.get_litrefs_markdown(plain=True)
+            elif path == "origin":
+                sBack = self.get_origin()
+            elif path == "provenances":
+                sBack = self.get_provenance_markdown(plain=True)
+            elif path == "external":
+                sBack = self.get_external_markdown(plain=True)
+            elif path == "brefs":
+                sBack = self.get_bibleref(plain=True)
+            elif path == "signaturesM":
+                sBack = self.get_sermonsignatures_markdown(plain=True)
+            elif path == "signaturesA":
+                sBack = self.get_eqsetsignatures_markdown(plain=True)
+            elif path == "ssglinks":
+                sBack = self.get_eqset(plain=True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_get")
+        return sBack
+
+    def custom_getkv(self, item, **kwargs):
+        """Get key and value from the manuitem entry"""
+
+        oErr = ErrHandle()
+        key = ""
+        value = ""
+        try:
+            key = item['name']
+            if self != None:
+                if item['type'] == 'field':
+                    value = getattr(self, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(self, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.custom_get(item['path'], kwargs=kwargs)
+                    # Adaptation for empty lists
+                    if value == "[]": value = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_getkv")
+        return key, value
+
+    def custom_set(self, path, value, **kwargs):
+        """Set related items"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            # Note: we skip a number of fields that are determined automatically
+            #       [ stype ]
+            if path == "brefs":
+                # Set the 'bibleref' field
+                self.bibleref = value
+                # Turn this into BibRange
+                self.do_ranges()
+            elif path == "keywordsU":
+                # Get the list of keywords
+                user_keywords = get_json_list(value)
+                for kw in user_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the sermon for this user
+                        UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
+            elif path == "datasets":
+                # Walk the personal datasets
+                datasets = get_json_list(value)
+                for ds_name in datasets:
+                    # Get the actual dataset
+                    collection = Collection.objects.filter(name=ds_name, owner=profile, type="sermo", settype="pd").first()
+                    # Does it exist?
+                    if collection == None:
+                        # Create this set
+                        collection = Collection.objects.create(name=ds_name, owner=profile, type="sermo", settype="pd")
+                    # Add manuscript to collection
+                    highest = collection.collections_sermon.all().order_by('-order').first()
+                    order = 1 if higest == None else highest + 1
+                    CollectionSerm.objects.create(collection=collection, sermon=self, order=order)
+            elif path == "ssglinks":
+                ssglink_names = get_json_list(value)
+                for ssg_code in ssglink_names:
+                    # Get this SSG
+                    ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+
+                    if ssg == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually the SSG link [{}]".format(intro, ssg_code)
+                        self.save()
+                    else:
+                        # Make link between SSG and SermonDescr
+                        SermonDescrEqual.objects.create(manuscript=self, super=ssg, linktype="eqs")
+                # Ready
+            elif path == "signaturesM":
+                signatureM_names = get_json_list(value)
+                for code in signatureM_names:
+                    # Find the SIgnature
+                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Find the editype
+                    if signature == None:
+                        editype = "gr"
+                        if "CPPM" in code:
+                            editype = "cl"
+                    else:
+                        editype = signature.editype
+                    # Create a manual signature
+                    sig_m = SermonSignature.objects.create(code=code, gsig=signature, sermon=self, editype=editype)
+                # Ready
+            else:
+                # Figure out what to do in this case
+                pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_set")
+            bResult = False
+        return bResult
 
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
@@ -6581,7 +6926,7 @@ class SermonDescr(models.Model):
                     bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
                         obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
-                sBack = "; ".join(html)
+            sBack = "; ".join(html)
             # Possibly adapt the bibleref
             if bAutoCorrect and self.bibleref != sBack:
                 self.bibleref = sBack
@@ -6676,7 +7021,7 @@ class SermonDescr(models.Model):
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
-    def get_eqset(self):
+    def get_eqset(self, plain=True):
         """GEt a list of SSGs linked to this SermonDescr"""
 
         oErr = ErrHandle()
@@ -6684,7 +7029,10 @@ class SermonDescr(models.Model):
         try:
             ssg_list = self.equalgolds.all().values('code')
             code_list = [x['code'] for x in ssg_list if x['code'] != None]
-            sBack = ", ".join(code_list)
+            if plain:
+                sBack = json.dumps(code_list)
+            else:
+                sBack = ", ".join(code_list)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("get_eqset")

@@ -10372,54 +10372,6 @@ class ManuscriptDownload(BasicPart):
     template_name = "seeker/download_status.html"
     action = "download"
     dtype = "excel"       # downloadtype
-    manuitems = [
-        {'name': 'Status',              'type': 'field', 'path': 'stype'},
-        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name'},
-        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name'},
-        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name'},
-        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},
-        {'name': 'Title',               'type': 'field', 'path': 'name'},
-        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        {'name': 'Support',             'type': 'field', 'path': 'support'},
-        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
-        {'name': 'Format',              'type': 'field', 'path': 'format'},
-        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name'},
-        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
-        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
-        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
-        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
-        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
-        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
-        {'name': 'External links',      'type': 'func',  'path': 'external'},
-        ]
-    sermoitems = [
-        {'name': 'Order',               'type': ''},
-        {'name': 'Parent',              'type': ''},
-        {'name': 'FirstChild',          'type': ''},
-        {'name': 'Next',                'type': ''},
-        {'name': 'Type',                'type': ''},
-        {'name': 'Status',              'type': 'field', 'path': 'stype'},
-        {'name': 'Locus',               'type': 'field', 'path': 'locus'},
-        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
-        {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
-        {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
-        {'name': 'Title',               'type': 'field', 'path': 'title'},
-        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
-        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
-        {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
-        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
-        {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
-        {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
-        {'name': 'Note',                'type': 'field', 'path': 'note'},
-        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
-        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
-        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
-        {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
-        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
-        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
-        ]
 
     def custom_init(self):
         """Calculate stuff"""
@@ -10463,20 +10415,6 @@ class ManuscriptDownload(BasicPart):
     def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
 
-        def get_item_value(item, instance):
-            key = item['name']
-            value = ""
-            if instance != None:
-                if item['type'] == 'field':
-                    value = getattr(instance, item['path'])
-                elif item['type'] == "fk":
-                    fk_obj = getattr(instance, item['path'])
-                    if fk_obj != None:
-                        value = getattr( fk_obj, item['fkfield'])
-                elif item['type'] == 'func':
-                    value = self.get_func(instance, item['path'], profile, username, team_group)
-            return key, value
-
         # Initialize
         lData = []
         sData = ""
@@ -10507,8 +10445,9 @@ class ManuscriptDownload(BasicPart):
 
             # Walk the mainitems
             row_num = 2
-            for item in self.manuitems:
-                key, value = get_item_value(item, self.obj)
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+            for item in Manuscript.specification:
+                key, value = self.obj.custom_getkv(item, kwargs=kwargs)
                 # Add the K/V row
                 ws.cell(row=row_num, column = 1).value = key
                 ws.cell(row=row_num, column = 2).value = value
@@ -10561,9 +10500,9 @@ class ManuscriptDownload(BasicPart):
                     col_num += 1
                     sermon = msitem.itemsermons.first()
                     # Walk the items
-                    for item in self.sermoitems:
+                    for item in SermonDescr.specification:
                         if item['type'] != "":
-                            key, value = get_item_value(item, sermon)
+                            key, value = sermon.custom_getkv(item, kwargs=kwargs)
                             ws.cell(row=row_num, column=col_num).value = value
                             col_num += 1
                 

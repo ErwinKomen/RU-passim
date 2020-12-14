@@ -32,7 +32,8 @@ from io import StringIO
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 
-from passim.seeker.models import Manuscript, SermonDescr
+from passim.seeker.models import Manuscript, SermonDescr, Profile
+from passim.seeker.views import app_editor
 from passim.reader.views import ReaderImport
 from passim.reader.forms import UploadFileForm
 
@@ -53,6 +54,9 @@ class ManuscriptUploadExcel(ReaderImport):
         try:
             # Make sure we have the username
             username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
 
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
@@ -107,20 +111,77 @@ class ManuscriptUploadExcel(ReaderImport):
                                     row_num += 1
                                 bStop = False
                                 while not bStop:
-                                    k = ws_manu.cell(row=row_num, column=1).value.lower()
+                                    k = ws_manu.cell(row=row_num, column=1).value
                                     v = ws_manu.cell(row=row_num, column=2).value
-                                    if k == "":
+                                    if k == "" or k == None:
                                         bStop = True
                                     else:
                                         row_num += 1
+                                        k = k.lower()
                                         oManu[k] = v
                                 # We have an object with key/value pairs: process it
-                                manu = Manuscript.add_one(oManu)
+                                manu = Manuscript.custom_add(oManu, **kwargs)
 
                                 # Check if there is a "Sermon" worksheet
                                 if ws_sermo != None:
+                                    # Get the column names
+                                    row_num = 1
+                                    column = 1
+                                    header = []
+                                    v = ws_sermo.cell(row=row_num, column=column).value
+                                    while v != None and v != "" and v != "-":                                        
+                                        header.append(v.lower())
+                                        column += 1
+                                        v = ws_sermo.cell(row=row_num, column=column).value
                                     # Process the sermons in this sheet
-                                    pass
+                                    sermon_list = []
+                                    column = 1
+                                    row_num += 1
+                                    v = ws_sermo.cell(row=row_num, column=column).value
+                                    while v != "" and v != None:
+                                        # Create a new sermon object
+                                        oSermon = {}
+                                        # Process this row
+                                        for idx, col_name in enumerate(header):
+                                            column = idx + 1
+                                            oSermon[col_name] = ws_sermo.cell(row=row_num, column=column).value
+                                        # Process this sermon
+                                        order = oSermon['order']
+                                        sermon = SermonDescr.custom_add(oSermo, manu, order, **kwargs)
+                                        # Get parent, firstchild, next
+                                        parent = oSermon['parent']
+                                        firstchild = oSermon['firstchild']
+                                        next = oSermon['next']
+                                        # Add to list
+                                        sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
+                                                            'next': next, 'sermon': sermon})
+                                        # GO to the next row for the next sermon
+                                        row_num += 1
+                                        column = 1
+                                        v = ws_sermo.cell(row=row_num, column=column).value
+
+                                    # Now process the parent/firstchild/next items
+                                    with transaction.atomic():
+                                        for oSermo in sermon_list:
+                                            # Get the p/f/n numbers
+                                            parent_id = oSermo['parent']
+                                            firstchild_id = oSermo['firstchild']
+                                            next_id = oSermo['next']
+                                            # Process parent
+                                            if parent_id != '' and parent_id != None:
+                                                parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
+                                                oSermo['sermon'].msitem.parent = parent
+                                                oSermo['sermon'].msitem.save()
+                                            # Process firstchild
+                                            if firstchild_id != '' and firstchild_id != None:
+                                                firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
+                                                oSermo['sermon'].msitem.firstchild = firstchild
+                                                oSermo['sermon'].msitem.save()
+                                            # Process next
+                                            if next_id != '' and next_id != None:
+                                                next = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
+                                                oSermo['sermon'].msitem.next = next
+                                                oSermo['sermon'].msitem.save()
 
 
                         # Create a report and add it to what we return
