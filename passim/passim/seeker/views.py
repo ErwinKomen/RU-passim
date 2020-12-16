@@ -10128,7 +10128,7 @@ class ManuscriptListView(BasicList):
             oExcel = dict(title="excel", label="Excel",
                           url=reverse('manuscript_upload_excel'),
                           type="multiple",
-                          msg="Import one manuscript from an Excel file")
+                          msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
 
         # ======== One-time adaptations ==============
@@ -10456,8 +10456,8 @@ class ManuscriptDownload(BasicPart):
             # Second worksheet: ALL SERMONS in the manuscript
             ws = wb.create_sheet("Sermons")
 
-            # Read the header cells and make a header row in the MANUSCRIPT worksheet
-            headers = [x['name'] for x in self.sermoitems ]
+            # Read the header cells and make a header row in the SERMON worksheet
+            headers = [x['name'] for x in SermonDescr.specification ]
             for col_num in range(len(headers)):
                 c = ws.cell(row=1, column=col_num+1)
                 c.value = headers[col_num]

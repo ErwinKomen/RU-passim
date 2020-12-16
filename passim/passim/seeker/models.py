@@ -3032,8 +3032,13 @@ class Manuscript(models.Model):
             if idno == None:
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
-                # Create a new manuscript with default values
-                manu = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                # Get the standard project
+                project = Project.get_default(username)
+                # Retrieve or create a new manuscript with default values
+                obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                if obj == None:
+                    # Doesn't exist: create it
+                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
                         
                 # Process all fields in the Specification
                 for oField in Manuscript.specification:
@@ -3045,7 +3050,7 @@ class Manuscript(models.Model):
                         type = oField.get("type")
                         if type == "field":
                             # Set the correct field's value
-                            setattr(manu, path, value)
+                            setattr(obj, path, value)
                         elif type == "fk":
                             fkfield = oField.get("fkfield")
                             model = oField.get("model")
@@ -3054,16 +3059,17 @@ class Manuscript(models.Model):
                                 cls = apps.app_configs['seeker'].get_model(model)
                                 instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
                                 if instance != None:
-                                    setattr(manu, path, instance)
+                                    setattr(obj, path, instance)
                         elif type == "func":
                             # Set the KV in a special way
-                            manu.custom_set(path, value, **kwargs)
+                            obj.custom_set(path, value, **kwargs)
 
-
+                # Make sure the updae the object
+                obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/add_one")
-        return manu
+        return obj
 
     def custom_get(self, path, **kwargs):
         sBack = ""
@@ -3138,9 +3144,14 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            value_lst = []
+            if isinstance(value, str) and value[0] != '[':
+                value_lst = value.split(",")
+                for idx, item in enumerate(value_lst):
+                    value_lst[idx] = value_lst[idx].strip()
             if path == "dateranges":
                 # TRanslate the string into a list
-                dates = json.loads(value)
+                dates = value_lst # json.loads(value)
                 # Possibly add each item from the list, if it doesn't yet exist
                 for date_item in dates:
                     years = date_item.split("-")
@@ -3153,7 +3164,7 @@ class Manuscript(models.Model):
                         obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
             elif path == "keywordsU":
                 # Get the list of keywords
-                user_keywords = json.loads(value)
+                user_keywords = value_lst #  json.loads(value)
                 for kw in user_keywords:
                     # Find the keyword
                     keyword = Keyword.objects.filter(name__iexact=kw).first()
@@ -3162,7 +3173,7 @@ class Manuscript(models.Model):
                         UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
             elif path == "datasets":
                 # Walk the personal datasets
-                datasets = json.loads(value)
+                datasets = value_lst #  json.loads(value)
                 for ds_name in datasets:
                     # Get the actual dataset
                     collection = Collection.objects.filter(name=ds_name, owner=profile, type="manu", settype="pd").first()
@@ -3179,7 +3190,7 @@ class Manuscript(models.Model):
                     CollectionMan.objects.create(collection=collection, manuscript=self, order=order)
             elif path == "literature":
                 # Go through the items to be added
-                litrefs_full = json.loads(value)
+                litrefs_full = value_lst #  json.loads(value)
                 for litref_full in litrefs_full:
                     # Divide into pages
                     arLitref = litref_full.split(", pp")
@@ -3210,7 +3221,7 @@ class Manuscript(models.Model):
                         self.save()
                 sBack = self.get_origin()
             elif path == "provenances":
-                provenance_names = json.loads(value)
+                provenance_names = value_lst #  json.loads(value)
                 for pname in provenance_names:
                     pname = pname.strip()
                     # Try find this provenance
@@ -3228,7 +3239,7 @@ class Manuscript(models.Model):
                         ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
                 # Ready
             elif path == "external":
-                link_names = json.loads(value)
+                link_names = value_lst #  json.loads(value)
                 for link_name in link_names:
                     # Create this stuff
                     ManuscriptExt.objects.create(manuscript=self, url=link_name)
@@ -6539,35 +6550,43 @@ class SermonDescr(models.Model):
     def custom_add(oSermo, manuscript, order=None):
         """Add a manuscript according to the specifications provided"""
 
-        oErr = ErrHandle
+        oErr = ErrHandle()
         obj = None
         lst_msg = []
 
         try:
-            # Create a MsItem
-            msitem = MsItem(manu=manuscript)
-            # Possibly add order, parent, firstchild, next
-            if order != None: msitem.order = order
-            # Save the msitem
-            msitem.save()
+            # Figure out whether this sermon item already exists or not
+            locus = oSermo['locus']
+            if locus != None and locus != "":
+                # Try retrieve an existing or 
+                obj = SermonDescr.objects.filter(msitem__manu=manuscript, locus=locus, mtype="man").first()
+            if obj == None:
+                # Create a MsItem
+                msitem = MsItem(manu=manuscript)
+                # Possibly add order, parent, firstchild, next
+                if order != None: msitem.order = order
+                # Save the msitem
+                msitem.save()
 
-            # Create a new SermonDescr with default values, tied to the msitem
-            obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
+                # Create a new SermonDescr with default values, tied to the msitem
+                obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
                         
             # Process all fields in the Specification
             for oField in SermonDescr.specification:
-                field = oField.get("field").lower()
+                field = oField.get("name").lower()
                 value = oSermo.get(field)
-                if value != None and value != "":
-                    path = oField.get("path")
+                readonly = oField.get('readonly', False)
+                
+                if value != None and value != "" and not readonly:
                     type = oField.get("type")
+                    path = oField.get("path")
                     if type == "field":
                         # Set the correct field's value
                         setattr(obj, path, value)
                     elif type == "fk":
                         fkfield = oField.get("fkfield")
                         model = oField.get("model")
-                        if fk != None and model != None:
+                        if fkfield != None and model != None:
                             # Find an item with the name for the particular model
                             cls = apps.app_configs['seeker'].get_model(model)
                             instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
@@ -6577,6 +6596,8 @@ class SermonDescr(models.Model):
                         # Set the KV in a special way
                         obj.custom_set(path, value)
 
+            # Make sure the updae the object
+            obj.save()
 
         except:
             msg = oErr.get_error_message()
@@ -6656,16 +6677,21 @@ class SermonDescr(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            value_lst = []
+            if isinstance(value, str) and value[0] != '[':
+                value_lst = value.split(",")
+                for idx, item in enumerate(value_lst):
+                    value_lst[idx] = value_lst[idx].strip()
             # Note: we skip a number of fields that are determined automatically
             #       [ stype ]
             if path == "brefs":
-                # Set the 'bibleref' field
+                # Set the 'bibleref' field. Note: do *NOT* use value_lst here
                 self.bibleref = value
                 # Turn this into BibRange
                 self.do_ranges()
             elif path == "keywordsU":
                 # Get the list of keywords
-                user_keywords = get_json_list(value)
+                user_keywords = value_lst #  get_json_list(value)
                 for kw in user_keywords:
                     # Find the keyword
                     keyword = Keyword.objects.filter(name__iexact=kw).first()
@@ -6674,7 +6700,7 @@ class SermonDescr(models.Model):
                         UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
             elif path == "datasets":
                 # Walk the personal datasets
-                datasets = get_json_list(value)
+                datasets = value_lst #  get_json_list(value)
                 for ds_name in datasets:
                     # Get the actual dataset
                     collection = Collection.objects.filter(name=ds_name, owner=profile, type="sermo", settype="pd").first()
@@ -6687,7 +6713,7 @@ class SermonDescr(models.Model):
                     order = 1 if higest == None else highest + 1
                     CollectionSerm.objects.create(collection=collection, sermon=self, order=order)
             elif path == "ssglinks":
-                ssglink_names = get_json_list(value)
+                ssglink_names = value_lst #  get_json_list(value)
                 for ssg_code in ssglink_names:
                     # Get this SSG
                     ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
@@ -6695,15 +6721,15 @@ class SermonDescr(models.Model):
                     if ssg == None:
                         # Indicate that we didn't find it in the notes
                         intro = ""
-                        if self.notes != "": intro = "{}. ".format(self.notes)
-                        self.notes = "{}Please set manually the SSG link [{}]".format(intro, ssg_code)
+                        if self.note != "": intro = "{}. ".format(self.note)
+                        self.note = "{}Please set manually the SSG link [{}]".format(intro, ssg_code)
                         self.save()
                     else:
                         # Make link between SSG and SermonDescr
-                        SermonDescrEqual.objects.create(manuscript=self, super=ssg, linktype="eqs")
+                        SermonDescrEqual.objects.create(sermon=self, super=ssg, linktype="eqs")
                 # Ready
             elif path == "signaturesM":
-                signatureM_names = get_json_list(value)
+                signatureM_names = value_lst #  get_json_list(value)
                 for code in signatureM_names:
                     # Find the SIgnature
                     signature = Signature.objects.filter(code__iexact=code).first()
@@ -6959,7 +6985,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
     
-    def get_collections_markdown(self, username, team_group, settype = None, plain=True):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=False):
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group, settype = settype).values('id')
@@ -7038,7 +7064,7 @@ class SermonDescr(models.Model):
             oErr.DoError("get_eqset")
         return sBack
 
-    def get_eqsetsignatures_markdown(self, type="all", plain=True):
+    def get_eqsetsignatures_markdown(self, type="all", plain=False):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
         # Initialize
@@ -7180,7 +7206,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self, plain=True):
+    def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
@@ -7198,7 +7224,7 @@ class SermonDescr(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile, plain=True):
+    def get_keywords_user_markdown(self, profile, plain=False):
         lHtml = []
         # Visit all keywords
         for kwlink in self.sermo_userkeywords.filter(profile=profile).order_by('keyword__name'):
@@ -7253,7 +7279,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_litrefs_markdown(self, plain=True):
+    def get_litrefs_markdown(self, plain=False):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
         lHtml = []
@@ -7364,7 +7390,7 @@ class SermonDescr(models.Model):
         # Return the sermon signature
         return sermonsig
 
-    def get_sermonsignatures_markdown(self, plain=True):
+    def get_sermonsignatures_markdown(self, plain=False):
         lHtml = []
         # Visit all signatures
         for sig in self.sermonsignatures.all().order_by('-editype', 'code'):

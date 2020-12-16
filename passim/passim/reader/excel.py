@@ -22,7 +22,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 # General imports
 import io, sys, os
-import openpyxl
+import openpyxl, json
 from openpyxl.utils.cell import get_column_letter
 from openpyxl.cell import Cell
 from openpyxl import Workbook
@@ -32,7 +32,7 @@ from io import StringIO
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 
-from passim.seeker.models import Manuscript, SermonDescr, Profile
+from passim.seeker.models import Manuscript, SermonDescr, Profile, Report
 from passim.seeker.views import app_editor
 from passim.reader.views import ReaderImport
 from passim.reader.forms import UploadFileForm
@@ -80,7 +80,7 @@ class ManuscriptUploadExcel(ReaderImport):
                         lst_read = []
 
                         # Further processing depends on the extension
-                        oResult = None
+                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
 
                         if extension == "xlsx":
                             # This is an Excel file: read the file using openpyxl
@@ -122,6 +122,10 @@ class ManuscriptUploadExcel(ReaderImport):
                                 # We have an object with key/value pairs: process it
                                 manu = Manuscript.custom_add(oManu, **kwargs)
 
+                                oResult['count'] += 1
+                                oResult['obj'] = manu
+                                oResult['name'] = manu.idno
+
                                 # Check if there is a "Sermon" worksheet
                                 if ws_sermo != None:
                                     # Get the column names
@@ -139,6 +143,10 @@ class ManuscriptUploadExcel(ReaderImport):
                                     row_num += 1
                                     v = ws_sermo.cell(row=row_num, column=column).value
                                     while v != "" and v != None:
+                                        # ==== DEBUG ====
+                                        oErr.Status("Upload excel row_num={}".format(row_num))
+                                        # ===============
+
                                         # Create a new sermon object
                                         oSermon = {}
                                         # Process this row
@@ -147,14 +155,17 @@ class ManuscriptUploadExcel(ReaderImport):
                                             oSermon[col_name] = ws_sermo.cell(row=row_num, column=column).value
                                         # Process this sermon
                                         order = oSermon['order']
-                                        sermon = SermonDescr.custom_add(oSermo, manu, order, **kwargs)
+                                        sermon = SermonDescr.custom_add(oSermon, manu, order)
+
+                                        oResult['sermons'] += 1
+
                                         # Get parent, firstchild, next
                                         parent = oSermon['parent']
                                         firstchild = oSermon['firstchild']
-                                        next = oSermon['next']
+                                        nextone = oSermon['next']
                                         # Add to list
                                         sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
-                                                            'next': next, 'sermon': sermon})
+                                                            'next': nextone, 'sermon': sermon})
                                         # GO to the next row for the next sermon
                                         row_num += 1
                                         column = 1
@@ -169,24 +180,27 @@ class ManuscriptUploadExcel(ReaderImport):
                                             next_id = oSermo['next']
                                             # Process parent
                                             if parent_id != '' and parent_id != None:
+                                                # parent_id = str(parent_id)
                                                 parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
-                                                oSermo['sermon'].msitem.parent = parent
+                                                oSermo['sermon'].msitem.parent = parent.msitem
                                                 oSermo['sermon'].msitem.save()
                                             # Process firstchild
                                             if firstchild_id != '' and firstchild_id != None:
+                                                # firstchild_id = str(firstchild_id)
                                                 firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
-                                                oSermo['sermon'].msitem.firstchild = firstchild
+                                                oSermo['sermon'].msitem.firstchild = firstchild.msitem
                                                 oSermo['sermon'].msitem.save()
                                             # Process next
                                             if next_id != '' and next_id != None:
-                                                next = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
-                                                oSermo['sermon'].msitem.next = next
+                                                # next_id = str(next_id)
+                                                nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
+                                                oSermo['sermon'].msitem.next = nextone.msitem
                                                 oSermo['sermon'].msitem.save()
 
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
-                        oReport = Report.make(username, "iecod", json.dumps(oContents))
+                        oReport = Report.make(username, "ixlsx", json.dumps(oContents))
                                 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"

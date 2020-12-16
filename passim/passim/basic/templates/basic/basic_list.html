@@ -282,11 +282,11 @@
                   {% csrf_token %}
                   <!-- Room for the filename to appear -->
                   <div class="col-md-6 form-group" id="{{uitem.title}}-import_info"
-                       sync-progress="{% url 'sync_progress' %}?synctype={{uitem.title}}"
+                       sync-progress-TEST="{% url 'sync_progress' %}?synctype={{uitem.title}}"
                        targetid="{{uitem.title}}_data_import"
                        targeturl="{{uitem.url}}">
                     <div class="input-group">
-                      <span>{{uitem.msg}}</span>
+                      <span>{{uitem.msg|safe}}</span>
                       <span class="input-group-btn">
                         <span class="btn btn-default btn-xs btn-file">
                           Browse...
