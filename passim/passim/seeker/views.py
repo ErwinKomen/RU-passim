@@ -10038,9 +10038,10 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
-    order_cols = ['library__lcity__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
-    order_heads = [{'name': 'City',     'order': 'o=1', 'type': 'str', 'custom': 'city'},
+    order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
+                    'title': 'City or other location, such as monastery'},
                    {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
                    {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
                    {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
@@ -10051,7 +10052,7 @@ class ManuscriptListView(BasicList):
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
         {"name": "Country",         "id": "filter_country",          "enabled": False},
-        {"name": "City",            "id": "filter_city",             "enabled": False},
+        {"name": "City/Location",   "id": "filter_city",             "enabled": False},
         {"name": "Library",         "id": "filter_library",          "enabled": False},
         {"name": "Origin",          "id": "filter_origin",           "enabled": False},
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
@@ -10076,7 +10077,8 @@ class ManuscriptListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'manuid',        'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'library__lcity',         'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'library__lcity|library__location',         
+                                                                             'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
@@ -10247,10 +10249,18 @@ class ManuscriptListView(BasicList):
         sTitle = ""
         html = []
         if custom == "city":
-            if instance.library and instance.library.lcity:
-                city = instance.library.lcity.name
-                html.append("<span>{}</span>".format(city[:12]))        
-                sTitle = city
+            if instance.library:
+                city = None
+                if instance.library.lcity:
+                    city = instance.library.lcity.name
+                elif instance.library.location:
+                    city = instance.library.location.name
+                if city == None:
+                    html.append("??")
+                    sTitle = "City or location unclear"
+                else:
+                    html.append("<span>{}</span>".format(city[:12]))        
+                    sTitle = city
         elif custom == "library":
             if instance.library:
                 lib = instance.library.name

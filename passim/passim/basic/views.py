@@ -287,9 +287,10 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
                             s_q = None
+                            if "*" in val:
+                                val = adapt_search(val, regex_function)
                             for fkfield in arFkField:
                                 if "*" in val:
-                                    val = adapt_search(val, regex_function)
                                     s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
                                 else:
                                     s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
