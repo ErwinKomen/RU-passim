@@ -3771,6 +3771,17 @@ class Manuscript(models.Model):
 
                     # Save the copy
                     sermon_dst.save()
+                else:
+                    head_src = src.itemheads.first()
+                    if head_src != None:
+                        # COpy it
+                        head_dst = head_src
+                        head_dst.pk = None
+                        head_dst.msitem = dst
+                        # NOTE: a SermonHead does *not* have an mtype or stype
+
+                        # Save the copy
+                        head_dst.save()
 
         # Walk the msitems again, and make sure SSG-links are copied!!
         with transaction.atomic():
