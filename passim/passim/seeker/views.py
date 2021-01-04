@@ -5747,17 +5747,22 @@ class SermonEdit(BasicDetails):
              'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
             {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}
              ]
-        for item in mainitems_main: context['mainitems'].append(item)
+        exclude_field_keys = ['locus']
+        for item in mainitems_main: 
+            # Make sure to exclude field key 'locus'
+            if item['field_key'] not in exclude_field_keys:
+                context['mainitems'].append(item)
 
-        # Bibref can only be added to non-templates
+        # Bibref and Cod. notes can only be added to non-templates
         if not istemplate:
             mainitems_BibRef ={'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
              'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]}
             context['mainitems'].append(mainitems_BibRef)
+            mainitems_CodNotes ={'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       
+             'field_key': 'additional',   'title': 'Codicological notes'}
+            context['mainitems'].append(mainitems_CodNotes)
 
         mainitems_more =[
-            {'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       'field_key': 'additional',
-             'title': 'Codicological notes'},
             {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
             ]
         for item in mainitems_more: context['mainitems'].append(item)
@@ -7291,6 +7296,7 @@ class TemplateImport(TemplateDetails):
             if template_id != "":
                 template = Template.objects.filter(id=template_id).first()
                 if template != None:
+                    # Set my own object
                     self.object = template
 
                     # Issue #314: add note "created from template" to this manuscript
@@ -7303,8 +7309,15 @@ class TemplateImport(TemplateDetails):
                     instance.notes = sNoteText
                     instance.save()
 
+                    # Issue #315: copy keywords
+                    for kw in template.keywords.all():
+                        mkw = ManuscriptKeyword.objects.create(manuscript=instance, keyword=kw.keyword)
+
+                    # Find out who I am
+                    profile = Profile.get_user_profile(request.user.username)
+
                     # Import this template into the manuscript
-                    instance.import_template(template)
+                    instance.import_template(template, profile)
             # Getting here means all went well
         except:
             msg = oErr.get_error_message()

@@ -3614,7 +3614,9 @@ class Manuscript(models.Model):
         # Check if I am a template
         if self.mtype == "tem":
             # add a clear TEMPLATE indicator with a link to the actual template
-            template = Template.objects.filter(manu=self, profile=profile).first()
+            template = Template.objects.filter(manu=self).first()
+            # Wrong: template = Template.objects.filter(manu=self, profile=profile).first()
+            # (show template even if it is not my own one)
             if template:
                 url = reverse('template_details', kwargs={'pk': template.id})
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
@@ -3688,7 +3690,7 @@ class Manuscript(models.Model):
         # Return the new object
         return obj
 
-    def import_template(self, template):
+    def import_template(self, template, profile):
         """Import the information in [template] into the manuscript [self]"""
 
         # Get the source manuscript
@@ -3697,12 +3699,12 @@ class Manuscript(models.Model):
         # Copy the sermons from [manu_src] into [self]
         # NOTE: only if there are no sermons in [self] yet!!!!
         if self.manuitems.count() == 0:
-            self.load_sermons_from(manu_src, mtype="man")
+            self.load_sermons_from(manu_src, mtype="man", profile=profile)
 
         # Return myself again
         return self
 
-    def load_sermons_from(self, manu_src, mtype = "tem"):
+    def load_sermons_from(self, manu_src, mtype = "tem", profile=None):
         """Copy sermons from [manu_src] into myself"""
 
         # Indicate what the destination manuscript object is
@@ -3746,6 +3748,12 @@ class Manuscript(models.Model):
                     sermon_dst.msitem = dst
                     sermon_dst.mtype = mtype   # Change the type
                     sermon_dst.stype = "imp"   # Imported
+
+                    # Issue #315: exclude some fields from copying
+                    sermon_dst.locus = ""
+                    sermon_dst.additional = ""
+
+                    # Save the copy
                     sermon_dst.save()
         # Walk the msitems again, and make sure SSG-links are copied!!
         with transaction.atomic():
@@ -3760,6 +3768,34 @@ class Manuscript(models.Model):
                     for eq in sermon_src.equalgolds.all():
                         # Add it to the destination sermon
                         SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+
+                    # Issue #315: adapt Bible reference(s) linking based on copied field
+                    sermon_dst.adapt_verses()
+
+                    # Issue #315 note: 
+                    #   this is *NOT* working, because templates do not contain 
+                    #     keywords nor do they contain Gryson/Clavis codes
+                    #   Alternative: 
+                    #     Store the keywords and signatures in a special JSON field in the template
+                    #     Then do the copying based on this JSON field
+                    #     Look at Manuscript.custom_...() procedures to see how this goes
+                    # ===============================================================================
+
+                    ## Issue #315: copy USER keywords - only if there is a profile
+                    #if profile != None:
+                    #    for ukw in sermon_src.sermo_userkeywords.all():
+                    #        # Copy the user-keyword to a new one attached to [sermon_dst]
+                    #        keyword = UserKeyword.objects.create(
+                    #            keyword=ukw.keyword, sermo=sermon_dst, type=ukw.type, profile=profile)
+                    ## Copy KEYWORDS per sermon
+                    #for kw in sermon_src.keywords.all():
+                    #    skw = SermonDescrKeyword.objects.create(sermon=sermon_dst, keyword=kw.keyword)
+
+                    ## Issue #315: copy manual Gryson/Clavis-codes
+                    #for msig in sermon_src.sermonsignatures.all():
+                    #    usig = SermonSignature.objects.create(
+                    #        code=msig.code, editype=msig.editype, gsig=msig.gsig, sermon=sermon_dst)
+
         # Return okay
         return True
 
@@ -7422,7 +7458,9 @@ class SermonDescr(models.Model):
         # Check if I am a template
         if self.mtype == "tem":
             # add a clear TEMPLATE indicator with a link to the actual template
-            template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            template = Template.objects.filter(manu=self.msitem.manu).first()
+            # Wrong template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            # (show template even if it isn't my own one)
             if template:
                 url = reverse('template_details', kwargs={'pk': template.id})
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
