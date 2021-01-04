@@ -7275,22 +7275,40 @@ class TemplateImport(TemplateDetails):
     initRedirect = True
 
     def initializations(self, request, pk):
-        # Get the parameters
-        self.qd = request.POST
-        self.object = None
-        manu_id = self.qd.get("manu_id", "")
-        if manu_id != "":
-            instance = Manuscript.objects.filter(id=manu_id).first()
-        # The default redirectpage is just this manuscript
-        self.redirectpage = reverse("manuscript_details", kwargs = {'pk': instance.id})
-        # Get the template to be used as import
-        template_id = self.qd.get("template", "")
-        if template_id != "":
-            template = Template.objects.filter(id=template_id).first()
-            if template != None:
-                self.object = template
-                # Import this template into the manuscript
-                instance.import_template(template)
+        oErr = ErrHandle()
+        try:
+            # Get the parameters
+            self.qd = request.POST
+            self.object = None
+            manu_id = self.qd.get("manu_id", "")
+            if manu_id != "":
+                instance = Manuscript.objects.filter(id=manu_id).first()
+
+            # The default redirectpage is just this manuscript
+            self.redirectpage = reverse("manuscript_details", kwargs = {'pk': instance.id})
+            # Get the template to be used as import
+            template_id = self.qd.get("template", "")
+            if template_id != "":
+                template = Template.objects.filter(id=template_id).first()
+                if template != None:
+                    self.object = template
+
+                    # Issue #314: add note "created from template" to this manuscript
+                    sNoteText = instance.notes
+                    sDate = get_current_datetime().strftime("%d/%b/%Y %H:%M")
+                    if sNoteText == "":
+                        sNoteText = "Created from template [{}] on {}".format(template.name, sDate)
+                    else:
+                        sNoteText = "{}. Added sermons from template [{}] on {}".format(sNoteText, template.name, sDate)
+                    instance.notes = sNoteText
+                    instance.save()
+
+                    # Import this template into the manuscript
+                    instance.import_template(template)
+            # Getting here means all went well
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("TemplateImport/initializations")
         return None
 
 

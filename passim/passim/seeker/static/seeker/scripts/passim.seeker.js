@@ -3039,6 +3039,29 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * submitform
+       *    Submit the form at [elStart]
+       *    If 'disable' is true, then disable all <a> with class 'btn'
+       *
+       */
+      submitform: function (elStart, disable) {
+        var elForm = null;
+
+        try {
+          // Disable all buttons in the document, except the submit one
+          $("a.btn").addClass("disabled");
+
+          // Possibly get the waiting rolling
+          $("#" + elStart).find(".waiting").removeClass("hidden");
+          
+          // COntinue to submit
+          document.getElementById(elStart).submit();
+        } catch (ex) {
+          private_methods.errMsg("submitform", ex);
+        }
+      },
+
+      /**
        * gold_search_prepare
        *    Prepare the modal form to search for gold-sermon destinations
        *
