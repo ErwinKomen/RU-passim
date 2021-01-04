@@ -7256,7 +7256,7 @@ class TemplateDetails(TemplateEdit):
                 manu = Manuscript.objects.filter(id=manubase).first()
                 if manu != None:
                     # Create a 'template-copy' of this manuscript
-                    manutemplate = manu.get_template_copy()
+                    manutemplate = manu.get_manutemplate_copy()
                     instance.manu = manutemplate
         return bStatus, msg
     
@@ -7265,10 +7265,12 @@ class TemplateApply(TemplateDetails):
     """Create a new manuscript that is based on this template"""
 
     def custom_init(self, instance):
+        # Find out who I am
+        profile = Profile.get_user_profile(self.request.user.username)
         # Get the manuscript
         manu_template = instance.manu
         # Create a new manuscript that is based on this one
-        manu_new = manu_template.get_template_copy("man")
+        manu_new = manu_template.get_manutemplate_copy("man", profile, instance)
         # Re-direct to this manuscript
         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_new.id})
         return None
@@ -7282,6 +7284,9 @@ class TemplateImport(TemplateDetails):
     def initializations(self, request, pk):
         oErr = ErrHandle()
         try:
+            # Find out who I am
+            profile = Profile.get_user_profile(request.user.username)
+
             # Get the parameters
             self.qd = request.POST
             self.object = None
@@ -7298,23 +7303,6 @@ class TemplateImport(TemplateDetails):
                 if template != None:
                     # Set my own object
                     self.object = template
-
-                    # Issue #314: add note "created from template" to this manuscript
-                    sNoteText = instance.notes
-                    sDate = get_current_datetime().strftime("%d/%b/%Y %H:%M")
-                    if sNoteText == "":
-                        sNoteText = "Created from template [{}] on {}".format(template.name, sDate)
-                    else:
-                        sNoteText = "{}. Added sermons from template [{}] on {}".format(sNoteText, template.name, sDate)
-                    instance.notes = sNoteText
-                    instance.save()
-
-                    # Issue #315: copy keywords
-                    for kw in template.keywords.all():
-                        mkw = ManuscriptKeyword.objects.create(manuscript=instance, keyword=kw.keyword)
-
-                    # Find out who I am
-                    profile = Profile.get_user_profile(request.user.username)
 
                     # Import this template into the manuscript
                     instance.import_template(template, profile)
@@ -8595,7 +8583,7 @@ class CollHistApply(CollHistDetails):
 
     def custom_init(self, instance):
         # Create a new manuscript that is based on this historical collection
-        item_new = instance.get_template_copy(self.request.user.username, self.apply_type)
+        item_new = instance.get_hctemplate_copy(self.request.user.username, self.apply_type)
         if item_new == None:
             # THis wasn't successful: redirect to the details view
             self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})

@@ -3622,8 +3622,12 @@ class Manuscript(models.Model):
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
         return sBack
 
-    def get_template_copy(self, mtype = "tem"):
-        """Create a 'template' copy of myself"""
+    def get_manutemplate_copy(self, mtype = "tem", profile=None, template=None):
+        """Create a copy of myself: 
+        
+        - either as 'template' 
+        - or as plain 'manuscript'
+        """
 
         repair = ['parent', 'firstchild', 'next']
         # Get a link to myself and save it to create a new instance
@@ -3633,73 +3637,84 @@ class Manuscript(models.Model):
         obj.pk = None
         obj.mtype = mtype   # Change the type
         obj.stype = "imp"   # Imported
+        # Actions to perform before saving a new template
+        if mtype == "tem":
+            obj.notes = ""
+        # Save the results
         obj.save()
         manu_src = Manuscript.objects.filter(id=manu_id).first()
         # Note: this doesn't copy relations that are not part of Manuscript proper
-        
-        # copy all the sermons...
-        msitems = []
-        with transaction.atomic():
-            # Walk over all MsItem stuff
-            for msitem in manu_src.manuitems.all().order_by('order'):
-                dst = msitem
-                src_id = msitem.id
-                dst.pk = None
-                dst.manu = obj  # This sets the destination's FK for the manuscript
-                                # Does this leave the original unchanged? I hope so...:)
-                dst.save()
-                src = MsItem.objects.filter(id=src_id).first()
-                msitems.append(dict(src=src, dst=dst))
 
-        # Repair all the relationships from sermon to sermon
-        with transaction.atomic():
-            for msitem in msitems:
-                src = msitem['src']
-                dst = msitem['dst']  
-                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
-                for relation in repair:
-                    src_rel = getattr(src, relation)
-                    if src_rel and src_rel.order:
-                        setattr(dst, relation, obj.manuitems.filter(order=src_rel.order).first())
-                        dst.save()
-                # Copy and save a SermonDescr if needed
-                sermon_src = src.itemsermons.first()
-                if sermon_src != None:
-                    # COpy it
-                    sermon_dst = sermon_src
-                    sermon_dst.pk = None
-                    sermon_dst.msitem = dst
-                    sermon_dst.mtype = mtype   # Change the type
-                    sermon_dst.stype = "imp"   # Imported
-                    sermon_dst.save()
-        # Walk the msitems again, and make sure SSG-links are copied!!
-        with transaction.atomic():
-            for msitem in msitems:
-                src = msitem['src']
-                dst = msitem['dst']  
-                sermon_src = src.itemsermons.first()
-                if sermon_src != None:
-                    # Make sure we also have the destination
-                    sermon_dst = dst.itemsermons.first()
-                    # Walk the SSG links tied with sermon_src
-                    for eq in sermon_src.equalgolds.all():
-                        # Add it to the destination sermon
-                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+        # Copy all the sermons:
+        # obj.load_sermons_from(manu_src, mtype="man", profile=profile)
+        obj.load_sermons_from(manu_src, mtype=mtype, profile=profile)
 
+        # Make sure the body of [obj] works out correctly
+        if mtype != "tem":
+            # This is only done for the creation of manuscripts from a template
+            obj.import_template_adapt(template, profile)
 
         # Return the new object
         return obj
 
+    def import_template_adapt(self, template, profile, notes_only=False):
+        """Adapt a manuscript after importing from template"""
+
+        manu_clear_fields = ['name', 'idno', 'filename', 'url', 'support', 'extent', 'format']
+        manu_none_fields = ['library', 'lcity', 'lcountry', 'origin']
+        oErr = ErrHandle()
+        try:
+            # Issue #314: add note "created from template" to this manuscript
+            sNoteText = self.notes
+            sDate = get_current_datetime().strftime("%d/%b/%Y %H:%M")
+            if sNoteText == "" or sNoteText == None:
+                if notes_only:
+                    sNoteText = "Added sermons from template [{}] on {}".format(template.name, sDate)
+                else:
+                    sNoteText = "Created from template [{}] on {}".format(template.name, sDate)
+            else:
+                sNoteText = "{}. Added sermons from template [{}] on {}".format(sNoteText, template.name, sDate)
+            self.notes = sNoteText
+
+            if not notes_only:
+                # Issue #316: clear a number of fields
+                for field in manu_clear_fields:
+                    setattr(self, field, "")
+                for field in manu_none_fields:
+                    setattr(self, field, None)
+
+            # Make sure to save the result
+            self.save()
+
+            if not notes_only:
+                # Issue #315: copy manuscript keywords
+                for kw in self.keywords.all():
+                    mkw = ManuscriptKeyword.objects.create(manuscript=self, keyword=kw.keyword)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/import_template_adapt")
+
+        return True
+
     def import_template(self, template, profile):
         """Import the information in [template] into the manuscript [self]"""
 
-        # Get the source manuscript
-        manu_src = template.manu
+        oErr = ErrHandle()
+        try:
+            # Get the source manuscript
+            manu_src = template.manu
 
-        # Copy the sermons from [manu_src] into [self]
-        # NOTE: only if there are no sermons in [self] yet!!!!
-        if self.manuitems.count() == 0:
-            self.load_sermons_from(manu_src, mtype="man", profile=profile)
+            # Copy the sermons from [manu_src] into [self]
+            # NOTE: only if there are no sermons in [self] yet!!!!
+            if self.manuitems.count() == 0:
+                self.load_sermons_from(manu_src, mtype="man", profile=profile)
+
+            # Adapt the manuscript itself
+            self.import_template_adapt(template, profile, notes_only = True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/import_template")
 
         # Return myself again
         return self
@@ -3749,12 +3764,14 @@ class Manuscript(models.Model):
                     sermon_dst.mtype = mtype   # Change the type
                     sermon_dst.stype = "imp"   # Imported
 
-                    # Issue #315: exclude some fields from copying
-                    sermon_dst.locus = ""
-                    sermon_dst.additional = ""
+                    # Issue #315: clear some fields after copying
+                    if mtype == "man":
+                        sermon_dst.locus = ""
+                        sermon_dst.additional = ""
 
                     # Save the copy
                     sermon_dst.save()
+
         # Walk the msitems again, and make sure SSG-links are copied!!
         with transaction.atomic():
             for msitem in msitems:
@@ -3770,7 +3787,8 @@ class Manuscript(models.Model):
                         SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
 
                     # Issue #315: adapt Bible reference(s) linking based on copied field
-                    sermon_dst.adapt_verses()
+                    if mtype == "man":
+                        sermon_dst.adapt_verses()
 
                     # Issue #315 note: 
                     #   this is *NOT* working, because templates do not contain 
@@ -6247,7 +6265,7 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_template_copy(self, username, mtype):
+    def get_hctemplate_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""
 
         # Double check to see that this is a SSG collection
