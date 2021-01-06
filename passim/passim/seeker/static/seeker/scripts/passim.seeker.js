@@ -1023,6 +1023,10 @@ var ru = (function ($, ru) {
               // THis is a [shead] element
               oNew['title'] = $(el).find(".shead").first().text();
               oNew['locus'] = $(el).find("code.draggable").first().text();
+              // See if this needs deletion
+              if ($(el).hasClass("hidden")) {
+                oNew['action'] = "delete";
+              }
             }
 
             hList.push(oNew);
@@ -1752,11 +1756,11 @@ var ru = (function ($, ru) {
           elTree = $(ev.target).closest(".tree");
           sermonid = $(elTree).attr("sermonid");
           divId = $(elTree).attr("id");
-          sermontype = $(elTree).attr("sermontype");
-          if (sermontype === "head") {
-            // Change the sermonid
-            divId = divId.replace("sermon", "head");
-          }
+          //sermontype = $(elTree).attr("sermontype");
+          //if (sermontype === "head") {
+          //  // Change the sermonid
+          //  divId = divId.replace("sermon", "head");
+          //}
 
           ev.dataTransfer.setData("text", divId);
         } catch (ex) {
@@ -1773,6 +1777,7 @@ var ru = (function ($, ru) {
         var elTree = null,
             divSrcId = null,
             divDstId = null,
+            divSrc = null,
             sermonid = "";
         try {
           // Prevent default handling
@@ -1782,8 +1787,9 @@ var ru = (function ($, ru) {
           elTree = $(ev.target).closest(".tree");
           divSrcId = ev.dataTransfer.getData("text");
           divDstId = $(elTree).attr("id");
+          divSrc = $("#sermon_tree").find("#" + divSrcId);
 
-          if (divDstId === "sermon_new" && divSrcId.indexOf("head") === 0) {
+          if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
             // This is not allowed
             return;
           }
@@ -1832,6 +1838,7 @@ var ru = (function ($, ru) {
             divHierarchy = "#sermon_hierarchy_element",
             divSrc = null,
             divDst = null,
+            divParent = null,
             bChanged = false,
             level = 0,
             target_under_source = false,
@@ -1852,6 +1859,12 @@ var ru = (function ($, ru) {
           $("#sermon_tree .ruler").addClass("ruler_white");
           $("#sermon_tree .ruler_show").removeClass("ruler_show");
 
+          // Prevent foul-play
+          if (divSrcId == "sermon_new" && divDstId.indexOf("sermon_new") >= 0) {
+            // Get out of here
+            return;
+          }
+
           // Find the actual source div
           if (divSrcId === "sermon_new") {
             // Create a new element
@@ -1869,17 +1882,16 @@ var ru = (function ($, ru) {
             $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
             // Make sure the new element becomes visible
             $(divSrc).removeClass("hidden");
-          } else if (divDstId === "sermon_new") {
-            if (divSrcId.indexOf("head") >= 0) {
-              // This is a structural head that is being removed
-              // This means: move up everything under this head...
-              return;
-            } else {
-              // This is not allowed
-              return;
-            }
           } else {
             divSrc = $("#sermon_tree").find("#" + divSrcId);
+            if (divDstId === "sermon_new") {
+              if ($(divSrc).attr("sermontype") === "head") {
+                type = "struct_del"; // Remove structural head
+              } else {
+                // This is not allowed
+                return;
+              }
+            }
           }
           // The destination - that is me myself
           divDst = elTree;
@@ -1927,6 +1939,30 @@ var ru = (function ($, ru) {
                 // SIgnal change
                 bChanged = true;
               }
+              break;
+            case "struct_del":  // Remove a structural head
+              // This is a structural head that is being removed
+
+              // This means: 
+              // (1) all 'children' of the structure element must become 'children' of the structure element's 'parent'
+              // (1a) get my parent
+              divParent = $(divSrc).parent();
+              // (1b) walk all .tree descendants and decrease the level
+              $(divSrc).find(".tree").each(function (idx, el) {
+                level = parseInt($(el).attr("level"), 10);
+                level -= 1;
+                $(el).attr("level", level.toString());
+              });
+              // (1c) walk all my children and set their different parent
+              $(divSrc).children(".tree").each(function (idx, el) {
+                divParent.append(el);
+              });
+
+              // (2) Hide the structural element
+              $(divSrc).addClass("hidden");
+
+              // Signal we have changed
+              bChanged = true;
               break;
           }
 

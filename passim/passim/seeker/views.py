@@ -9925,6 +9925,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
                     
                     # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                     head_to_id = {}
+                    deletables = []
                     with transaction.atomic():
                         for idx, item in enumerate(hlist):
                             if 'new' in item['id']:
@@ -9936,6 +9937,15 @@ class ManuscriptHierarchy(ManuscriptDetails):
                                 head_to_id[item['id']] = msitem.id
                                 # Testing
                                 id=getid(item, "id", head_to_id)
+                            elif 'action' in item and item['action'] == "delete":
+                                # This one must be deleted
+                                deletables.append(item['id'])
+
+                    # Step 1b: adapt the list with deletables
+                    hlist[:] = [x for x in hlist if x.get("action") != "delete"]
+
+                    # Step 1c: delete those that need it
+                    MsItem.objects.filter(id__in=deletables).delete()
 
                     # Step 2: store the hierarchy
                     changes = {}
