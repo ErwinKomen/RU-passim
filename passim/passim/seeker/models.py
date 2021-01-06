@@ -7550,25 +7550,34 @@ class SermonDescr(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        if self.incipit: self.srchincipit = get_searchable(self.incipit)
-        if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        if self.incipit: 
+            srchincipit = get_searchable(self.incipit)
+            if self.srchincipit != srchincipit:
+                self.srchincipit = srchincipit
+        if self.explicit: 
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchexplicit != srchexplicit:
+                self.srchexplicit = srchexplicit
         # Preliminary saving, before accessing m2m fields
         response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         # Process signatures
         lSign = []
-        bNeedSave = False
+        bCheckSave = False
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
-            bNeedSave = True
+            bCheckSave = True
 
         # =========== DEBUGGING ================
         # self.do_ranges(force = True)
         # ======================================
 
         # Make sure to save the siglist too
-        if bNeedSave: 
-            self.siglist = json.dumps(lSign)
-            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        if bCheckSave: 
+            siglist_new = json.dumps(lSign)
+            if siglist_new != self.siglist:
+                self.siglist = siglist_new
+                # Only now do the actual saving...
+                response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
     def signature_string(self):

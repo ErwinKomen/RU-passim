@@ -1738,14 +1738,25 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  sermon_drag
+       *      Starting to drag: keep track of the divId that is being dragged.
+       *
+       */
       sermon_drag: function (ev) {
         var elTree = null,
             divId = "",
+            sermontype = "",  // can be 'sermon' or 'head'
             sermonid = "";
         try {
           elTree = $(ev.target).closest(".tree");
           sermonid = $(elTree).attr("sermonid");
           divId = $(elTree).attr("id");
+          sermontype = $(elTree).attr("sermontype");
+          if (sermontype === "head") {
+            // Change the sermonid
+            divId = divId.replace("sermon", "head");
+          }
 
           ev.dataTransfer.setData("text", divId);
         } catch (ex) {
@@ -1753,10 +1764,30 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  sermon_dragenter
+       *      Entering a region where dropping is possible
+       *
+       */
       sermon_dragenter: function (ev) {
-        var elTree = null, sermonid = "";
+        var elTree = null,
+            divSrcId = null,
+            divDstId = null,
+            sermonid = "";
         try {
+          // Prevent default handling
           ev.preventDefault();
+
+          // Figure out what the source and destination is
+          elTree = $(ev.target).closest(".tree");
+          divSrcId = ev.dataTransfer.getData("text");
+          divDstId = $(elTree).attr("id");
+
+          if (divDstId === "sermon_new" && divSrcId.indexOf("head") === 0) {
+            // This is not allowed
+            return;
+          }
+
           if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
             //$(ev.target).addClass("dragover");
             $(ev.target).addClass("ruler_black");
@@ -1772,6 +1803,11 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  sermon_dragleave
+       *      Leaving...
+       *
+       */
       sermon_dragleave: function (ev) {
         var elTree = null, sermonid = "";
         try {
@@ -1784,6 +1820,11 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       *  sermon_drop
+       *      What happens when a sermon is dropped here?
+       *
+       */
       sermon_drop: function (ev) {
         var elTree = null,
             divSrcId = "",
@@ -1828,6 +1869,15 @@ var ru = (function ($, ru) {
             $(divSrc).find(".sermonnumber").first().html("<span>H-" + loc_newSermonNumber + "</span>")
             // Make sure the new element becomes visible
             $(divSrc).removeClass("hidden");
+          } else if (divDstId === "sermon_new") {
+            if (divSrcId.indexOf("head") >= 0) {
+              // This is a structural head that is being removed
+              // This means: move up everything under this head...
+              return;
+            } else {
+              // This is not allowed
+              return;
+            }
           } else {
             divSrc = $("#sermon_tree").find("#" + divSrcId);
           }

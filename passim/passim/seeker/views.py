@@ -5750,7 +5750,7 @@ class SermonEdit(BasicDetails):
         exclude_field_keys = ['locus']
         for item in mainitems_main: 
             # Make sure to exclude field key 'locus'
-            if item['field_key'] not in exclude_field_keys:
+            if not istemplate or item['field_key'] not in exclude_field_keys:
                 context['mainitems'].append(item)
 
         # Bibref and Cod. notes can only be added to non-templates

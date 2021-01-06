@@ -1127,8 +1127,8 @@ class SermonForm(PassimModelForm):
     signature   = forms.CharField(label=_("Signature"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
-    siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    #                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     siglist_a = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     siglist_m = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1255,7 +1255,7 @@ class SermonForm(PassimModelForm):
                 self.fields['kwlist'].widget.is_team = False
                 self.fields['ukwlist'].widget.is_team = False
             # Note: what we show the user is the set of GOLD-signatures
-            self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            # self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_m'].queryset = SermonSignature.objects.all().order_by('code')
             # The available Sermondescr-Equal list
@@ -1319,7 +1319,7 @@ class SermonForm(PassimModelForm):
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(type='super').order_by('name')]
 
                 # Note: what we *show* are the signatures that have actually been copied -- the SERMON signatures
-                self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
+                # self.fields['siglist'].initial = [x.pk for x in instance.signatures.all().order_by('-editype', 'code')]
                 self.fields['siglist_m'].initial = [x.pk for x in instance.sermonsignatures.all().order_by('-editype', 'code')]
 
                 # Note: this is the list of links between SermonDesrc-Gold
@@ -1353,9 +1353,11 @@ class KeywordForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Keyword
-        fields = ['name', 'visibility']
+        fields = ['name', 'visibility', 'description']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'visibility':  forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Visibility type...',  'style': 'width: 100%;'})
+                 'visibility':  forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Visibility type...',  'style': 'width: 100%;'}),
+                 'description': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'Comments on this keyword...'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -1364,6 +1366,7 @@ class KeywordForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['visibility'].required = False
+        self.fields['description'].required = False
         self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
         # Initialize choices for linktype
         init_choices(self, 'vistype', VISIBILITY_TYPE, bUseAbbr=True, use_helptext=False)
