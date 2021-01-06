@@ -1023,8 +1023,13 @@ def redo_zotero(request):
 
     try:
         if request.method == 'GET':
-            Litref.sync_zotero(True)
-        data['status'] = 'ok'
+            bBack, msg = Litref.sync_zotero(True)
+        if bBack:
+            data['status'] = 'ok'
+        else:
+            data['status'] = "error"
+            data['msg'] = msg
+            data['html'] = msg
     except:
         oErr.DoError("redo_zotero error")
         data = {'status': 'error'}

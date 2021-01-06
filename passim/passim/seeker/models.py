@@ -2217,6 +2217,7 @@ class Litref(models.Model):
         zot = zotero.Zotero(libid, libtype, apikey)
         group_size = 25
         bBack = True
+        msg = ""
         oErr = ErrHandle()
         try:
             # Get the total number of items
@@ -2251,7 +2252,7 @@ class Litref(models.Model):
             print("sync_zotero error")
             msg = oErr.get_error_message()
             bBack = False
-        return bBack
+        return bBack, msg
 
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""
