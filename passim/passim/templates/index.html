@@ -25,7 +25,8 @@
       <div class="col-md-6 bgimg">
         <h2>Summary</h2>
         <p>Currently the web application hosts {{count_sermon}} sermons, that are part of {{count_manu}} manuscripts. 
-        We keep track of the information that is extracted from external <a href="{% url 'source_list' %}" target="_blank">sources</a>.
+        We keep track of the information that is extracted from external <a href="{% url 'source_list' %}" target="_blank">sources</a> 
+        (<a href="{% url 'about' %}">statistics</a>).
         More details can be found on the <a href="{% url 'literature_list' %}" target="_blank">bibliography page</a>.</p>
 
         <div class="row" style="height: 200px;" targeturl="{% url 'guide' %}">

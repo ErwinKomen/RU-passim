@@ -986,6 +986,7 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    srclist     = ModelMultipleChoiceField(queryset=None, required=False)
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
@@ -1021,11 +1022,11 @@ class SearchManuForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'yearstart', 'yearfinish', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype']
+        fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
-                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
+                 #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
+                 #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
                  'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
                  'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1045,12 +1046,13 @@ class SearchManuForm(PassimModelForm):
             # NONE of the fields are required in the SEARCH form!
             self.fields['stype'].required = False
             self.fields['name'].required = False
-            self.fields['yearstart'].required = False
-            self.fields['yearfinish'].required = False
+            #self.fields['yearstart'].required = False
+            #self.fields['yearfinish'].required = False
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')

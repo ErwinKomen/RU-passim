@@ -2173,10 +2173,18 @@ class SourceInfo(models.Model):
         qs = SourceInfo.objects.filter(profile__isnull=True)
         with transaction.atomic():
             for obj in qs:
-                if obj.collector not in coll_set:
+                if obj.collector != "" and obj.collector not in coll_set:
                     coll_set[obj.collector] = Profile.get_user_profile(obj.collector)
                 obj.profile = coll_set[obj.collector]
                 obj.save()
+        # Derive from profile
+        qs = SourceInfo.objects.filter(collector="").exclude(profile__isnull=True)
+        with transaction.atomic():
+            for obj in qs:
+                if obj.collector == "" or obj.collector not in coll_set:
+                    obj.collector = Profile.objects.filter(id=obj.profile.id).first().user.username
+                obj.save()
+
         result = True
 
 
@@ -2911,7 +2919,7 @@ class Manuscript(models.Model):
 
     # Where do we get our information from? And when was it added?
     #    Note: deletion of a sourceinfo sets the manuscript.source to NULL
-    source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
+    source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL, related_name="sourcemanuscripts")
 
     # [0-1] Each manuscript should belong to a particular project
     project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
