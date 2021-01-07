@@ -6744,10 +6744,14 @@ class SermonDescr(models.Model):
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
             value_lst = []
-            if isinstance(value, str) and value[0] != '[':
-                value_lst = value.split(",")
-                for idx, item in enumerate(value_lst):
-                    value_lst[idx] = value_lst[idx].strip()
+            if isinstance(value, str):
+                if value[0] == '[':
+                    # Make list from JSON
+                    value_lst = json.loads(value)
+                else:
+                    value_lst = value.split(",")
+                    for idx, item in enumerate(value_lst):
+                        value_lst[idx] = value_lst[idx].strip()
             # Note: we skip a number of fields that are determined automatically
             #       [ stype ]
             if path == "brefs":

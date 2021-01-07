@@ -40,7 +40,7 @@ from passim.reader.forms import UploadFileForm
 
 
 class ManuscriptUploadExcel(ReaderImport):
-    """Specific parameters for importing ECODEX"""
+    """Specific parameters for importing manuscripts from Excel"""
 
     import_type = "excel"
     sourceinfo_url = "https://www.ru.nl/english/people/boodts-s/"
