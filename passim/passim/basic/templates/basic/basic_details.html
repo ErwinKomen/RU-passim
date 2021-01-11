@@ -25,11 +25,12 @@
           <!-- Possibility to go back-->
           <div class="col-md-1">
             <a class="btn jumbo-1" 
-               href="{{listview}}"
+               href="{{listview}}{% if params %}?{{params|safe}}{% endif %}"
                title="Return to the list of items">&lt;&lt;</a>
             <!-- Any additional buttons here in the topleft -->
             {% for buttonspec in topleftbuttons %}
-              <a class="btn jumbo-1" href="{{buttonspec.url}}" title="{{buttonspec.title}}">{{buttonspec.label}}</a>
+              <a class="btn jumbo-1" href="{{buttonspec.url}}"
+                 title="{{buttonspec.title}}">{{buttonspec.label}}</a>
             {% endfor %}
           </div>
 

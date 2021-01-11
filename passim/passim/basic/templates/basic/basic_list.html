@@ -386,7 +386,8 @@
                         {% for field in result.fields %}
                           <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
-                              <a href="{% url basic_details result.id %}" class="nostyle" title="Show details of this {{titlesg}}">
+                              <a href="{% url basic_details result.id %}{% if params %}?params={{params}}{% endif %}" 
+                                 class="nostyle" title="Show details of this {{titlesg}}">
                                 {% if field.value %}{{field.value|safe}}{% else %}&nbsp;&nbsp;{% endif %}
                               </a>
                             {% else %}

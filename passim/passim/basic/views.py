@@ -22,6 +22,7 @@ from django.views.generic import ListView, View
 import json
 import fnmatch
 import os
+import base64
 from datetime import datetime
 
 # provide error handling
@@ -479,6 +480,18 @@ def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=
     rel_item.append(oAdd)
     return True
 
+def base64_encode(sInput):
+    message_bytes = sInput.encode("ascii")
+    base64_bytes = base64.b64encode(message_bytes)
+    sOutput = base64_bytes.decode("ascii")
+    return sOutput
+
+def base64_decode(sInput):
+    base64_bytes = sInput.encode('ascii')
+    message_bytes = base64.b64decode(base64_bytes)
+    sOutput = message_bytes.decode('ascii')
+    return sOutput
+
 
 
 # The views that are defined by 'basic'
@@ -590,6 +603,9 @@ class BasicList(ListView):
             context['page_obj'] = context['paginator'].page( page_num)
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
+            self.param_list.append("page={}".format(page_num))
+        # Make sure the parameter list becomes available
+        context['params'] = base64_encode( "&".join(self.param_list))
 
         # Set the title of the application
         if self.plural_name =="":
@@ -1246,6 +1262,10 @@ class BasicDetails(DetailView):
         initial = get.copy()
         self.qd = initial
 
+        # Possibly first get params
+        context['params'] = base64_decode( "".join(self.qd.pop("params")))
+
+        # Now see if anything is left
         self.bHasFormInfo = (len(self.qd) > 0)
 
         # Set the title of the application
