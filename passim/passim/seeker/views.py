@@ -784,15 +784,15 @@ def nlogin(request):
 
 # ================ OTHER VIEW HELP FUNCTIONS ============================
 
-def sync_entry(request):
+def sync_passim(request):
     """-"""
     assert isinstance(request, HttpRequest)
 
     # Gather info
-    context = {'title': 'SyncEntry',
+    context = {'title': 'SyncPassim',
                'message': 'Radboud University PASSIM'
                }
-    template_name = 'seeker/syncentry.html'
+    template_name = 'seeker/syncpassim.html'
 
     # Add the information in the 'context' of the web page
     return render(request, template_name, context)
@@ -817,10 +817,7 @@ def sync_start(request):
 
         else:
             # Remove previous status objects for this combination of user/type
-            lstQ = []
-            lstQ.append(Q(user=username))
-            lstQ.append(Q(type=synctype))
-            qs = Status.objects.filter(*lstQ)
+            qs = Status.objects.filter(user=username, type=synctype)
             qs.delete()
 
             # Create a status object for this combination of synctype/user
@@ -840,6 +837,18 @@ def sync_start(request):
                     data.status = 'error'
                 elif oResult != None:
                     data['count'] = oResult
+
+            elif synctype == "zotero":
+                # Use the synchronisation object that contains all relevant information
+                oStatus.set("loading")
+
+                # Update the models with the new information
+                oResult = Litref.sync_zotero(force=False, oStatus=oStatus)
+                if oResult == None or oResult['status'] == "error":
+                    data.status = 'error'
+                elif oResult != None:
+                    data['count'] = oResult
+
 
     except:
         oErr.DoError("sync_start error")

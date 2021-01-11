@@ -47,7 +47,7 @@ urlpatterns = [
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
 
-    url(r'^sync/entry/$', passim.seeker.views.sync_entry, name='entries_json'),
+    url(r'^sync/passim/$', passim.seeker.views.sync_passim, name='sync_passim'),
     url(r'^sync/start/$', passim.seeker.views.sync_start, name='sync_start'),
     url(r'^sync/progress/$', passim.seeker.views.sync_progress, name='sync_progress'),
     url(r'^sync/zotero/$', passim.seeker.views.redo_zotero, name='sync_zotero'),

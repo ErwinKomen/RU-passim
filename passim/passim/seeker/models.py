@@ -2210,7 +2210,7 @@ class Litref(models.Model):
             sBack = self.short
         return sBack
 
-    def sync_zotero(force=False):
+    def sync_zotero(force=False, oStatus=None):
         """Read all stuff from Zotero"""
 
         libid = Information.get_kvalue("zotero_libraryid")
@@ -2224,12 +2224,19 @@ class Litref(models.Model):
 
         zot = zotero.Zotero(libid, libtype, apikey)
         group_size = 25
+        oBack = dict(status="ok", msg="")
         bBack = True
         msg = ""
+        changes = 0
+        additions = 0
         oErr = ErrHandle()
         try:
             # Get the total number of items
             total_count = zot.count_items()
+            # Initial status
+            oBack['total'] = "There are {} references in the Passim Zotero library".format(total_count)
+            oStatus.set("ok", oBack)
+
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
             for grp_num in range( total_groups):
@@ -2248,19 +2255,52 @@ class Litref(models.Model):
                         # Add it
                         obj = Litref(itemid=itemid, data=sData)
                         obj.save()
+                        additions += 1
                     # Check if it needs processing
                     if force or obj.short == "" or obj.data != sData:
-                        # It needs processing
-                        obj.read_zotero(data=item['data'])
+                        # Do a complete check on all KV pairs
+                        oDataZotero = item['data']
+                        oDataLitref = json.loads(obj.data)
+                        bNeedChanging = False
+                        for k,v in oDataZotero.items():
+                            # Find the corresponding in Litref
+                            if k in oDataLitref:
+                                if v != oDataLitref[k]:
+                                    oErr.Status("Litref/sync_zotero: value on [{}] differs [{}] / [{}]".format(k, v, oDataLitref[k]))
+                                    bNeedChanging = True
+                            else:
+                                # The key is not even found
+                                oErr.Status("Litref/sync_zotero: key not found {}".format(k))
+                                bNeedChanging = True
+                                break
+                        if bNeedChanging:
+                            # It needs processing
+                            obj.read_zotero(data=item['data'])
+                            obj.data = sData
+                            obj.save()
+                            changes += 1
                     elif obj.data != sData:
                         obj.data = sData
                         obj.save()
+                        changes += 1
+
+                # Update the status information
+                oBack['group'] = "Group {}/{}".format(grp_num+1, total_groups)
+                oBack['changes'] = changes
+                oBack['additions'] = additions
+                oStatus.set("ok", oBack)
                     
+            # Make sure to set the status to finished
+            oBack['group'] = "Everything has been done"
+            oBack['changes'] = changes
+            oBack['additions'] = additions
+            oStatus.set("finished", oBack)
         except:
             print("sync_zotero error")
             msg = oErr.get_error_message()
-            bBack = False
-        return bBack, msg
+            oBack['msg'] = msg
+            oBack['status'] = 'error'
+        return oBack
 
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""

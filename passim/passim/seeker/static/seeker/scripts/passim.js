@@ -33,6 +33,7 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_divErr = "passim_err",
         loc_typeahead_init = false,
+        loc_sync_detail = {},
         loc_ta_done = [],
         loc_countries = [],
         loc_countriesL = [],
@@ -1577,13 +1578,15 @@ var ru = (function ($, ru) {
             // Default action is to show the status
             $("#sync_progress_" + sSyncType).html(json.status);
             $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
+            loc_sync_detail[sSyncType] = json;
             // Finish nicely
-            ru.passim.sync_stop(sSyncType, json);
+            ru.passim.sync_stop(sSyncType, json, false);
             return;
           default:
             // Default action is to show the status
             $("#sync_progress_" + sSyncType).html(json.status);
             $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
+            loc_sync_detail[sSyncType] = json;
             ru.passim.oSyncTimer = window.setTimeout(function () { ru.passim.sync_progress(sSyncType, options); }, 1000);
             break;
         }
@@ -1595,12 +1598,15 @@ var ru = (function ($, ru) {
        *
        */
       sync_stop: function (sSyncType, json) {
-        var lHtml = [];
+        var lHtml = [], json = {};
 
         // Stop the progress calling
         window.clearInterval(ru.passim.oSyncTimer);
+
         // Show we are ready
-        $("#sync_progress_" + sSyncType).html("Finished synchronizing: " + sSyncType + "<br>" + JSON.stringify(json, null, 2));
+        $("#sync_progress_" + sSyncType).html("Finished synchronizing: " + sSyncType + "<br>Last details:" );
+        json = loc_sync_detail[sSyncType];
+        $("#sync_details_" + sSyncType).html(ru.passim.sync_details(json));
 
       },
 
@@ -1619,10 +1625,10 @@ var ru = (function ($, ru) {
         // Get the counts
         oCount = JSON.parse(json['count']);
         // Create a reply
-        lHtml.push("<div><table><thead><tr><th></th><th></th></tr></thead><tbody>");
+        lHtml.push("<div><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody>");
         for (var property in oCount) {
           if (oCount.hasOwnProperty(property)) {
-            lHtml.push("<tr><td>" + property + "</td><td>" + oCount[property] + "</td></tr>");
+            lHtml.push("<tr><td style='color: darkblue;'><b>" + property + "</b>:</td><td>" + oCount[property] + "</td></tr>");
           }
         }
         lHtml.push("</tbody></table></div>");
