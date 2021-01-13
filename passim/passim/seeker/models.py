@@ -2237,6 +2237,8 @@ class Litref(models.Model):
     # [0-1] A short reference: including possible markdown symbols
     short = models.TextField("Short reference", blank=True, default="")
 
+    ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+
     def __str__(self):
         sBack = str(self.itemid)
         if self.short != None and self.short != "":
@@ -2264,11 +2266,27 @@ class Litref(models.Model):
         additions = 0
         oErr = ErrHandle()
         try:
+            oBack['total'] = "Checking for literature references that have not been completely processed..."
+            if oStatus != None: oStatus.set("ok", oBack)
+            # Now walk all Litrefs again to see where fields are missing
+            processing = 0
+            for obj in Litref.objects.all():
+                oData = json.loads(obj.data)
+                if oData.get('itemType') in Litref.ok_types and obj.full == "" and obj.short == "":
+                    # Do this one again
+                    obj.read_zotero(data=oData)
+                    processing += 1
+                    # Update status
+                    oBack['processed'] = processing
+                    if oStatus != None: oStatus.set("ok", oBack)
+            if processing > 0:
+                oBack['processed'] = processing
+                    
             # Get the total number of items
             total_count = zot.count_items()
             # Initial status
             oBack['total'] = "There are {} references in the Passim Zotero library".format(total_count)
-            oStatus.set("ok", oBack)
+            if oStatus != None: oStatus.set("ok", oBack)
 
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
@@ -2294,46 +2312,50 @@ class Litref(models.Model):
                         # Do a complete check on all KV pairs
                         oDataZotero = item['data']
                         oDataLitref = json.loads(obj.data)
-                        bNeedChanging = False
-                        for k,v in oDataZotero.items():
-                            # Find the corresponding in Litref
-                            if k in oDataLitref:
-                                if v != oDataLitref[k]:
-                                    oErr.Status("Litref/sync_zotero: value on [{}] differs [{}] / [{}]".format(k, v, oDataLitref[k]))
+                        if force:
+                            bNeedChanging = True
+                        else:
+                            bNeedChanging = False
+                            for k,v in oDataZotero.items():
+                                # Find the corresponding in Litref
+                                if k in oDataLitref:
+                                    if v != oDataLitref[k]:
+                                        oErr.Status("Litref/sync_zotero: value on [{}] differs [{}] / [{}]".format(k, v, oDataLitref[k]))
+                                        bNeedChanging = True
+                                else:
+                                    # The key is not even found
+                                    oErr.Status("Litref/sync_zotero: key not found {}".format(k))
                                     bNeedChanging = True
-                            else:
-                                # The key is not even found
-                                oErr.Status("Litref/sync_zotero: key not found {}".format(k))
-                                bNeedChanging = True
-                                break
+                                    break
                         if bNeedChanging:
                             # It needs processing
-                            obj.read_zotero(data=item['data'])
                             obj.data = sData
                             obj.save()
+                            obj.read_zotero(data=item['data'])
                             changes += 1
                     elif obj.data != sData:
                         obj.data = sData
                         obj.save()
+                        obj.read_zotero(data=item['data'])
                         changes += 1
 
                 # Update the status information
                 oBack['group'] = "Group {}/{}".format(grp_num+1, total_groups)
                 oBack['changes'] = changes
                 oBack['additions'] = additions
-                oStatus.set("ok", oBack)
-                    
+                if oStatus != None: oStatus.set("ok", oBack)
+
             # Make sure to set the status to finished
             oBack['group'] = "Everything has been done"
             oBack['changes'] = changes
             oBack['additions'] = additions
-            oStatus.set("finished", oBack)
+            if oStatus != None: oStatus.set("finished", oBack)
         except:
             print("sync_zotero error")
             msg = oErr.get_error_message()
             oBack['msg'] = msg
             oBack['status'] = 'error'
-        return oBack
+        return oBack, ""
 
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""
@@ -2362,7 +2384,7 @@ class Litref(models.Model):
             data = self.get_zotero()
         result = ""
         back = True
-        ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+        ok_types = self.ok_types # ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
         oErr = ErrHandle()
 
         try:
@@ -2372,11 +2394,21 @@ class Litref(models.Model):
                 itemType = data['itemType']
 
                 if itemType in ok_types:
+                    # ====== Debugging =========
+                    if data['key'] == "V78MYW8F":
+                        iStop = 1
+                    # ==========================
+
+                    # Initialise SHORT
+                    result = ""
+                    bNeedShortSave = False
+
                     # Check presence of data
                     sData = json.dumps(data)
                     # Check and adapt the JSON string data
                     if self.data != sData:
                         self.data = sData
+                        bNeedShortSave = True
 
                     # First step: store data 
 
@@ -2444,7 +2476,8 @@ class Litref(models.Model):
                                     result = "{} {} ({})".format(short_title, volume, year)
                                                                           
                         # Fifth step: make short reference for edition (book) 
-                        elif extra == "ed": 
+                        # EK: only i there is a [short_title]
+                        elif extra == "ed" and (short_title != "" or series_number != "" or volume != ""): 
                             if short_title == "PL":
                                 if series_number != "":
                                     result = "{} {}".format(short_title, series_number)
@@ -2487,20 +2520,25 @@ class Litref(models.Model):
                             result = "{} ({})".format(short_title, year)
 
  
-                    if result != "":
+                    if result != "" and self.short != result:
+                        oErr.Status("Update short [{}] to [{}]".format(self.short, result))
                         # update the short field
                         self.short = result
+                        bNeedShortSave = True
 
                     if year != "" and year != "?":
                         try:
                             self.year = int(year)
+                            bNeedShortSave = True
                         except:
                             pass
 
                     # Now update this item
-                    self.save()
+                    if bNeedShortSave:
+                        self.save()
                     
-                  
+                    result = ""
+                    bNeedFullSave = False
                     # Make a full reference for a book
                     authors = Litref.get_creators(data, type="author")
                     
@@ -2561,7 +2599,7 @@ class Litref(models.Model):
                             # There are no editors:
                             if editors == "":
                                 # There is no series name
-                                if series =="":
+                                if series =="" and result == "":
                                     # There is no series number
                                     if series_number =="":
                                         result = "_{}_ {}, {} ({})".format(title, volume, publisher, year)
@@ -2676,12 +2714,15 @@ class Litref(models.Model):
                         result = ". ".join(combi) + "."
                     elif itemType == "webpage":
                         pass
-                    if result != "":
+                    if result != "" and self.full != result:
                         # update the full field
+                        oErr.Status("Update full [{}] to [{}]".format(self.full, result))
                         self.full = result
+                        bNeedFullSave = True
 
                     # Now update this item
-                    self.save()
+                    if bNeedFullSave:
+                        self.save()
                 else:
                     # This item type is not yet supported
                     pass
@@ -2697,6 +2738,20 @@ class Litref(models.Model):
     def get_creators(data, type="author", style=""):
         """Extract the authors"""
 
+        def get_lastname(item):
+            sBack = ""
+            if 'lastName' in item:
+                sBack = item['lastName']
+            elif 'name' in item:
+                sBack = item['name']
+            return sBack
+
+        def get_firstname(item):
+            sBack = ""
+            if 'firstName' in item:
+                sBack = item['firstName']
+            return sBack
+
         oErr = ErrHandle()
         authors = []
         extra = ['data']
@@ -2709,22 +2764,24 @@ class Litref(models.Model):
                     if item['creatorType'] == type:
                         number += 1
                     
+                        firstname = get_firstname(item)
+                        lastname = get_lastname(item)
                         # Add this author
                         if bFirst:
                             # Extremely short: only the last name of the first author TH: afvangen igv geen auteurs
-                            authors.append(item['lastName'])
+                            authors.append(lastname)
                         else:
                             if number == 1 and type == "author":
                                 # First author of anything must have lastname - first initial
-                                authors.append("{}, {}.".format(item['lastName'], item['firstName'][:1]))
+                                authors.append("{}, {}.".format(lastname, firstname[:1]))
                                 if extra == "ed": 
-                                    authors.append("{} {}".format(item['firstName'], item['lastName']))
+                                    authors.append("{} {}".format(firstname, lastname))
                             elif type == "editor":
                                 # Editors should have full first name
-                                authors.append("{} {}".format(item['firstName'], item['lastName']))
+                                authors.append("{} {}".format(firstname, lastname))
                             else:
                                 # Any other author or editor is first initial-lastname
-                                authors.append("{}. {}".format(item['firstName'][:1], item['lastName']))
+                                authors.append("{}. {}".format(firstname[:1], lastname))
                 if bFirst:
                     if len(authors) == 0:
                         result = "(unknown)"
@@ -2736,7 +2793,8 @@ class Litref(models.Model):
                     if number == 1:
                         result = authors[0]
                     elif number == 0:
-                        result = "(no author)"
+                        if type == "author":
+                            result = "(no author)"
                     else:
                         preamble = authors[:-1]
                         last = authors[-1]

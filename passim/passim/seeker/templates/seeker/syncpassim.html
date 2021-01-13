@@ -35,6 +35,13 @@
                     sync-progress="{% url 'sync_progress' %}?synctype=zotero" 
                     onclick="ru.passim.sync_start('zotero')">Synchronize the literature references</a>
                 </span>
+                {% if is_superuser %}
+                  <span><a id="sync_start_zotero" class="btn btn-primary btn-xs" 
+                      sync-start="{% url 'sync_start' %}?synctype=zotero&force=true" 
+                      sync-progress="{% url 'sync_progress' %}?synctype=zotero" 
+                      onclick="ru.passim.sync_start('zotero')">Force synchronize all literature</a>
+                  </span>
+                {% endif %}
               </div>
             </div>
             <div class="row">

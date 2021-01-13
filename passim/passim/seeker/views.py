@@ -794,6 +794,11 @@ def sync_passim(request):
                'message': 'Radboud University PASSIM'
                }
     template_name = 'seeker/syncpassim.html'
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context['is_superuser'] = user_is_superuser(request)
 
     # Add the information in the 'context' of the web page
     return render(request, template_name, context)
@@ -806,11 +811,19 @@ def sync_start(request):
     try:
         # Get the user
         username = request.user.username
+        # Authentication
+        if not user_is_ingroup(request, app_editor):
+            return redirect('home')
+
         # Get the synchronization type
         get = request.GET
         synctype = ""
+        force = False
         if 'synctype' in get:
             synctype = get['synctype']
+        if 'force' in get:
+            force = get['force']
+            force = (force == "true" or force == "1" )
 
         if synctype == '':
             # Formulate a response
@@ -844,7 +857,7 @@ def sync_start(request):
                 oStatus.set("loading")
 
                 # Update the models with the new information
-                oResult = Litref.sync_zotero(force=False, oStatus=oStatus)
+                oResult = Litref.sync_zotero(force=force, oStatus=oStatus)
                 if oResult == None or oResult['status'] == "error":
                     data.status = 'error'
                 elif oResult != None:
@@ -1058,9 +1071,10 @@ def redo_zotero(request):
 
     try:
         if request.method == 'GET':
-            bBack, msg = Litref.sync_zotero(True)
-        if bBack:
-            data['status'] = 'ok'
+            oBack, msg = Litref.sync_zotero(True)
+        if oBack != None and 'status' in oBack:
+            data['status'] = "ok"
+            data['count'] = oBack
         else:
             data['status'] = "error"
             data['msg'] = msg
@@ -7526,6 +7540,12 @@ class CollAnyEdit(BasicDetails):
     manu = None
     datasettype = ""
     mainitems = []
+    hlistitems = [
+        {'type': 'manu',    'clsColl': CollectionMan,   'field': 'manuscript'},
+        {'type': 'sermo',   'clsColl': CollectionSerm,  'field': 'sermon'},
+        {'type': 'gold',    'clsColl': CollectionGold,  'field': 'gold'},
+        {'type': 'super',   'clsColl': CollectionSuper, 'field': 'super'},
+        ]
 
     ClitFormSet = inlineformset_factory(Collection, LitrefCol,
                                          form = CollectionLitrefForm, min_num=0,
@@ -7564,44 +7584,89 @@ class CollAnyEdit(BasicDetails):
                 self.newRedirect = True
 
                 # Action depends on the particular prefix
-                if instance.type == "manu":
-                    # First check if this needs to be a *NEW* collection instance
-                    if savenew == "true":
-                        profile = Profile.get_user_profile(self.request.user.username)
-                        # Yes, we need to copy the existing collection to a new one first
-                        original = instance
-                        instance = original.get_copy(owner=profile)
+                #if instance.type == "manu":
+                #    # First check if this needs to be a *NEW* collection instance
+                #    if savenew == "true":
+                #        profile = Profile.get_user_profile(self.request.user.username)
+                #        # Yes, we need to copy the existing collection to a new one first
+                #        original = instance
+                #        instance = original.get_copy(owner=profile)
 
-                    # Change the redirect URL
-                    if self.redirectpage == "":
-                        if instance.settype == "hc": this_type = "hist"
-                        elif instance.scope == "priv": this_type = "priv"
-                        else: this_type = "publ"
-                        self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
-                    else:
-                        self.redirectpage = self.redirectpage.replace(original.id, instance.id)
+                #    # Change the redirect URL
+                #    if self.redirectpage == "":
+                #        this_type = ""
+                #        if instance.settype == "hc": this_type = "hist"
+                #        elif instance.scope == "priv": this_type = "priv"
+                #        else: this_type = "publ"
+                #        self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
+                #    else:
+                #        self.redirectpage = self.redirectpage.replace(original.id, instance.id)
 
-                    # What we have is the ordered list of Manuscript id's that are part of this collection
-                    with transaction.atomic():
-                        # Make sure the orders are correct
-                        for idx, manu_id in enumerate(hlist):
-                            order = idx + 1
-                            obj = CollectionMan.objects.filter(collection=instance, manuscript__id=manu_id).first()
-                            if obj != None:
-                                if obj.order != order:
-                                    obj.order = order
-                                    obj.save()
-                    # See if any need to be removed
-                    existing_manu_id = [str(x.manuscript.id) for x in CollectionMan.objects.filter(collection=instance)]
-                    delete_id = []
-                    for manu_id in existing_manu_id:
-                        if not manu_id in hlist:
-                            delete_id.append(manu_id)
-                    if len(delete_id)>0:
-                         CollectionMan.objects.filter(collection=instance, manuscript__id__in=delete_id).delete()
-                else:
-                    # Nothing implemented right now
-                    pass
+                #    # What we have is the ordered list of Manuscript id's that are part of this collection
+                #    with transaction.atomic():
+                #        # Make sure the orders are correct
+                #        for idx, manu_id in enumerate(hlist):
+                #            order = idx + 1
+                #            obj = CollectionMan.objects.filter(collection=instance, manuscript__id=manu_id).first()
+                #            if obj != None:
+                #                if obj.order != order:
+                #                    obj.order = order
+                #                    obj.save()
+                #    # See if any need to be removed
+                #    existing_manu_id = [str(x.manuscript.id) for x in CollectionMan.objects.filter(collection=instance)]
+                #    delete_id = []
+                #    for manu_id in existing_manu_id:
+                #        if not manu_id in hlist:
+                #            delete_id.append(manu_id)
+                #    if len(delete_id)>0:
+                #         CollectionMan.objects.filter(collection=instance, manuscript__id__in=delete_id).delete()
+                #else:
+                for hlistitem in self.hlistitems:
+                    # Is this the one?
+                    if hlistitem['type'] == instance.type:
+                        # THis is the type
+                        clsColl = hlistitem['clsColl']
+                        field = hlistitem['field']
+
+                        # First check if this needs to be a *NEW* collection instance
+                        if savenew == "true":
+                            profile = Profile.get_user_profile(self.request.user.username)
+                            # Yes, we need to copy the existing collection to a new one first
+                            original = instance
+                            instance = original.get_copy(owner=profile)
+
+                        # Change the redirect URL
+                        if self.redirectpage == "":
+                            this_type = ""
+                            if instance.settype == "hc": this_type = "hist"
+                            elif instance.scope == "priv": this_type = "priv"
+                            else: this_type = "publ"
+                            self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
+                        else:
+                            self.redirectpage = self.redirectpage.replace(original.id, instance.id)
+
+                        # What we have is the ordered list of Manuscript id's that are part of this collection
+                        with transaction.atomic():
+                            # Make sure the orders are correct
+                            for idx, item_id in enumerate(hlist):
+                                order = idx + 1
+                                lstQ = [Q(collection=instance)]
+                                lstQ.append(Q(**{"{}__id".format(field): item_id}))
+                                obj = clsColl.objects.filter(*lstQ).first()
+                                if obj != None:
+                                    if obj.order != order:
+                                        obj.order = order
+                                        obj.save()
+                        # See if any need to be removed
+                        existing_item_id = [str(getattr(x, field).id) for x in clsColl.objects.filter(collection=instance)]
+                        delete_id = []
+                        for item_id in existing_item_id:
+                            if not item_id in hlist:
+                                delete_id.append(item_id)
+                        if len(delete_id)>0:
+                            lstQ = [Q(collection=instance)]
+                            lstQ.append(Q(**{"{}__id__in".format(field): delete_id}))
+                            clsColl.objects.filter(*lstQ).delete()
 
             return True
         except:
@@ -7996,18 +8061,12 @@ class CollPrivDetails(CollAnyEdit):
                 # Get all non-template manuscripts part of this PD
                 manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
                 if resizable: manuscripts['gridclass'] = "resizable dragdrop"
-                # manuscripts['savebuttons'] = self.get_savebuttons(instance)
                 manuscripts['savebuttons'] = True
 
                 # Check ordering
                 qs_manu = instance.manuscript_col.all().order_by(
                         'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
                 check_order(qs_manu)
-
-                #lstQ.append(Q(collections=instance))
-                #lstQ.append(Q(mtype="man"))
-                #qs_manu = Manuscript.objects.filter(*lstQ).order_by(
-                #    'id').distinct().order_by('manuscript_col__order', 'lcity__name', 'library__name', 'idno')
 
                 for obj in qs_manu:
                     rel_item = []
@@ -8057,10 +8116,9 @@ class CollPrivDetails(CollAnyEdit):
             elif instance.type == "sermo":
                 # Get all sermons that are part of this PD
                 sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
-                if resizable: sermons['gridclass'] = "resizable"
+                if resizable: sermons['gridclass'] = "resizable dragdrop"
+                sermons['savebuttons'] = True
 
-                #qs_sermo = SermonDescr.objects.filter(collections=instance, mtype="man").order_by(
-                #    'sermondescr_col__order', 'author__name', 'siglist', 'srchincipit', 'srchexplicit')
                 qs_sermo = instance.sermondescr_col.all().order_by(
                         'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
                 check_order(qs_sermo)
@@ -8073,7 +8131,7 @@ class CollPrivDetails(CollAnyEdit):
                     # S: Order in Sermon
                     #add_one_item(rel_item, index, False, align="right")
                     #index += 1
-                    add_one_item(rel_item, obj.order, False, align="right")
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
                     # S: Author
                     add_one_item(rel_item, self.get_field_value("sermo", item, "author"), False, main=True)
@@ -8110,11 +8168,10 @@ class CollPrivDetails(CollAnyEdit):
 
             elif instance.type == "gold":
                 # Get all sermons that are part of this PD
-                goldsermons = dict(title="Gold sermons within this dataset", prefix="sermo")
-                if resizable: goldsermons['gridclass'] = "resizable"
+                goldsermons = dict(title="Gold sermons within this dataset", prefix="gold")   # prefix="sermo") 
+                if resizable: goldsermons['gridclass'] = "resizable dragdrop"
+                goldsermons['savebuttons'] = True
 
-                #qs_sermo = SermonGold.objects.filter(collections=instance).order_by(
-                #    'author__name', 'siglist', 'equal__code', 'srchincipit', 'srchexplicit')
                 qs_sermo = instance.gold_col.all().order_by(
                         'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
                 check_order(qs_sermo)
@@ -8127,7 +8184,7 @@ class CollPrivDetails(CollAnyEdit):
                     # G: Order in Gold
                     #add_one_item(rel_item, index, False, align="right")
                     #index += 1
-                    add_one_item(rel_item, obj.order, False, align="right")
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
                     # G: Author
                     add_one_item(rel_item, self.get_field_value("gold", item, "author"), False,main=True)
@@ -8164,15 +8221,13 @@ class CollPrivDetails(CollAnyEdit):
 
             elif instance.type == "super":
                 # Get all sermons that are part of this PD
-                supers = dict(title="Super sermons gold within this dataset", prefix="sermo")
-                if resizable: supers['gridclass'] = "resizable"
+                supers = dict(title="Super sermons gold within this dataset", prefix="super")   #prefix="sermo")
+                if resizable: supers['gridclass'] = "resizable dragdrop"
+                supers['savebuttons'] = True
 
-                #qs_sermo = EqualGold.objects.filter(collections=instance).order_by(
-                #    'code', 'author', 'firstsig', 'srchincipit', 'sgcount')
                 qs_sermo = instance.super_col.all().order_by(
                         'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
                 check_order(qs_sermo)
-
 
                 # Walk these collection sermons
                 for obj in qs_sermo:
@@ -8182,7 +8237,7 @@ class CollPrivDetails(CollAnyEdit):
                     # SSG: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right")
                     #index += 1
-                    add_one_item(rel_item, obj.order, False, align="right")
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
                     # SSG: Author
                     add_one_item(rel_item, self.get_field_value("super", item, "author"), False, main=True)
