@@ -71,6 +71,13 @@
               {% endif %}
               {% if filters %}
                 <span class="">
+                  <!-- Show a help button that will open a model popup -->
+                  <a class="btn btn-xs jumbo-5" role="button" 
+                     data-toggle="modal" data-target="#modal-filterhelp" title="How can I filter?">
+                    <span class="glyphicon glyphicon-question-sign"></span>
+                  </a>
+                </span>
+                <span class="">
                   <!-- NEW: use filtering instead of 'searching' -->
                   <a class="btn btn-xs jumbo-4" data-toggle="collapse" data-target="#tab_filter" role="button" title="Define your filter(s)...">
                     <span class="glyphicon glyphicon-filter"></span>
@@ -143,20 +150,34 @@
                           <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
                             <table style="width: 100%;">
                               <tr class="form-row">
-                                <td style="min-width: 130px;" valign="top">{{filter.name}}</td>
+                                <td style="min-width: 130px;" valign="top">
+                                  {{filter.name}}
+                                  {% if filter.help != "" and filter.helptext != "" %}
+                                    <a role="button" data-toggle="collapse" data-target="#basic_h_{{filter.help}}">
+                                      <span class="glyphicon glyphicon-question-sign" style="color: blue;"></span>
+                                    </a>
+                                  {% endif %}
+                                </td>
                                 <td style="width: 100%;">
-                                  {% for fitem in filter.fitems %}
-                                    {% if fitem.dbfield %}<span class="keyword-key hidden filter-dbfield">{{fitem.dbfield}}</span>{% endif %}
-                                    {% if fitem.keyS %}
-                                      <span class="filter-keys">{{fitem.keyS}}</span>
-                                      {% if fitem.has_keylist %}
-                                        <span> or select: </span>
-                                        <span class="filter-keylist">{{fitem.keyList}}</span>
+                                  {% if filter.help != "" and filter.helptext != "" %}
+                                    <div id="basic_h_{{filter.help}}" class="collapse">
+                                      {{filter.helptext|safe}}
+                                    </div>
+                                  {% endif %}
+                                  <div>
+                                    {% for fitem in filter.fitems %}
+                                      {% if fitem.dbfield %}<span class="keyword-key hidden filter-dbfield">{{fitem.dbfield}}</span>{% endif %}
+                                      {% if fitem.keyS %}
+                                        <span class="filter-keys">{{fitem.keyS}}</span>
+                                        {% if fitem.has_keylist %}
+                                          <span> or select: </span>
+                                          <span class="filter-keylist">{{fitem.keyList}}</span>
+                                        {% endif %}
+                                      {% elif fitem.has_keylist %}
+                                          <span class="filter-keylist">{{fitem.keyList}}</span>
                                       {% endif %}
-                                    {% elif fitem.has_keylist %}
-                                        <span class="filter-keylist">{{fitem.keyList}}</span>
-                                    {% endif %}
-                                  {% endfor %}
+                                    {% endfor %}
+                                  </div>
                                 </td>
                               </tr>
                             </table>
@@ -467,6 +488,36 @@
     {% endif %}
     
   </div>
+
+<!-- Modal form for filter help -->
+<div id="modal-filterhelp" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content -->
+    <div class="modal-content" style='width: 60%;' >
+      <!-- introduction header -->
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">How can I filter?</h4>
+      </div>
+
+      <!-- Body of the modal-->
+      <div class="modal-body modal-dragpoint" id="view-filterhelp">
+        <!-- This is where the actual help shows up -->
+        <div  style='height: 300px; overflow-y: scroll;'>
+          {{filterhelp_contents|safe}}
+        </div>
+      </div>
+
+      <!-- Footer with the save button -->
+      <div class="modal-footer">
+        <a class="btn jumbo-1" data-dismiss="modal" >
+          <span class="glyphicon glyphicon-ok" title="Close help">&nbsp;Close</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <script>
   ru.basic.init_events();

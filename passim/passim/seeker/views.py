@@ -68,7 +68,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm, TemplateImportForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
-    add_gold2equal, add_equal2equal, add_ssg_equal2equal, Information, Country, City, Author, Manuscript, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
@@ -553,6 +553,7 @@ def adapt_regex_incexp(value):
         value = value.replace("ae", "e").replace("e", "a?e").translate(oTranslation)
 
     return value
+
 
 # ================= STANDARD views =====================================
 
@@ -6184,6 +6185,7 @@ class SermonListView(BasicList):
     plural_name = "Sermons"
     basic_name = "sermon"
     use_team_group = True
+    template_help = "seeker/filter_help.html"
     has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
@@ -6234,7 +6236,7 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',        
+            {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
             {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
@@ -6380,6 +6382,10 @@ class SermonListView(BasicList):
         fields['mtype'] = "man"
 
         return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
 
 
 class KeywordEdit(BasicDetails):
@@ -9827,6 +9833,7 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
+    template_help = "seeker/filter_help.html"
     order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
@@ -9874,7 +9881,8 @@ class ManuscriptListView(BasicList):
             {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
             {'filter': 'daterange',     'dbfield': 'manuscript_dateranges__yearstart__gte',         'keyS': 'date_from'},
             {'filter': 'daterange',     'dbfield': 'manuscript_dateranges__yearfinish__lte',        'keyS': 'date_until'},
-            {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super',    'help': 'passimcode',
+             'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -9895,7 +9903,8 @@ class ManuscriptListView(BasicList):
             # ===================
             ]},
         {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',  'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefbk'},
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},
@@ -10165,6 +10174,10 @@ class ManuscriptListView(BasicList):
         # Make sure we only show manifestations
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
   
 
 class ManuscriptDownload(BasicPart):
@@ -10327,6 +10340,7 @@ class SermonGoldListView(BasicList):
     basic_name = "gold"
     plural_name = "Gold sermons"
     sg_name = "Gold sermon"
+    template_help = "seeker/filter_help.html"
     new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
     has_select2 = True
@@ -10361,9 +10375,9 @@ class SermonGoldListView(BasicList):
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
             {'filter': 'author',    'fkfield': 'author',            'keyS': 'authorname', 
              'keyFk': 'name',       'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
-            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature', 
+            {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature',    'help': 'signature',
              'keyFk': 'code',       'keyList': 'siglist',   'keyId': 'signatureid', 'infield': 'code' },
-            {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',          
+            {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',     'help': 'passimcode',      
              'keyFk': 'code',       'keyList': 'codelist',  'infield': 'code'},
             {'filter': 'keyword',   'fkfield': 'keywords',          
              'keyFk': 'name',       'keyList': 'kwlist',    'infield': 'name' },
@@ -10488,6 +10502,10 @@ class SermonGoldListView(BasicList):
 
         # Return the adapted stuff
         return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
 
 
 class SermonGoldSelect(BasicPart):
@@ -11410,6 +11428,7 @@ class EqualGoldListView(BasicList):
     listform = SuperSermonGoldForm
     has_select2 = True  # Check
     use_team_group = True
+    template_help = "seeker/filter_help.html"
     prefix = "ssg"
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
@@ -11458,7 +11477,8 @@ class EqualGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
-            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'code',      'dbfield': 'code',              'keyS': 'code',     'help': 'passimcode',
+             'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
              'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
             {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
@@ -11468,7 +11488,7 @@ class EqualGoldListView(BasicList):
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
-            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures', 
+            {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures',    'help': 'signature',
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -11690,6 +11710,10 @@ class EqualGoldListView(BasicList):
             fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
 
         return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
 
 
 class EqualGoldScountDownload(BasicPart):

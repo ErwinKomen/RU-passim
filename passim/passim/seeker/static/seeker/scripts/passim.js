@@ -745,7 +745,7 @@ var ru = (function ($, ru) {
             {
               name: 'gldincipits', source: loc_gldincipits, limit: 25, displayKey: "name",
               templates: {
-                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
                 suggestion: function (item) {
                   return '<div>' + item.name + '</div>';
                 }
@@ -763,7 +763,7 @@ var ru = (function ($, ru) {
             {
               name: 'srmincipits', source: loc_srmincipits, limit: 25, displayKey: "name",
               templates: {
-                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
                 suggestion: function (item) {
                   return '<div>' + item.name + '</div>';
                 }
@@ -781,7 +781,7 @@ var ru = (function ($, ru) {
             {
               name: 'gldexplicits', source: loc_gldexplicits, limit: 25, displayKey: "name",
               templates: {
-                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
                 suggestion: function (item) {
                   return '<div>' + item.name + '</div>';
                 }
@@ -799,7 +799,7 @@ var ru = (function ($, ru) {
             {
               name: 'srmexplicits', source: loc_srmexplicits, limit: 25, displayKey: "name",
               templates: {
-                empty: '<p>Use the wildcard * to mark inexact wording</p>',
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
                 suggestion: function (item) {
                   return '<div>' + item.name + '</div>';
                 }

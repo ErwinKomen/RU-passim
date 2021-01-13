@@ -71,6 +71,15 @@ class FieldChoiceAdmin(admin.ModelAdmin):
         obj.save()
 
 
+class HelpChoiceAdmin(admin.ModelAdmin):
+    list_display = ['field', 'display_name', 'help_url', 'help_html']
+    list_filter = ['field']
+    fields = ['field', 'display_name', 'searchable', 'help_url', 'help_html']
+    formfield_overrides = {
+        models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
+        }
+
+
 class CountryAdmin(admin.ModelAdmin):
     list_display = ['name', 'nameFR', 'idPaysEtab']
     
@@ -206,6 +215,7 @@ class ManuscriptAdmin(admin.ModelAdmin):
 
 # Models that serve others
 admin.site.register(FieldChoice, FieldChoiceAdmin)
+admin.site.register(HelpChoice, HelpChoiceAdmin)
 admin.site.register(NewsItem, NewsItemAdmin)
 admin.site.register(Information, InformationAdmin)
 

@@ -192,11 +192,14 @@ def adapt_search(val, regex_function=None):
     val = val.strip()
     # Double check whether we don't have a starting ^ and trailing $ yet
     if len(val) > 0:
-        val = fnmatch.translate(val)
-        if val[0] != '^':
-            val = "^{}".format(val)
-        if val[-1] != "$":
-            val = "{}$".format(val)
+        if "#" in val:
+            val = r'(^|(.*\b))' + val.replace('#', r'((\b.*)|$)')
+        else:
+            val = fnmatch.translate(val)
+            if val[0] != '^':
+                val = "^{}".format(val)
+            if val[-1] != "$":
+                val = "{}$".format(val)
 
         # Is there a regex function?
         if regex_function != None:
@@ -288,10 +291,10 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
                             s_q = None
-                            if "*" in val:
+                            if "*" in val or "#" in val:
                                 val = adapt_search(val, regex_function)
                             for fkfield in arFkField:
-                                if "*" in val:
+                                if "*" in val or "#" in val:
                                     s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
                                 else:
                                     s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
@@ -346,7 +349,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             enable_filter(filter_type, head_id)
                             if isinstance(val, int):
                                 s_q = Q(**{"{}".format(dbfield): val})
-                            elif "*" in val:
+                            elif "*" in val or "#" in val:
                                 val = adapt_search(val, regex_function)
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             elif "$" in dbfield:
@@ -508,6 +511,7 @@ class BasicList(ListView):
     bFilter = False
     basketview = False
     template_name = 'basic/basic_list.html'
+    template_help = None
     bHasParameters = False
     bUseFilter = False
     new_button = True
@@ -605,7 +609,10 @@ class BasicList(ListView):
             context['object_list'] = context['page_obj']
             self.param_list.append("page={}".format(page_num))
         # Make sure the parameter list becomes available
-        context['params'] = base64_encode( "&".join(self.param_list))
+        params = ""
+        if len(self.param_list) > 0:
+            params = base64_encode( "&".join(self.param_list))
+        context['params'] = params
 
         # Set the title of the application
         if self.plural_name =="":
@@ -717,6 +724,11 @@ class BasicList(ListView):
                             # Append the [fitem] to the [fitems]                            
                             filteritem['fitems'].append(fitem)
                             filteritem['count'] = len(filteritem['fitems'])
+                            filteritem['help'] = ""
+                            # Possibly add help
+                            if 'help' in item:
+                                filteritem['helptext'] = self.get_helptext(item['help'])
+                                filteritem['help'] = item['help']
                             # Make sure we indicate that there is a value
                             if  bHasItemValue: filteritem['hasvalue'] = True
                             break
@@ -734,6 +746,9 @@ class BasicList(ListView):
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
+
+        # Get help for filtering
+        context['filterhelp_contents'] = self.get_filterhelp()
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
@@ -821,6 +836,15 @@ class BasicList(ListView):
             # Add to the list of results
             result_list.append(result)
         return result_list
+
+    def get_helptext(self, name):
+        return ""
+
+    def get_filterhelp(self):
+        sBack = "(no help available)"
+        if self.template_help != None and self.template_help != "":
+            sBack = render_to_string(self.template_help)
+        return sBack
 
     def get_template_names(self):
         names = [ self.template_name ]
@@ -1263,7 +1287,10 @@ class BasicDetails(DetailView):
         self.qd = initial
 
         # Possibly first get params
-        context['params'] = base64_decode( "".join(self.qd.pop("params")))
+        params = ""
+        if "params" in dict(self.qd):
+            params = base64_decode( "".join(self.qd.pop("params")))
+        context['params'] = params
 
         # Now see if anything is left
         self.bHasFormInfo = (len(self.qd) > 0)
