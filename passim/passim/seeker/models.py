@@ -2384,7 +2384,7 @@ class Litref(models.Model):
             data = self.get_zotero()
         result = ""
         back = True
-        ok_types = self.ok_types # ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+        ok_types = self.ok_types
         oErr = ErrHandle()
 
         try:
@@ -2394,10 +2394,6 @@ class Litref(models.Model):
                 itemType = data['itemType']
 
                 if itemType in ok_types:
-                    # ====== Debugging =========
-                    if data['key'] == "V78MYW8F":
-                        iStop = 1
-                    # ==========================
 
                     # Initialise SHORT
                     result = ""

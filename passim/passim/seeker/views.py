@@ -7584,43 +7584,6 @@ class CollAnyEdit(BasicDetails):
                 self.newRedirect = True
 
                 # Action depends on the particular prefix
-                #if instance.type == "manu":
-                #    # First check if this needs to be a *NEW* collection instance
-                #    if savenew == "true":
-                #        profile = Profile.get_user_profile(self.request.user.username)
-                #        # Yes, we need to copy the existing collection to a new one first
-                #        original = instance
-                #        instance = original.get_copy(owner=profile)
-
-                #    # Change the redirect URL
-                #    if self.redirectpage == "":
-                #        this_type = ""
-                #        if instance.settype == "hc": this_type = "hist"
-                #        elif instance.scope == "priv": this_type = "priv"
-                #        else: this_type = "publ"
-                #        self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
-                #    else:
-                #        self.redirectpage = self.redirectpage.replace(original.id, instance.id)
-
-                #    # What we have is the ordered list of Manuscript id's that are part of this collection
-                #    with transaction.atomic():
-                #        # Make sure the orders are correct
-                #        for idx, manu_id in enumerate(hlist):
-                #            order = idx + 1
-                #            obj = CollectionMan.objects.filter(collection=instance, manuscript__id=manu_id).first()
-                #            if obj != None:
-                #                if obj.order != order:
-                #                    obj.order = order
-                #                    obj.save()
-                #    # See if any need to be removed
-                #    existing_manu_id = [str(x.manuscript.id) for x in CollectionMan.objects.filter(collection=instance)]
-                #    delete_id = []
-                #    for manu_id in existing_manu_id:
-                #        if not manu_id in hlist:
-                #            delete_id.append(manu_id)
-                #    if len(delete_id)>0:
-                #         CollectionMan.objects.filter(collection=instance, manuscript__id__in=delete_id).delete()
-                #else:
                 for hlistitem in self.hlistitems:
                     # Is this the one?
                     if hlistitem['type'] == instance.type:
