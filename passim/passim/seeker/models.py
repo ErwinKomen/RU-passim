@@ -2097,6 +2097,49 @@ class Library(models.Model):
         return oResult
 
 
+class Provenance(models.Model):
+    """The 'origin' is a location where manuscripts were originally created"""
+
+    # [1] Name of the location (can be cloister or anything)
+    name = models.CharField("Provenance location", max_length=LONG_STRING)
+    # [0-1] Optional: LOCATION element this refers to
+    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Notes on this provenance", blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    def find_or_create(sName,  city=None, country=None, note=None):
+        """Find a location or create it."""
+
+        lstQ = []
+        obj_loc = Location.get_location(city=city, country=country)
+        lstQ.append(Q(name__iexact=sName))
+        if obj_loc != None:
+            lstQ.append(Q(location=obj_loc))
+        if note!=None: lstQ.append(Q(note__iexact=note))
+        qs = Provenance.objects.filter(*lstQ)
+        if qs.count() == 0:
+            # Create one
+            hit = Provenance(name=sName)
+            if note!=None: hit.note=note
+            if obj_loc != None: hit.location = obj_loc
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
+
 class Origin(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 
@@ -2105,13 +2148,6 @@ class Origin(models.Model):
 
     # [0-1] Optional: LOCATION element this refers to
     location = models.ForeignKey(Location, null=True, related_name="location_origins")
-
-    # ============== EXTINCT ===================================
-    ## [0-1] Optional city
-    #city = models.ForeignKey(City, null=True, related_name="city_origins")
-    ## [0-1] Name of the country this is in
-    #country = models.ForeignKey(Country, null=True, related_name="country_origins")
-    # ==========================================================
 
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this origin", blank=True, null=True)
@@ -2132,57 +2168,6 @@ class Origin(models.Model):
         if qs.count() == 0:
             # Create one
             hit = Origin(name=sName)
-            if note!=None: hit.note=note
-            if obj_loc != None: hit.location = obj_loc
-            hit.save()
-        else:
-            hit = qs[0]
-        # Return what we found or created
-        return hit
-
-    def get_location(self):
-        if self.location:
-            sBack = self.location.name
-        else:
-            sBack = "-"
-
-        return sBack
-
-
-class Provenance(models.Model):
-    """The 'origin' is a location where manuscripts were originally created"""
-
-    # [1] Name of the location (can be cloister or anything)
-    name = models.CharField("Provenance location", max_length=LONG_STRING)
-    # [0-1] Optional: LOCATION element this refers to
-    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
-
-    # ============== EXTINCT ===================================
-    ## [0-1] Optional city
-    #city = models.ForeignKey(City, null=True, related_name="city_provenances")
-    ## [0-1] Name of the country this is in
-    #country = models.ForeignKey(Country, null=True, related_name="country_provenances")
-    # ==========================================================
-
-    # [0-1] Further details are perhaps required too
-    note = models.TextField("Notes on this provenance", blank=True, null=True)
-
-    def __str__(self):
-        return self.name
-
-    def find_or_create(sName,  city=None, country=None, note=None):
-        """Find a location or create it."""
-
-        lstQ = []
-        obj_loc = Location.get_location(city=city, country=country)
-        lstQ.append(Q(name__iexact=sName))
-        if obj_loc != None:
-            lstQ.append(Q(location=obj_loc))
-        if note!=None: lstQ.append(Q(note__iexact=note))
-        qs = Provenance.objects.filter(*lstQ)
-        if qs.count() == 0:
-            # Create one
-            hit = Provenance(name=sName)
             if note!=None: hit.note=note
             if obj_loc != None: hit.location = obj_loc
             hit.save()
