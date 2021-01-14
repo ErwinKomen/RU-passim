@@ -511,7 +511,7 @@ class BasicList(ListView):
     bFilter = False
     basketview = False
     template_name = 'basic/basic_list.html'
-    template_help = None
+    template_help = 'basic/filter_help.html'
     bHasParameters = False
     bUseFilter = False
     new_button = True

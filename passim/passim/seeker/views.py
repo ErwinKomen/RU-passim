@@ -2270,13 +2270,16 @@ def do_create_pdf_manu(request):
         origin = None if obj.origin == None else obj.origin.name
         
         # Retrieve all provenances for each manuscript
-        qs_prov = obj.manuscripts_provenances.all()
+        # qs_prov = obj.manuscripts_provenances.all()
+        # Issue #289:
+        qs_prov = obj.manuprovenances.all()
         
         # Iterate through the queryset, place name and location 
         # for each provenance together 
         prov_texts = []
         for prov in qs_prov:
-            prov = prov.provenance
+            # prov = prov.provenance
+            # Issue #289:
             prov_text = prov.name
             if prov.location:
                 prov_text = "{} ({})".format(prov_text, prov.location.name)
@@ -6789,14 +6792,20 @@ class ProvenanceEdit(BasicDetails):
 
     def get_manuscripts(self, instance):
         # find the shelfmark
-        lManu = []
-        for obj in instance.manuscripts_provenances.all():
-            # Add the shelfmark of this one
-            manu = obj.manuscript
+        manu = instance.manu
+        if manu != None:
+            # Get the URL to the manu details
             url = reverse("manuscript_details", kwargs = {'pk': manu.id})
             shelfmark = manu.idno[:20]
-            lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-        sBack = ", ".join(lManu)
+            sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        #lManu = []
+        #for obj in instance.manuscripts_provenances.all():
+        #    # Add the shelfmark of this one
+        #    manu = obj.manuscript
+        #    url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+        #    shelfmark = manu.idno[:20]
+        #    lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+        #sBack = ", ".join(lManu)
         return sBack
 
 
@@ -6813,13 +6822,13 @@ class ProvenanceListView(BasicList):
     prefix = "prov"
     has_select2 = True
     new_button = False  # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['location__name', 'name', 'note', '']
+    order_cols = ['location__name', 'name', 'note', 'manu__idno']
     order_default = order_cols
     order_heads = [
         {'name': 'Location',    'order': 'o=1', 'type': 'str', 'custom': 'location', 'linkdetails': True},
-        {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field':  'name', 'main': True, 'linkdetails': True},
         {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
-        {'name': 'Manuscripts', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
         ]
     filters = [ {"name": "Name",        "id": "filter_name",    "enabled": False},
                 {"name": "Location",    "id": "filter_location","enabled": False},
@@ -6829,23 +6838,68 @@ class ProvenanceListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'name',      'dbfield': 'name', 'keyS': 'name'},
             {'filter': 'location',  'fkfield': 'location', 'keyS': 'location_ta', 'keyId': 'location', 'keyFk': "name", 'keyList': 'locationlist', 'infield': 'id' },
-            {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            # OLD: {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            # Issue #289
+            {'filter': 'manuid',    'fkfield': 'manu', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
             ]}
         ]
+
+    def initializations(self):
+        """Perform some initializations"""
+
+        oErr = ErrHandle()
+        try:
+            # Check if otype has already been taken over
+            manuprov_m2o = Information.get_kvalue("manuprov_m2o")
+            if manuprov_m2o == None or manuprov_m2o != "done":
+                prov_changes = 0
+                prov_added = 0
+                # Get all the manuscripts
+                for manu in Manuscript.objects.all():
+                    # Treat the provenances for this manuscript
+                    for provenance in manu.provenances.all():
+                        # Check if this can be used
+                        if provenance.manu_id == None or provenance.manu_id == 0 or provenance.manu == None or provenance.manu.id == 0:
+                            # We can use this one
+                            provenance.manu = manu
+                            prov_changes += 1
+                        else:
+                            # Need to create a new provenance
+                            provenance = Provenance.objects.create(
+                                manu=manu, name=provenance.name, location=provenance.location, 
+                                note=provenance.note)
+                            prov_added += 1
+                        # Make sure to save the result
+                        provenance.save() 
+                # Success
+                oErr.Status("manuprov_m2o: {} changes, {} additions".format(prov_changes, prov_added))
+                Information.set_kvalue("manuprov_m2o", "done")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProvenanceListView/initializations")
+
+        return None
 
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
         if custom == "manuscript":
             # find the shelfmark
-            lManu = []
-            for obj in instance.manuscripts_provenances.all():
-                # Add the shelfmark of this one
-                manu = obj.manuscript
+            manu = instance.manu
+            if manu != None:
+                # Get the URL to the manu details
                 url = reverse("manuscript_details", kwargs = {'pk': manu.id})
                 shelfmark = manu.idno[:20]
-                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-            sBack = ", ".join(lManu)
+                sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+            ## Old: multiple connections possible
+            #lManu = []
+            #for obj in instance.manuscripts_provenances.all():
+            #    # Add the shelfmark of this one
+            #    manu = obj.manuscript
+            #    url = reverse("manuscript_details", kwargs = {'pk': manu.id})
+            #    shelfmark = manu.idno[:20]
+            #    lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+            #sBack = ", ".join(lManu)
         elif custom == "location":
             sBack = ""
             if instance.location:

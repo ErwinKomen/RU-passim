@@ -2097,49 +2097,6 @@ class Library(models.Model):
         return oResult
 
 
-class Provenance(models.Model):
-    """The 'origin' is a location where manuscripts were originally created"""
-
-    # [1] Name of the location (can be cloister or anything)
-    name = models.CharField("Provenance location", max_length=LONG_STRING)
-    # [0-1] Optional: LOCATION element this refers to
-    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
-    # [0-1] Further details are perhaps required too
-    note = models.TextField("Notes on this provenance", blank=True, null=True)
-
-    def __str__(self):
-        return self.name
-
-    def find_or_create(sName,  city=None, country=None, note=None):
-        """Find a location or create it."""
-
-        lstQ = []
-        obj_loc = Location.get_location(city=city, country=country)
-        lstQ.append(Q(name__iexact=sName))
-        if obj_loc != None:
-            lstQ.append(Q(location=obj_loc))
-        if note!=None: lstQ.append(Q(note__iexact=note))
-        qs = Provenance.objects.filter(*lstQ)
-        if qs.count() == 0:
-            # Create one
-            hit = Provenance(name=sName)
-            if note!=None: hit.note=note
-            if obj_loc != None: hit.location = obj_loc
-            hit.save()
-        else:
-            hit = qs[0]
-        # Return what we found or created
-        return hit
-
-    def get_location(self):
-        if self.location:
-            sBack = self.location.name
-        else:
-            sBack = "-"
-
-        return sBack
-
-
 class Origin(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 
@@ -3358,16 +3315,19 @@ class Manuscript(models.Model):
                 for pname in provenance_names:
                     pname = pname.strip()
                     # Try find this provenance
-                    provenance = Provenance.objects.filter(name__iexact=pname).first()
-                    if provenance == None:
-                        provenance = Provenance.objects.filter(location__name__iexact=pname).first()
-                    if provenance == None:
+                    prov_found = Provenance.objects.filter(name__iexact=pname).first()
+                    if prov_found == None:
+                        prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
+                    if prov_found == None:
                         # Indicate that we didn't find it in the notes
                         intro = ""
                         if self.notes != "": intro = "{}. ".format(self.notes)
                         self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
                         self.save()
                     else:
+                        # Make a copy of prov_found
+                        provenance = Provenance.objects.create(
+                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
                         # Make link between provenance and manuscript
                         ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
                 # Ready
@@ -3681,7 +3641,8 @@ class Manuscript(models.Model):
     def get_provenance_markdown(self, plain=False):
         lHtml = []
         # Visit all literature references
-        for prov in self.provenances.all().order_by('name'):
+        # Issue #289: this was self.provenances.all()
+        for prov in self.manuprovenances.all().order_by('name'):
             # Get the URL
             url = reverse("provenance_details", kwargs = {'pk': prov.id})
             if prov.location == None:
@@ -4772,6 +4733,52 @@ class Feast(models.Model):
         sBack = ""
         if self.feastdate != None and self.feastdate != "":
             sBack = self.feastdate
+        return sBack
+
+
+class Provenance(models.Model):
+    """The 'origin' is a location where manuscripts were originally created"""
+
+    # [1] Name of the location (can be cloister or anything)
+    name = models.CharField("Provenance location", max_length=LONG_STRING)
+    # [0-1] Optional: LOCATION element this refers to
+    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Notes on this provenance", blank=True, null=True)
+
+    # [1] One provenance belongs to exactly one manuscript
+    manu = models.ForeignKey(Manuscript, default=0, related_name="manuprovenances")
+
+    def __str__(self):
+        return self.name
+
+    def find_or_create(sName,  city=None, country=None, note=None):
+        """Find a location or create it."""
+
+        lstQ = []
+        obj_loc = Location.get_location(city=city, country=country)
+        lstQ.append(Q(name__iexact=sName))
+        if obj_loc != None:
+            lstQ.append(Q(location=obj_loc))
+        if note!=None: lstQ.append(Q(note__iexact=note))
+        qs = Provenance.objects.filter(*lstQ)
+        if qs.count() == 0:
+            # Create one
+            hit = Provenance(name=sName)
+            if note!=None: hit.note=note
+            if obj_loc != None: hit.location = obj_loc
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
         return sBack
 
 

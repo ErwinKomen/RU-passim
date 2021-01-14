@@ -625,7 +625,8 @@ class ProvenanceWidget(ModelSelect2MultipleWidget):
             if self.manu == None:
                 qs = Provenance.objects.none()
             else:
-                qs = self.manu.provenances.all()
+                # qs = self.manu.provenances.all()
+                qs = self.manu.manuprovenances.all()
         else:
             qs = Provenance.objects.all().order_by('name').distinct()
         return qs        
@@ -3172,7 +3173,9 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
-                self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
+                # self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
+                # issue #289
+                self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
                 self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
 
