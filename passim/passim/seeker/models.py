@@ -43,6 +43,8 @@ LONG_STRING=255
 MAX_TEXT_LEN = 200
 ABBR_LENGTH = 5
 PASSIM_CODE_LENGTH = 20
+VISIT_MAX = 1400
+VISIT_REDUCE = 1000
 
 COLLECTION_SCOPE = "seeker.colscope"
 COLLECTION_TYPE = "seeker.coltype" 
@@ -1570,6 +1572,16 @@ class Visit(models.Model):
 
             # Process this visit in the profile
             profile.add_visit(name, path, is_menu, **kwargs)
+            # Possibly throw away an overflow of visit logs?
+            user_visit_count = Visit.objects.filter(user=user).count()
+            if user_visit_count > VISIT_MAX:
+                # Check how many to remove
+                removing = user_visit_count - VISIT_REDUCE
+                # Find the ID of the first one to remove
+                id_list = Visit.objects.filter(user=user).order_by('id').values('id')
+                below_id = id_list[removing]['id']
+                # Remove them
+                Visit.objects.filter(user=user, id__lte=below_id).delete()
             # Return success
             result = True
         except:
