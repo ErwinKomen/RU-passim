@@ -472,13 +472,14 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     return qs, order_heads, colnum
 
-def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=None, nowrap=True, main=None, draggable=None):
     oAdd = dict(value=value)
     if resizable: oAdd['initial'] = 'small'
     if title != None: oAdd['title'] = title
     if align != None: oAdd['align'] = align
     if link != None: oAdd['link'] = link
     if main != None: oAdd['main'] = main
+    if nowrap != None: oAdd['nowrap'] = nowrap
     if draggable != None: oAdd['draggable'] = draggable
     rel_item.append(oAdd)
     return True
@@ -1034,6 +1035,7 @@ class BasicDetails(DetailView):
     do_not_save = False
     no_delete = False
     afterdelurl = None
+    listview = None
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
@@ -1252,11 +1254,14 @@ class BasicDetails(DetailView):
             else:
                 self.basic_name = "{}{}".format(self.basic_name_prefix, self.prefix)
         basic_name = self.basic_name
-        listviewname = "{}_list".format(basic_name)
-        try:
-            context['listview'] = reverse(listviewname)
-        except:
-            context['listview'] = reverse('home')
+        if self.listview != None:
+            context['listview'] = self.listview
+        else:
+            listviewname = "{}_list".format(basic_name)
+            try:
+                context['listview'] = reverse(listviewname)
+            except:
+                context['listview'] = reverse('home')
 
         if self.basic_add:
             basic_add = reverse(self.basic_add)

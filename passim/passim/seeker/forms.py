@@ -611,6 +611,29 @@ class ProfileOneWidget(ModelSelect2Widget):
         return Profile.objects.all().order_by('user__username').distinct()
 
 
+class ProvenanceOneWidget(ModelSelect2Widget):
+    model = Provenance
+    search_fields = [ 'name__icontains', 'location__name__icontains' ]
+
+    def label_from_instance(self, obj):
+        sLabel = ""
+        if obj.name == "":
+            if obj.location == None:
+                sLabel = "(undetermined)"
+            else:
+                sLabel = obj.location.name
+        else:
+            if obj.location == None:
+                sLabel = obj.name
+            else:
+                sLabel = "{}: {}".format(obj.name, obj.location.name)
+        return sLabel
+
+    def get_queryset(self):
+        qs = Provenance.objects.all().order_by('name', 'location__name').distinct()
+        return qs        
+
+
 class ProvenanceWidget(ModelSelect2MultipleWidget):
     model = Provenance
     search_fields = [ 'name__icontains' ]
@@ -626,9 +649,56 @@ class ProvenanceWidget(ModelSelect2MultipleWidget):
                 qs = Provenance.objects.none()
             else:
                 # qs = self.manu.provenances.all()
-                qs = self.manu.manuprovenances.all()
+                qs = self.manu.manuprovenances.all().order_by('name')
         else:
             qs = Provenance.objects.all().order_by('name').distinct()
+        return qs        
+
+
+class ProvenanceManWidget(ModelSelect2MultipleWidget):
+    model = ProvenanceMan
+    search_fields = [ 'provenance__name__icontains', 'provenance__location__name__icontains' ]
+    addonly = False
+    manu = None
+
+    def label_from_instance(self, obj):
+        oErr = ErrHandle()
+        sLabel = ""
+        try:
+            prov = obj.provenance
+            if prov.name == "":
+                if prov.location == None:
+                    sLabel = "(undetermined)"
+                else:
+                    sLabel = prov.location.name
+            else:
+                if prov.location == None:
+                    sLabel = prov.name
+                else:
+                    sLabel = "{}: {}".format(prov.name, prov.location.name)
+            sNote = obj.note
+            if sNote != None and sNote != "":
+                sLabel = "{} ({}...)".format(sLabel, sNote[:30])
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProvenanceManWidget/label_from_instance")
+        return sLabel
+
+    def get_queryset(self):
+        qs = ProvenanceMan.objects.none()
+        oErr = ErrHandle()
+        try:
+            if self.addonly:
+                if self.manu == None:
+                    qs = ProvenanceMan.objects.none()
+                else:
+                    # qs = self.manu.provenances.all()
+                    qs = self.manu.manuscripts_provenances.all().order_by('provenance__name', 'provenance__location__name')
+            else:
+                qs = ProvenanceMan.objects.all().order_by('provenance__name', 'provenance__location__name') # .distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProvenanceManWidget/get_queryset")
         return qs        
 
 
@@ -1432,11 +1502,11 @@ class ProvenanceForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Provenance
-        fields = ['name', 'location', 'note']
+        fields = ['name', 'location']   # , 'note'
         widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching', 'placeholder': 'Name for this provenance'}),
                  'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
-                 'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
-                                                      'class': 'searching', 'placeholder': 'Notes on this provenance...'})
+                 #'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                 #                                     'class': 'searching', 'placeholder': 'Notes on this provenance...'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -1446,11 +1516,35 @@ class ProvenanceForm(forms.ModelForm):
         # Some fields are not required
         self.fields['name'].required = False
         self.fields['location'].required = False
-        self.fields['note'].required = False
+        # self.fields['note'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
         self.fields['locationlist'].queryset = Location.objects.all().order_by('loctype__level', 'name')
         self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            
+
+class ProvenanceManForm(forms.ModelForm):
+    """ProvenanceMan item"""
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ProvenanceMan
+        fields = ['note']
+        widgets={'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                      'class': 'searching', 'placeholder': 'Notes on this provenance...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ProvenanceManForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['note'].required = False
 
         # Get the instance
         if 'instance' in kwargs:
@@ -2747,14 +2841,16 @@ class SermonGoldLitrefForm(forms.ModelForm):
 
 
 class ManuscriptProvForm(forms.ModelForm):
-    name = forms.CharField(label=_("Name"), required=False, help_text="editable",
-                           widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
+    prov_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget = ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #name = forms.CharField(label=_("Name"), required=False, help_text="editable",
+    #                       widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
     note = forms.CharField(label=_("Note"), required=False, help_text="editable",
                            widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
-    location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                           widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
-    location_ta = forms.CharField(label=_("Location"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
+    #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+    #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #location_ta = forms.CharField(label=_("Location"), required=False, 
+    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:
@@ -2762,17 +2858,21 @@ class ManuscriptProvForm(forms.ModelForm):
 
         model = ProvenanceMan
         fields = ['provenance', 'manuscript']
+        widgets={'provenance':     ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}),
+ 
+                 }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ManuscriptProvForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
-        self.fields['name'].required = False
+        #self.fields['name'].required = False
         self.fields['note'].required = False
         self.fields['provenance'].required = False
-        self.fields['location'].required = False
-        self.fields['location_ta'].required = False
-        self.fields['location'].queryset = Location.objects.all().order_by('name')
+        #self.fields['location'].required = False
+        #self.fields['location_ta'].required = False
+        #self.fields['location'].queryset = Location.objects.all().order_by('name')
+        self.fields['prov_new'].queryset = Provenance.objects.all().order_by('name', 'location__name')
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
@@ -3055,8 +3155,10 @@ class ManuscriptForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
-    provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProvenanceWidget(attrs={'data-placeholder': 'Select multiple provenances...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=ProvenanceWidget(attrs={'data-placeholder': 'Select multiple provenances...', 'style': 'width: 100%;', 'class': 'searching'}))
+    mprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -3064,7 +3166,7 @@ class ManuscriptForm(PassimModelForm):
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
-                  'ukwlist', 'kwlist', 'listlist', 'collist', 'provlist', 'extlist', 'datelist']
+                  'ukwlist', 'kwlist', 'listlist', 'collist', 'mprovlist', 'extlist', 'datelist']
     exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
@@ -3131,11 +3233,13 @@ class ManuscriptForm(PassimModelForm):
             self.fields['origone'].queryset = Origin.objects.all().order_by('name')
 
             # Some lists need to be initialized to NONE:
-            self.fields['provlist'].queryset = Provenance.objects.none()
+            #self.fields['provlist'].queryset = Provenance.objects.none()
+            self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
             self.fields['datelist'].queryset = Daterange.objects.none()
 
-            self.fields['provlist'].widget.addonly = True
+           # self.fields['provlist'].widget.addonly = True
+            self.fields['mprovlist'].widget.addonly = True
             self.fields['extlist'].widget.addonly = True
             self.fields['datelist'].widget.addonly = True
         
@@ -3173,18 +3277,21 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
-                # self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
-                # issue #289
-                self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
+                #self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
+                # issue #289 - below was innovation, but that is now turned back. Above is current
+                # self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
+                self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
                 self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
-                self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
+                #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
+                self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
                 self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
-                self.fields['provlist'].widget.manu = instance
+                #self.fields['provlist'].widget.manu = instance
+                self.fields['mprovlist'].widget.manu = instance
 
         except:
             msg = oErr.get_error_message()

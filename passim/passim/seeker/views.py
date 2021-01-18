@@ -66,7 +66,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
-    SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, TemplateForm, TemplateImportForm
+    SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
+    TemplateForm, TemplateImportForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -2270,16 +2271,16 @@ def do_create_pdf_manu(request):
         origin = None if obj.origin == None else obj.origin.name
         
         # Retrieve all provenances for each manuscript
-        # qs_prov = obj.manuscripts_provenances.all()
-        # Issue #289:
-        qs_prov = obj.manuprovenances.all()
+        qs_prov = obj.manuscripts_provenances.all()
+        # Issue #289: innovation below turned back to the above
+        # qs_prov = obj.manuprovenances.all()
         
         # Iterate through the queryset, place name and location 
         # for each provenance together 
         prov_texts = []
         for prov in qs_prov:
-            # prov = prov.provenance
-            # Issue #289:
+            prov = prov.provenance
+            # Issue #289: innovation turned back to the above
             prov_text = prov.name
             if prov.location:
                 prov_text = "{} ({})".format(prov_text, prov.location.name)
@@ -6756,7 +6757,7 @@ class UserKeywordListView(BasicList):
 
 
 class ProvenanceEdit(BasicDetails):
-    """The details of one 'user-keyword': one that has been linked by a user"""
+    """The details of one 'provenance'"""
 
     model = Provenance
     mForm = ProvenanceForm
@@ -6773,8 +6774,10 @@ class ProvenanceEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",         'value': instance.name,             'field_key': "name"},
             {'type': 'plain', 'label': "Location:",     'value': instance.get_location(),   'field_key': 'location'     },
-            {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
-            {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
+            # Notes must now appear in the list of related manuscripts
+            # {'type': 'line',  'label': "Note:",         'value': instance.note,             'field_key': 'note'},
+            # Note issue #289: the manuscripts are now shown in the listview below (see ProvenanceDetails)
+            # {'type': 'plain', 'label': "Manuscripts:",  'value': self.get_manuscripts(instance)}
             ]
 
         # Signal that we have select2
@@ -6812,6 +6815,63 @@ class ProvenanceEdit(BasicDetails):
 class ProvenanceDetails(ProvenanceEdit):
     """Like Provenance Edit, but then html output"""
     rtype = "html"
+
+    def add_to_context(self, context, instance):
+        # First get the 'standard' context
+        context = super(ProvenanceDetails, self).add_to_context(context, instance)
+
+        context['sections'] = []
+
+        # Lists of related objects
+        related_objects = []
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        # List of Manuscripts that use this provenance
+        sermons = dict(title="Manuscripts with this provenance", prefix="mprov")
+        if resizable: sermons['gridclass'] = "resizable"
+
+        rel_list =[]
+        qs = instance.manuscripts_provenances.all().order_by('manuscript__idno')
+        for item in qs:
+            manu = item.manuscript
+            url = reverse('manuscript_details', kwargs={'pk': manu.id})
+            url_pm = reverse('provenanceman_details', kwargs={'pk': item.id})
+            rel_item = []
+
+            # S: Order number for this manuscript
+            add_rel_item(rel_item, index, False, align="right")
+            index += 1
+
+            # Manuscript
+            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
+            add_rel_item(rel_item, manu_full, False, main=False, link=url)
+
+            # Note for this provenance
+            note = "(none)" if item.note == None or item.note == "" else item.note
+            add_rel_item(rel_item, note, False, nowrap=False, main=True, link=url_pm,
+                         title="Note for this provenance-manuscript relation")
+
+            # Add this line to the list
+            rel_list.append(dict(id=item.id, cols=rel_item))
+
+        sermons['rel_list'] = rel_list
+
+        sermons['columns'] = [
+            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Note</span>{}'.format(sort_start, sort_end)
+            ]
+        related_objects.append(sermons)
+
+        # Add all related objects to the context
+        context['related_objects'] = related_objects
+
+        # Return the context we have made
+        return context
     
 
 class ProvenanceListView(BasicList):
@@ -6821,13 +6881,15 @@ class ProvenanceListView(BasicList):
     listform = ProvenanceForm
     prefix = "prov"
     has_select2 = True
-    new_button = False  # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['location__name', 'name', 'note', 'manu__idno']
+    new_button = True   # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
+                        # Issue #289: provenances are to be added *HERE*
+    order_cols = ['location__name', 'name']
     order_default = order_cols
     order_heads = [
         {'name': 'Location',    'order': 'o=1', 'type': 'str', 'custom': 'location', 'linkdetails': True},
         {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field':  'name', 'main': True, 'linkdetails': True},
-        {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
+        # Issue #289: remove this note from here
+        # {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
         ]
     filters = [ {"name": "Name",        "id": "filter_name",    "enabled": False},
@@ -6838,9 +6900,9 @@ class ProvenanceListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'name',      'dbfield': 'name', 'keyS': 'name'},
             {'filter': 'location',  'fkfield': 'location', 'keyS': 'location_ta', 'keyId': 'location', 'keyFk': "name", 'keyList': 'locationlist', 'infield': 'id' },
-            # OLD: {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
-            # Issue #289
-            {'filter': 'manuid',    'fkfield': 'manu', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            {'filter': 'manuid',    'fkfield': 'manuscripts_provenances__manuscript', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
+            # Issue #289: innovation below turned back to the original above
+            # {'filter': 'manuid',    'fkfield': 'manu', 'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id' }
             ]}
         ]
 
@@ -6849,31 +6911,69 @@ class ProvenanceListView(BasicList):
 
         oErr = ErrHandle()
         try:
-            # Check if otype has already been taken over
-            manuprov_m2o = Information.get_kvalue("manuprov_m2o")
-            if manuprov_m2o == None or manuprov_m2o != "done":
+            # OUTDATED: Check if otype has already been taken over
+            #manuprov_m2o = Information.get_kvalue("manuprov_m2o")
+            #if manuprov_m2o == None or manuprov_m2o != "done":
+            #    prov_changes = 0
+            #    prov_added = 0
+            #    # Get all the manuscripts
+            #    for manu in Manuscript.objects.all():
+            #        # Treat the provenances for this manuscript
+            #        for provenance in manu.provenances.all():
+            #            # Check if this can be used
+            #            if provenance.manu_id == None or provenance.manu_id == 0 or provenance.manu == None or provenance.manu.id == 0:
+            #                # We can use this one
+            #                provenance.manu = manu
+            #                prov_changes += 1
+            #            else:
+            #                # Need to create a new provenance
+            #                provenance = Provenance.objects.create(
+            #                    manu=manu, name=provenance.name, location=provenance.location, 
+            #                    note=provenance.note)
+            #                prov_added += 1
+            #            # Make sure to save the result
+            #            provenance.save() 
+            #    # Success
+            #    oErr.Status("manuprov_m2o: {} changes, {} additions".format(prov_changes, prov_added))
+            #    Information.set_kvalue("manuprov_m2o", "done")
+
+            # Issue #289: back to m2m connection
+            manuprov_m2m = Information.get_kvalue("manuprov_m2m")
+            if manuprov_m2m == None or manuprov_m2m != "done":
                 prov_changes = 0
                 prov_added = 0
+                # Keep a list of provenance id's that may be kept
+                keep_id = []
+
+                # Remove all previous ProvenanceMan connections
+                ProvenanceMan.objects.all().delete()
                 # Get all the manuscripts
                 for manu in Manuscript.objects.all():
-                    # Treat the provenances for this manuscript
-                    for provenance in manu.provenances.all():
-                        # Check if this can be used
-                        if provenance.manu_id == None or provenance.manu_id == 0 or provenance.manu == None or provenance.manu.id == 0:
-                            # We can use this one
-                            provenance.manu = manu
-                            prov_changes += 1
-                        else:
-                            # Need to create a new provenance
-                            provenance = Provenance.objects.create(
-                                manu=manu, name=provenance.name, location=provenance.location, 
-                                note=provenance.note)
-                            prov_added += 1
-                        # Make sure to save the result
-                        provenance.save() 
+                    # Treat all the M2O provenances for this manuscript
+                    for prov in manu.manuprovenances.all():
+                        # Get the *name* and the *loc* for this prov
+                        name = prov.name
+                        loc = prov.location
+                        note = prov.note
+                        # Get the very *first* provenance with name/loc
+                        firstprov = Provenance.objects.filter(name__iexact=name, location=loc).first()
+                        if firstprov == None:
+                            # Create one
+                            firstprov = Provenance.objects.create(name=name, location=loc)
+                        keep_id.append(firstprov.id)
+                        # Add the link
+                        link = ProvenanceMan.objects.create(manuscript=manu, provenance=firstprov, note=note)
+                # Walk all provenances to remove the unused ones
+                delete_id = []
+                for prov in Provenance.objects.all().values('id'):
+                    if not prov['id'] in keep_id:
+                        delete_id.append(prov['id'])
+                oErr.Status("Deleting provenances: {}".format(len(delete_id)))
+                Provenance.objects.filter(id__in=delete_id).delete()
+
                 # Success
-                oErr.Status("manuprov_m2o: {} changes, {} additions".format(prov_changes, prov_added))
-                Information.set_kvalue("manuprov_m2o", "done")
+                oErr.Status("manuprov_m2m: {} changes, {} additions".format(prov_changes, prov_added))
+                Information.set_kvalue("manuprov_m2m", "done")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProvenanceListView/initializations")
@@ -6884,30 +6984,32 @@ class ProvenanceListView(BasicList):
         sBack = ""
         sTitle = ""
         if custom == "manuscript":
-            # find the shelfmark
-            manu = instance.manu
-            if manu != None:
-                # Get the URL to the manu details
+            # Multiple connections possible
+            # One provenance may be connected to any number of manuscripts!
+            lManu = []
+            for obj in instance.manuscripts_provenances.all():
+                # Add the shelfmark of this one
+                manu = obj.manuscript
                 url = reverse("manuscript_details", kwargs = {'pk': manu.id})
                 shelfmark = manu.idno[:20]
-                sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
-            ## Old: multiple connections possible
-            #lManu = []
-            #for obj in instance.manuscripts_provenances.all():
-            #    # Add the shelfmark of this one
-            #    manu = obj.manuscript
+                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+            sBack = ", ".join(lManu)
+            # Issue #289: the innovation below is turned back to the original above
+            ## find the shelfmark
+            #manu = instance.manu
+            #if manu != None:
+            #    # Get the URL to the manu details
             #    url = reverse("manuscript_details", kwargs = {'pk': manu.id})
             #    shelfmark = manu.idno[:20]
-            #    lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-            #sBack = ", ".join(lManu)
+            #    sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
         elif custom == "location":
             sBack = ""
             if instance.location:
                 sBack = instance.location.name
-        elif custom == "note":
-            sBack = ""
-            if instance.note:
-                sBack = instance.note[:40]
+        #elif custom == "note":
+        #    sBack = ""
+        #    if instance.note:
+        #        sBack = instance.note[:40]
         return sBack, sTitle
 
     def adapt_search(self, fields):
@@ -6916,6 +7018,47 @@ class ProvenanceListView(BasicList):
         x = fields
         return fields, lstExclude, qAlternative
 
+
+class ProvenanceManEdit(BasicDetails):
+    """The details of one 'provenance'"""
+
+    model = ProvenanceMan
+    mForm = ProvenanceManForm
+    prefix = 'mprov'
+    title = "ManuscriptProvenance"
+    rtype = "json"
+    history_button = False # True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Provenance:",   'value': instance.get_provenance()},
+            {'type': 'plain', 'label': "Note:",         'value': instance.note,   'field_key': 'note'     },
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        context['listview'] = reverse("manuscript_details", kwargs={'pk': instance.manuscript.id})
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class ProvenanceManDetails(ProvenanceManEdit):
+    """Like ProvenanceMan Edit, but then html output"""
+    rtype = "html"
+        
 
 class BibRangeEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
@@ -9305,7 +9448,7 @@ class ManuscriptEdit(BasicDetails):
                         #'kwlist',
                         #'CollectionMan', 'collist',
                         'LitrefMan', 'litlist',
-                        'ProvenanceMan', 'provlist'
+                        'ProvenanceMan', 'mprovlist'
                         'ManuscriptExt', 'extlist']
     
     def add_to_context(self, context, instance):
@@ -9354,8 +9497,10 @@ class ManuscriptEdit(BasicDetails):
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
                     {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
-                    {'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
-                        'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] }
+                    {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
+                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
+                    #{'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
+                    #    'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] }
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -9450,6 +9595,13 @@ class ManuscriptEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_provenance_markdown(self, instance):
+        """Calculate a collapsible table view of the provenances for this manuscript, for Manu details view"""
+
+        context = dict(manu=instance)
+        sBack = render_to_string("seeker/manu_provs.html", context, self.request)
+        return sBack
+
     def process_formset(self, prefix, request, formset):
         errors = []
         bResult = True
@@ -9508,18 +9660,27 @@ class ManuscriptEdit(BasicDetails):
                                 form.instance.pages = newpages
                     # Note: it will get saved with form.save()
                 elif prefix == "mprov":
-                    name = cleaned.get("name")
+                    # ========= OLD (issue #289) =======
+                    #name = cleaned.get("name")
+                    #note = cleaned.get("note")
+                    #location = cleaned.get("location")
+                    #prov_new = cleaned.get("prov_new")
+                    #if name:
+                    #    obj = Provenance.objects.filter(name=name, note=note, location=location).first()
+                    #    if obj == None:
+                    #        obj = Provenance.objects.create(name=name)
+                    #        if note: obj.note = note
+                    #        if location: obj.location = location
+                    #        obj.save()
+                    #    if obj:
+                    #        form.instance.provenance = obj
+                    # New method, issue #289 (last part)
                     note = cleaned.get("note")
-                    location = cleaned.get("location")
-                    if name:
-                        obj = Provenance.objects.filter(name=name, note=note, location=location).first()
-                        if obj == None:
-                            obj = Provenance.objects.create(name=name)
-                            if note: obj.note = note
-                            if location: obj.location = location
-                            obj.save()
-                        if obj:
-                            form.instance.provenance = obj
+                    prov_new = cleaned.get("prov_new")
+                    if prov_new != None:
+                        form.instance.provenance = prov_new
+                        form.instance.note = note
+
                     # Note: it will get saved with form.save()
                 elif prefix == "mext":
                     newurl = cleaned.get('newurl')
@@ -9568,8 +9729,8 @@ class ManuscriptEdit(BasicDetails):
             adapt_m2m(LitrefMan, instance, "manuscript", litlist, "reference", extra=['pages'], related_is_through = True)
 
             # (5) 'provenances'
-            provlist = form.cleaned_data['provlist']
-            adapt_m2m(ProvenanceMan, instance, "manuscript", provlist, "provenance")
+            mprovlist = form.cleaned_data['mprovlist']
+            adapt_m2m(ProvenanceMan, instance, "manuscript", mprovlist, "provenance", extra=['note'], related_is_through = True)
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG

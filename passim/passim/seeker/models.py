@@ -3642,26 +3642,65 @@ class Manuscript(models.Model):
         lHtml = []
         # Visit all literature references
         # Issue #289: this was self.provenances.all()
-        for prov in self.manuprovenances.all().order_by('name'):
+        #             now back to self.provenances.all()
+        order = 0
+        if not plain: lHtml.append("<table><tbody>")
+        # for prov in self.provenances.all().order_by('name'):
+        for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
+            order += 1
             # Get the URL
+            prov = mprov.provenance
             url = reverse("provenance_details", kwargs = {'pk': prov.id})
-            if prov.location == None:
-                if plain:
-                    lHtml.append(prov.name)
-                else:
-                    # Create a display for this item
-                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
-            else:
-                if plain:
-                    lHtml.append("{}: {}".format(prov.name, prov.location.name))
-                else:
-                    # Create a display for this item
-                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
+            sNote = mprov.note
+            if sNote == None: sNote = ""
 
+            if not plain: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+            sLocName = "" 
+            if prov.location!=None:
+                if plain:
+                    sLocName = prov.location.name
+                else:
+                    sLocName = " ({})".format(prov.location.name)
+            sName = "-" if prov.name == "" else prov.name
+            sLoc = "{} {}".format(sName, sLocName)
+
+            if plain:
+                sMprov = dict(prov=prov.name, location=sLocName)
+            else:
+                sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                    sProvLink, sNote)
+
+            lHtml.append(sMprov)
+
+            #if prov.location == None:
+            #    if plain:
+            #        mprov_html.append("<span title='{}'>{}</span>".format(sTitle, prov.name))
+            #    else:
+            #        # Create a display for this item
+            #        mprov_html.append("<a href='{}' title='{}'>{}</a>".format(
+            #            url, sTitle, prov.name))
+            #else:
+            #    if plain:
+            #        mprov_html.append("<span title='{}'>{}: {}</span>".format(
+            #            sTitle, prov.name, prov.location.name))
+            #    else:
+            #        # Create a display for this item
+            #        mprov_html.append("<a href='{}' title='{}'>{}: {}</a>".format(
+            #            url, sTitle, prov.name, prov.location.name))
+            #mprov_html.append("</span>")
+            ## COmbine...
+            #lHtml.append("".join(mprov_html))
+
+            # if not plain: lHtml.append("</tr>")
+
+        if not plain: lHtml.append("</tbody></table>")
         if plain:
             sBack = json.dumps(lHtml)
         else:
-            sBack = ", ".join(lHtml)
+            # sBack = ", ".join(lHtml)
+            sBack = "".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
@@ -4743,11 +4782,11 @@ class Provenance(models.Model):
     name = models.CharField("Provenance location", max_length=LONG_STRING)
     # [0-1] Optional: LOCATION element this refers to
     location = models.ForeignKey(Location, null=True, related_name="location_provenances")
-    # [0-1] Further details are perhaps required too
-    note = models.TextField("Notes on this provenance", blank=True, null=True)
+    ## [0-1] Further details are perhaps required too
+    #note = models.TextField("Notes on this provenance", blank=True, null=True)
 
-    # [1] One provenance belongs to exactly one manuscript
-    manu = models.ForeignKey(Manuscript, default=0, related_name="manuprovenances")
+    ## [1] One provenance belongs to exactly one manuscript
+    #manu = models.ForeignKey(Manuscript, default=0, related_name="manuprovenances")
 
     def __str__(self):
         return self.name
@@ -8591,6 +8630,19 @@ class ProvenanceMan(models.Model):
     provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
     # [1] The manuscript this sermon is written on 
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Manuscript-specific provenance note", blank=True, null=True)
+
+    def get_provenance(self):
+        sBack = ""
+        prov = self.provenance
+        sName = ""
+        sLoc = ""
+        url = reverse("provenance_details", kwargs={'pk': self.id})
+        if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
+        if prov.location != None: sLoc = prov.location.name
+        sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
+        return sBack
 
 
 class LitrefMan(models.Model):

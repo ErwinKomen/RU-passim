@@ -228,7 +228,7 @@
                               <!-- Remaining cells -->
                               {% for relcol in relrow.cols %}
                                 <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                                    class="tdnowrap {% if relcol.link %}clickable{% endif %} 
+                                    class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
                                            {% if relcol.draggable %}draggable{% endif %}"
                                     {% if relcol.align %}align="{{relcol.align}}"{% endif %}
                                     {% if relcol.draggable %}draggable="true"{% endif %}
