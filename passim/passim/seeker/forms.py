@@ -2287,8 +2287,10 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     scount      = forms.IntegerField(min_value=-1, required=False,
                 widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Sermon set size'}))
-    soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,
-                widget=forms.Select())
+    ssgcount    = forms.IntegerField(min_value=-1, required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Relation set size'}))
+    soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
+    ssgoperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -2333,7 +2335,9 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['authorname'].required = False
             self.fields['stype'].required = False
             self.fields['soperator'].initial = 2
+            self.fields['ssgoperator'].initial = 2
             self.fields['scount'].initial = -1
+            self.fields['ssgcount'].initial = -1
 
             # Initialize querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")

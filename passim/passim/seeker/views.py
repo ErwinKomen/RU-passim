@@ -6283,28 +6283,40 @@ class SermonListView(BasicList):
          ]
 
     def initializations(self):
-        # Check if signature adaptation is needed
-        nick_done = Information.get_kvalue("nicknames")
-        if nick_done == None or nick_done == "":
-            # Perform adaptations
-            bResult, msg = SermonDescr.adapt_nicknames()
-            if bResult:
-                # Success
-                Information.set_kvalue("nicknames", "done")
+        oErr = ErrHandle()
+        try:
+            # Check if signature adaptation is needed
+            nick_done = Information.get_kvalue("nicknames")
+            if nick_done == None or nick_done == "":
+                # Perform adaptations
+                bResult, msg = SermonDescr.adapt_nicknames()
+                if bResult:
+                    # Success
+                    Information.set_kvalue("nicknames", "done")
 
-        # Check if signature adaptation is needed
-        bref_done = Information.get_kvalue("biblerefs")
-        if bref_done == None or bref_done != "done":
-            # Remove any previous BibRange objects
-            BibRange.objects.all().delete()
-            # Perform adaptations
-            for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
-                sermon.do_ranges(force=True)
-            # Success
-            Information.set_kvalue("biblerefs", "done")
-            SermonDescr.objects.all()
-        # Make sure to set a basic filter
-        self.basic_filter = Q(mtype="man")
+            # Check if signature adaptation is needed
+            bref_done = Information.get_kvalue("biblerefs")
+            if bref_done == None or bref_done != "done":
+                # Remove any previous BibRange objects
+                BibRange.objects.all().delete()
+                # Perform adaptations
+                for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
+                    sermon.do_ranges(force=True)
+                # Success
+                Information.set_kvalue("biblerefs", "done")
+                SermonDescr.objects.all()
+
+            # Check if there are any sermons not connected to a manuscript: remove these
+            delete_id = SermonDescr.objects.filter(Q(msitem__isnull=True)|Q(msitem__manu__isnull=True)).values('id')
+            if len(delete_id) > 0:
+                oErr.Status("Deleting {} sermons that are not connected".format(len(delete_id)))
+                SermonDescr.objects.filter(id__in=delete_id).delete()
+
+            # Make sure to set a basic filter
+            self.basic_filter = Q(mtype="man")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonListiew/initializations")
         return None
 
     def add_to_context(self, context, initial):
@@ -6346,10 +6358,17 @@ class SermonListView(BasicList):
             html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
         elif custom == "manuscript":
             manu = instance.get_manuscript()
-            html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
-                reverse('manuscript_details', kwargs={'pk': manu.id}),
-                manu.idno[:20]))
-            sTitle = manu.idno
+            if manu == None:
+                html.append("-")
+            else:
+                if manu.idno == None:
+                    sIdNo = "-"
+                else:
+                    sIdNo = manu.idno[:20]
+                html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
+                    reverse('manuscript_details', kwargs={'pk': manu.id}),
+                    sIdNo))
+                sTitle = manu.idno
         elif custom == "links":
             for gold in instance.goldsermons.all():
                 for link_def in gold.link_oview():
@@ -6368,38 +6387,44 @@ class SermonListView(BasicList):
         # Adapt the search to the keywords that *may* be shown
         lstExclude=None
         qAlternative = None
+        oErr = ErrHandle()
 
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        try:
+            # Make sure to only show mtype manifestations
+            fields['mtype'] = "man"
 
-        # Adapt the bible reference list
-        bibrefbk = fields.get("bibrefbk", "")
-        if bibrefbk != None and bibrefbk != "":
-            bibrefchvs = fields.get("bibrefchvs", "")
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
 
-            # Get the start and end of this bibref
-            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+            # Adapt the bible reference list
+            bibrefbk = fields.get("bibrefbk", "")
+            if bibrefbk != None and bibrefbk != "":
+                bibrefchvs = fields.get("bibrefchvs", "")
+
+                # Get the start and end of this bibref
+                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
  
-            # Find out which sermons have references in this range
-            lstQ = []
-            lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
-            lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-            sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
+                # Find out which sermons have references in this range
+                lstQ = []
+                lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                lstQ.append(Q(sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibrefbk'] = Q(id__in=sermonlist)
+                fields['bibrefbk'] = Q(id__in=sermonlist)
 
-        # Make sure to only show mtype manifestations
-        fields['mtype'] = "man"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
@@ -11668,7 +11693,7 @@ class EqualGoldListView(BasicList):
     plural_name = "Super sermons gold"
     sg_name = "Super sermon gold"
     # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'hccount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype' ]
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -11687,9 +11712,11 @@ class EqualGoldListView(BasicList):
          'title': "Number of Sermon (manifestation)s that are connected with this Super Sermon Gold"},
         {'name': 'Gold',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Super Sermon Gold"},
-        {'name': 'HCs',                    'order': 'o=8'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'Super',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+         'title': "Number of other Super Sermon Golds this Super Sermon Gold links to"},
+        {'name': 'HCs',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Super Sermon Gold"},
-        {'name': 'Status',                  'order': 'o=9',   'type': 'str', 'custom': 'status'}
+        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -11701,6 +11728,7 @@ class EqualGoldListView(BasicList):
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
         {"name": "Sermon count",    "id": "filter_scount",            "enabled": False},
+        {"name": "Relation count",  "id": "filter_ssgcount",          "enabled": False},
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -11719,6 +11747,9 @@ class EqualGoldListView(BasicList):
             {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
             {'filter': 'scount',    'dbfield': 'scount',            'keyS': 'scount',
              'title': 'The number of sermons (manifestations) belonging to this Super Sermon Gold'},
+            {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'},
+            {'filter': 'ssgcount',  'dbfield': 'ssgcount',          'keyS': 'ssgcount',
+             'title': 'The number of links a Super Sermon Gold has to other Super Sermons Gold'},
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
@@ -11803,6 +11834,16 @@ class EqualGoldListView(BasicList):
                         ssg.scount = scount
                         ssg.save()
             Information.set_kvalue("scount", "done")
+
+        if Information.get_kvalue("ssgcount") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                for ssg in EqualGold.objects.all():
+                    ssgcount = ssg.relations.count()
+                    if ssgcount != ssg.ssgcount:
+                        ssg.ssgcount = ssgcount
+                        ssg.save()
+            Information.set_kvalue("ssgcount", "done")
 
         if Information.get_kvalue("ssgselflink") != "done":
             # Walk all SSGs
@@ -11893,6 +11934,10 @@ class EqualGoldListView(BasicList):
             sCount = instance.scount
             if sCount == None: sCount = 0
             html.append("{}".format(sCount))
+        elif custom == "ssgcount":
+            sCount = instance.ssgcount
+            if sCount == None: sCount = 0
+            html.append("{}".format(sCount))
         elif custom == "hccount":
             html.append("{}".format(instance.hccount))
         elif custom == "hclist":
@@ -11943,6 +11988,12 @@ class EqualGoldListView(BasicList):
         if scount != None and scount >= 0 and soperator != None:
             # Action depends on the operator
             fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
+
+        ssgcount = fields.get('ssgcount', -1)
+        ssgoperator = fields.pop('ssgoperator', None)
+        if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
+            # Action depends on the operator
+            fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
 
         return fields, lstExclude, qAlternative
 

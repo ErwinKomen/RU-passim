@@ -546,7 +546,7 @@ class BasicList(ListView):
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
-    param_list = ""
+    param_list = []
     qs = None
     page_function = "ru.basic.search_paged_start"
 

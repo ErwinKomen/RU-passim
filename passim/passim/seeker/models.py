@@ -4859,6 +4859,8 @@ class EqualGold(models.Model):
     hccount = models.IntegerField("Historical Collection count", default=0)
     # [1] The number of SermonDescr linked to me
     scount = models.IntegerField("Sermon set size", default=0)
+    # [1] The number of EqualGold linked to me (i.e. relations.count)
+    ssgcount = models.IntegerField("SSG set size", default=0)
 
     # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
@@ -5320,6 +5322,15 @@ class EqualGold(models.Model):
         iSize = self.equal_goldsermons.all().count()
         if iSize != sgcount:
             self.sgcount = iSize
+            self.save()
+        return True
+
+    def set_ssgcount(self):
+        # Calculate and set the ssgcount
+        ssgcount = self.ssgcount
+        iSize = self.relations.count()
+        if iSize != ssgcount:
+            self.ssgcount = iSize
             self.save()
         return True
 
@@ -6116,7 +6127,17 @@ class EqualGoldLink(models.Model):
         else:
             # Perform the actual save() method on [self]
             response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+            # Adapt the ssgcount
+            self.src.set_ssgcount()
+            self.dst.set_ssgcount()
         # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        eqg_list = [self.src, self.dst]
+        response = super(EqualGoldLink, self).delete(using, keep_parents)
+        for obj in eqg_list:
+            obj.set_ssgcount()
         return response
 
     def get_label(self, do_incexpl=False):
