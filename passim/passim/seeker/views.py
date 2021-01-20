@@ -6254,8 +6254,10 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
+            {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
+            #                            'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
             {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
@@ -11582,7 +11584,7 @@ class EqualGoldDetails(EqualGoldEdit):
                                          'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
                         # Origin
-                        or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
+                        or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown(table=False))
                         rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
 
                         # date range
@@ -11594,7 +11596,7 @@ class EqualGoldDetails(EqualGoldEdit):
                         rel_item.append({'value': coll_info, 'initial': 'small'})
 
                         # Location number and link to the correct point in the manuscript details view...
-                        itemloc = "{}/{}".format(sermon.order, item.get_sermon_count())
+                        itemloc = "{}/{}".format(sermon.msitem.order, item.get_sermon_count())
                         link_on_manu_page = "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)
                         link_to_sermon = reverse('sermon_details', kwargs={'pk': sermon.id})
                         rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',

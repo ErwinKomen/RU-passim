@@ -3638,13 +3638,14 @@ class Manuscript(models.Model):
             sBack = '<span class="project">{}</span>'.format(self.project.name)
         return sBack
 
-    def get_provenance_markdown(self, plain=False):
+    def get_provenance_markdown(self, plain=False, table=True):
         lHtml = []
         # Visit all literature references
         # Issue #289: this was self.provenances.all()
         #             now back to self.provenances.all()
         order = 0
-        if not plain: lHtml.append("<table><tbody>")
+        if not plain: 
+            if table: lHtml.append("<table><tbody>")
         # for prov in self.provenances.all().order_by('name'):
         for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
             order += 1
@@ -3654,7 +3655,8 @@ class Manuscript(models.Model):
             sNote = mprov.note
             if sNote == None: sNote = ""
 
-            if not plain: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+            if not plain: 
+                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
 
             sLocName = "" 
             if prov.location!=None:
@@ -3669,8 +3671,11 @@ class Manuscript(models.Model):
                 sMprov = dict(prov=prov.name, location=sLocName)
             else:
                 sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
-                sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
-                    sProvLink, sNote)
+                if table:
+                    sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        sProvLink, sNote)
+                else:
+                    sMprov = sProvLink
 
             lHtml.append(sMprov)
 
@@ -3695,7 +3700,8 @@ class Manuscript(models.Model):
 
             # if not plain: lHtml.append("</tr>")
 
-        if not plain: lHtml.append("</tbody></table>")
+        if not plain: 
+            if table: lHtml.append("</tbody></table>")
         if plain:
             sBack = json.dumps(lHtml)
         else:
