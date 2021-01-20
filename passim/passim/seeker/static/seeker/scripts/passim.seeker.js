@@ -1785,13 +1785,16 @@ var ru = (function ($, ru) {
 
           // Figure out what the source and destination is
           elTree = $(ev.target).closest(".tree");
-          divSrcId = ev.dataTransfer.getData("text");
           divDstId = $(elTree).attr("id");
-          divSrc = $("#sermon_tree").find("#" + divSrcId);
+          divSrcId = ev.dataTransfer.getData("text");
+          if (divSrcId !== "") {
+            // Nothing yet
+            divSrc = $("#sermon_tree").find("#" + divSrcId);
 
-          if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
-            // This is not allowed
-            return;
+            if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
+              // This is not allowed
+              return;
+            }
           }
 
           if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("ruler")) {
