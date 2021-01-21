@@ -7790,16 +7790,31 @@ class SermonDescr(models.Model):
                 response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def signature_string(self):
+    def signature_string(self, include_auto = False):
         """Combine all signatures into one string: manual ones"""
 
         lSign = []
-        # Get the manual signatures
+        if include_auto:
+            # Get the automatic signatures
+            equal_set = self.equalgolds.all().values("id")
+            for item in Signature.objects.filter(gold__equal__id__in=equal_set).order_by("-editype", "code"):
+                short = item.short()
+                editype = item.editype
+                url = "{}?sermo-siglist_a={}".format(reverse("sermon_list"), item.id)
+                lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                    editype, short, url, short[:20]))
+
+        # Add the manual signatures
         for item in self.sermonsignatures.all().order_by("-editype", "code"):
-            lSign.append(item.short())
+            short = item.short()
+            editype = item.editype
+            url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
+            lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                editype, short, url, short[:20]))
+
 
         # REturn the combination
-        combi = " | ".join(lSign)
+        combi = " ".join(lSign)
         if combi == "": combi = "[-]"
         return combi
 

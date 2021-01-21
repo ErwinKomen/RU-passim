@@ -6208,13 +6208,15 @@ class SermonListView(BasicList):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
     order_default = order_cols
-    order_heads = [{'name': 'Author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
-                   {'name': 'Signature', 'order': 'o=2', 'type': 'str', 'custom': 'signature'}, 
-                   {'name': 'Incipit ... Explicit', 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
-                   {'name': 'Manuscript', 'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-                   {'name': 'Locus', 'order': '', 'type': 'str', 'field': 'locus' },
-                   {'name': 'Links', 'order': '', 'type': 'str', 'custom': 'links'},
-                   {'name': 'Status', 'order': 'o=7', 'type': 'str', 'custom': 'status'}]
+    order_heads = [
+        {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
+        {'name': 'Signature',   'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111'}, 
+        {'name': 'Incipit ... Explicit', 
+                                'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
+        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
+        {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
+        {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
+        {'name': 'Status',      'order': 'o=7', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
@@ -6241,7 +6243,7 @@ class SermonListView(BasicList):
                 {"name": "Date from",        "id": "filter_datestart",      "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
                 ]
-
+    
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
@@ -6278,7 +6280,9 @@ class SermonListView(BasicList):
             {'filter': 'datefinish',    'dbfield': 'manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
+            {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'},
+            {'filter': 'sigauto',   'fkfield': 'equalgolds__equal_goldsermons__goldsignatures', 'keyList':  'siglist_a', 'infield': 'id'},
+            {'filter': 'sigmanu',   'fkfield': 'sermonsignatures',                              'keyList':  'siglist_m', 'infield': 'id'}
             ]}
          ]
 
@@ -6349,8 +6353,7 @@ class SermonListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-            html.append("<span>{}</span>".format(instance.signature_string()[:20]))
-            sTitle = instance.signature_string()
+            html.append(instance.signature_string(include_auto=True))
         elif custom == "incexpl":
             html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
             dots = "..." if instance.incipit else ""
@@ -11605,16 +11608,17 @@ class EqualGoldDetails(EqualGoldEdit):
                         manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
                         # Name as CITY - LIBRARY - IDNO + Name
                         manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
-                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
+                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': True, 'initial': 'small',
                                          'link': reverse('manuscript_details', kwargs={'pk': item.id})})
 
                         # Origin
                         or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown(table=False))
-                        rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
+                        rel_item.append({'value': or_prov, 
+                                         'title': "Origin (if known), followed by provenances (between brackets)"}) #, 'initial': 'small'})
 
                         # date range
                         daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                        rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
+                        rel_item.append({'value': daterange, 'align': "right"}) #, 'initial': 'small'})
 
                         # Collection(s)
                         coll_info = item.get_collections_markdown(username, team_group)
@@ -11634,10 +11638,10 @@ class EqualGoldDetails(EqualGoldEdit):
                         rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
 
                         # Incipit
-                        rel_item.append({'value': sermon.get_incipit_markdown(), 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_incipit_markdown()}) #, 'initial': 'small'})
 
                         # Explicit
-                        rel_item.append({'value': sermon.get_explicit_markdown(), 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_explicit_markdown()}) #, 'initial': 'small'})
 
                         # Keywords
                         rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})

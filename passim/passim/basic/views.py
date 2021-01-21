@@ -365,6 +365,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 if has_list_value(keyList, oFields):
                     s_q_lst = ""
                     enable_filter(filter_type, head_id)
+                    if infield == None: infield = "id"
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
@@ -819,7 +820,10 @@ class BasicList(ListView):
                         if not 'allowwrap' in head or not head['allowwrap']:
                             classes.append("tdnowrap")
                 else:
-                    fobj['styles'] = "width: 100px;"
+                    if 'width' in head and len(head['width']) > 0:
+                        fobj['styles'] = "width: {};".format(head['width'])
+                    else:
+                        fobj['styles'] = "width: 100px;"
                     if not 'allowwrap' in head or not head['allowwrap']:
                         classes.append("tdnowrap")
                 if 'align' in head and head['align'] != "":
