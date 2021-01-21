@@ -1325,6 +1325,12 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    # [1] Stringified JSON lists for M/S/SG/SSG search results, to facilitate basket operations
+    search_manu = models.TextField("Search results Manu", default = "[]")
+    search_sermo = models.TextField("Search results Sermo", default = "[]")
+    search_gold = models.TextField("Search results Gold", default = "[]")
+    search_super = models.TextField("Search results Super", default = "[]")
+
     # [0-1] Affiliation of this user with as many details as needed
     affiliation = models.TextField("Affiliation", blank=True, null=True)
 

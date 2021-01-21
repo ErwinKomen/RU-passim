@@ -966,6 +966,11 @@ def search_generic(s_view, cls, form, qd, username=None, team_group=None):
                 if 'soperator' in oFields:
                     if not 'scount' in oFields or oFields['soperator'] == "-":
                         oFields.pop('soperator') 
+
+                # Adapt search for mtype, if that is not specified
+                if 'mtype' in oFields and oFields['mtype'] == "":
+                    # Make sure we only select MAN and not TEM (template)
+                    oFields['mtype'] = "man"
                                  
                 # Create the search based on the specification in searches
                 filters, lstQ, qd, lstExclude = make_search_list(filters, oFields, searches, qd, lstExclude)
@@ -6431,6 +6436,13 @@ class SermonListView(BasicList):
 
         return fields, lstExclude, qAlternative
 
+    def view_queryset(self, qs):
+        search_id = [x['id'] for x in qs.values('id')]
+        profile = Profile.get_user_profile(self.request.user.username)
+        profile.search_sermo = json.dumps(search_id)
+        profile.save()
+        return None
+
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
@@ -10438,6 +10450,13 @@ class ManuscriptListView(BasicList):
         fields['mtype'] = 'man'
         return fields, lstExclude, qAlternative
 
+    def view_queryset(self, qs):
+        search_id = [x['id'] for x in qs.values('id')]
+        profile = Profile.get_user_profile(self.request.user.username)
+        profile.search_manu = json.dumps(search_id)
+        profile.save()
+        return None
+
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
@@ -10765,6 +10784,13 @@ class SermonGoldListView(BasicList):
 
         # Return the adapted stuff
         return fields, lstExclude, qAlternative
+
+    def view_queryset(self, qs):
+        search_id = [x['id'] for x in qs.values('id')]
+        profile = Profile.get_user_profile(self.request.user.username)
+        profile.search_gold = json.dumps(search_id)
+        profile.save()
+        return None
 
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
@@ -12001,6 +12027,13 @@ class EqualGoldListView(BasicList):
 
         return fields, lstExclude, qAlternative
 
+    def view_queryset(self, qs):
+        search_id = [x['id'] for x in qs.values('id')]
+        profile = Profile.get_user_profile(self.request.user.username)
+        profile.search_super = json.dumps(search_id)
+        profile.save()
+        return None
+
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
@@ -13067,6 +13100,8 @@ class BasketUpdate(BasicPart):
         # Reset the redirect page
         self.redirectpage = ""
 
+        method = "use_profile_search_id_list"
+
         # Get the operation
         if 'operation' in self.qd:
             operation = self.qd['operation']
@@ -13086,43 +13121,91 @@ class BasketUpdate(BasicPart):
 
             # Get the queryset
             self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
-                    
+
+            # Action depends on operations
             if operation in lst_basket_target:
+                if method == "use_profile_search_id_list":
+                    # Get the latest search results
+                    search_s = getattr(profile, "search_{}".format(self.colltype))
+                    search_id = []
+                    if search_s != None and search_s != "" and search_s[0] == "[":
+                        search_id = json.loads(search_s)
+                    search_count = len(search_id)
 
-                kwargs = {'profile': profile}
+                    kwargs = {'profile': profile}
 
-                # Action depends on the operation specified
-                if qs and operation == "create":
-                    # Remove anything there
-                    self.clsBasket.objects.filter(profile=profile).delete()
-                    # Add
-                    with transaction.atomic():
-                        for item in qs:
-                            kwargs[self.s_field] = item
-                            self.clsBasket.objects.create(**kwargs)
-                    # Process history
-                    profile.history(operation, self.colltype, oFields)
-                elif qs and operation == "add":
-                    # Add
-                    with transaction.atomic():
-                        for item in qs:
-                            kwargs[self.s_field] = item
-                            self.clsBasket.objects.create(**kwargs)
-                    # Process history
-                    profile.history(operation, self.colltype, oFields)
-                elif qs and operation == "remove":
-                    # Add
-                    with transaction.atomic():
-                        for item in qs:
-                            kwargs[self.s_field] = item
-                            self.clsBasket.objects.filter(**kwargs).delete()
-                    # Process history
-                    profile.history(operation, self.colltype, oFields)
-                elif operation == "reset":
-                    # Remove everything from our basket
-                    self.clsBasket.objects.filter(profile=profile).delete()
-                    # Reset the history for this one
-                    profile.history(operation, self.colltype)
+                    # NOTE PROBLEM - we don't have the [oFields] at this point...
+
+                    # Action depends on the operation specified
+                    if search_count > 0 and operation == "create":
+                        # Remove anything there
+                        self.clsBasket.objects.filter(profile=profile).delete()
+                        # Add
+                        with transaction.atomic():
+                            for item in search_id:
+                                kwargs["{}_id".format(self.s_field)] = item
+                                self.clsBasket.objects.create(**kwargs)
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif search_count > 0  and operation == "add":
+                        # Add
+                        with transaction.atomic():
+                            for item in search_id:
+                                kwargs["{}_id".format(self.s_field)] = item
+                                self.clsBasket.objects.create(**kwargs)
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif search_count > 0  and operation == "remove":
+                        # Add
+                        with transaction.atomic():
+                            for item in search_id:
+                                kwargs["{}_id".format(self.s_field)] = item
+                                self.clsBasket.objects.filter(**kwargs).delete()
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif operation == "reset":
+                        # Remove everything from our basket
+                        self.clsBasket.objects.filter(profile=profile).delete()
+                        # Reset the history for this one
+                        profile.history(operation, self.colltype)
+
+                else:
+                    
+                    kwargs = {'profile': profile}
+
+                    # Action depends on the operation specified
+                    if qs and operation == "create":
+                        # Remove anything there
+                        self.clsBasket.objects.filter(profile=profile).delete()
+                        # Add
+                        with transaction.atomic():
+                            for item in qs:
+                                kwargs[self.s_field] = item
+                                self.clsBasket.objects.create(**kwargs)
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif qs and operation == "add":
+                        # Add
+                        with transaction.atomic():
+                            for item in qs:
+                                kwargs[self.s_field] = item
+                                self.clsBasket.objects.create(**kwargs)
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif qs and operation == "remove":
+                        # Add
+                        with transaction.atomic():
+                            for item in qs:
+                                kwargs[self.s_field] = item
+                                self.clsBasket.objects.filter(**kwargs).delete()
+                        # Process history
+                        profile.history(operation, self.colltype, oFields)
+                    elif operation == "reset":
+                        # Remove everything from our basket
+                        self.clsBasket.objects.filter(profile=profile).delete()
+                        # Reset the history for this one
+                        profile.history(operation, self.colltype)
+
             elif operation in lst_basket_source:
                 # Queryset: the basket contents
                 qs = self.clsBasket.objects.filter(profile=profile)

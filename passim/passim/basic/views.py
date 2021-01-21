@@ -995,9 +995,15 @@ class BasicList(ListView):
         # Determine the length
         self.entrycount = len(qs)
 
+        # Allow doing something additionally with the queryset
+        self.view_queryset(qs)
+
         # Return the resulting filtered and sorted queryset
         self.qs = qs
         return qs
+
+    def view_queryset(self, qs):
+        return None
 
     def get(self, request, *args, **kwargs):
         # FIrst do my own initializations
