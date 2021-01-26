@@ -1,6 +1,6 @@
 ﻿{% load i18n %}
 
-{% if is_passim_editor %}
+{% if is_app_editor %}
 <!-- Project information -->
 <form>
   {% csrf_token %}
@@ -9,7 +9,7 @@
         <td colspan="2"  class="ms editable table">
           <!-- Provide the necessary buttons: edit, cancel and save -->
           <div>
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <a mode="edit" class="view-mode btn btn-xs jumbo-1">
                 <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
               </a>
@@ -19,7 +19,7 @@
               <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
             </a>
 
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid=""
                  targeturl="{% if prjForm.instance.id %}{% url 'project_edit' prjForm.instance.id %}{% else %}{% url 'project_edit' %}{% endif %}" >
                 <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
@@ -32,7 +32,7 @@
             <!-- Little error message room -->
             <span id="gold_err_msg" class="err-msg"></span>
 
-            {% if is_passim_editor %}
+            {% if is_app_editor %}
               <!-- Put the delete button completely to the right-->
               <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
                  onclick="ru.passim.seeker.delete_confirm(this);">
@@ -42,7 +42,7 @@
           </div>
 
           <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-          {% if is_passim_editor %}
+          {% if is_app_editor %}
             <div class="delete-confirm hidden selected">
               <span>Are you sure you would like to delete this project?</span>
               <span>

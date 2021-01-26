@@ -22,6 +22,7 @@ from django.views.generic import ListView, View
 import json
 import fnmatch
 import os
+import base64
 from datetime import datetime
 
 # provide error handling
@@ -191,11 +192,14 @@ def adapt_search(val, regex_function=None):
     val = val.strip()
     # Double check whether we don't have a starting ^ and trailing $ yet
     if len(val) > 0:
-        val = fnmatch.translate(val)
-        if val[0] != '^':
-            val = "^{}".format(val)
-        if val[-1] != "$":
-            val = "{}$".format(val)
+        if "#" in val:
+            val = r'(^|(.*\b))' + val.replace('#', r'((\b.*)|$)')
+        else:
+            val = fnmatch.translate(val)
+            if val[0] != '^':
+                val = "^{}".format(val)
+            if val[-1] != "$":
+                val = "{}$".format(val)
 
         # Is there a regex function?
         if regex_function != None:
@@ -287,9 +291,10 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 iStop = 1
                             # we are dealing with a foreign key, so we should use keyFk
                             s_q = None
+                            if "*" in val or "#" in val:
+                                val = adapt_search(val, regex_function)
                             for fkfield in arFkField:
-                                if "*" in val:
-                                    val = adapt_search(val, regex_function)
+                                if "*" in val or "#" in val:
                                     s_q_add = Q(**{"{}__{}__iregex".format(fkfield, keyFk): val})
                                 else:
                                     s_q_add = Q(**{"{}__{}__iexact".format(fkfield, keyFk): val})
@@ -344,7 +349,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             enable_filter(filter_type, head_id)
                             if isinstance(val, int):
                                 s_q = Q(**{"{}".format(dbfield): val})
-                            elif "*" in val:
+                            elif "*" in val or "#" in val:
                                 val = adapt_search(val, regex_function)
                                 s_q = Q(**{"{}__iregex".format(dbfield): val})
                             elif "$" in dbfield:
@@ -360,6 +365,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 if has_list_value(keyList, oFields):
                     s_q_lst = ""
                     enable_filter(filter_type, head_id)
+                    if infield == None: infield = "id"
                     code_list = [getattr(x, infield) for x in oFields[keyList]]
                     if fkfield:
                         # Now we need to look at the id's
@@ -467,16 +473,29 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
 
     return qs, order_heads, colnum
 
-def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=None, nowrap=True, main=None, draggable=None):
     oAdd = dict(value=value)
     if resizable: oAdd['initial'] = 'small'
     if title != None: oAdd['title'] = title
     if align != None: oAdd['align'] = align
     if link != None: oAdd['link'] = link
     if main != None: oAdd['main'] = main
+    if nowrap != None: oAdd['nowrap'] = nowrap
     if draggable != None: oAdd['draggable'] = draggable
     rel_item.append(oAdd)
     return True
+
+def base64_encode(sInput):
+    message_bytes = sInput.encode("ascii")
+    base64_bytes = base64.b64encode(message_bytes)
+    sOutput = base64_bytes.decode("ascii")
+    return sOutput
+
+def base64_decode(sInput):
+    base64_bytes = sInput.encode('ascii')
+    message_bytes = base64.b64decode(base64_bytes)
+    sOutput = message_bytes.decode('ascii')
+    return sOutput
 
 
 
@@ -494,6 +513,7 @@ class BasicList(ListView):
     bFilter = False
     basketview = False
     template_name = 'basic/basic_list.html'
+    template_help = 'basic/filter_help.html'
     bHasParameters = False
     bUseFilter = False
     new_button = True
@@ -527,7 +547,7 @@ class BasicList(ListView):
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
-    param_list = ""
+    param_list = []
     qs = None
     page_function = "ru.basic.search_paged_start"
 
@@ -589,6 +609,12 @@ class BasicList(ListView):
             context['page_obj'] = context['paginator'].page( page_num)
             # Make sure to adapt the object_list
             context['object_list'] = context['page_obj']
+            self.param_list.append("page={}".format(page_num))
+        # Make sure the parameter list becomes available
+        params = ""
+        if len(self.param_list) > 0:
+            params = base64_encode( "&".join(self.param_list))
+        context['params'] = params
 
         # Set the title of the application
         if self.plural_name =="":
@@ -700,6 +726,11 @@ class BasicList(ListView):
                             # Append the [fitem] to the [fitems]                            
                             filteritem['fitems'].append(fitem)
                             filteritem['count'] = len(filteritem['fitems'])
+                            filteritem['help'] = ""
+                            # Possibly add help
+                            if 'help' in item:
+                                filteritem['helptext'] = self.get_helptext(item['help'])
+                                filteritem['help'] = item['help']
                             # Make sure we indicate that there is a value
                             if  bHasItemValue: filteritem['hasvalue'] = True
                             break
@@ -717,6 +748,9 @@ class BasicList(ListView):
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
+
+        # Get help for filtering
+        context['filterhelp_contents'] = self.get_filterhelp()
 
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
@@ -786,7 +820,10 @@ class BasicList(ListView):
                         if not 'allowwrap' in head or not head['allowwrap']:
                             classes.append("tdnowrap")
                 else:
-                    fobj['styles'] = "width: 100px;"
+                    if 'width' in head and len(head['width']) > 0:
+                        fobj['styles'] = "width: {};".format(head['width'])
+                    else:
+                        fobj['styles'] = "width: 100px;"
                     if not 'allowwrap' in head or not head['allowwrap']:
                         classes.append("tdnowrap")
                 if 'align' in head and head['align'] != "":
@@ -804,6 +841,15 @@ class BasicList(ListView):
             # Add to the list of results
             result_list.append(result)
         return result_list
+
+    def get_helptext(self, name):
+        return ""
+
+    def get_filterhelp(self):
+        sBack = "(no help available)"
+        if self.template_help != None and self.template_help != "":
+            sBack = render_to_string(self.template_help)
+        return sBack
 
     def get_template_names(self):
         names = [ self.template_name ]
@@ -931,7 +977,7 @@ class BasicList(ListView):
             elif not self.none_on_empty:
                 # Just show everything
                 qs = self.model.objects.all().distinct()
-                
+
             # Do the ordering of the results
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
@@ -949,9 +995,15 @@ class BasicList(ListView):
         # Determine the length
         self.entrycount = len(qs)
 
+        # Allow doing something additionally with the queryset
+        self.view_queryset(qs)
+
         # Return the resulting filtered and sorted queryset
         self.qs = qs
         return qs
+
+    def view_queryset(self, qs):
+        return None
 
     def get(self, request, *args, **kwargs):
         # FIrst do my own initializations
@@ -993,6 +1045,7 @@ class BasicDetails(DetailView):
     do_not_save = False
     no_delete = False
     afterdelurl = None
+    listview = None
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
@@ -1211,11 +1264,14 @@ class BasicDetails(DetailView):
             else:
                 self.basic_name = "{}{}".format(self.basic_name_prefix, self.prefix)
         basic_name = self.basic_name
-        listviewname = "{}_list".format(basic_name)
-        try:
-            context['listview'] = reverse(listviewname)
-        except:
-            context['listview'] = reverse('home')
+        if self.listview != None:
+            context['listview'] = self.listview
+        else:
+            listviewname = "{}_list".format(basic_name)
+            try:
+                context['listview'] = reverse(listviewname)
+            except:
+                context['listview'] = reverse('home')
 
         if self.basic_add:
             basic_add = reverse(self.basic_add)
@@ -1245,6 +1301,13 @@ class BasicDetails(DetailView):
         initial = get.copy()
         self.qd = initial
 
+        # Possibly first get params
+        params = ""
+        if "params" in dict(self.qd):
+            params = base64_decode( "".join(self.qd.pop("params")))
+        context['params'] = params
+
+        # Now see if anything is left
         self.bHasFormInfo = (len(self.qd) > 0)
 
         # Set the title of the application

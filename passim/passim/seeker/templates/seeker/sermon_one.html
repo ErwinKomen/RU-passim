@@ -2,6 +2,7 @@
 
     <!-- Information on one sermon-->
     <div sermonid="{{msitem.obj.id}}" level="{{level}}" id="sermon_{{msitem.obj.id}}"
+         sermontype="{% if msitem.shead %}head{% else %}sermon{% endif %}"
          class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
       <table class="func-view sermons" style="width: 100%;">
         <tbody>

@@ -33,6 +33,7 @@ var ru = (function ($, ru) {
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
+        loc_params = "",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         KEYS = {
@@ -939,7 +940,7 @@ var ru = (function ($, ru) {
           private_methods.waitStart(elWait);
 
           // Now initiate any possible progress calling
-          if (progrurl !== null) {
+          if (progrurl !== null && progrurl !== undefined) {
             loc_progr = [];
             window.setTimeout(function () { ru.basic.check_progress(progrurl, sTargetDiv); }, 2000);
           }

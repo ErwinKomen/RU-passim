@@ -2,6 +2,7 @@
 
 """
 from django.apps.config import AppConfig
+from django.apps import apps
 from django.db import models, transaction
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
@@ -42,6 +43,8 @@ LONG_STRING=255
 MAX_TEXT_LEN = 200
 ABBR_LENGTH = 5
 PASSIM_CODE_LENGTH = 20
+VISIT_MAX = 1400
+VISIT_REDUCE = 1000
 
 COLLECTION_SCOPE = "seeker.colscope"
 COLLECTION_TYPE = "seeker.coltype" 
@@ -103,26 +106,50 @@ class FieldChoice(models.Model):
 class HelpChoice(models.Model):
     """Define the URL to link to for the help-text"""
     
-    field = models.CharField(max_length=200)        # The 'path' to and including the actual field
-    searchable = models.BooleanField(default=False) # Whether this field is searchable or not
-    display_name = models.CharField(max_length=50)  # Name between the <a></a> tags
-    help_url = models.URLField(default='')          # THe actual help url (if any)
+    # [1] The 'path' to and including the actual field
+    field = models.CharField(max_length=200)        
+    # [1] Whether this field is searchable or not
+    searchable = models.BooleanField(default=False) 
+    # [1] Name between the <a></a> tags
+    display_name = models.CharField(max_length=50)  
+    # [0-1] The actual help url (if any)
+    help_url = models.URLField("Link to more help", blank=True, null=True, default='')         
+    # [0-1] One-line contextual help
+    help_html = models.TextField("One-line help", blank=True, null=True)
 
     def __str__(self):
         return "[{}]: {}".format(
             self.field, self.display_name)
 
-    def Text(self):
+    def get_text(self):
         help_text = ''
         # is anything available??
-        if (self.help_url != ''):
+        if self.help_url != None and self.help_url != '':
             if self.help_url[:4] == 'http':
                 help_text = "See: <a href='{}'>{}</a>".format(
                     self.help_url, self.display_name)
             else:
                 help_text = "{} ({})".format(
                     self.display_name, self.help_url)
+        elif self.help_html != None and self.help_html != "":
+            help_text = self.help_html
         return help_text
+
+    def get_help_markdown(sField):
+        """Get help based on the field name """
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            obj = HelpChoice.objects.filter(field__iexact=sField).first()
+            if obj != None:
+                sBack = obj.get_text()
+                # Convert markdown to html
+                sBack = markdown(sBack)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_help")
+        return sBack
 
 
 def get_current_datetime():
@@ -138,7 +165,10 @@ def adapt_search(val, do_brackets = True):
         for idx, part in enumerate(arPart):
             arPart[idx] = part.replace("]", "[]]")
         val = "[[]".join(arPart)
-    val = '^' + fnmatch.translate(val) + '$'
+    if "#" in val:
+        val = r'(^|(.*\b))' + val.replace('#', r'((\b.*)|$)')
+    else:
+        val = '^' + fnmatch.translate(val) + '$'
     return val
 
 def adapt_brackets(val):
@@ -203,11 +233,17 @@ def get_help(field):
         entry_list = HelpChoice.objects.filter(field__iexact=field)
         entry = entry_list[0]
         # Note: only take the first actual instance!!
-        help_text = entry.Text()
+        help_text = entry.get_text()
     except:
         help_text = "Sorry, no help available for " + field
 
     return help_text
+
+def get_helptext(name):
+    sBack = ""
+    if name != "":
+        sBack = HelpChoice.get_help_markdown(name)
+    return sBack
 
 def get_crpp_date(dtThis, readable=False):
     """Convert datetime to string"""
@@ -225,6 +261,15 @@ def get_crpp_date(dtThis, readable=False):
 def get_now_time():
     """Get the current time"""
     return time.clock()
+
+def get_json_list(value):
+    oBack = []
+    if value != None and value != "":
+        if value[0] == '[' and value[-1] == ']':
+            oBack = json.loads(value)
+        else:
+            oBack = [ value ]
+    return oBack
 
 def obj_text(d):
     stack = list(d.items())
@@ -1280,6 +1325,12 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    # [1] Stringified JSON lists for M/S/SG/SSG search results, to facilitate basket operations
+    search_manu = models.TextField("Search results Manu", default = "[]")
+    search_sermo = models.TextField("Search results Sermo", default = "[]")
+    search_gold = models.TextField("Search results Gold", default = "[]")
+    search_super = models.TextField("Search results Super", default = "[]")
+
     # [0-1] Affiliation of this user with as many details as needed
     affiliation = models.TextField("Affiliation", blank=True, null=True)
 
@@ -1527,6 +1578,16 @@ class Visit(models.Model):
 
             # Process this visit in the profile
             profile.add_visit(name, path, is_menu, **kwargs)
+            # Possibly throw away an overflow of visit logs?
+            user_visit_count = Visit.objects.filter(user=user).count()
+            if user_visit_count > VISIT_MAX:
+                # Check how many to remove
+                removing = user_visit_count - VISIT_REDUCE
+                # Find the ID of the first one to remove
+                id_list = Visit.objects.filter(user=user).order_by('id').values('id')
+                below_id = id_list[removing]['id']
+                # Remove them
+                Visit.objects.filter(user=user, id__lte=below_id).delete()
             # Return success
             result = True
         except:
@@ -2051,13 +2112,6 @@ class Origin(models.Model):
     # [0-1] Optional: LOCATION element this refers to
     location = models.ForeignKey(Location, null=True, related_name="location_origins")
 
-    # ============== EXTINCT ===================================
-    ## [0-1] Optional city
-    #city = models.ForeignKey(City, null=True, related_name="city_origins")
-    ## [0-1] Name of the country this is in
-    #country = models.ForeignKey(Country, null=True, related_name="country_origins")
-    # ==========================================================
-
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this origin", blank=True, null=True)
 
@@ -2094,57 +2148,6 @@ class Origin(models.Model):
         return sBack
 
 
-class Provenance(models.Model):
-    """The 'origin' is a location where manuscripts were originally created"""
-
-    # [1] Name of the location (can be cloister or anything)
-    name = models.CharField("Provenance location", max_length=LONG_STRING)
-    # [0-1] Optional: LOCATION element this refers to
-    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
-
-    # ============== EXTINCT ===================================
-    ## [0-1] Optional city
-    #city = models.ForeignKey(City, null=True, related_name="city_provenances")
-    ## [0-1] Name of the country this is in
-    #country = models.ForeignKey(Country, null=True, related_name="country_provenances")
-    # ==========================================================
-
-    # [0-1] Further details are perhaps required too
-    note = models.TextField("Notes on this provenance", blank=True, null=True)
-
-    def __str__(self):
-        return self.name
-
-    def find_or_create(sName,  city=None, country=None, note=None):
-        """Find a location or create it."""
-
-        lstQ = []
-        obj_loc = Location.get_location(city=city, country=country)
-        lstQ.append(Q(name__iexact=sName))
-        if obj_loc != None:
-            lstQ.append(Q(location=obj_loc))
-        if note!=None: lstQ.append(Q(note__iexact=note))
-        qs = Provenance.objects.filter(*lstQ)
-        if qs.count() == 0:
-            # Create one
-            hit = Provenance(name=sName)
-            if note!=None: hit.note=note
-            if obj_loc != None: hit.location = obj_loc
-            hit.save()
-        else:
-            hit = qs[0]
-        # Return what we found or created
-        return hit
-
-    def get_location(self):
-        if self.location:
-            sBack = self.location.name
-        else:
-            sBack = "-"
-
-        return sBack
-
-
 class SourceInfo(models.Model):
     """Details of the source from which we get information"""
 
@@ -2163,10 +2166,18 @@ class SourceInfo(models.Model):
         qs = SourceInfo.objects.filter(profile__isnull=True)
         with transaction.atomic():
             for obj in qs:
-                if obj.collector not in coll_set:
+                if obj.collector != "" and obj.collector not in coll_set:
                     coll_set[obj.collector] = Profile.get_user_profile(obj.collector)
                 obj.profile = coll_set[obj.collector]
                 obj.save()
+        # Derive from profile
+        qs = SourceInfo.objects.filter(collector="").exclude(profile__isnull=True)
+        with transaction.atomic():
+            for obj in qs:
+                if obj.collector == "" or obj.collector not in coll_set:
+                    obj.collector = Profile.objects.filter(id=obj.profile.id).first().user.username
+                obj.save()
+
         result = True
 
 
@@ -2186,13 +2197,15 @@ class Litref(models.Model):
     # [0-1] A short reference: including possible markdown symbols
     short = models.TextField("Short reference", blank=True, default="")
 
+    ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+
     def __str__(self):
         sBack = str(self.itemid)
         if self.short != None and self.short != "":
             sBack = self.short
         return sBack
 
-    def sync_zotero(force=False):
+    def sync_zotero(force=False, oStatus=None):
         """Read all stuff from Zotero"""
 
         libid = Information.get_kvalue("zotero_libraryid")
@@ -2206,11 +2219,35 @@ class Litref(models.Model):
 
         zot = zotero.Zotero(libid, libtype, apikey)
         group_size = 25
+        oBack = dict(status="ok", msg="")
         bBack = True
+        msg = ""
+        changes = 0
+        additions = 0
         oErr = ErrHandle()
         try:
+            oBack['total'] = "Checking for literature references that have not been completely processed..."
+            if oStatus != None: oStatus.set("ok", oBack)
+            # Now walk all Litrefs again to see where fields are missing
+            processing = 0
+            for obj in Litref.objects.all():
+                oData = json.loads(obj.data)
+                if oData.get('itemType') in Litref.ok_types and obj.full == "" and obj.short == "":
+                    # Do this one again
+                    obj.read_zotero(data=oData)
+                    processing += 1
+                    # Update status
+                    oBack['processed'] = processing
+                    if oStatus != None: oStatus.set("ok", oBack)
+            if processing > 0:
+                oBack['processed'] = processing
+                    
             # Get the total number of items
             total_count = zot.count_items()
+            # Initial status
+            oBack['total'] = "There are {} references in the Passim Zotero library".format(total_count)
+            if oStatus != None: oStatus.set("ok", oBack)
+
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
             for grp_num in range( total_groups):
@@ -2229,19 +2266,56 @@ class Litref(models.Model):
                         # Add it
                         obj = Litref(itemid=itemid, data=sData)
                         obj.save()
+                        additions += 1
                     # Check if it needs processing
                     if force or obj.short == "" or obj.data != sData:
-                        # It needs processing
-                        obj.read_zotero(data=item['data'])
+                        # Do a complete check on all KV pairs
+                        oDataZotero = item['data']
+                        oDataLitref = json.loads(obj.data)
+                        if force:
+                            bNeedChanging = True
+                        else:
+                            bNeedChanging = False
+                            for k,v in oDataZotero.items():
+                                # Find the corresponding in Litref
+                                if k in oDataLitref:
+                                    if v != oDataLitref[k]:
+                                        oErr.Status("Litref/sync_zotero: value on [{}] differs [{}] / [{}]".format(k, v, oDataLitref[k]))
+                                        bNeedChanging = True
+                                else:
+                                    # The key is not even found
+                                    oErr.Status("Litref/sync_zotero: key not found {}".format(k))
+                                    bNeedChanging = True
+                                    break
+                        if bNeedChanging:
+                            # It needs processing
+                            obj.data = sData
+                            obj.save()
+                            obj.read_zotero(data=item['data'])
+                            changes += 1
                     elif obj.data != sData:
                         obj.data = sData
                         obj.save()
-                    
+                        obj.read_zotero(data=item['data'])
+                        changes += 1
+
+                # Update the status information
+                oBack['group'] = "Group {}/{}".format(grp_num+1, total_groups)
+                oBack['changes'] = changes
+                oBack['additions'] = additions
+                if oStatus != None: oStatus.set("ok", oBack)
+
+            # Make sure to set the status to finished
+            oBack['group'] = "Everything has been done"
+            oBack['changes'] = changes
+            oBack['additions'] = additions
+            if oStatus != None: oStatus.set("finished", oBack)
         except:
             print("sync_zotero error")
             msg = oErr.get_error_message()
-            bBack = False
-        return bBack
+            oBack['msg'] = msg
+            oBack['status'] = 'error'
+        return oBack, ""
 
     def get_zotero(self):
         """Retrieve the zotero list of dicts for this item"""
@@ -2270,7 +2344,7 @@ class Litref(models.Model):
             data = self.get_zotero()
         result = ""
         back = True
-        ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
+        ok_types = self.ok_types
         oErr = ErrHandle()
 
         try:
@@ -2280,11 +2354,17 @@ class Litref(models.Model):
                 itemType = data['itemType']
 
                 if itemType in ok_types:
+
+                    # Initialise SHORT
+                    result = ""
+                    bNeedShortSave = False
+
                     # Check presence of data
                     sData = json.dumps(data)
                     # Check and adapt the JSON string data
                     if self.data != sData:
                         self.data = sData
+                        bNeedShortSave = True
 
                     # First step: store data 
 
@@ -2352,7 +2432,8 @@ class Litref(models.Model):
                                     result = "{} {} ({})".format(short_title, volume, year)
                                                                           
                         # Fifth step: make short reference for edition (book) 
-                        elif extra == "ed": 
+                        # EK: only i there is a [short_title]
+                        elif extra == "ed" and (short_title != "" or series_number != "" or volume != ""): 
                             if short_title == "PL":
                                 if series_number != "":
                                     result = "{} {}".format(short_title, series_number)
@@ -2395,20 +2476,25 @@ class Litref(models.Model):
                             result = "{} ({})".format(short_title, year)
 
  
-                    if result != "":
+                    if result != "" and self.short != result:
+                        oErr.Status("Update short [{}] to [{}]".format(self.short, result))
                         # update the short field
                         self.short = result
+                        bNeedShortSave = True
 
                     if year != "" and year != "?":
                         try:
                             self.year = int(year)
+                            bNeedShortSave = True
                         except:
                             pass
 
                     # Now update this item
-                    self.save()
+                    if bNeedShortSave:
+                        self.save()
                     
-                  
+                    result = ""
+                    bNeedFullSave = False
                     # Make a full reference for a book
                     authors = Litref.get_creators(data, type="author")
                     
@@ -2469,7 +2555,7 @@ class Litref(models.Model):
                             # There are no editors:
                             if editors == "":
                                 # There is no series name
-                                if series =="":
+                                if series =="" and result == "":
                                     # There is no series number
                                     if series_number =="":
                                         result = "_{}_ {}, {} ({})".format(title, volume, publisher, year)
@@ -2584,12 +2670,15 @@ class Litref(models.Model):
                         result = ". ".join(combi) + "."
                     elif itemType == "webpage":
                         pass
-                    if result != "":
+                    if result != "" and self.full != result:
                         # update the full field
+                        oErr.Status("Update full [{}] to [{}]".format(self.full, result))
                         self.full = result
+                        bNeedFullSave = True
 
                     # Now update this item
-                    self.save()
+                    if bNeedFullSave:
+                        self.save()
                 else:
                     # This item type is not yet supported
                     pass
@@ -2605,6 +2694,20 @@ class Litref(models.Model):
     def get_creators(data, type="author", style=""):
         """Extract the authors"""
 
+        def get_lastname(item):
+            sBack = ""
+            if 'lastName' in item:
+                sBack = item['lastName']
+            elif 'name' in item:
+                sBack = item['name']
+            return sBack
+
+        def get_firstname(item):
+            sBack = ""
+            if 'firstName' in item:
+                sBack = item['firstName']
+            return sBack
+
         oErr = ErrHandle()
         authors = []
         extra = ['data']
@@ -2617,22 +2720,24 @@ class Litref(models.Model):
                     if item['creatorType'] == type:
                         number += 1
                     
+                        firstname = get_firstname(item)
+                        lastname = get_lastname(item)
                         # Add this author
                         if bFirst:
                             # Extremely short: only the last name of the first author TH: afvangen igv geen auteurs
-                            authors.append(item['lastName'])
+                            authors.append(lastname)
                         else:
                             if number == 1 and type == "author":
                                 # First author of anything must have lastname - first initial
-                                authors.append("{}, {}.".format(item['lastName'], item['firstName'][:1]))
+                                authors.append("{}, {}.".format(lastname, firstname[:1]))
                                 if extra == "ed": 
-                                    authors.append("{} {}".format(item['firstName'], item['lastName']))
+                                    authors.append("{} {}".format(firstname, lastname))
                             elif type == "editor":
                                 # Editors should have full first name
-                                authors.append("{} {}".format(item['firstName'], item['lastName']))
+                                authors.append("{} {}".format(firstname, lastname))
                             else:
                                 # Any other author or editor is first initial-lastname
-                                authors.append("{}. {}".format(item['firstName'][:1], item['lastName']))
+                                authors.append("{}. {}".format(firstname[:1], lastname))
                 if bFirst:
                     if len(authors) == 0:
                         result = "(unknown)"
@@ -2644,7 +2749,8 @@ class Litref(models.Model):
                     if number == 1:
                         result = authors[0]
                     elif number == 0:
-                        result = "(no author)"
+                        if type == "author":
+                            result = "(no author)"
                     else:
                         preamble = authors[:-1]
                         last = authors[-1]
@@ -2900,7 +3006,7 @@ class Manuscript(models.Model):
 
     # Where do we get our information from? And when was it added?
     #    Note: deletion of a sourceinfo sets the manuscript.source to NULL
-    source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL)
+    source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL, related_name="sourcemanuscripts")
 
     # [0-1] Each manuscript should belong to a particular project
     project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
@@ -2916,6 +3022,29 @@ class Manuscript(models.Model):
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
+
+    # Scheme for downloading and uploading
+    specification = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
+        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
+        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
+        {'name': 'Title',               'type': 'field', 'path': 'name'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Support',             'type': 'field', 'path': 'support'},
+        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        ]
 
     def __str__(self):
         return self.name
@@ -2983,138 +3112,245 @@ class Manuscript(models.Model):
             bResult = False
         return bResult, msg
 
-    def add_one(oManu):
+    def custom_add(oManu, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
-        oErr = ErrHandle
+        oErr = ErrHandle()
         manu = None
         lst_msg = []
 
-        def add_one_custom(type, value, islist):
-            """Add a custom type"""
-
-            lst_value = []
-
-            try:
-                # Is this a list?
-                if islist:
-                    lst_value = json.loads(value)
-
-                if type == "origin":
-                    # Check if there is an origin with this name
-                    origin = Origin.objects.filter(Q(name__iexact=value)).first()
-                    if origin == None:
-                        # Check for an origin pointing to a location with this name
-                        origin = Origin.objects.filter(Q(location__name__iexact=value)).first()
-                        if origin == None:
-                            lst_msg.append("Please add origina manually: {}".format(value))
-                    if origin != None:
-                        # Add the origin to the manuscript
-                        manu.origin = origin
-                elif type == "keywords":
-                    # Add m2m links for the identified keywords
-                    for kw in lst_value:
-                        keyword = Keyword.objects.filter(name=kw).first()
-                        if keyword == None:
-                            keyword = Keyword.objects.create(name=kw)
-                        # Link the kw to the manuscript
-                        manu.keywords.add(keyword)
-                elif type == "litrefs":
-                    for lref_txt in lst_value:
-                        # The lref_txt should consist of a main type and possibly pages
-                        arLref = lref_txt.split(", pp")
-                        pages = ""
-                        short = arLref[0].replace("<em>", "_").replace("</em>", "_")
-                        if len(arLref) > 0:
-                            pages = arLref[1]
-                        # Get to the correct litref 
-                        lref = Litref.objects.filter(short__iexact = short).first() 
-                        if lref == None:
-                            # Sorry, cannot work with this
-                            lst_msg.append("Please add the reference manually. I cannot find it: {}".format(short))
-                        else:
-                            # We have the reference, now create the right LitrefMan
-                            litrefman = LitrefMan.objects.create(manuscript=manu, reference=lref, pages=pages)
-                elif type == "datasets":
-                    pass
-                elif type == "provenances":
-                    # Add all provenance locations
-                    for prov_loc in lst_value:
-                        # First try a provenance with this name
-                        prov = Provenance.objects.filter(Q(name__iexact=prov_loc)).first()
-                        if prov == None:
-                            # Check if there is a provenance that points to a location with this name?
-                            prov = Provenance.objects.filter(Q(location__name__iexact=prov_loc)).first()
-                            if prov == None:
-                                # Create a new provenance
-                                prov = Provenance.objects.create(name=prov_loc)
-                        # Add the provenance to this manuscript
-                        manu.provenances.add(prov)
-            except:
-                msg = oErr.get_error_message()
-                oErr.DoError("Manuscript/add_one_custom")
-
-        manu_attrib = [
-            {'field': 'title',      'type': 'plain', 'path': 'title'},
-            {'field': 'support',    'type': 'plain', 'path': 'support'},
-            {'field': 'extent',     'type': 'plain', 'path': 'extent'},
-            {'field': 'format',     'type': 'plain', 'path': 'format'},
-            {'field': 'notes',      'type': 'plain', 'path': 'notes'},
-            {'field': 'country',    'type': 'fk',    'path': 'lcountry', 'model': 'Location',   'fk': 'name'},
-            {'field': 'city',       'type': 'fk',    'path': 'lcity',    'model': 'Location',   'fk': 'name'},
-            {'field': 'library',    'type': 'fk',    'path': 'library',  'model': 'Library',    'fk': 'name'},
-            {'field': 'project',    'type': 'fk',    'path': 'project',  'model': 'Project',    'fk': 'name'},
-            {'field': 'external links','type': 'm2o','path': 'url',      'model': "ManuscriptExt"},
-            {'field': 'origin',     'type': 'plain', 'path': 'origin',   'custom': 'origin'},
-            {'field': 'keywords',   'type': 'plain', 'path': 'keywords', 'custom': 'keywords', 'islist': True},
-            {'field': 'literature', 'type': 'plain', 'path': 'litrefs',  'custom': 'litrefs',   'islist': True},
-            {'field': 'personal datasets',  'path': 'collections',      'custom': 'datasets',   'islist': True},
-            {'field': 'provenances',        'path': 'provenances',      'custom': 'provenances', 'islist': True},
-            ]
         try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
             # First get the shelf mark
             idno = oManu.get('shelf mark')
             if idno == None:
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
-                # Create a new manuscript with default values
-                manu = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
-                # Process all fields in manu_attrib
-                for oField in manu_attrib:
-                    field = oField.get("field")
+                # Get the standard project
+                project = Project.get_default(username)
+                # Retrieve or create a new manuscript with default values
+                obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                if obj == None:
+                    # Doesn't exist: create it
+                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
+                        
+                # Process all fields in the Specification
+                for oField in Manuscript.specification:
+                    field = oField.get("name").lower()
                     value = oManu.get(field)
-                    if value != None and value != "":
+                    readonly = oField.get('readonly', False)
+                    if value != None and value != "" and not readonly:
                         path = oField.get("path")
                         type = oField.get("type")
-                        if type == "plain":
+                        if type == "field":
                             # Set the correct field's value
-                            setattr(manu, path, value)
+                            setattr(obj, path, value)
                         elif type == "fk":
-                            fk = oField.get("fk")
+                            fkfield = oField.get("fkfield")
                             model = oField.get("model")
-                            if fk != None and model != None:
+                            if fkfield != None and model != None:
                                 # Find an item with the name for the particular model
-                                cls = AppConfig.get_model(model)
-                                instance = cls.objects.filter(**{"{}".format(fk): value}).first()
+                                cls = apps.app_configs['seeker'].get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
                                 if instance != None:
-                                    setattr(manu, path, instance)
-                        elif type == "m2o":
-                            model = oField.get("model")
-                            if model != None:
-                                # Create a new instance of the other thing
-                                cls = AppConfig.get_model(model)
-                                instance = cls.objects.create(**{"{}".format(path): value, "manuscript": manu})
-                        elif type == "custom":
-                            custom = oField.get("custom")
-                            # Custom processing
-                            add_one_custom(custom, value, oField.get("islist"))
-                        
+                                    setattr(obj, path, instance)
+                        elif type == "func":
+                            # Set the KV in a special way
+                            obj.custom_set(path, value, **kwargs)
 
-
+                # Make sure the updae the object
+                obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/add_one")
-        return manu
+        return obj
+
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                dates = []
+                for obj in qs:
+                    dates.append(obj.__str__())
+                sBack = json.dumps(dates)
+            elif path == "keywords":
+                sBack = self.get_keywords_markdown(plain=True)
+            elif path == "keywordsU":
+                sBack =  self.get_keywords_user_markdown(profile, plain=True)
+            elif path == "datasets":
+                sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
+            elif path == "literature":
+                sBack = self.get_litrefs_markdown(plain=True)
+            elif path == "origin":
+                sBack = self.get_origin()
+            elif path == "provenances":
+                sBack = self.get_provenance_markdown(plain=True)
+            elif path == "external":
+                sBack = self.get_external_markdown(plain=True)
+            elif path == "brefs":
+                sBack = self.get_bibleref(plain=True)
+            elif path == "signaturesM":
+                sBack = self.get_sermonsignatures_markdown(plain=True)
+            elif path == "signaturesA":
+                sBack = self.get_eqsetsignatures_markdown(plain=True)
+            elif path == "ssglinks":
+                sBack = self.get_eqset()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_get")
+        return sBack
+
+    def custom_getkv(self, item, **kwargs):
+        """Get key and value from the manuitem entry"""
+
+        oErr = ErrHandle()
+        key = ""
+        value = ""
+        try:
+            key = item['name']
+            if self != None:
+                if item['type'] == 'field':
+                    value = getattr(self, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(self, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.custom_get(item['path'], kwargs=kwargs)
+                    # Adaptation for empty lists
+                    if value == "[]": value = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_getkv")
+        return key, value
+
+    def custom_set(self, path, value, **kwargs):
+        """Set related items"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            value_lst = []
+            if isinstance(value, str) and value[0] != '[':
+                value_lst = value.split(",")
+                for idx, item in enumerate(value_lst):
+                    value_lst[idx] = value_lst[idx].strip()
+            if path == "dateranges":
+                # TRanslate the string into a list
+                dates = value_lst # json.loads(value)
+                # Possibly add each item from the list, if it doesn't yet exist
+                for date_item in dates:
+                    years = date_item.split("-")
+                    yearstart = years[0]
+                    yearfinish = yearstart
+                    if len(years) > 0: yearfinish = years[1]
+                    obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
+                    if obj == None:
+                        # Doesn't exist, so create it
+                        obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
+            elif path == "keywordsU":
+                # Get the list of keywords
+                user_keywords = value_lst #  json.loads(value)
+                for kw in user_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the manuscript for this user
+                        UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
+            elif path == "datasets":
+                # Walk the personal datasets
+                datasets = value_lst #  json.loads(value)
+                for ds_name in datasets:
+                    # Get the actual dataset
+                    collection = Collection.objects.filter(name=ds_name, owner=profile, type="manu", settype="pd").first()
+                    # Does it exist?
+                    if collection == None:
+                        # Create this set
+                        collection = Collection.objects.create(name=ds_name, owner=profile, type="manu", settype="pd")
+                    # Add manuscript to collection
+                    highest = CollectionMan.objects.filter(collection=collection).order_by('-order').first()
+                    if highest != None and highest.order >= 0:
+                        order = highest.order + 1
+                    else:
+                        order = 1
+                    CollectionMan.objects.create(collection=collection, manuscript=self, order=order)
+            elif path == "literature":
+                # Go through the items to be added
+                litrefs_full = value_lst #  json.loads(value)
+                for litref_full in litrefs_full:
+                    # Divide into pages
+                    arLitref = litref_full.split(", pp")
+                    litref_short = arLitref[0]
+                    pages = ""
+                    if len(arLitref)>1: pages = arLitref[1].strip()
+                    # Find the short reference
+                    litref = Litref.objects.filter(short__iexact = litref_short).first()
+                    if litref != None:
+                        # Create an appropriate LitrefMan object
+                        obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
+            elif path == "origin":
+                if value != "" and value != "-":
+                    # THere is an origin specified
+                    origin = Origin.objects.filter(name__iexact=value).first()
+                    if origin == None:
+                        # Try find it through location
+                        origin = Origin.objects.filter(location__name__iexact=value).first()
+                    if origin == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually origin [{}]".format(intro, value)
+                        self.save()
+                    else:
+                        # The origin can be tied to me
+                        self.origin = origin
+                        self.save()
+                sBack = self.get_origin()
+            elif path == "provenances":
+                provenance_names = value_lst #  json.loads(value)
+                for pname in provenance_names:
+                    pname = pname.strip()
+                    # Try find this provenance
+                    prov_found = Provenance.objects.filter(name__iexact=pname).first()
+                    if prov_found == None:
+                        prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
+                    if prov_found == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
+                        self.save()
+                    else:
+                        # Make a copy of prov_found
+                        provenance = Provenance.objects.create(
+                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
+                        # Make link between provenance and manuscript
+                        ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
+                # Ready
+            elif path == "external":
+                link_names = value_lst #  json.loads(value)
+                for link_name in link_names:
+                    # Create this stuff
+                    ManuscriptExt.objects.create(manuscript=self, url=link_name)
+                # Ready
+            else:
+                # Figure out what to do in this case
+                pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/custom_set")
+            bResult = False
+        return bResult
 
     def find_sermon(self, oDescr):
         """Find a sermon within a manuscript"""
@@ -3408,29 +3644,75 @@ class Manuscript(models.Model):
             sBack = '<span class="project">{}</span>'.format(self.project.name)
         return sBack
 
-    def get_provenance_markdown(self, plain=False):
+    def get_provenance_markdown(self, plain=False, table=True):
         lHtml = []
         # Visit all literature references
-        for prov in self.provenances.all().order_by('name'):
+        # Issue #289: this was self.provenances.all()
+        #             now back to self.provenances.all()
+        order = 0
+        if not plain: 
+            if table: lHtml.append("<table><tbody>")
+        # for prov in self.provenances.all().order_by('name'):
+        for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
+            order += 1
             # Get the URL
+            prov = mprov.provenance
             url = reverse("provenance_details", kwargs = {'pk': prov.id})
-            if prov.location == None:
-                if plain:
-                    lHtml.append(prov.name)
-                else:
-                    # Create a display for this item
-                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, prov.name))
-            else:
-                if plain:
-                    lHtml.append("{}: {}".format(prov.name, prov.location.name))
-                else:
-                    # Create a display for this item
-                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url,prov.name, prov.location.name))
+            sNote = mprov.note
+            if sNote == None: sNote = ""
 
+            if not plain: 
+                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+            sLocName = "" 
+            if prov.location!=None:
+                if plain:
+                    sLocName = prov.location.name
+                else:
+                    sLocName = " ({})".format(prov.location.name)
+            sName = "-" if prov.name == "" else prov.name
+            sLoc = "{} {}".format(sName, sLocName)
+
+            if plain:
+                sMprov = dict(prov=prov.name, location=sLocName)
+            else:
+                sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                if table:
+                    sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        sProvLink, sNote)
+                else:
+                    sMprov = sProvLink
+
+            lHtml.append(sMprov)
+
+            #if prov.location == None:
+            #    if plain:
+            #        mprov_html.append("<span title='{}'>{}</span>".format(sTitle, prov.name))
+            #    else:
+            #        # Create a display for this item
+            #        mprov_html.append("<a href='{}' title='{}'>{}</a>".format(
+            #            url, sTitle, prov.name))
+            #else:
+            #    if plain:
+            #        mprov_html.append("<span title='{}'>{}: {}</span>".format(
+            #            sTitle, prov.name, prov.location.name))
+            #    else:
+            #        # Create a display for this item
+            #        mprov_html.append("<a href='{}' title='{}'>{}: {}</a>".format(
+            #            url, sTitle, prov.name, prov.location.name))
+            #mprov_html.append("</span>")
+            ## COmbine...
+            #lHtml.append("".join(mprov_html))
+
+            # if not plain: lHtml.append("</tr>")
+
+        if not plain: 
+            if table: lHtml.append("</tbody></table>")
         if plain:
             sBack = json.dumps(lHtml)
         else:
-            sBack = ", ".join(lHtml)
+            # sBack = ", ".join(lHtml)
+            sBack = "".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
@@ -3477,14 +3759,20 @@ class Manuscript(models.Model):
         # Check if I am a template
         if self.mtype == "tem":
             # add a clear TEMPLATE indicator with a link to the actual template
-            template = Template.objects.filter(manu=self, profile=profile).first()
+            template = Template.objects.filter(manu=self).first()
+            # Wrong: template = Template.objects.filter(manu=self, profile=profile).first()
+            # (show template even if it is not my own one)
             if template:
                 url = reverse('template_details', kwargs={'pk': template.id})
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
         return sBack
 
-    def get_template_copy(self, mtype = "tem"):
-        """Create a 'template' copy of myself"""
+    def get_manutemplate_copy(self, mtype = "tem", profile=None, template=None):
+        """Create a copy of myself: 
+        
+        - either as 'template' 
+        - or as plain 'manuscript'
+        """
 
         repair = ['parent', 'firstchild', 'next']
         # Get a link to myself and save it to create a new instance
@@ -3494,78 +3782,89 @@ class Manuscript(models.Model):
         obj.pk = None
         obj.mtype = mtype   # Change the type
         obj.stype = "imp"   # Imported
+        # Actions to perform before saving a new template
+        if mtype == "tem":
+            obj.notes = ""
+        # Save the results
         obj.save()
         manu_src = Manuscript.objects.filter(id=manu_id).first()
         # Note: this doesn't copy relations that are not part of Manuscript proper
-        
-        # copy all the sermons...
-        msitems = []
-        with transaction.atomic():
-            # Walk over all MsItem stuff
-            for msitem in manu_src.manuitems.all().order_by('order'):
-                dst = msitem
-                src_id = msitem.id
-                dst.pk = None
-                dst.manu = obj  # This sets the destination's FK for the manuscript
-                                # Does this leave the original unchanged? I hope so...:)
-                dst.save()
-                src = MsItem.objects.filter(id=src_id).first()
-                msitems.append(dict(src=src, dst=dst))
 
-        # Repair all the relationships from sermon to sermon
-        with transaction.atomic():
-            for msitem in msitems:
-                src = msitem['src']
-                dst = msitem['dst']  
-                # Repair 'parent', 'firstchild' and 'next', which are part of MsItem
-                for relation in repair:
-                    src_rel = getattr(src, relation)
-                    if src_rel and src_rel.order:
-                        setattr(dst, relation, obj.manuitems.filter(order=src_rel.order).first())
-                        dst.save()
-                # Copy and save a SermonDescr if needed
-                sermon_src = src.itemsermons.first()
-                if sermon_src != None:
-                    # COpy it
-                    sermon_dst = sermon_src
-                    sermon_dst.pk = None
-                    sermon_dst.msitem = dst
-                    sermon_dst.mtype = mtype   # Change the type
-                    sermon_dst.stype = "imp"   # Imported
-                    sermon_dst.save()
-        # Walk the msitems again, and make sure SSG-links are copied!!
-        with transaction.atomic():
-            for msitem in msitems:
-                src = msitem['src']
-                dst = msitem['dst']  
-                sermon_src = src.itemsermons.first()
-                if sermon_src != None:
-                    # Make sure we also have the destination
-                    sermon_dst = dst.itemsermons.first()
-                    # Walk the SSG links tied with sermon_src
-                    for eq in sermon_src.equalgolds.all():
-                        # Add it to the destination sermon
-                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+        # Copy all the sermons:
+        # obj.load_sermons_from(manu_src, mtype="man", profile=profile)
+        obj.load_sermons_from(manu_src, mtype=mtype, profile=profile)
 
+        # Make sure the body of [obj] works out correctly
+        if mtype != "tem":
+            # This is only done for the creation of manuscripts from a template
+            obj.import_template_adapt(template, profile)
 
         # Return the new object
         return obj
 
-    def import_template(self, template):
+    def import_template_adapt(self, template, profile, notes_only=False):
+        """Adapt a manuscript after importing from template"""
+
+        manu_clear_fields = ['name', 'idno', 'filename', 'url', 'support', 'extent', 'format']
+        manu_none_fields = ['library', 'lcity', 'lcountry', 'origin']
+        oErr = ErrHandle()
+        try:
+            # Issue #314: add note "created from template" to this manuscript
+            sNoteText = self.notes
+            sDate = get_current_datetime().strftime("%d/%b/%Y %H:%M")
+            if sNoteText == "" or sNoteText == None:
+                if notes_only:
+                    sNoteText = "Added sermons from template [{}] on {}".format(template.name, sDate)
+                else:
+                    sNoteText = "Created from template [{}] on {}".format(template.name, sDate)
+            else:
+                sNoteText = "{}. Added sermons from template [{}] on {}".format(sNoteText, template.name, sDate)
+            self.notes = sNoteText
+
+            if not notes_only:
+                # Issue #316: clear a number of fields
+                for field in manu_clear_fields:
+                    setattr(self, field, "")
+                for field in manu_none_fields:
+                    setattr(self, field, None)
+
+            # Make sure to save the result
+            self.save()
+
+            if not notes_only:
+                # Issue #315: copy manuscript keywords
+                for kw in self.keywords.all():
+                    mkw = ManuscriptKeyword.objects.create(manuscript=self, keyword=kw.keyword)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/import_template_adapt")
+
+        return True
+
+    def import_template(self, template, profile):
         """Import the information in [template] into the manuscript [self]"""
 
-        # Get the source manuscript
-        manu_src = template.manu
+        oErr = ErrHandle()
+        try:
+            # Get the source manuscript
+            manu_src = template.manu
 
-        # Copy the sermons from [manu_src] into [self]
-        # NOTE: only if there are no sermons in [self] yet!!!!
-        if self.manuitems.count() == 0:
-            self.load_sermons_from(manu_src, mtype="man")
+            # Copy the sermons from [manu_src] into [self]
+            # NOTE: only if there are no sermons in [self] yet!!!!
+            if self.manuitems.count() == 0:
+                self.load_sermons_from(manu_src, mtype="man", profile=profile)
+
+            # Adapt the manuscript itself
+            self.import_template_adapt(template, profile, notes_only = True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/import_template")
 
         # Return myself again
         return self
 
-    def load_sermons_from(self, manu_src, mtype = "tem"):
+    def load_sermons_from(self, manu_src, mtype = "tem", profile=None):
         """Copy sermons from [manu_src] into myself"""
 
         # Indicate what the destination manuscript object is
@@ -3609,7 +3908,26 @@ class Manuscript(models.Model):
                     sermon_dst.msitem = dst
                     sermon_dst.mtype = mtype   # Change the type
                     sermon_dst.stype = "imp"   # Imported
+
+                    # Issue #315: clear some fields after copying
+                    if mtype == "man":
+                        sermon_dst.locus = ""
+                        sermon_dst.additional = ""
+
+                    # Save the copy
                     sermon_dst.save()
+                else:
+                    head_src = src.itemheads.first()
+                    if head_src != None:
+                        # COpy it
+                        head_dst = head_src
+                        head_dst.pk = None
+                        head_dst.msitem = dst
+                        # NOTE: a SermonHead does *not* have an mtype or stype
+
+                        # Save the copy
+                        head_dst.save()
+
         # Walk the msitems again, and make sure SSG-links are copied!!
         with transaction.atomic():
             for msitem in msitems:
@@ -3623,6 +3941,35 @@ class Manuscript(models.Model):
                     for eq in sermon_src.equalgolds.all():
                         # Add it to the destination sermon
                         SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+
+                    # Issue #315: adapt Bible reference(s) linking based on copied field
+                    if mtype == "man":
+                        sermon_dst.adapt_verses()
+
+                    # Issue #315 note: 
+                    #   this is *NOT* working, because templates do not contain 
+                    #     keywords nor do they contain Gryson/Clavis codes
+                    #   Alternative: 
+                    #     Store the keywords and signatures in a special JSON field in the template
+                    #     Then do the copying based on this JSON field
+                    #     Look at Manuscript.custom_...() procedures to see how this goes
+                    # ===============================================================================
+
+                    ## Issue #315: copy USER keywords - only if there is a profile
+                    #if profile != None:
+                    #    for ukw in sermon_src.sermo_userkeywords.all():
+                    #        # Copy the user-keyword to a new one attached to [sermon_dst]
+                    #        keyword = UserKeyword.objects.create(
+                    #            keyword=ukw.keyword, sermo=sermon_dst, type=ukw.type, profile=profile)
+                    ## Copy KEYWORDS per sermon
+                    #for kw in sermon_src.keywords.all():
+                    #    skw = SermonDescrKeyword.objects.create(sermon=sermon_dst, keyword=kw.keyword)
+
+                    ## Issue #315: copy manual Gryson/Clavis-codes
+                    #for msig in sermon_src.sermonsignatures.all():
+                    #    usig = SermonSignature.objects.create(
+                    #        code=msig.code, editype=msig.editype, gsig=msig.gsig, sermon=sermon_dst)
+
         # Return okay
         return True
 
@@ -4440,6 +4787,52 @@ class Feast(models.Model):
         return sBack
 
 
+class Provenance(models.Model):
+    """The 'origin' is a location where manuscripts were originally created"""
+
+    # [1] Name of the location (can be cloister or anything)
+    name = models.CharField("Provenance location", max_length=LONG_STRING)
+    # [0-1] Optional: LOCATION element this refers to
+    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
+    ## [0-1] Further details are perhaps required too
+    #note = models.TextField("Notes on this provenance", blank=True, null=True)
+
+    ## [1] One provenance belongs to exactly one manuscript
+    #manu = models.ForeignKey(Manuscript, default=0, related_name="manuprovenances")
+
+    def __str__(self):
+        return self.name
+
+    def find_or_create(sName,  city=None, country=None, note=None):
+        """Find a location or create it."""
+
+        lstQ = []
+        obj_loc = Location.get_location(city=city, country=country)
+        lstQ.append(Q(name__iexact=sName))
+        if obj_loc != None:
+            lstQ.append(Q(location=obj_loc))
+        if note!=None: lstQ.append(Q(note__iexact=note))
+        qs = Provenance.objects.filter(*lstQ)
+        if qs.count() == 0:
+            # Create one
+            hit = Provenance(name=sName)
+            if note!=None: hit.note=note
+            if obj_loc != None: hit.location = obj_loc
+            hit.save()
+        else:
+            hit = qs[0]
+        # Return what we found or created
+        return hit
+
+    def get_location(self):
+        if self.location:
+            sBack = self.location.name
+        else:
+            sBack = "-"
+
+        return sBack
+
+
 class EqualGold(models.Model):
     """This combines all SermonGold instance belonging to the same group"""
 
@@ -4472,6 +4865,8 @@ class EqualGold(models.Model):
     hccount = models.IntegerField("Historical Collection count", default=0)
     # [1] The number of SermonDescr linked to me
     scount = models.IntegerField("Sermon set size", default=0)
+    # [1] The number of EqualGold linked to me (i.e. relations.count)
+    ssgcount = models.IntegerField("SSG set size", default=0)
 
     # ============= MANY_TO_MANY FIELDS ============
     # [m] Many-to-many: all the gold sermons linked to me
@@ -4933,6 +5328,15 @@ class EqualGold(models.Model):
         iSize = self.equal_goldsermons.all().count()
         if iSize != sgcount:
             self.sgcount = iSize
+            self.save()
+        return True
+
+    def set_ssgcount(self):
+        # Calculate and set the ssgcount
+        ssgcount = self.ssgcount
+        iSize = self.relations.count()
+        if iSize != ssgcount:
+            self.ssgcount = iSize
             self.save()
         return True
 
@@ -5729,7 +6133,17 @@ class EqualGoldLink(models.Model):
         else:
             # Perform the actual save() method on [self]
             response = super(EqualGoldLink, self).save(force_insert, force_update, using, update_fields)
+            # Adapt the ssgcount
+            self.src.set_ssgcount()
+            self.dst.set_ssgcount()
         # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        eqg_list = [self.src, self.dst]
+        response = super(EqualGoldLink, self).delete(using, keep_parents)
+        for obj in eqg_list:
+            obj.set_ssgcount()
         return response
 
     def get_label(self, do_incexpl=False):
@@ -6074,7 +6488,7 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_template_copy(self, username, mtype):
+    def get_hctemplate_copy(self, username, mtype):
         """Create a manuscript + sermons based on the SSGs in this collection"""
 
         # Double check to see that this is a SSG collection
@@ -6302,6 +6716,35 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
+    # SPecification for download/upload
+    specification = [
+        {'name': 'Order',               'type': ''},
+        {'name': 'Parent',              'type': ''},
+        {'name': 'FirstChild',          'type': ''},
+        {'name': 'Next',                'type': ''},
+        {'name': 'Type',                'type': ''},
+        {'name': 'Status',              'type': 'field', 'path': 'stype'},
+        {'name': 'Locus',               'type': 'field', 'path': 'locus'},
+        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
+        {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
+        {'name': 'Title',               'type': 'field', 'path': 'title'},
+        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
+        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
+        {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
+        {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
+        {'name': 'Note',                'type': 'field', 'path': 'note'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
+        {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
+        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
+        {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
+        {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
+        {'name': 'Literature',          'type': 'func',  'path': 'literature'},
+        {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
+        ]
+
     def __str__(self):
         if self.author:
             sAuthor = self.author.name
@@ -6380,6 +6823,215 @@ class SermonDescr(models.Model):
             msg = oErr.get_error_message()
             bStatus = False
         return bStatus, msg
+
+    def custom_add(oSermo, manuscript, order=None):
+        """Add a manuscript according to the specifications provided"""
+
+        oErr = ErrHandle()
+        obj = None
+        lst_msg = []
+
+        try:
+            # Figure out whether this sermon item already exists or not
+            locus = oSermo['locus']
+            if locus != None and locus != "":
+                # Try retrieve an existing or 
+                obj = SermonDescr.objects.filter(msitem__manu=manuscript, locus=locus, mtype="man").first()
+            if obj == None:
+                # Create a MsItem
+                msitem = MsItem(manu=manuscript)
+                # Possibly add order, parent, firstchild, next
+                if order != None: msitem.order = order
+                # Save the msitem
+                msitem.save()
+
+                # Create a new SermonDescr with default values, tied to the msitem
+                obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
+                        
+            # Process all fields in the Specification
+            for oField in SermonDescr.specification:
+                field = oField.get("name").lower()
+                value = oSermo.get(field)
+                readonly = oField.get('readonly', False)
+                
+                if value != None and value != "" and not readonly:
+                    type = oField.get("type")
+                    path = oField.get("path")
+                    if type == "field":
+                        # Set the correct field's value
+                        setattr(obj, path, value)
+                    elif type == "fk":
+                        fkfield = oField.get("fkfield")
+                        model = oField.get("model")
+                        if fkfield != None and model != None:
+                            # Find an item with the name for the particular model
+                            cls = apps.app_configs['seeker'].get_model(model)
+                            instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                            if instance != None:
+                                setattr(obj, path, instance)
+                    elif type == "func":
+                        # Set the KV in a special way
+                        obj.custom_set(path, value)
+
+            # Make sure the updae the object
+            obj.save()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_add")
+        return obj
+
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                dates = []
+                for obj in qs:
+                    dates.append(obj.__str__())
+                sBack = json.dumps(dates)
+            elif path == "keywords":
+                sBack = self.get_keywords_markdown(plain=True)
+            elif path == "keywordsU":
+                sBack =  self.get_keywords_user_markdown(profile, plain=True)
+            elif path == "datasets":
+                sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
+            elif path == "literature":
+                sBack = self.get_litrefs_markdown(plain=True)
+            elif path == "origin":
+                sBack = self.get_origin()
+            elif path == "provenances":
+                sBack = self.get_provenance_markdown(plain=True)
+            elif path == "external":
+                sBack = self.get_external_markdown(plain=True)
+            elif path == "brefs":
+                sBack = self.get_bibleref(plain=True)
+            elif path == "signaturesM":
+                sBack = self.get_sermonsignatures_markdown(plain=True)
+            elif path == "signaturesA":
+                sBack = self.get_eqsetsignatures_markdown(plain=True)
+            elif path == "ssglinks":
+                sBack = self.get_eqset(plain=True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_get")
+        return sBack
+
+    def custom_getkv(self, item, **kwargs):
+        """Get key and value from the manuitem entry"""
+
+        oErr = ErrHandle()
+        key = ""
+        value = ""
+        try:
+            key = item['name']
+            if self != None:
+                if item['type'] == 'field':
+                    value = getattr(self, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(self, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.custom_get(item['path'], kwargs=kwargs)
+                    # Adaptation for empty lists
+                    if value == "[]": value = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_getkv")
+        return key, value
+
+    def custom_set(self, path, value, **kwargs):
+        """Set related items"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            value_lst = []
+            if isinstance(value, str):
+                if value[0] == '[':
+                    # Make list from JSON
+                    value_lst = json.loads(value)
+                else:
+                    value_lst = value.split(",")
+                    for idx, item in enumerate(value_lst):
+                        value_lst[idx] = value_lst[idx].strip()
+            # Note: we skip a number of fields that are determined automatically
+            #       [ stype ]
+            if path == "brefs":
+                # Set the 'bibleref' field. Note: do *NOT* use value_lst here
+                self.bibleref = value
+                # Turn this into BibRange
+                self.do_ranges()
+            elif path == "keywordsU":
+                # Get the list of keywords
+                user_keywords = value_lst #  get_json_list(value)
+                for kw in user_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the sermon for this user
+                        UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
+            elif path == "datasets":
+                # Walk the personal datasets
+                datasets = value_lst #  get_json_list(value)
+                for ds_name in datasets:
+                    # Get the actual dataset
+                    collection = Collection.objects.filter(name=ds_name, owner=profile, type="sermo", settype="pd").first()
+                    # Does it exist?
+                    if collection == None:
+                        # Create this set
+                        collection = Collection.objects.create(name=ds_name, owner=profile, type="sermo", settype="pd")
+                    # Add manuscript to collection
+                    highest = collection.collections_sermon.all().order_by('-order').first()
+                    order = 1 if higest == None else highest + 1
+                    CollectionSerm.objects.create(collection=collection, sermon=self, order=order)
+            elif path == "ssglinks":
+                ssglink_names = value_lst #  get_json_list(value)
+                for ssg_code in ssglink_names:
+                    # Get this SSG
+                    ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+
+                    if ssg == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.note != "": intro = "{}. ".format(self.note)
+                        self.note = "{}Please set manually the SSG link [{}]".format(intro, ssg_code)
+                        self.save()
+                    else:
+                        # Make link between SSG and SermonDescr
+                        SermonDescrEqual.objects.create(sermon=self, super=ssg, linktype="eqs")
+                # Ready
+            elif path == "signaturesM":
+                signatureM_names = value_lst #  get_json_list(value)
+                for code in signatureM_names:
+                    # Find the SIgnature
+                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Find the editype
+                    if signature == None:
+                        editype = "gr"
+                        if "CPPM" in code:
+                            editype = "cl"
+                    else:
+                        editype = signature.editype
+                    # Create a manual signature
+                    sig_m = SermonSignature.objects.create(code=code, gsig=signature, sermon=self, editype=editype)
+                # Ready
+            else:
+                # Figure out what to do in this case
+                pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/custom_set")
+            bResult = False
+        return bResult
 
     def delete(self, using = None, keep_parents = False):
         # First remove my msitem, if I have one
@@ -6581,7 +7233,7 @@ class SermonDescr(models.Model):
                     bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
                         obj, url, intro, obj.book.latabbr, obj.chvslist, added)
                 html.append(bref_display)
-                sBack = "; ".join(html)
+            sBack = "; ".join(html)
             # Possibly adapt the bibleref
             if bAutoCorrect and self.bibleref != sBack:
                 self.bibleref = sBack
@@ -6614,7 +7266,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
     
-    def get_collections_markdown(self, username, team_group, settype = None, plain=True):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=False):
         lHtml = []
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('sermo', username, team_group, settype = settype).values('id')
@@ -6676,7 +7328,7 @@ class SermonDescr(models.Model):
         ssg_count = SermonDescrEqual.objects.filter(sermon=self).count()
         return ssg_count
 
-    def get_eqset(self):
+    def get_eqset(self, plain=True):
         """GEt a list of SSGs linked to this SermonDescr"""
 
         oErr = ErrHandle()
@@ -6684,13 +7336,16 @@ class SermonDescr(models.Model):
         try:
             ssg_list = self.equalgolds.all().values('code')
             code_list = [x['code'] for x in ssg_list if x['code'] != None]
-            sBack = ", ".join(code_list)
+            if plain:
+                sBack = json.dumps(code_list)
+            else:
+                sBack = ", ".join(code_list)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("get_eqset")
         return sBack
 
-    def get_eqsetsignatures_markdown(self, type="all", plain=True):
+    def get_eqsetsignatures_markdown(self, type="all", plain=False):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
         # Initialize
@@ -6832,7 +7487,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_markdown(self, plain=True):
+    def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
@@ -6850,7 +7505,7 @@ class SermonDescr(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_keywords_user_markdown(self, profile, plain=True):
+    def get_keywords_user_markdown(self, profile, plain=False):
         lHtml = []
         # Visit all keywords
         for kwlink in self.sermo_userkeywords.filter(profile=profile).order_by('keyword__name'):
@@ -6905,7 +7560,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_litrefs_markdown(self, plain=True):
+    def get_litrefs_markdown(self, plain=False):
         # Pass on all the literature from Manuscript to each of the Sermons of that Manuscript
                
         lHtml = []
@@ -7016,7 +7671,7 @@ class SermonDescr(models.Model):
         # Return the sermon signature
         return sermonsig
 
-    def get_sermonsignatures_markdown(self, plain=True):
+    def get_sermonsignatures_markdown(self, plain=False):
         lHtml = []
         # Visit all signatures
         for sig in self.sermonsignatures.all().order_by('-editype', 'code'):
@@ -7048,7 +7703,9 @@ class SermonDescr(models.Model):
         # Check if I am a template
         if self.mtype == "tem":
             # add a clear TEMPLATE indicator with a link to the actual template
-            template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            template = Template.objects.filter(manu=self.msitem.manu).first()
+            # Wrong template = Template.objects.filter(manu=self.msitem.manu, profile=profile).first()
+            # (show template even if it isn't my own one)
             if template:
                 url = reverse('template_details', kwargs={'pk': template.id})
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
@@ -7109,37 +7766,61 @@ class SermonDescr(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        if self.incipit: self.srchincipit = get_searchable(self.incipit)
-        if self.explicit: self.srchexplicit = get_searchable(self.explicit)
+        if self.incipit: 
+            srchincipit = get_searchable(self.incipit)
+            if self.srchincipit != srchincipit:
+                self.srchincipit = srchincipit
+        if self.explicit: 
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchexplicit != srchexplicit:
+                self.srchexplicit = srchexplicit
         # Preliminary saving, before accessing m2m fields
         response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         # Process signatures
         lSign = []
-        bNeedSave = False
+        bCheckSave = False
         for item in self.sermonsignatures.all():
             lSign.append(item.short())
-            bNeedSave = True
+            bCheckSave = True
 
         # =========== DEBUGGING ================
         # self.do_ranges(force = True)
         # ======================================
 
         # Make sure to save the siglist too
-        if bNeedSave: 
-            self.siglist = json.dumps(lSign)
-            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        if bCheckSave: 
+            siglist_new = json.dumps(lSign)
+            if siglist_new != self.siglist:
+                self.siglist = siglist_new
+                # Only now do the actual saving...
+                response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def signature_string(self):
+    def signature_string(self, include_auto = False):
         """Combine all signatures into one string: manual ones"""
 
         lSign = []
-        # Get the manual signatures
+        if include_auto:
+            # Get the automatic signatures
+            equal_set = self.equalgolds.all().values("id")
+            for item in Signature.objects.filter(gold__equal__id__in=equal_set).order_by("-editype", "code"):
+                short = item.short()
+                editype = item.editype
+                url = "{}?sermo-siglist_a={}".format(reverse("sermon_list"), item.id)
+                lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                    editype, short, url, short[:20]))
+
+        # Add the manual signatures
         for item in self.sermonsignatures.all().order_by("-editype", "code"):
-            lSign.append(item.short())
+            short = item.short()
+            editype = item.editype
+            url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
+            lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                editype, short, url, short[:20]))
+
 
         # REturn the combination
-        combi = " | ".join(lSign)
+        combi = " ".join(lSign)
         if combi == "": combi = "[-]"
         return combi
 
@@ -7997,6 +8678,19 @@ class ProvenanceMan(models.Model):
     provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
     # [1] The manuscript this sermon is written on 
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Manuscript-specific provenance note", blank=True, null=True)
+
+    def get_provenance(self):
+        sBack = ""
+        prov = self.provenance
+        sName = ""
+        sLoc = ""
+        url = reverse("provenance_details", kwargs={'pk': self.id})
+        if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
+        if prov.location != None: sLoc = prov.location.name
+        sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
+        return sBack
 
 
 class LitrefMan(models.Model):

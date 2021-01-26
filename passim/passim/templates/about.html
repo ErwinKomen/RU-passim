@@ -24,6 +24,32 @@
       </p>
     </div>
     <div class="col-md-6">
+      <section id='statistics'>
+        <h3>Statistics</h3>
+        <p>Different people have entered manuscripts manually:</p>
+        <table class="func-view">
+          <thead>
+            <tr><th>Person</th><th>Manuscripts</th></tr>
+          </thead>
+          <tbody>
+            {% for item in people %}
+              <tr><td>{{item.person}}</td><td align="right">{{item.count}}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p>We also have read and processed information from external sources:</p>
+        <table class="func-view">
+          <thead>
+            <tr><th>Source url</th><th>Manuscripts</th></tr>
+          </thead>
+          <tbody>
+            {% for item in sites %}
+              <tr><td>{{item.url}}</td><td align="right">{{item.count}}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
       <h3>Quick Reference</h3>
       <p>The main purpose of the Passim web application is to facilitate searches:
       <table>

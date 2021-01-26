@@ -16,11 +16,15 @@
             class="btn btn-xs jumbo-1" onclick="document.getElementById('{{import_button}}').click();">
           <span>Cancel</span>
         </a>
-        <a id="import_select" title="Remove these search results from the basket" 
-            class="btn btn-xs jumbo-3" onclick="document.getElementById('template_import_form').submit();">
+        <a id="import_select" title="Continue and import Manuscript as well as Sermon (manifestations) from the selected template" 
+           class="btn btn-xs jumbo-3" 
+           onclick="ru.passim.seeker.submitform('template_import_form', disable=true);">
           <span>Import</span>
         </a>
 
+      </div>
+      <div class="hidden waiting">
+        <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
       </div>
     </form>
   </div>
