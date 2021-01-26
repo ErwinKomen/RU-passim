@@ -1518,6 +1518,13 @@ span.overlap {
     color: darkgreen; font-size: small;
 }
 
+table.guide-table td {
+    padding: 2px;
+}
+table.guide-table td:hover {
+    background-color: lightblue;
+}
+
 
 /* D3 styles */
 
@@ -1543,14 +1550,17 @@ g > text {
 div.tooltip {
     position: fixed; /*   !important; */
     text-align: center;
-    width: 150px;
+    width: 120px;
     height: 35px;
     padding: 2px;
     font: 12px sans-serif;
-    background: lightsteelblue;
-    border: 0px;
+    background-color: white;
+    /* border: 0px; /* */
+    border: 1px solid lightblue;
     border-radius: 8px;
+    box-shadow: 1px 1px;
     pointer-events: none;
+    opacity: 0.8;
     z-index:1;
 }
 svg .histogram-bar {

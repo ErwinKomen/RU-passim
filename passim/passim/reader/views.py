@@ -965,6 +965,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 for prov_custh_high in manu.findall("./custodhist/p/corpname[@role='4010']"):
                         provtemp_custh_high = prov_custh_high.text 
                         prov_custh_high_list.append(provtemp_custh_high)
+                
                 # URL of the manuscript (HIGH) TH: check
                             
                 # Look for URL of the manuscript - if it exists                                        
@@ -1062,9 +1063,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     else:
                         unit_anccote_final = unit_anccote_final_low
 
-                    # Now the combined old shelfmarks can be stored in the database as notes
+                    # The combined old shelfmarks can now be stored in the database
+                    # For many manuscripts there will be <scopecontent> elements that will also be stored in the 
+                    # notes field, in these cases the contents in the notes field are overwritten by the combined
+                    # ancient shelfmarks and scopececontent, later on.                      
                     manu_obj.notes = unit_anccote_final
-                                                            
+                                                                                
                     # SUPPORT and BINDING of the manuscript
 
                     # Get the support and binding of the manuscript - if it is exists 
@@ -1399,7 +1403,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # NOTES/COMMENTS    
                     
                     # Get to sermons, hier een lijst van te maken, helaas komt scopecontents twee keer voor bij 
-                    # sommige manuscripten zoals LAtin 196
+                    # sommige manuscripten zoals Latin 196
                     # Find notes/comments in scopecontents only when there is a <c> element with manifestations
 
                     # First get the contents 
@@ -1460,110 +1464,135 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     #  de tekst
 
                     # IN CASE THERE ARE NO NESTED <c> ELEMENTS (SermDescr)
+                    
+                    # After a  discussion with Erwin we decided it would make no sense to make sermons of 
+                    # the contents of scopecontents since we do not know when these contents are sermons. 
+                    # Large parts of the code below can be deleted because it was meant to store ALL separate contents 
+                    # of scopecontent as sermons.
+                    
                     # Check if there are titles, heads and manuscripts in nested <c> elements
                     # First if the above is not the case:
                     if len(check_on_c_element) < 1: 
-                        # print("This part works!")
+                     
                         # Create a list to store the msitems from the manifestations
-                        # for processing later on                            
-                        msitems_children = []
+                        # for processing later on  
+                                                  
+                        # msitems_children = []
 
                         # Create a list to store the titles of the manifestations
                         # for processing later on
-                        sermon_manif_titles_3 = []
-                        # Go through all <p> elements
-                        for unit_p in manu.findall("./scopecontent/p"):
-                            sermon_manif_titles_1 = ElementTree.tostring(unit_p, encoding="unicode")
-                            if unit_p is None:
-                                pass
-                        # In case in the <p> element the manifestations are separated by a <lb/> as a 
-                        # selfclosing element, for example with Latin 113:     WOENSDAG mee verder  
-                        # # https://stackoverflow.com/questions/57622731/python-extract-attributes-from-a-self-closing-element-with-same-name-as-other-e  
-                            elif '<lb />' in sermon_manif_titles_1:  
-                                # DIT IS NIEUW
-                                #for unit_lb in unit_p.findall(".//lb"):
-                                #    lb_serm_manif_title_join = ''.join(unit_lb.itertext())
-                                #    print (lb_serm_manif_title_join)
-
-                                # DIT IS OUD, met NIEUW te integreren
-                                
-                                # Here a list is made by splitting up sermon_manif_titles_1
-                                sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
-                            # Clean titles and store in new list 
-                            # is dit nodig?? Would it be possible to see if some parts could be extracted?
-                            # Folia, author,title inc en expl? Terwijl elk deel langskomt? Dus alleen als er aan bepaalde
-                            # voorwaarden wordt voldaan. Als er een ":" is, split en deel[0] is folio? 
-                                for title in sermon_manif_titles_2:
-                                    title_1 = re.sub("[\n\s]+"," ", title)
-                                    #title_2 = re.sub('<[^>]+>', '', title_2)
-                                    title_2 = title_1.strip()
-                                    
-                                    # Store the titles in a new list
-                                    sermon_manif_titles_3.append(title_2)   
-                                #for title in sermon_manif_titles_3:
-                                    # How to extract the folio?
-                                 #   titles_spaced = title.split("ff. ")
-                                  #  title_folio = titles_spaced[0]
-                                   # print(title_folio)
-                                        # how to extract the inc?
-                                        # my_string="hello python world , i'm a beginner "
-                                # print my_string.split("world",1)[1] 
-                                # Menna: dat wat uit de string voor title gehaald kan worden kan ook uit string weggehaald worden
-                                    
-                                    # Create MsItem to store the correct sequence of title, head and manifestations
-                                    # Use order to count the number of MsItems
-                                    msitem = MsItem.objects.create(manu=manu_obj, order=order)
-
-                                    # Add each msitem for each manifestation to the list
-                                    msitems_children.append(msitem)
-
-                                    # Add 1 to order
-                                    order += 1
-                                    # Store manifestations in title in SermDescr with MsItems:
-                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
                         
-                            # In case the manifestations are better described in scopecontent 
-                            # for instance Latin 309 and 330, 1788 example?):
-                            # TH: dit werkt maar hoe de folio eruit? 
-                            elif '<lb />' not in sermon_manif_titles_1:
+                        # sermon_manif_titles_3 = []
+                        
+                        # unit_origination = manu.find("./did/origination")
+
+                        # Find the scopecontent element if it exists.
+                        scopecontent_element = manu.find("./scopecontent")
+                        # Process the scopecontent element:
+                        if scopecontent_element != None and scopecontent_element != "":
+                        
+                            # First get all the text from <scopecontent>
+                            scopecontent_1 = ''.join(scopecontent_element.itertext())
+                                 
+                            # Second clean the string
+                            scopecontent_2 = re.sub("[\n\s]+"," ", scopecontent_1)
+                                                        
+                            # Third strip string of spaces 
+                            scopecontent_3 = scopecontent_2.strip()
+                            print(scopecontent_3)
+
+                            # Now the combined old shelfmarks can be stored in the database in the notes field
+                            # If there is no section <scopecontent> then only the ancienne cotes should be stored. 
+                            # Dit werkt niet igv Latin 196, wel ancienne cotes, geen scopecontent op dat niveau
+                        
+                            manu_obj.notes = unit_anccote_final + " // " + scopecontent_3
+
+                    #    for unit_p in manu.findall("./scopecontent"):
+                    #        sermon_manif_titles_1 = ElementTree.tostring(unit_p, encoding="unicode")
+                    #        print(sermon_manif_titles_1)
+                    #        if unit_p is None:
+                    #            pass
+                    #    # In case in the <p> element the manifestations are separated by a <lb/> as a 
+                    #    # selfclosing element, for example with Latin 113
+                    #    # # https://stackoverflow.com/questions/57622731/python-extract-attributes-from-a-self-closing-element-with-same-name-as-other-e  
+                    #        elif '<lb />' in sermon_manif_titles_1:  
+                    #            # DIT IS NIEUW
+                    #            #for unit_lb in unit_p.findall(".//lb"):
+                    #            #    lb_serm_manif_title_join = ''.join(unit_lb.itertext())
+                    #            #    print (lb_serm_manif_title_join)
+
+                    #            # DIT IS OUD, met NIEUW te integreren
                                 
-                                # First go through all manifestations (all <p> elements)
-                                serm_manif_title_join = ''.join(unit_p.itertext())
-                                serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
-                                sermon_manif_titles_3.append(serm_manif_title)
+                    #            # Here a list is made by splitting up sermon_manif_titles_1
+                    #            sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
+                    #        # Clean titles and store in new list 
+                    #        # is dit nodig?? Would it be possible to see if some parts could be extracted?
+                    #        # Folia, author,title inc en expl? Terwijl elk deel langskomt? Dus alleen als er aan bepaalde
+                    #        # voorwaarden wordt voldaan. Als er een ":" is, split en deel[0] is folio? 
+                    #            for title in sermon_manif_titles_2:
+                    #                title_1 = re.sub("[\n\s]+"," ", title)
+                    #                #title_2 = re.sub('<[^>]+>', '', title_2)
+                    #                title_2 = title_1.strip()
+                                    
+                    #                # Store the titles in a new list
+                    #                sermon_manif_titles_3.append(title_2)   
+                    #            #for title in sermon_manif_titles_3:
+                                    
+                                    
+                    #                # Create MsItem to store the correct sequence of title, head and manifestations
+                    #                # Use order to count the number of MsItems
+                    #                msitem = MsItem.objects.create(manu=manu_obj, order=order)
+
+                    #                # Add each msitem for each manifestation to the list
+                    #                msitems_children.append(msitem)
+
+                    #                # Add 1 to order
+                    #                order += 1
+                    #                # Store manifestations in title in SermDescr with MsItems:
+                    #                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
+                        
+                    #        # In case the manifestations are better described in scopecontent 
+                    #        # for instance Latin 309 and 330, 1788 example?):
+                    #        # TH: dit werkt maar hoe de folio eruit? 
+                    #        elif '<lb />' not in sermon_manif_titles_1:
+                                
+                    #            # First go through all manifestations (all <p> elements)
+                    #            serm_manif_title_join = ''.join(unit_p.itertext())
+                    #            serm_manif_title = re.sub("[\n\s]+"," ", serm_manif_title_join)
+                    #            sermon_manif_titles_3.append(serm_manif_title)
                                 
 
-                                # Check if there is also a head/folio
-                                # Hoe werkt dit in de bestaande loop? bekijkt dus al elk <p> element
-                                # dus steeds in dat element kijken?? Hoe kan ik dat <num> deel uit serm_manif_title halen? 
-                                # Overleg met Erwin na eerst zelf te kijken
-                                sermon_head = unit_p.find("./num")
-                                if sermon_head != None and sermon_head != "":
-                                    serm_folio = sermon_head.text
-                                    print(serm_folio)
-                                else: 
-                                    serm_folio = ''
+                    #            # Check if there is also a head/folio
+                    #            # Hoe werkt dit in de bestaande loop? bekijkt dus al elk <p> element
+                    #            # dus steeds in dat element kijken?? Hoe kan ik dat <num> deel uit serm_manif_title halen? 
+                    #            # Overleg met Erwin na eerst zelf te kijken
+                    #            sermon_head = unit_p.find("./num")
+                    #            if sermon_head != None and sermon_head != "":
+                    #                serm_folio = sermon_head.text
+                    #                print(serm_folio)
+                    #            else: 
+                    #                serm_folio = ''
                                 
-                                # Create MsItem to store the correct sequence of title, head and manifestations
-                                # Use order to count the number of MsItems
-                                msitem = MsItem.objects.create(manu=manu_obj, order=order)
+                    #            # Create MsItem to store the correct sequence of title, head and manifestations
+                    #            # Use order to count the number of MsItems
+                    #            msitem = MsItem.objects.create(manu=manu_obj, order=order)
 
-                                # Add each msitem for each manifestation to the list
-                                msitems_children.append(msitem)
+                    #            # Add each msitem for each manifestation to the list
+                    #            msitems_children.append(msitem)
 
-                                # Add 1 to order
-                                order += 1
-                                # Store manifestations in title in SermDescr with MsItem:
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = serm_manif_title, locus = serm_folio)
+                    #            # Add 1 to order
+                    #            order += 1
+                    #            # Store manifestations in title in SermDescr with MsItem:
+                    #            serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = serm_manif_title, locus = serm_folio)
                     
-                    # Now the next_id's need to be taken care of for the msitems in this manuscript
-                    # TH: dit werkt, alleen next want geen parents en dus ook geen first children
-                        with transaction.atomic():
-                            for idx, msitem in enumerate(msitems_children):
-                            # Treat the next
-                                if idx < len(msitems_children) - 1:
-                                    msitem.next = msitems_children[idx+1]
-                                    msitem.save()            
+                    ## Now the next_id's need to be taken care of for the msitems in this manuscript
+                    ## TH: dit werkt, alleen next want geen parents en dus ook geen first children
+                    #    with transaction.atomic():
+                    #        for idx, msitem in enumerate(msitems_children):
+                    #        # Treat the next
+                    #            if idx < len(msitems_children) - 1:
+                    #                msitem.next = msitems_children[idx+1]
+                    #                msitem.save()            
 
                     
                     # IN CASE OF NESTED <c> ELEMENTS (SermHead, DateRange, SermDescr)
@@ -1671,25 +1700,42 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             sermhead_obj = SermonHead.objects.create(msitem = msitem_parent, title = sermon_title_3, locus = serm_folio)
                                                     
                             # MANIFESTATIONS (with <c> element)
-                                                        
+
+                            # TH: hier kan nog wel wat opgesplitst en verwijderd worden?
+                            
+                            # All separate elements are stored in title since we are not able to automate the splitting up
+                            # of these titles in a proper way. 
+
                             # Grab contents in p under scopecontent in order to
                             # later on store the sermon manifestations
                             scopecontent_p = unit_c.find("./scopecontent/p")
-                            
-                            # Zie ook 1788 dit is eigenlijk hetzelfde als boven, 
 
                             # Create sermon manifestation title 
                             # (store only if there are no multiple sermon manifestations)
                             # Moeten die %% er nog uit?
                             serm_manif_title = '%%'.join(scopecontent_p.itertext())
                             sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode")
-                                            
-                            # Ahhhh, in LAtin 196 gaat het natuurlijk in <c> op verschillende wijzen
 
                             # Differentiatie between scopecontent_p with 1 or more manifestaties, 
                             # separated with an <lb/> element, first 1 manifestation:
                             if '<lb />' not in sermon_manif_titles_1:
                                 print(serm_manif_title)
+
+                                # Split the title to grab the folio TH maybe keep the title
+                                title_split_1 = serm_manif_title.split(" ")
+                                print(title_split_1)
+                                    
+                                folio_1 = title_split_1[1]
+                                folio_2 = re.sub(",", "", folio_1)
+                                print(folio_2)
+
+                                # Grab title (without folio)
+                                title_split_2 = serm_manif_title.split(" ", 2)
+                                print(title_split_2)
+                                title_cleaned = title_split_2[2]
+                                print(title_cleaned)    
+
+
                                 # Create a list to store the msitems from the manifestations
                                 # for processing later on                            
                                 msitems_children = []
@@ -1705,7 +1751,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                 # Add 1 to order
                                 order += 1
                                 # Store manifestations in title in SermDescr with MsItem:
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = serm_manif_title)
+                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title_cleaned, locus = folio_2, note = serm_manif_title )
                                 
                             # Dit lijkt goed te gaan maar is niet ideaal want er 
                             # blijven soms codes in de sermon zitten
@@ -1714,22 +1760,62 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             elif '<lb />' in sermon_manif_titles_1:                                
                                 # Split up the string maar er komt geen list uit. TH: werkt nog niet, wordt niet gesplitst!
                                 sermon_manif_titles_3 = []
+                                dict_temp = {}
                                 sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
                                 # Clean titles and store in new list
-                                # is dit nodig??
+                                # is dit nodig?? HIER VERDER verder, lijst maken wat er uit te halen valt en wat er op te splitsen valt
+                                # folio iig, en alle elementen enzo
+                                # denk met re sub of zoiets micha vragen
+                                # </persname>,<persname>, <p>
+                                # https://stackoverflow.com/questions/8784396/how-to-delete-the-words-between-two-delimiters
                                 for title in sermon_manif_titles_2:
                                     title_1 = re.sub("[\n\s]+"," ", title)
+                                                                        
+                                    # Get rid of all the elements
+                                    title_2a = re.sub('<[^>]+>', '', title_1)
                                     
-                                    title_2 = title_1.strip()
-                                    print(title_2)
-                                    sermon_manif_titles_3.append(title_2)
-                                                                   
+                                    # Strip the title
+                                    title_2b = title_2a.strip()                                   
+
+                                    # Add the cleaned title to the list
+                                    if title_2b != "":
+                                        sermon_manif_titles_3.append(title_2b)
+                                    
+                                    title_split_1_lb = title_2b.split(" ")
+                                    print(title_split_1_lb)                                                                                                                
+                                    
+                                    # Grab folio 
+                                    folio_1_lb = title_split_1_lb[1]
+                                    folio_2_lb = re.sub(",", "", folio_1_lb)
+                                    print(folio_2_lb)
+                                    # Folio aan een lijst toevoegen of dictionary?
+                                    
+                                    # Grab title (without folio)
+                                    title_split_2 = title_2b.split(" ", 2)
+                                    print(title_split_2)
+                                    title_temp_lb = title_split_2[2] 
+                                    
+                                    # Append to dictionary TH: hiermee verder, ff checken of dit werkt
+                                    
+
+                                    dict_temp['folio'] = folio_2_lb
+                                    dict_temp['title'] = title_temp_lb
+                                    # dict_temp['notes'] = alles pakken
+
+                                    print(dict_temp)
+                                    # sermon_folio_3.append(folio_2)
+                                    # Add the title and folio to a 2d array
+                                    # https://snakify.org/en/lessons/two_dimensional_lists_arrays/
+
+                                    # split the title to grab everything
+                                    
                                 # Create a list to store the msitems from the manifestations
-                                # for processing later on                            
+                                # for processing later on 
+                                                            
                                 msitems_children = []
 
                                 # Opslaan van de inhoud van de lijst
-                                # Create new Sermon Description TH: werkt het nou goed? Nee, laatste title = "</p>"
+                                # Create new Sermon Description TH: werkt het nou goed? 
                                 for title in sermon_manif_titles_3:                                    
                                     # Create MsItem to store the correct sequence of title, head and manifestations
                                     # Use order to count the number of MsItems, add the parent of the item
@@ -1743,7 +1829,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     order += 1
                                     # Store manifestations in title in SermDescr with MsItems:
                                     # order moet ook hier erin komen te staan volgens mij
-                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
+                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title, locus = folio_2)
                             
                             # Now all children are in msitem_children!
                             # Dit handelt dus alleen in MsItems eea af!
@@ -1776,16 +1862,15 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Save the results
                     manu_obj.save()
                 
-                    # Look for external references TH tijdelijk even eruit!
+                    # Look for external references 
                     for extref in manu.findall("./bibliography/bibref/extref"):
                         if extref is None:
                             continue
                         url = extref.attrib.get('href')
                         if url != None:
-                            # Create new ManuscriptExt
+                            # Create new ManuscriptExt object
                             mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
-            
-            # Take care of collection of manuscripts under one shelfmark for example: Latin 2013-2023
+                      
 
             
             pass
