@@ -5184,6 +5184,10 @@ class EqualGold(models.Model):
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
         return sBack
 
+    def get_passimcode(self):
+        code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
+        return code
+
     def get_passimcode_markdown(self):
         lHtml = []
         # Add the PASSIM code
@@ -7796,7 +7800,7 @@ class SermonDescr(models.Model):
                 response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def signature_string(self, include_auto = False):
+    def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
 
         lSign = []
@@ -7812,15 +7816,21 @@ class SermonDescr(models.Model):
 
         # Add the manual signatures
         for item in self.sermonsignatures.all().order_by("-editype", "code"):
-            short = item.short()
-            editype = item.editype
-            url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
-            lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
-                editype, short, url, short[:20]))
+            if do_plain:
+                lSign.append(item.short())
+            else:
+                short = item.short()
+                editype = item.editype
+                url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
+                lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                    editype, short, url, short[:20]))
 
 
         # REturn the combination
-        combi = " ".join(lSign)
+        if do_plain:
+            combi = " | ".join(lSign)
+        else:
+            combi = " ".join(lSign)
         if combi == "": combi = "[-]"
         return combi
 
@@ -8279,6 +8289,26 @@ class ManuscriptKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class ManuscriptCorpus(models.Model):
+    """A user-SSG-specific manuscript corpus"""
+
+    # [1] Each corpus is created with a particular SSG as starting point
+    super = models.ForeignKey(EqualGold, related_name="supercorpora", on_delete=models.CASCADE)
+
+    # Links: source.SSG - target.SSG - manu
+    # [1] Link-item 1: source
+    source = models.ForeignKey(EqualGold, related_name="sourcecorpora", on_delete=models.CASCADE)
+    # [1] Link-item 2: target
+    target = models.ForeignKey(EqualGold, related_name="targetcorpora", on_delete=models.CASCADE)
+    # [1] Link-item 3: manuscript
+    manu = models.ForeignKey(Manuscript, related_name="manucorpora", on_delete=models.CASCADE)
+
+    # [1] Each corpus belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profilecorpora", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+    
+
 class UserKeyword(models.Model):
     """Relation between a M/S/SG/SSG and a Keyword - restricted to user"""
 
@@ -8367,6 +8397,8 @@ class SermonDescrEqual(models.Model):
 
     # [1] The sermondescr
     sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_super")
+    # [0-1] The manuscript in which the sermondescr resides
+    manu = models.ForeignKey(Manuscript, related_name="sermondescr_super", blank=True, null=True)
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
@@ -8406,6 +8438,10 @@ class SermonDescrEqual(models.Model):
         return response
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Automatically provide the value for the manuscript through the sermon
+        manu = self.sermon.msitem.manu
+        if self.manu != manu:
+            self.manu = manu
         # First do the saving
         response = super(SermonDescrEqual, self).save(force_insert, force_update, using, update_fields)
         # Perform the scount

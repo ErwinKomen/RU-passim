@@ -33,6 +33,7 @@ from time import sleep
 import fnmatch
 import sys, os
 import base64
+import copy
 import json
 import csv, re
 import requests
@@ -76,7 +77,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptCorpus, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -4277,11 +4278,13 @@ class BasicPart(View):
                 self.data['redirecturl'] = ''
             elif self.action == "delete":
                 self.data['html'] = "deleted" 
-            else:
+            elif self.template_name != None:
                 # In this case reset the errors - they should be shown within the template
                 sHtml = render_to_string(self.template_name, context, request)
                 sHtml = treat_bom(sHtml)
                 self.data['html'] = sHtml
+            else:
+                self.data['html'] = 'no template_name specified'
 
             # At any rate: empty the error basket
             self.arErr = []
@@ -6117,42 +6120,48 @@ class SermonDetails(SermonEdit):
         # Start by executing the standard handling
         context = super(SermonDetails, self).add_to_context(context, instance)
 
-        # Are we copying information?? (only allowed if we are the app_editor)
-        if 'supercopy' in self.qd and context['is_app_editor']:
-            # Get the ID of the SSG from which information is to be copied to the S
-            superid = self.qd['supercopy']
-            # Get the SSG instance
-            equal = EqualGold.objects.filter(id=superid).first()
+        oErr = ErrHandle()
 
-            if equal != None:
-                # Copy all relevant information to the EqualGold obj (which is a SSG)
-                obj = self.object
-                # (1) copy author
-                if equal.author != None: obj.author = equal.author
-                # (2) copy incipit
-                if equal.incipit != None and equal.incipit != "": obj.incipit = equal.incipit ; obj.srchincipit = equal.srchincipit
-                # (3) copy explicit
-                if equal.explicit != None and equal.explicit != "": obj.explicit = equal.explicit ; obj.srchexplicit = equal.srchexplicit
+        try:
+            # Are we copying information?? (only allowed if we are the app_editor)
+            if 'supercopy' in self.qd and context['is_app_editor']:
+                # Get the ID of the SSG from which information is to be copied to the S
+                superid = self.qd['supercopy']
+                # Get the SSG instance
+                equal = EqualGold.objects.filter(id=superid).first()
 
-                # Now save the adapted EqualGold obj
-                obj.save()
+                if equal != None:
+                    # Copy all relevant information to the EqualGold obj (which is a SSG)
+                    obj = self.object
+                    # (1) copy author
+                    if equal.author != None: obj.author = equal.author
+                    # (2) copy incipit
+                    if equal.incipit != None and equal.incipit != "": obj.incipit = equal.incipit ; obj.srchincipit = equal.srchincipit
+                    # (3) copy explicit
+                    if equal.explicit != None and equal.explicit != "": obj.explicit = equal.explicit ; obj.srchexplicit = equal.srchexplicit
 
-                # Mark these changes, which are done outside the normal 'form' system
-                actiontype = "save"
-                changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
-                details = dict(savetype="change", id=obj.id, changes=changes)
-                passim_action_add(self, obj, details, actiontype)
+                    # Now save the adapted EqualGold obj
+                    obj.save()
 
-            # And in all cases: make sure we redirect to the 'clean' GET page
-            self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
-        else:
-            context['sections'] = []
+                    # Mark these changes, which are done outside the normal 'form' system
+                    actiontype = "save"
+                    changes = dict(author=obj.author.id, incipit=obj.incipit, explicit=obj.explicit)
+                    details = dict(savetype="change", id=obj.id, changes=changes)
+                    passim_action_add(self, obj, details, actiontype)
 
-            # List of post-load objects
-            context['postload_objects'] = []
+                # And in all cases: make sure we redirect to the 'clean' GET page
+                self.redirectpage = reverse('sermon_details', kwargs={'pk': self.object.id})
+            else:
+                context['sections'] = []
 
-            # Lists of related objects
-            context['related_objects'] = []
+                # List of post-load objects
+                context['postload_objects'] = []
+
+                # Lists of related objects
+                context['related_objects'] = []
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDetails/add_to_context")
 
         # Return the context we have made
         return context
@@ -6358,7 +6367,7 @@ class SermonListView(BasicList):
             else:
                 html.append("<span><i>(unknown)</i></span>")
         elif custom == "signature":
-            html.append(instance.signature_string(include_auto=True))
+            html.append(instance.signature_string(include_auto=True, do_plain=False))
         elif custom == "incexpl":
             html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
             dots = "..." if instance.incipit else ""
@@ -11606,7 +11615,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 for sermonlink in qs_s:
                     sermon = sermonlink.sermon
                     # Get the 'item': the manuscript
-                    item = sermon.manu
+                    # OLD: item = sermon.manu
+                    item = sermon.msitem.manu
                     rel_item = []
                 
                     if method == "FourColumns":
@@ -11691,9 +11701,23 @@ class EqualGoldDetails(EqualGoldEdit):
                         '<span title="Explicit">expl.</span>', 
                         '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
                         ]
+
+                # Add a custom button to the manuscript listview: to trigger showing a graph
+                html = []
+                html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
+                html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
+                custombutton = "\n".join(html)
+                manuscripts['custombutton'] = custombutton
+
+                # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
 
                 context['related_objects'] = related_objects
+
+                # THe graph also needs room in after details
+                context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
+                context['after_details'] = render_to_string('seeker/super_graph.html', context, self.request)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldDetails/add_to_context")
@@ -11709,6 +11733,85 @@ class EqualGoldDetails(EqualGoldEdit):
 
     def after_save(self, form, instance):
         return True, ""
+
+
+class EqualGoldGraph(BasicPart):
+    """Prepare for a network graph"""
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+        oErr = ErrHandle()
+        try:
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            # Get the 'manuscript-corpus': the manuscripts in which the same kind of sermon like me is
+            manu_list = SermonDescrEqual.objects.filter(super=instance).distinct().values("manu_id")
+            manu_dict = {}
+            for idx, manu in enumerate(manu_list):
+                manu_dict[manu['manu_id']] = idx + 1
+
+            # Remove corpora containing any of these manuscripts
+            ManuscriptCorpus.objects.filter(profile=profile, super=instance).delete()
+
+            # Walk the manuscripts one by one
+            with transaction.atomic():
+                for manu in manu_list:
+                    manu_id = manu['manu_id']
+                    # Get a list of SSGs here
+                    ssg_list = SermonDescrEqual.objects.filter(manu__id=manu_id).distinct().values('super_id')
+                    # Create a list of links from ssg to ssg via the manu
+                    for idx, ssg_src in enumerate(ssg_list):
+                        source_id = ssg_src['super_id']
+
+                        for idx_dst in range(idx+1, len(ssg_list) - 1):
+                            target_id = ssg_list[idx_dst]['super_id']
+
+                            # Add link
+                            link = ManuscriptCorpus.objects.create(
+                                    profile=profile, super=instance,
+                                    source_id=source_id, target_id=target_id, manu_id=manu_id)
+
+
+            # Get the list
+            qs = ManuscriptCorpus.objects.filter(super=instance).order_by(
+                'source_id', 'target_id').values(
+                'source_id', 'target_id', 'manu_id', 'source__code', 'target__code')
+            link_list = []
+            node_list = []
+            node_dict = {}
+            oItem = None
+            for item in qs:
+                if oItem == None or oItem['source'] != item['source_id'] or oItem['target'] != item['target_id']:
+                    # Determine source and target
+                    source_code = item['source__code']
+                    source = source_code if source_code != None and source_code != "" else "(nocode_{})".format(item['source_id'])
+                    target_code = item['target__code']
+                    target = target_code if target_code != None and target_code != "" else "(nocode_{})".format(item['target_id'])
+                    # Store them
+                    oItem = dict(source_id=item['source_id'], source=source,
+                                 target_id=item['target_id'], target=target,
+                                 value=1)
+                    link_list.append(oItem)
+                    if not item['source_id'] in node_dict:
+                        node_dict[item['source_id']] = dict(group= manu_dict[item['manu_id']], id=source)
+                else:
+                    # Same item: increment counter
+                    oItem['value'] += 1
+            # Turn the node_dict into a list
+            node_list = [dict(id=v['id'], group=v['group']) for k,v in node_dict.items()]
+
+            # Add the information to the context in data
+            context['data'] = dict(node_list=node_list, link_list=link_list)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldGraph/add_to_context")
+
+        return context
+
 
 
 class EqualGoldListView(BasicList):
@@ -11888,6 +11991,18 @@ class EqualGoldListView(BasicList):
                 # Remove all self-links
                 EqualGoldLink.objects.filter(id__in=must_delete).delete()
             Information.set_kvalue("ssgselflink", "done")
+
+        if Information.get_kvalue("add_manu") != "done":
+            # Walk all SSGs
+            with transaction.atomic():
+                # Walk all SSG links
+                for link in SermonDescrEqual.objects.all():
+                    # Get the manuscript for this sermon
+                    manu = link.sermon.msitem.manu
+                    # Add it
+                    link.manu = manu
+                    link.save()
+            Information.set_kvalue("add_manu", "done")
 
         return None
     

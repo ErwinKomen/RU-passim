@@ -175,6 +175,11 @@
                   <div class="col-md-12">
                     <h4>
                       <span>{{related.title}}</span>
+                      {% if related.custombutton %}
+                        <span class="pull-right">
+                          {{related.custombutton|safe}}
+                        </span>
+                      {% endif %}
                       {% if related.savebuttons %}
                         <span class="hidden related-save pull-right">
                           <span style="font-size: x-small;">

@@ -106,6 +106,7 @@ urlpatterns = [
     #url(r'^ssg/eqset(?:/(?P<pk>\d+))?/$', EqualGoldEqualset.as_view(), name='equalgold_eqset'),
     #url(r'^ssg/linkset(?:/(?P<pk>\d+))?/$', EqualGoldLinkset.as_view(), name='equalgold_linkset'),
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
+    url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),

@@ -4562,6 +4562,59 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * network_graph
+       *   Create and show a network graph
+       *
+       */
+      network_graph: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            link_list = null,
+            node_list = null,
+            divNetwork = "#ssg_network";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  node_list = response.node_list;
+                  link_list = response.link_list;
+                  // Use D3 to create a network visualisation
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_graph)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_graph", ex);
+        }
+      },
+
+      /**
        * formset_setdel
        *   Set the delete checkbox of me
        *
