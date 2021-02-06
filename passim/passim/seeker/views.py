@@ -77,7 +77,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptCorpus, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptCorpus, ManuscriptCorpusLock, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -11741,6 +11741,13 @@ class EqualGoldGraph(BasicPart):
     MainModel = EqualGold
 
     def add_to_context(self, context):
+        def get_author(code):
+            """Get the author id from the passim code"""
+            author = 10000
+            if "PASSIM" in code:
+                author = int(code.replace("PASSIM", "").strip().split(".")[0])
+            return author
+
         oErr = ErrHandle()
         try:
             # Need to figure out who I am
@@ -11752,39 +11759,68 @@ class EqualGoldGraph(BasicPart):
             manu_dict = {}
             for idx, manu in enumerate(manu_list):
                 manu_dict[manu['manu_id']] = idx + 1
+            author_dict = {}
 
+            lock_status = "new"
             # Remove corpora containing any of these manuscripts
-            ManuscriptCorpus.objects.filter(profile=profile, super=instance).delete()
+            lock = ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).last()
+            if lock != None:
+                lock_status = lock.status
+                # Check the status
+                if lock_status == "busy":
+                    # Already busy
+                    return context
+            else:
+                # Need to create a lock
+                lock = ManuscriptCorpusLock.objects.create(profile=profile, super=instance)
+                lock_status = "busy"
 
-            # Walk the manuscripts one by one
-            with transaction.atomic():
-                for manu in manu_list:
-                    manu_id = manu['manu_id']
-                    # Get a list of SSGs here
-                    ssg_list = SermonDescrEqual.objects.filter(manu__id=manu_id).distinct().values('super_id')
-                    # Create a list of links from ssg to ssg via the manu
-                    for idx, ssg_src in enumerate(ssg_list):
-                        source_id = ssg_src['super_id']
+            # Set the status to 'busy'
+            lock.status = lock_status
+            lock.save()
 
-                        for idx_dst in range(idx+1, len(ssg_list) - 1):
-                            target_id = ssg_list[idx_dst]['super_id']
+            if lock_status == "new":
+                # Remove corpora containing any of these manuscripts
+                ManuscriptCorpus.objects.filter(profile=profile, super=instance).delete()
 
-                            # Add link
-                            link = ManuscriptCorpus.objects.create(
-                                    profile=profile, super=instance,
-                                    source_id=source_id, target_id=target_id, manu_id=manu_id)
+                # Walk the manuscripts one by one
+                with transaction.atomic():
+                    for manu in manu_list:
+                        manu_id = manu['manu_id']
+                        # Get a list of SSGs here
+                        ssg_list = SermonDescrEqual.objects.filter(manu__id=manu_id).distinct().values('super_id')
+                        # Create a list of links from ssg to ssg via the manu
+                        for idx, ssg_src in enumerate(ssg_list):
+                            source_id = ssg_src['super_id']
 
+                            for idx_dst in range(idx+1, len(ssg_list) - 1):
+                                target_id = ssg_list[idx_dst]['super_id']
+
+                                # Add link
+                                link = ManuscriptCorpus.objects.create(
+                                        profile=profile, super=instance,
+                                        source_id=source_id, target_id=target_id, manu_id=manu_id)
+
+
+            # DEBUGGING
+            debug_code = "PASSIM 002.0001"
+            lstQ = []
+            lstQ.append(Q(profile=profile))
+            lstQ.append(Q(super=instance))
+            lstQ.append(Q(source__code__icontains=debug_code)|Q(target__code__icontains=debug_code))
+            attempt = ManuscriptCorpus.objects.filter(*lstQ)
 
             # Get the list
-            qs = ManuscriptCorpus.objects.filter(super=instance).order_by(
+            qs = ManuscriptCorpus.objects.filter(profile=profile, super=instance).order_by(
                 'source_id', 'target_id').values(
                 'source_id', 'target_id', 'manu_id', 'source__code', 'target__code')
-            link_list = []
+            link_list_all = []
             node_list = []
             node_dict = {}
+            max_value = 1
             oItem = None
             for item in qs:
-                if oItem == None or oItem['source'] != item['source_id'] or oItem['target'] != item['target_id']:
+                if oItem == None or oItem['source_id'] != item['source_id'] or oItem['target_id'] != item['target_id']:
                     # Determine source and target
                     source_code = item['source__code']
                     source = source_code if source_code != None and source_code != "" else "(nocode_{})".format(item['source_id'])
@@ -11794,17 +11830,32 @@ class EqualGoldGraph(BasicPart):
                     oItem = dict(source_id=item['source_id'], source=source,
                                  target_id=item['target_id'], target=target,
                                  value=1)
-                    link_list.append(oItem)
+                    link_list_all.append(oItem)
                     if not item['source_id'] in node_dict:
-                        node_dict[item['source_id']] = dict(group= manu_dict[item['manu_id']], id=source)
+                        node_dict[item['source_id']] = dict(group=get_author(source), manu=manu_dict[item['manu_id']], id=source)
+                    if not item['target_id'] in node_dict:
+                        node_dict[item['target_id']] = dict(group=get_author(target), manu=manu_dict[item['manu_id']], id=target)
                 else:
                     # Same item: increment counter
                     oItem['value'] += 1
+                    if oItem['value'] > max_value:
+                        max_value = oItem['value']
+            # Remove the links with value 1
+            link_list = [x for x in link_list_all if x['value'] > 1]
+
             # Turn the node_dict into a list
-            node_list = [dict(id=v['id'], group=v['group']) for k,v in node_dict.items()]
+            node_list_unsorted = [dict(id=v['id'], group=v['group']) for k,v in node_dict.items()]
+            node_list = sorted(node_list_unsorted, key = lambda x: x['id'])
 
             # Add the information to the context in data
-            context['data'] = dict(node_list=node_list, link_list=link_list)
+            context['data'] = dict(node_list=node_list, 
+                                   link_list=link_list,
+                                   max_value=max_value,
+                                   legend="SSG network")
+            
+            # Can remove the lock
+            lock.status = "ready"
+            lock.save()
 
         except:
             msg = oErr.get_error_message()

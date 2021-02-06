@@ -29,6 +29,8 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_bManuSaved = false,
         loc_vscrolling = 0,
+        loc_simulation = null,
+        loc_network_options = {},
         loc_newSermonNumber = 0,
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
@@ -83,6 +85,40 @@ var ru = (function ($, ru) {
     // Private methods specification
     var private_methods = {
       /**
+       *
+       */
+      addLegend: function (options) {
+        var sMethod = "", // Sampling method
+            iSize = 0,    // Sample size
+            sExcl = "";   // Exclusion string
+
+        try {
+          // Check to see if the correct options are there
+          if (!('divsvg' in options && 'x' in options &&
+                 'y' in options && 'legend' in options)) {
+            private_methods.errMsg("Error in addLegend: missing option");
+            return false;
+          }
+          d3.select(options['divsvg']).append("svg:g")
+              .append("svg:text")
+              .attr("x", options['x'])
+              .attr("y", options['y'])
+              .attr("class", "ca-legendtext")
+              .text(options['legend']);
+          d3.select(options['divsvg']).append("svg:g")
+              .append("svg:text")
+              .attr("x", options['x'])
+              .attr("y", options['y'] + 15)
+              .attr("class", "ca-legendtext");
+
+          return true;
+        } catch (err) {
+          private_methods.errMsg("addLegend", err);
+          return false;
+        }
+      },
+
+      /**
        * fitFeatureBox
        *    Initialize the <svg> in the @sDiv
        * 
@@ -117,6 +153,61 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("fitFeatureBox", ex);
           return oBound;
+        }
+      },
+
+      /**
+       * getIntParam - get a numerical parameter from the qdict
+       *  
+       * @param {object} qdict
+       * @param {string} sParamName
+       * @param {int}    iDefault
+       * @returns {Number}
+       */
+      getIntParam: function (qdict, sParamName, iDefault) {
+        var iBack = 0,  // Integer value
+          sBack = "";   // Value as string
+
+        try {
+          // Validate
+          if (qdict === undefined || qdict === null) return -1;
+          if (sParamName === undefined || sParamName === "") return -1;
+          if (qdict.hasOwnProperty(sParamName)) {
+            sBack = qdict[sParamName];
+            if (/^\+?(0|[1-9]\d*)$/.test(sBack)) {
+              iBack = Number(sBack);
+            }
+          } else if (iDefault !== undefined) {
+            iBack = iDefault;
+          }
+          // Return what we have found
+          return iBack;
+        } catch (err) {
+          private_methods.errMsg("getIntParam", err);
+          return -1;
+        }
+      },
+
+      /**
+       * getStringParam - get a string parameter from the qdict
+       *  
+       * @param {type} qdict
+       * @param {type} sParamName
+       * @returns {String}
+       */
+      getStringParam: function (qdict, sParamName) {
+        var sBack = "";
+        try {
+          // Validate
+          if (qdict === undefined || qdict === null) return "";
+          if (sParamName === undefined || sParamName === "") return "";
+          if (qdict.hasOwnProperty(sParamName)) {
+            sBack = qdict[sParamName].toString().trim();
+          }
+          return sBack;
+        } catch (err) {
+          private_methods.errMsg("getStringParam", err);
+          return "";
         }
       },
 
@@ -1378,6 +1469,156 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * draw_network
+       *    draw a force-directed network (e.g. for Cluster Analysis)
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            divSvg,   // The target svg div
+            color,    // D3 color scheme
+            factor,
+            width,
+            height,
+            p = {},
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          color = network_color;
+
+          // Append a legend
+          private_methods.addLegend({
+            'x': width / 2,
+            'y': height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation =  d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result;
+                // This determines the size of each link
+                // Should be: result = d.value * factor;
+                result = d.id;
+                return result;
+              }))
+              // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
+              .force("charge", d3.forceManyBody().strength(0))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(options['links'])
+                    .join("line")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(options['nodes'])
+                    .join("circle")
+                    .attr("r", 5)
+                    .attr("fill", color)
+                    .call(network_drag(loc_simulation));
+
+
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.id; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+                  .text(function (d) { return d.value; });
+
+          // Then execute the simulation
+          // loc_simulation.restart();
+
+          // Define the 'ticked' function
+          function ticked() {
+            link
+                .attr("x1", function (d) { return d.source.x; })
+                .attr("y1", function (d) { return d.source.y; })
+                .attr("x2", function (d) { return d.target.x; })
+                .attr("y2", function (d) { return d.target.y; });
+            node
+                .attr("cx", function (d) { return d.x; })
+                .attr("cy", function (d) { return d.y; });
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            if (d.group > 1) {
+              col_result = "aap";
+            }
+            col_result = scale(d.group);
+            return col_result;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.3).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network", ex);
+          return false;
+        }
+      },
+
       errMsg: function (sMsg, ex, bNoCode) {
         var sHtml = "",
             bCode = true;
@@ -1444,6 +1685,8 @@ var ru = (function ($, ru) {
           $(el).addClass("hidden");
         }
       }
+
+
     }
 
     // Public methods
@@ -4570,13 +4813,22 @@ var ru = (function ($, ru) {
         var targeturl = "",
             frm = null,
             data = null,
+            options = {},
             link_list = null,
             node_list = null,
+            lock_status = "",
+            iWidth = 800,
+            iHeight = 500,
+            max_value = 0,
+            divTarget = "super_network",
+            divWait = "#super_network_wait",
             divNetwork = "#ssg_network";
 
         try {
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
           // Get the target url
           frm = $(divNetwork).find("form").first();
           targeturl = $(frm).attr("action");
@@ -4588,13 +4840,26 @@ var ru = (function ($, ru) {
             if (response === undefined || response === null || !("status" in response)) {
               private_methods.errMsg("No status returned");
             } else {
+              $(divWait).addClass("hidden");
               switch (response.status) {
                 case "ready":
                 case "ok":
                   // Then retrieve the data here: two lists
-                  node_list = response.node_list;
-                  link_list = response.link_list;
-                  // Use D3 to create a network visualisation
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network(options);
 
                   break;
                 case "error":

@@ -1596,4 +1596,15 @@ svg .histogram-bar:focus {
     animation-fill-mode: forwards;
 }
 
+svg .links {
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
+svg .nodes {
+    stroke: #fff;
+    stroke-width: 1.5;
+}
+
 /* END OF D3 Section */
+
+

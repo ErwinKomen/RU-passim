@@ -8307,6 +8307,21 @@ class ManuscriptCorpus(models.Model):
     profile = models.ForeignKey(Profile, related_name="profilecorpora", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptCorpusLock(models.Model):
+    """A user-SSG-specific manuscript corpus"""
+
+    # [1] Each lock is created with a particular SSG as starting point
+    super = models.ForeignKey(EqualGold, related_name="supercorpuslocks", on_delete=models.CASCADE)
+    # [1] Each lock belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profilecorpuslocks", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # [1] Status
+    status = models.TextField("Status", default = "empty")
+
     
 
 class UserKeyword(models.Model):
