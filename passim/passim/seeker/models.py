@@ -8323,7 +8323,35 @@ class ManuscriptCorpusLock(models.Model):
     status = models.TextField("Status", default = "empty")
 
     
+class EqualGoldCorpus(models.Model):
+    """A corpus of SSG's"""
 
+    # [1] Each lock is created with a particular SSG as starting point
+    ssg = models.ForeignKey(EqualGold, related_name="ssgequalcorpora", on_delete=models.CASCADE)
+    # [1] Each lock belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profileequalcorpora", on_delete=models.CASCADE)
+    # [1] List of most frequent words
+    mfw = models.TextField("Most frequent words", default = "[]")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # [1] Status
+    status = models.TextField("Status", default = "empty")
+
+
+class EqualGoldCorpusItem(models.Model):
+    """One item from the EqualGoldCOrpus"""
+
+    # [1] Link-item 1: source
+    equal = models.ForeignKey(EqualGold, related_name="ssgcorpusequals", on_delete=models.CASCADE)
+    # [1] WOrds in this SSG's incipit and explicit - stringified JSON
+    words = models.TextField("Words", default = "{}")
+    # [1] Name of the author
+    authorname = models.TextField("Author's name", default = "empty")
+    # [1] Link to the corpus itself
+    corpus = models.ForeignKey(EqualGoldCorpus, related_name="corpusitems", on_delete=models.CASCADE)
+
+    
 class UserKeyword(models.Model):
     """Relation between a M/S/SG/SSG and a Keyword - restricted to user"""
 

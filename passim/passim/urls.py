@@ -12,6 +12,7 @@ import passim.seeker.forms
 import passim.seeker.views
 import passim.reader.views
 from passim.seeker.views import *
+from passim.seeker.visualizations import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson
@@ -107,6 +108,7 @@ urlpatterns = [
     #url(r'^ssg/linkset(?:/(?P<pk>\d+))?/$', EqualGoldLinkset.as_view(), name='equalgold_linkset'),
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
+    url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),

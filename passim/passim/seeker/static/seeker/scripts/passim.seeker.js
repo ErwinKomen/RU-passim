@@ -1531,7 +1531,7 @@ var ru = (function ($, ru) {
                 return result;
               }))
               // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
-              .force("charge", d3.forceManyBody().strength(0))
+              .force("charge", d3.forceManyBody().strength(-0.5))
               .force("center", d3.forceCenter(width / 2, height / 2))
               .on("tick", ticked);
 
@@ -4876,6 +4876,81 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("network_graph", ex);
+        }
+      },
+
+      /**
+       * network_pca
+       *   Create and show a PCA of SSGs
+       *
+       */
+      network_pca: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            iWidth = 800,
+            iHeight = 500,
+            max_value = 0,
+            divTarget = "super_pca",
+            divWait = "#super_pca_wait",
+            divNetwork = "#ssg_pca";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_pca)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_pca", ex);
         }
       },
 

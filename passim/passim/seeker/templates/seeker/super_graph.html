@@ -12,3 +12,18 @@
     <svg viewBox="0,0,800,500"></svg>
   </div>
 </div>
+
+<div id="ssg_pca" class="hidden">
+  <form action="{{equalgold_pca}}" method="post" >
+    {% csrf_token %}
+  </form>
+
+  <div id="super_pca_wait" class="hidden">
+    <span>Calculating network PCA...</span>
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
+
+  <div id="super_pca" style="width: 800px; height: 500px;">
+    <svg viewBox="0,0,800,500"></svg>
+  </div>
+</div>
