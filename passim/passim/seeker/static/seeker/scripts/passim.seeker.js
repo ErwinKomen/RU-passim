@@ -1535,7 +1535,8 @@ var ru = (function ($, ru) {
                 // Should be: result = d.value * factor;
                 result = d.id;
                 return result;
-              }))
+              }).distance(function (d) { return 40; })
+              )
               // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
               .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
               .force("center", d3.forceCenter(width / 2, height / 2))
@@ -1548,7 +1549,7 @@ var ru = (function ($, ru) {
                     .data(options['links'])
                     .join("line")
                     .attr("stroke-width", function (d) {
-                      return Math.sqrt(d.value);
+                      return Math.sqrt(2 * d.value);
                     });
           node = svg.append("g")
                     .attr("class", "nodes")
@@ -1577,12 +1578,20 @@ var ru = (function ($, ru) {
 
           // Define the 'ticked' function
           function ticked() {
+            node.attr("cx", function (d) {
+              var radius = 10;
+              if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2);}
+              return d.x = Math.max(radius, Math.min(width - radius, d.x));
+            })
+                .attr("cy", function (d) {
+                  var radius = 10;
+                  if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
+                  return d.y = Math.max(radius, Math.min(height - radius, d.y));
+                });
             link.attr("x1", function (d) { return d.source.x; })
                 .attr("y1", function (d) { return d.source.y; })
                 .attr("x2", function (d) { return d.target.x; })
                 .attr("y2", function (d) { return d.target.y; });
-            node.attr("cx", function (d) { return d.x; })
-                .attr("cy", function (d) { return d.y; });
           }
 
           function network_color(d) {

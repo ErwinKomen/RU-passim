@@ -1010,14 +1010,18 @@ class BasicList(ListView):
         return None
 
     def get(self, request, *args, **kwargs):
-        # FIrst do my own initializations
-        self.initializations()
-        # Then check if we have a redirect or not
-        if self.redirectpage == "":
-            # We can continue with the normal 'get()'
-            response = super(BasicList, self).get(request, *args, **kwargs)
+        if not request.user.is_authenticated:
+            # Do not allow to get a good response
+            response = redirect(reverse('nlogin'))
         else:
-            response = redirect(self.redirectpage)
+            # FIrst do my own initializations
+            self.initializations()
+            # Then check if we have a redirect or not
+            if self.redirectpage == "":
+                # We can continue with the normal 'get()'
+                response = super(BasicList, self).get(request, *args, **kwargs)
+            else:
+                response = redirect(self.redirectpage)
         # REturn the appropriate response
         return response
 
@@ -1071,12 +1075,9 @@ class BasicDetails(DetailView):
                 data['html'] = "(No authorization)"
                 data['status'] = "error"
 
-                # Set any possible typeaheads
-                data['typeaheads'] = self.lst_typeahead
-
                 response = JsonResponse(data)
             else:
-                response = reverse('nlogin')
+                response = redirect(reverse('nlogin'))
         else:
             context = self.get_context_data(object=self.object)
 
