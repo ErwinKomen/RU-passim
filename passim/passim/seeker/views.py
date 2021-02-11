@@ -11979,6 +11979,34 @@ class EqualGoldListView(BasicList):
                     link.save()
             Information.set_kvalue("add_manu", "done")
 
+        if Information.get_kvalue("passim_code") != "done":
+            # Walk all SSGs
+            need_correction = {}
+            for obj in EqualGold.objects.all():
+                code = obj.code
+                if code != None and code != "ZZZ_DETERMINE":
+                    count = EqualGold.objects.filter(code=code).count()
+                    if count > 1:
+                        oErr.Status("Duplicate code={} id={}".format(code, obj.id))
+                        if code in need_correction:
+                            need_correction[code].append(obj.id)
+                        else:                            
+                            need_correction[code] = [obj.id]
+            oErr.Status(json.dumps(need_correction))
+            for k,v in need_correction.items():
+                code = k
+                ssg_list = v
+                for ssg_id in ssg_list[:-1]:
+                    oErr.Status("Changing CODE for id {}".format(ssg_id))
+                    obj = EqualGold.objects.filter(id=ssg_id).first()
+                    if obj != None:
+                        obj.code = None
+                        obj.number = None
+                        obj.save()
+                        oErr.Status("Re-saved id {}, code is now: {}".format(obj.id, obj.code))
+
+            Information.set_kvalue("passim_code", "done")
+
         return None
     
     def add_to_context(self, context, initial):

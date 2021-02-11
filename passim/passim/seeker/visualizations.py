@@ -187,7 +187,7 @@ class EqualGoldGraph(BasicPart):
         node_list = []
         link_list = []
         max_value = 0       # Maximum number of manuscripts in which an SSG occurs
-        max_scount = 0      # Maximum number of sermons associated with one SSG
+        max_scount = 1      # Maximum number of sermons associated with one SSG
         manu_count = []
 
         def get_nodes(crp):
@@ -229,11 +229,22 @@ class EqualGoldGraph(BasicPart):
                 if item['scount'] > max_scount:
                     max_scount = item['scount']
 
-                # Also make sure to buidl an SSG-dictionary
-                ssg_dict[item['equal__id']] = title
-
                 # Add the text to the corpus
-                sty_corpus.add_text(text, title, category)
+                if title in sty_corpus.titles:
+                    ssg_id = -1
+                    bFound = False
+                    for k,v in ssg_dict.items():
+                        if v == title:
+                            ssg_id = k
+                            bFound = True
+                            break
+                    oErr.Status("EqualGoldGraph/do_manu_method: attempt to add same title '{}' for {} and {}".format(
+                        title, ssg_id, item['equal__id']))
+                else:
+                    # Also make sure to buidl an SSG-dictionary
+                    ssg_dict[item['equal__id']] = title
+
+                    sty_corpus.add_text(text, title, category)
 
             # Get a list of nodes
             node_listT = get_nodes(sty_corpus)
@@ -454,6 +465,8 @@ class EqualGoldPca(BasicPart):
             # Create a pystyl-corpus object (see above)
             sty_corpus = Corpus(texts=[], titles=[], target_ints=[], target_idx=[])
 
+            ssg_dict = {}
+
             # Walk the ssg_corpus: each SSG is one 'text', having a title and a category (=author code)
             for idx, item in enumerate(EqualGoldCorpusItem.objects.filter(corpus=ssg_corpus).values(
                 'words', 'authorname', 'equal__code', 'equal__id')):
@@ -468,7 +481,21 @@ class EqualGoldPca(BasicPart):
                 text = " ".join(json.loads(item['words']))
 
                 # Add the text to the corpus
-                sty_corpus.add_text(text, title, category)
+                if title in sty_corpus.titles:
+                    ssg_id = -1
+                    bFound = False
+                    for k,v in ssg_dict.items():
+                        if v == title:
+                            ssg_id = k
+                            bFound = True
+                            break
+                    oErr.Status("EqualGoldGraph/do_manu_method: attempt to add same title '{}' for {} and {}".format(
+                        title, ssg_id, item['equal__id']))
+                else:
+                    # Also make sure to buidl an SSG-dictionary
+                    ssg_dict[item['equal__id']] = title
+
+                    sty_corpus.add_text(text, title, category)
 
             # We now 'have' the corpus, so we can work with it...
             sty_corpus.preprocess(alpha_only=True, lowercase=True)
