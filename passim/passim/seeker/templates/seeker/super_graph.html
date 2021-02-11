@@ -1,10 +1,30 @@
 ﻿<div id="ssg_network" class="hidden">
   <form action="{{equalgold_graph}}" method="post" >
     {% csrf_token %}
+    <div class="row">
+      <div class="col-md-5 col-md-offset-4 align-right">
+        <span>Minimum number of manuscripts in which SSGs co-occur: </span>
+        <span id="networkslidervalue">1</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="networkslider" id="id_networkslider" valueid="networkslidervalue"
+                type="range" min="1" max="{{manuscripts}}" value="1" class="slider" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-5 col-md-offset-4 align-right">
+        <span>Gravity: </span>
+        <span id="gravityvalue">10</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="gravityslider" id="id_gravityslider" valueid="gravityvalue"
+                type="range" min="1" max="100" value="10" class="slider" />
+      </div>
+    </div>
   </form>
 
   <div id="super_network_wait" class="hidden">
-    <span>Calculating network graph...</span>
+    <span>Calculating SSG co-occurrance network...</span>
     <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
   </div>
 
@@ -19,7 +39,7 @@
   </form>
 
   <div id="super_pca_wait" class="hidden">
-    <span>Calculating network PCA...</span>
+    <span>Calculating incipit-explicit network...</span>
     <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
   </div>
 

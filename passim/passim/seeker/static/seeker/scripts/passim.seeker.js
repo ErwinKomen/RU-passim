@@ -1488,6 +1488,8 @@ var ru = (function ($, ru) {
             factor,
             width,
             height,
+            gravityvalue = 10,
+            gravityid = "#gravityvalue",
             p = {},
             link,
             node;
@@ -1496,11 +1498,15 @@ var ru = (function ($, ru) {
         try {
           // Validate the options
           if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
                 'target' in options && 'width' in options &&
                 'height' in options)) { return false; }
 
           // Initialize
           loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
 
           // Get parameters
           width = options['width'];
@@ -1531,7 +1537,7 @@ var ru = (function ($, ru) {
                 return result;
               }))
               // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
-              .force("charge", d3.forceManyBody().strength(-0.5))
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
               .force("center", d3.forceCenter(width / 2, height / 2))
               .on("tick", ticked);
 
@@ -1549,7 +1555,11 @@ var ru = (function ($, ru) {
                     .selectAll("circle")
                     .data(options['nodes'])
                     .join("circle")
-                    .attr("r", 5)
+                    .attr("r", function (d) {
+                      var scount = d.scount;
+                      var iSize = Math.max(10, scount / 2);
+                      return iSize;
+                    })
                     .attr("fill", color)
                     .call(network_drag(loc_simulation));
 
@@ -1567,13 +1577,11 @@ var ru = (function ($, ru) {
 
           // Define the 'ticked' function
           function ticked() {
-            link
-                .attr("x1", function (d) { return d.source.x; })
+            link.attr("x1", function (d) { return d.source.x; })
                 .attr("y1", function (d) { return d.source.y; })
                 .attr("x2", function (d) { return d.target.x; })
                 .attr("y2", function (d) { return d.target.y; });
-            node
-                .attr("cx", function (d) { return d.x; })
+            node.attr("cx", function (d) { return d.x; })
                 .attr("cy", function (d) { return d.y; });
           }
 
@@ -4847,6 +4855,9 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  if ("networkslider" in response) {
+                    $("#networkslidervalue").html(response.networkslider);
+                  }
 
                   // Other data
                   max_value = response.max_value;

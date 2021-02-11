@@ -8346,6 +8346,8 @@ class EqualGoldCorpusItem(models.Model):
     equal = models.ForeignKey(EqualGold, related_name="ssgcorpusequals", on_delete=models.CASCADE)
     # [1] WOrds in this SSG's incipit and explicit - stringified JSON
     words = models.TextField("Words", default = "{}")
+    # [1] Number of sermons - the scount
+    scount = models.IntegerField("Sermon count", default = 0)
     # [1] Name of the author
     authorname = models.TextField("Author's name", default = "empty")
     # [1] Link to the corpus itself

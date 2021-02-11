@@ -77,7 +77,8 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptCorpus, ManuscriptCorpusLock, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -11599,6 +11600,14 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 username = self.request.user.username
                 team_group = app_editor
+                profile = Profile.get_user_profile(username=username)
+
+                # Make sure to delete any previous corpora of mine
+                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+
+                # Old, extinct
+                ManuscriptCorpus.objects.filter(super=instance).delete()
+                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
 
                 # List of manuscripts related to the SSG via sermon descriptions
                 manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
@@ -11724,6 +11733,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 if use_network_graph:
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
+                context['manuscripts'] = qs_s.count()
                 context['after_details'] = render_to_string('seeker/super_graph.html', context, self.request)
 
         except:
@@ -11839,6 +11849,7 @@ class EqualGoldListView(BasicList):
 
         re_pattern = r'^\s*(?:\b[A-Z][a-zA-Z]+\b\s*)+(?=[_])'
         re_name = r'^[A-Z][a-zA-Z]+\s*'
+        oErr = ErrHandle()
 
         def add_names(main_list, fragment):
             oErr = ErrHandle()

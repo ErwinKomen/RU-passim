@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import json
+import copy
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
@@ -69,7 +70,7 @@ class EqualGoldGraph(BasicPart):
             return author
 
         def add_to_dict(this_dict, item):
-            if item != "" and not item in names_list:
+            if item != "":
                 if not item in this_dict: 
                     this_dict[item] = 1
                 else:
@@ -80,6 +81,10 @@ class EqualGoldGraph(BasicPart):
             # Need to figure out who I am
             profile = Profile.get_user_profile(self.request.user.username)
             instance = self.obj
+
+            networkslider = self.qd.get("networkslider", "1")            
+            if isinstance(networkslider, str):
+                networkslider = int(networkslider)
 
             # Get the 'manuscript-corpus': the manuscripts in which the same kind of sermon like me is
             manu_list = SermonDescrEqual.objects.filter(super=instance).distinct().values("manu_id")
@@ -134,9 +139,12 @@ class EqualGoldGraph(BasicPart):
                                 add_to_dict(all_words, item)
                         # Get the name of the author
                         authorname = "empty" if ssg.author==None else ssg.author.name
+                        # Get the scount
+                        scount = ssg.scount
                         # Create new ssg_corpus item
                         obj = EqualGoldCorpusItem.objects.create(
-                            ssg_corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, authorname=authorname)
+                            corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, 
+                            authorname=authorname, scount=scount)
 
                 # What are the 100 MFWs in all_words?
                 mfw = [dict(word=k, count=v) for k,v in all_words.items()]
@@ -149,13 +157,14 @@ class EqualGoldGraph(BasicPart):
                 ssg_corpus.status = "ready"
                 ssg_corpus.save()
 
-            node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list)
+            node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
 
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
                                    max_value=max_value,
+                                   networkslider=networkslider,
                                    legend="SSG network")
             
             # Can remove the lock
@@ -169,12 +178,17 @@ class EqualGoldGraph(BasicPart):
 
         return context
 
-    def do_manu_method(self, ssg_corpus, manu_list):
-        """Calculation like Manuscript_Transmission_Of_se172"""
+    def do_manu_method(self, ssg_corpus, manu_list, min_value):
+        """Calculation like Manuscript_Transmission_Of_se172
+        
+        The @min_value is the minimum link-value the user wants to see
+        """
         oErr = ErrHandle()
         node_list = []
         link_list = []
-        max_value = 0
+        max_value = 0       # Maximum number of manuscripts in which an SSG occurs
+        max_scount = 0      # Maximum number of sermons associated with one SSG
+        manu_count = []
 
         def get_nodes(crp):
             nodes = []
@@ -189,10 +203,17 @@ class EqualGoldGraph(BasicPart):
 
             ssg_dict = {}
             link_dict = {}
+            scount_dict = {}
+            node_listT = []
+            link_listT = []
+
+            # Initialize manu_count: the number of SSG co-occurring in N manuscripts
+            for item in manu_list:
+                manu_count.append(0)
 
             # Walk the ssg_corpus: each SSG is one 'text', having a title and a category (=author code)
             for idx, item in enumerate(EqualGoldCorpusItem.objects.filter(corpus=ssg_corpus).values(
-                'words', 'authorname', 'equal__code', 'equal__id')):
+                'words', 'authorname', 'scount', 'equal__code', 'equal__id')):
                 # Determine the name for this row
                 category = item['authorname']
                 code = item['equal__code']
@@ -202,6 +223,11 @@ class EqualGoldGraph(BasicPart):
                     title = code.split(" ")[1]
                 # The text = the words
                 text = " ".join(json.loads(item['words']))
+                
+                # the scount and store it in a dictionary
+                scount_dict[title] = item['scount']
+                if item['scount'] > max_scount:
+                    max_scount = item['scount']
 
                 # Also make sure to buidl an SSG-dictionary
                 ssg_dict[item['equal__id']] = title
@@ -210,7 +236,7 @@ class EqualGoldGraph(BasicPart):
                 sty_corpus.add_text(text, title, category)
 
             # Get a list of nodes
-            node_list = get_nodes(sty_corpus)
+            node_listT = get_nodes(sty_corpus)
 
             # Walk the manuscripts
             for manu_item in manu_list:
@@ -227,28 +253,44 @@ class EqualGoldGraph(BasicPart):
                         target_id = ssg_list_id[idx_t]
                         # Get the title of the target
                         target = ssg_dict[target_id]
-                        # Retrieve or create a link from the link_list
+                        # Retrieve or create a link from the link_listT
                         link_code = "{}_{}".format(source_id, target_id)
                         if link_code in link_dict:
-                            oLink = link_list[link_dict[link_code]]
+                            oLink = link_listT[link_dict[link_code]]
                         else:
                             oLink = dict(source=source, source_id=source_id,
                                          target=target, target_id=target_id,
                                          value=0)
-                            link_list.append(oLink)
-                            link_dict[link_code] = len(link_list) - 1
+                            link_listT.append(oLink)
+                            link_dict[link_code] = len(link_listT) - 1
                         # Now add to the value
                         oLink['value'] += 1
                         if oLink['value'] > max_value:
                             max_value = oLink['value']
+            
+            # Only accept the links that have a value >= min_value
+            node_dict = []
+            for oItem in link_listT:
+                if oItem['value'] >= min_value:
+                    link_list.append(copy.copy(oItem))
+                    # Take note of the nodes
+                    src = oItem['source']
+                    dst = oItem['target']
+                    if not src in node_dict: node_dict.append(src)
+                    if not dst in node_dict: node_dict.append(dst)
+            # Walk the nodes
+            for oItem in node_listT:
+                if oItem['id'] in node_dict:
+                    oItem['scount'] = 100 * scount_dict[oItem['id']] / max_scount
+                    node_list.append(copy.copy(oItem))
 
+ 
         except:
             msg = oErr.get_error_message()
             oErr.DoError("do_hier_method1")
 
         return node_list, link_list, max_value
-
-
+    
 
 class EqualGoldPca(BasicPart):
     """Principle component analysis of a set of SSGs"""
@@ -267,7 +309,7 @@ class EqualGoldPca(BasicPart):
             return author
 
         def add_to_dict(this_dict, item):
-            if item != "" and not item in names_list:
+            if item != "":
                 if not item in this_dict: 
                     this_dict[item] = 1
                 else:
@@ -334,7 +376,7 @@ class EqualGoldPca(BasicPart):
                         authorname = "empty" if ssg.author==None else ssg.author.name
                         # Create new ssg_corpus item
                         obj = EqualGoldCorpusItem.objects.create(
-                            ssg_corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, authorname=authorname)
+                            corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, authorname=authorname)
 
                 # What are the 100 MFWs in all_words?
                 mfw = [dict(word=k, count=v) for k,v in all_words.items()]
@@ -362,7 +404,7 @@ class EqualGoldPca(BasicPart):
 
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("EqualGoldGraph/add_to_context")
+            oErr.DoError("EqualGoldPca/add_to_context")
 
         return context
 
@@ -403,7 +445,7 @@ class EqualGoldPca(BasicPart):
         def get_nodes(crp):
             nodes = []
             for idx, item in enumerate(crp.target_ints):
-                oNode = dict(group=item, author=crp.target_idx[item], id=crp.titles[idx])
+                oNode = dict(group=item, author=crp.target_idx[item], id=crp.titles[idx], scount=5)
                 nodes.append(oNode)
             return nodes
 
