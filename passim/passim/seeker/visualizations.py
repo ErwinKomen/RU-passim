@@ -9,6 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import json
 import copy
+import itertools
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
@@ -47,6 +48,42 @@ COMMON_NAMES = ["Actibus", "Adiubante", "Africa", "Amen", "Andreas", "Apostoloru
                 "Spiritu", "Spiritus", "Stephanus", "Testamenti", "Therasiae", "Thomam", "Thomas"]
 
 
+def get_ssg_corpus(profile, instance):
+    oErr = ErrHandle()
+    lock_status = "new"
+    ssg_corpus = None
+    try:
+        
+        # Set the lock, or return if we are busy with this ssg_corpus
+        ssg_corpus = EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).last()
+        if ssg_corpus != None:
+            lock_status = ssg_corpus.status
+            # Check the status
+            if lock_status == "busy":
+                # Already busy
+                return context
+        else:
+            # Need to create a lock
+            ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance)
+            lock_status = "busy"
+
+        # Save the status
+        ssg_corpus.status = lock_status
+        ssg_corpus.save()
+
+        if lock_status == "new":
+            # Remove earlier corpora made by me based on this SSG
+            EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+
+            # Create a new one
+            ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance, status="busy")
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_ssg_corpus")       
+    return ssg_corpus, lock_status
+
+
 class DrawPieChart(BasicPart):
     """Fetch data for a particular type of pie-chart for the home page
     
@@ -54,6 +91,199 @@ class DrawPieChart(BasicPart):
     """
 
     pass
+
+
+class EqualGoldTrans(BasicPart):
+    """Prepare for a network graph"""
+
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+        def get_author(code):
+            """Get the author id from the passim code"""
+            author = 10000
+            if "PASSIM" in code:
+                author = int(code.replace("PASSIM", "").strip().split(".")[0])
+            return author
+
+        def add_to_dict(this_dict, item):
+            if item != "":
+                if not item in this_dict: 
+                    this_dict[item] = 1
+                else:
+                    this_dict[item] += 1
+                    
+        oErr = ErrHandle()
+        try:
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            networkslider = self.qd.get("network_trans_slider", "1")            
+            if isinstance(networkslider, str):
+                networkslider = int(networkslider)
+
+            # Get the 'manuscript-corpus': all manuscripts in which a sermon is that belongs to the same SSG
+            manu_list = SermonDescrEqual.objects.filter(super=instance).distinct().values("manu_id")
+            manu_dict = {}
+            for idx, manu in enumerate(manu_list):
+                manu_dict[manu['manu_id']] = idx + 1
+
+            author_dict = {}
+
+            ssg_corpus, lock_status = get_ssg_corpus(profile, instance)
+
+            if lock_status != "ready":
+
+                # Create an EqualGoldCorpus based on the SSGs in these manuscripts
+                ssg_list = SermonDescrEqual.objects.filter(manu__id__in=manu_list).order_by(
+                    'super_id').distinct().values('super_id')
+                ssg_list_id = [x['super_id'] for x in ssg_list]
+                with transaction.atomic():
+                    for ssg in EqualGold.objects.filter(id__in=ssg_list_id):
+                        # Get the name of the author
+                        authorname = "empty" if ssg.author==None else ssg.author.name
+                        # Get the scount
+                        scount = ssg.scount
+                        # Create new ssg_corpus item
+                        obj = EqualGoldCorpusItem.objects.create(
+                            corpus=ssg_corpus, equal=ssg, 
+                            authorname=authorname, scount=scount)
+
+                # Add this list to the ssg_corpus
+                ssg_corpus.status = "ready"
+                ssg_corpus.save()
+
+            node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
+
+
+            # Add the information to the context in data
+            context['data'] = dict(node_list=node_list, 
+                                   link_list=link_list,
+                                   max_value=max_value,
+                                   networkslider=networkslider,
+                                   legend="SSG network")
+            
+            # Can remove the lock
+            ssg_corpus.status = "ready"
+            ssg_corpus.save()
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldTrans/add_to_context")
+
+        return context
+
+    def do_manu_method(self, ssg_corpus, manu_list, min_value):
+        """Calculation like 'MedievalManuscriptTransmission' description
+        
+        The @min_value is the minimum link-value the user wants to see
+        """
+        oErr = ErrHandle()
+        node_list = []
+        link_list = []
+        max_value = 0       # Maximum number of manuscripts in which an SSG occurs
+        max_scount = 1      # Maximum number of sermons associated with one SSG
+
+        try:
+            # Initializations
+            ssg_dict = {}
+            link_dict = {}
+            scount_dict = {}
+            node_listT = []
+            link_listT = []
+            node_set = {}       # Put the nodes in a set, with their SSG_ID as key
+            title_set = {}      # Link from title to SSG_ID
+
+            # Walk the ssg_corpus: each SSG is one 'text', having a title and a category (=author code)
+            for idx, item in enumerate(EqualGoldCorpusItem.objects.filter(corpus=ssg_corpus).values(
+                'authorname', 'scount', 'equal__code', 'equal__id')):
+                # Determine the name for this row
+                category = item['authorname']
+                ssg_id = item['equal__id']
+                code = item['equal__code']
+                if code == None or code == "" or not " " in code or not "." in code:
+                    title = "eqg{}".format(ssg_id)
+                else:
+                    title = code.split(" ")[1]
+                
+                # the scount and store it in a dictionary
+                scount = item['scount']
+                scount_dict[ssg_id] = scount
+                if scount > max_scount:
+                    max_scount = scount
+
+                node_key = ssg_id
+                node_value = dict(label=title, category=category, scount=scount, rating=0)
+                if node_key in node_set:
+                    oErr.Status("EqualGoldGraph/do_manu_method: attempt to add same title '{}' for {} and {}".format(
+                        title, ssg_id, title_set[title]))
+                else:
+                    node_set[node_key] = node_value
+                    title_set[title] = ssg_id
+
+            # Create a dictionary of manuscripts, each having a list of SSG ids
+            manu_set = {}
+            for manu_item in manu_list:
+                manu_id = manu_item["manu_id"]
+                # Get a list of all SSGs in this manuscript
+                ssg_list = SermonDescrEqual.objects.filter(manu__id=manu_id).order_by(
+                    'super_id').distinct()
+                # Add the SSG id list to the manuset
+                manu_set[manu_id] = [x.super for x in ssg_list]
+
+            # Create a list of edges based on the above
+            link_dict = {}
+            for manu_id, ssg_list in manu_set.items():
+                # Only treat ssg_lists that are larger than 1
+                if len(ssg_list) > 1:
+                    # itertool.combinations creates all combinations of SSG to SSG in one manuscript
+                    for subset in itertools.combinations(ssg_list, 2):
+                        source = subset[0]
+                        target = subset[1]
+                        source_id = source.id
+                        target_id = target.id
+                        link_code = "{}_{}".format(source_id, target_id)
+                        if link_code in link_dict:
+                            oLink = link_dict[link_code]
+                        else:
+                            oLink = dict(source=source_id,
+                                         target=target_id,
+                                         value=0)
+                            link_dict[link_code] = oLink
+                        # Add 1
+                        oLink['value'] += 1
+                        if oLink['value'] > max_value:
+                            max_value = oLink['value']
+            # Turn the link_dict into a list
+            # link_list = [v for k,v in link_dict.items()]
+            
+            # Only accept the links that have a value >= min_value
+            node_dict = {}
+            link_list = []
+            for k, oItem in link_dict.items():
+                if oItem['value'] >= min_value:
+                    link_list.append(copy.copy(oItem))
+                    # Take note of the nodes
+                    src = oItem['source']
+                    dst = oItem['target']
+                    if not src in node_dict: node_dict[src] = node_set[src]
+                    if not dst in node_dict: node_dict[dst] = node_set[dst]
+            # Walk the nodes
+            node_list = []
+            for ssg_id, oItem in node_dict.items():
+                oItem['id'] = ssg_id
+                oItem['scount'] = 100 * scount_dict[oItem['id']] / max_scount
+                node_list.append(copy.copy(oItem))
+
+ 
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("do_manu_method")
+
+        return node_list, link_list, max_value
 
 
 class EqualGoldGraph(BasicPart):

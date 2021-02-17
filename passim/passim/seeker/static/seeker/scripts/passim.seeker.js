@@ -1636,6 +1636,197 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * draw_network_trans
+       *    draw a force-directed network (e.g. medieval text transmission)
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network_trans: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            divSvg,   // The target svg div
+            color,    // D3 color scheme
+            factor,
+            width,
+            height,
+            i,
+            count,
+            maxcount = 0,
+            gravityvalue = 10,
+            gravityid = "#gravity_trans_value",
+            p = {},
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+
+          // Calculate the maxcount
+          for (i = 0; i < options['nodes'].length; i++) {
+            count = options['nodes'][i]['scount'];
+            if (count > maxcount) {
+              maxcount = count;
+            }
+          }
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          color = network_color;
+
+          // Append a legend
+          private_methods.addLegend({
+            'x': width / 2,
+            'y': height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation = d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result;
+                // This determines the size of each link
+                // Should be: result = d.value * factor;
+                result = d.id;
+                return result;
+              }).distance(function (d) { return 2 * maxcount; })
+              )
+              // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .force("collide", d3.forceCollide().radius(function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize + 1;
+              }).iterations(3))
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("fill", "none")
+                    .attr("class", "links")
+                    .selectAll("path")
+                    .data(options['links'])
+                    .join("path")
+                    // .attr("stroke", "black")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(2 * d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(options['nodes'])
+                    .join("circle")
+                    .attr("r", function (d) {
+                      var scount = d.scount;
+                      var iSize = Math.max(10, scount / 2);
+                      return iSize;
+                    })
+                    .attr("fill", color)
+                    .call(network_drag(loc_simulation));
+
+
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.label; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+                  .text(function (d) { return d.value; });
+
+          // Then execute the simulation
+          // loc_simulation.restart();
+
+          // Define the 'ticked' function
+          function ticked() {
+            node.attr("cx", function (d) {
+              var radius = 10;
+              if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
+              return d.x = Math.max(radius, Math.min(width - radius, d.x));
+            })
+                .attr("cy", function (d) {
+                  var radius = 10;
+                  if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
+                  return d.y = Math.max(radius, Math.min(height - radius, d.y));
+                });
+            link.attr("d", linkArc)
+                .attr("x1", function (d) { return d.source.x; })
+                .attr("y1", function (d) { return d.source.y; })
+                .attr("x2", function (d) { return d.target.x; })
+                .attr("y2", function (d) { return d.target.y; });
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            if (d.category > 1) {
+              col_result = "aap";
+            }
+            col_result = scale(d.category);
+            return col_result;
+          }
+
+          function linkArc(d) {
+            const r = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+            return `M${d.source.x},${d.source.y} A${r},${r} 0 0,1 ${d.target.x},${d.target.y}`;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.4).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network_trans", ex);
+          return false;
+        }
+      },
+
       errMsg: function (sMsg, ex, bNoCode) {
         var sHtml = "",
             bCode = true;
@@ -4896,6 +5087,84 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("network_graph", ex);
+        }
+      },
+
+      /**
+       * network_transmission
+       *   Create and show a sermon-transmission network
+       *
+       */
+      network_transmission: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            iWidth = 800,
+            iHeight = 500,
+            max_value = 0,
+            divTarget = "super_network_trans",
+            divWait = "#super_network_trans_wait",
+            divNetwork = "#ssg_network_trans";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+                  if ("networkslider" in response) {
+                    $("#network_trans_slider_value").html(response.networkslider);
+                  }
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network_trans(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_transmission)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_transmission", ex);
         }
       },
 

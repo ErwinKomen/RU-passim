@@ -1,4 +1,39 @@
-﻿<div id="ssg_network" class="hidden">
+﻿<div id="ssg_network_trans" class="hidden">
+  <form action="{{equalgold_trans}}" method="post" >
+    {% csrf_token %}
+    <div class="row">
+      <div class="col-md-5 col-md-offset-4 align-right">
+        <span>Minimum number of manuscripts in which SSGs co-occur: </span>
+        <span id="network_trans_slider_value">1</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="network_trans_slider" id="id_network_trans_slider" valueid="network_trans_slider_value"
+                type="range" min="1" max="{{manuscripts}}" value="1" class="slider" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-5 col-md-offset-4 align-right">
+        <span>Gravity: </span>
+        <span id="gravity_trans_value">10</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="gravity_trans_slider" id="id_gravity_trans_slider" valueid="gravity_trans_value"
+                type="range" min="1" max="100" value="10" class="slider" />
+      </div>
+    </div>
+  </form>
+
+  <div id="super_network_trans_wait" class="hidden">
+    <span>Calculating SSG co-occurrance network...</span>
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
+
+  <div id="super_network_trans" style="width: 800px; height: 500px;">
+    <svg viewBox="0,0,800,500"></svg>
+  </div>
+</div>
+
+<div id="ssg_network" class="hidden">
   <form action="{{equalgold_graph}}" method="post" >
     {% csrf_token %}
     <div class="row">

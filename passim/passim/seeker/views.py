@@ -11717,6 +11717,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Add a custom button to the manuscript listview: to trigger showing a graph
                 html = []
                 if use_network_graph:
+                    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
+                    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
                     html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
                     html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
                 html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
@@ -11732,6 +11734,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 # THe graph also needs room in after details
                 if use_network_graph:
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
+                    context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
                 context['manuscripts'] = qs_s.count()
                 context['after_details'] = render_to_string('seeker/super_graph.html', context, self.request)
