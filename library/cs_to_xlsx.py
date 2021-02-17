@@ -8,9 +8,14 @@ Date: 11/nov/2020
 import sys, getopt, os.path, importlib
 import re
 import openpyxl
-from openpyxl.utils.cell import get_column_letter
-from openpyxl.cell import Cell
 from openpyxl import Workbook
+from openpyxl.cell import Cell
+# This part depends on teh specific version of OpenPyXL
+try:
+    from openpyxl.utils.cell import get_column_letter
+except:
+    from openpyxl.utils import get_column_letter
+# =========
 
 POS_DICT = {"NP-OB1": "O", "VMFIN": "Aux", "VVINF": "V", "VAFIN": "Aux", "VVPP": "V"}
 
@@ -159,11 +164,15 @@ def read_corpussearchresults(oArgs):
                 elif bInStructure:
                     # Add line to structure
                     lst_structure.append(line)
-                elif bNeedId and "(ID " in line:
+
+                # elif bNeedId and "(ID " in line:
+                elif bNeedId and re.match(r'.*\(([0-9]+\s+)?ID\s+.*',line):
                     # Extract the ID from this line
-                    match = re.match(r'.*(\(ID\s)([a-z0-9]*)(\)).*', line)
+                    match = re.match(r'.*(\(([0-9]+\s+)?ID\s)([a-zA-Z0-9_\+\.\:\,]+)(\)).*', line)
                     if match:
-                        str_id = match.group(2)
+                        count = len(match.groups())
+                        groupnum = 3 if count > 3 else 2
+                        str_id = match.group(groupnum)
 
                         # When we have the ID, we can process this result
                         structure = " ".join(lst_structure)
