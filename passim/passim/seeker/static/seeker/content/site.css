@@ -1606,6 +1606,10 @@ svg .nodes {
     stroke: #fff;
     stroke-width: 1.5;
 }
+svg .nodes text {
+    fill: currentColor;
+    stroke: none;
+}
 
 /* END OF D3 Section */
 

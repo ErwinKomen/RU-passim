@@ -14,11 +14,11 @@
     <div class="row">
       <div class="col-md-5 col-md-offset-4 align-right">
         <span>Gravity: </span>
-        <span id="gravity_trans_value">10</span>
+        <span id="gravity_trans_value">100</span>
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="gravity_trans_slider" id="id_gravity_trans_slider" valueid="gravity_trans_value"
-                type="range" min="1" max="100" value="10" class="slider" />
+                type="range" min="-100" max="300" value="100" class="slider" />
       </div>
     </div>
   </form>
@@ -28,8 +28,20 @@
     <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
   </div>
 
-  <div id="super_network_trans" style="width: 800px; height: 500px;">
-    <svg viewBox="0,0,800,500"></svg>
+  <div class="row" style="height: 800px;">
+    <!-- A legend of author names (selectable) -->
+    <div class="col-md-2">
+      <div id="super_network_trans_authors" style="width: 100%; ">
+        <svg viewBox="0,0,100,500"></svg>
+      </div>
+    </div>
+
+    <!-- The transmission network -->
+    <div class="col-md-10">
+      <div id="super_network_trans" style="width: 100%; ">
+        <svg viewBox="0,0,800,500"></svg>
+      </div>
+    </div>
   </div>
 </div>
 

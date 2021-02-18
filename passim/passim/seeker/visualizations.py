@@ -100,12 +100,6 @@ class EqualGoldTrans(BasicPart):
     MainModel = EqualGold
 
     def add_to_context(self, context):
-        def get_author(code):
-            """Get the author id from the passim code"""
-            author = 10000
-            if "PASSIM" in code:
-                author = int(code.replace("PASSIM", "").strip().split(".")[0])
-            return author
 
         def add_to_dict(this_dict, item):
             if item != "":
@@ -130,7 +124,7 @@ class EqualGoldTrans(BasicPart):
             for idx, manu in enumerate(manu_list):
                 manu_dict[manu['manu_id']] = idx + 1
 
-            author_dict = {}
+            # author_dict = {}
 
             ssg_corpus, lock_status = get_ssg_corpus(profile, instance)
 
@@ -150,17 +144,24 @@ class EqualGoldTrans(BasicPart):
                         obj = EqualGoldCorpusItem.objects.create(
                             corpus=ssg_corpus, equal=ssg, 
                             authorname=authorname, scount=scount)
+                        ## Add author to dictionary
+                        #if not authorname in author_dict: author_dict[authorname] = 0
+                        #author_dict[authorname] += 1
 
                 # Add this list to the ssg_corpus
                 ssg_corpus.status = "ready"
                 ssg_corpus.save()
+                ## Create list of authors
+                #author_list = [dict(category=k, count=v) for k,v in author_dict.items()]
+                #author_list = sorted(author_list, key=lambda x: (-1 * x['count'], x['category'].lower()))
 
-            node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
+            node_list, link_list, author_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
 
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   author_list=author_list,
                                    max_value=max_value,
                                    networkslider=networkslider,
                                    legend="SSG network")
@@ -182,6 +183,7 @@ class EqualGoldTrans(BasicPart):
         The @min_value is the minimum link-value the user wants to see
         """
         oErr = ErrHandle()
+        author_dict = {}
         node_list = []
         link_list = []
         max_value = 0       # Maximum number of manuscripts in which an SSG occurs
@@ -208,7 +210,14 @@ class EqualGoldTrans(BasicPart):
                     title = "eqg{}".format(ssg_id)
                 else:
                     title = code.split(" ")[1]
-                
+                # Get the Signature that is most appropriate
+                sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
+                sig = "" if sig_obj == None else sig_obj.code
+
+                # Add author to dictionary
+                if not category in author_dict: author_dict[category] = 0
+                author_dict[category] += 1
+               
                 # the scount and store it in a dictionary
                 scount = item['scount']
                 scount_dict[ssg_id] = scount
@@ -216,13 +225,17 @@ class EqualGoldTrans(BasicPart):
                     max_scount = scount
 
                 node_key = ssg_id
-                node_value = dict(label=title, category=category, scount=scount, rating=0)
+                node_value = dict(label=title, category=category, scount=scount, sig=sig, rating=0)
                 if node_key in node_set:
                     oErr.Status("EqualGoldGraph/do_manu_method: attempt to add same title '{}' for {} and {}".format(
                         title, ssg_id, title_set[title]))
                 else:
                     node_set[node_key] = node_value
                     title_set[title] = ssg_id
+
+            # Create list of authors
+            author_list = [dict(category=k, count=v) for k,v in author_dict.items()]
+            author_list = sorted(author_list, key=lambda x: (-1 * x['count'], x['category'].lower()))
 
             # Create a dictionary of manuscripts, each having a list of SSG ids
             manu_set = {}
@@ -283,7 +296,7 @@ class EqualGoldTrans(BasicPart):
             msg = oErr.get_error_message()
             oErr.DoError("do_manu_method")
 
-        return node_list, link_list, max_value
+        return node_list, link_list,  author_list, max_value
 
 
 class EqualGoldGraph(BasicPart):
