@@ -1650,17 +1650,21 @@ var ru = (function ($, ru) {
        */
       draw_network_trans: function (options) {
         var svg,      // the SVG element within the DOM that is being used
+            svgA,     // Author svg element
             divSvg,   // The target svg div
+            divAuthor,
             color,    // D3 color scheme
             factor,
+            size = 10,  //Size of each author selection square
             width,
             height,
             i,
             count,
             maxcount = 0,
-            gravityvalue = 10,
+            gravityvalue = 100,
             gravityid = "#gravity_trans_value",
             p = {},
+            author,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1695,12 +1699,14 @@ var ru = (function ($, ru) {
           divSvg = "#" + options['target'] + " svg";
           $(divSvg).empty();
           svg = d3.select(divSvg);
+          // Add a viewbox
+          svg.attr("viewBox", [0, 0, width, height])
           color = network_color;
 
-          // Append a legend
+          // Append a legend: top center
           private_methods.addLegend({
-            'x': width / 2,
-            'y': height - 50,
+            'x': 50,          // width / 2,
+            'y': 50,          // height - 50,
             'divsvg': divSvg,
             'legend': options['legend']
           });
@@ -1718,7 +1724,7 @@ var ru = (function ($, ru) {
               // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
               .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
               .force("center", d3.forceCenter(width / 2, height / 2))
-              .force("collide", d3.forceCollide().radius(function (d) {
+              .force("collide", d3.forceCollide(d => 65).radius(function (d) {
                 var scount = d.scount;
                 var iSize = Math.max(10, scount / 2);
                 return iSize + 1;
@@ -1738,18 +1744,35 @@ var ru = (function ($, ru) {
                     });
           node = svg.append("g")
                     .attr("class", "nodes")
-                    .selectAll("circle")
+                    .selectAll("g")
                     .data(options['nodes'])
-                    .join("circle")
-                    .attr("r", function (d) {
-                      var scount = d.scount;
-                      var iSize = Math.max(10, scount / 2);
-                      return iSize;
-                    })
-                    .attr("fill", color)
+                    .join("g")
                     .call(network_drag(loc_simulation));
 
+          // Add the circle below the <g>
+          node.append("circle")
+              .attr("r", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize;
+              })
+              .attr('fill', color);
 
+          // Add signature to node below the <g>
+          node.append("text")
+              .attr("x", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize;
+              })
+              .attr("y", "0.31em")
+              .text(function (d) {
+                return d.sig;
+              })
+              .clone(true).lower()
+              .attr("fill", "none")
+              .attr("stroke", "white")
+              .attr("stroke-width", 3);
 
           // Add popup title to nodes;
           node.append("title")
@@ -1758,33 +1781,60 @@ var ru = (function ($, ru) {
           link.append("title")
                   .text(function (d) { return d.value; });
 
-          // Then execute the simulation
-          // loc_simulation.restart();
+          // ====================== Author SVG element =========================
+          divAuthor = "#" + options['targetA'] + " svg";
+          $(divAuthor).empty()
+          svgA = d3.select(divAuthor);
+          // Add a viewbox
+          svgA.attr("viewBox", [0, 0, 2 * width / 10, height])
 
+          // Add a rectangle for each author
+          author = svgA.append("g")
+              .selectAll("g")
+              .data(options['authors'])
+              .join("g");
+
+
+          // Add a rectangle for each author
+          author.append("rect").attr("x", 5)
+              .attr("y", function (d, i) { return 50 + i * (size + 5); })
+              .attr("width", size).attr("height", size)
+              .style("fill", function (d) {
+                return network_color(d);
+              });
+
+          // Add a name (legend) for each author
+          author.append("text")
+                .attr("x", 5 + size * 1.2)
+                .attr("y", function (d, i) { return 50 + i * (size + 5) + (size ) }) // 50 is where the first dot appears. 25 is the distance between dots
+                .style("fill", function (d) {
+                  return network_color(d);
+                })
+                .text(function (d) {
+                  return d.category + " (" + d.count + ")";
+                })
+                .attr("text-anchor", "left")
+                .style("alignment-baseline", "middle");
+
+          // ====================== HELP FUNCTIONS =============================
           // Define the 'ticked' function
           function ticked() {
-            node.attr("cx", function (d) {
-              var radius = 10;
+            node.attr("transform", function (d) {
+              var radius = 10, ix, iy;
               if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
-              return d.x = Math.max(radius, Math.min(width - radius, d.x));
-            })
-                .attr("cy", function (d) {
-                  var radius = 10;
-                  if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
-                  return d.y = Math.max(radius, Math.min(height - radius, d.y));
-                });
-            link.attr("d", linkArc)
-                .attr("x1", function (d) { return d.source.x; })
-                .attr("y1", function (d) { return d.source.y; })
-                .attr("x2", function (d) { return d.target.x; })
-                .attr("y2", function (d) { return d.target.y; });
+              ix = Math.max(radius, Math.min(width - radius, d.x));
+              iy = Math.max(radius, Math.min(height - radius, d.y));
+              return `translate(${ix},${iy})`
+            });
+ 
+            link.attr("d", linkArc);
           }
 
           function network_color(d) {
             var col_result = "";
-            if (d.category > 1) {
-              col_result = "aap";
-            }
+            //if (d.category > 1) {
+            //  col_result = "aap";
+            //}
             col_result = scale(d.category);
             return col_result;
           }
@@ -5103,9 +5153,11 @@ var ru = (function ($, ru) {
             link_list = null,
             node_list = null,
             lock_status = "",
-            iWidth = 800,
-            iHeight = 500,
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 1000,
             max_value = 0,
+            divTargetA = "super_network_trans_authors",
             divTarget = "super_network_trans",
             divWait = "#super_network_trans_wait",
             divNetwork = "#ssg_network_trans";
@@ -5133,13 +5185,19 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['authors'] = response.author_list;
                   if ("networkslider" in response) {
                     $("#network_trans_slider_value").html(response.networkslider);
                   }
+                  // Calculate the width we have right now
+                  iWidth = $("#"+divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
 
                   // Other data
                   max_value = response.max_value;
                   options['target'] = divTarget;
+                  options['targetA'] = divTargetA;
                   options['width'] = iWidth;
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);

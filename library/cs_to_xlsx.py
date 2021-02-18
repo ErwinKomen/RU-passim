@@ -235,7 +235,13 @@ def data_to_excel(lst_data, flOutput):
     try:
         # Start workbook
         wb = openpyxl.Workbook()
-        ws = wb.get_active_sheet()
+
+        # Getting the active sheet is version-dependant...
+        try:
+            ws = wb.get_active_sheet()
+        except:
+            ws = wb.active
+        # GIve a good title to the active sheet
         ws.title="Data"
 
         # Set the headers
