@@ -11737,7 +11737,11 @@ class EqualGoldDetails(EqualGoldEdit):
                     context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
                 context['manuscripts'] = qs_s.count()
-                context['after_details'] = render_to_string('seeker/super_graph.html', context, self.request)
+                lHtml = []
+                if 'after_details' in context:
+                    lHtml.append(context['after_details'])
+                lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
+                context['after_details'] = "\n".join(lHtml)
 
         except:
             msg = oErr.get_error_message()
