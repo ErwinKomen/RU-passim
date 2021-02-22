@@ -1637,6 +1637,378 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * draw_network_overlap
+       *    draw a force-directed network similar to the on by Boodts & Denis "A sermon by any other name?"
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network_overlap: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            divSvg,   // The target svg div
+            color,    // D3 color scheme
+            factor,
+            width,
+            height,
+            i,
+            count,
+            maxcount = 0,
+            gravityvalue = 100,
+            gravityid = "#gravity_overlap_value",
+            degree = 1,
+            p = {},
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+          degree = options['degree'];
+
+          // Calculate the maxcount within the nodes 'scount' feature
+          for (i = 0; i < options['nodes'].length; i++) {
+            count = options['nodes'][i]['scount'];
+            if (count > maxcount) {
+              maxcount = count;
+            }
+          }
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          // Add a viewbox
+          svg.attr("viewBox", [0, 0, width, height])
+          color = network_color;
+
+          // Append a legend (with the title): top center
+          private_methods.addLegend({
+            'x': 50,          // width / 2,
+            'y': 50,          // height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation = d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result = d.id;
+                return result;
+              }).distance(function (d) { return 10 * maxcount / degree; })
+              )
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .force("collide", d3.forceCollide(d => 65).radius(function (d) {
+                return get_height(d) + 1;
+              }).iterations(3))
+              // .force("collision", rectCollide().size(function (d) {
+              //  return [get_width(d), get_height(d)];
+              //}))
+              //.nodes(options['nodes']);
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(options['links'])
+                    .join("line")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(2 * d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("g")
+                    .data(options['nodes'])
+                    .join("g")
+                    .call(network_drag(loc_simulation));
+
+          // Add the circle below the <g>
+          node.append("circle")
+              .attr("r", get_radius)
+              .attr('fill', color);
+
+          // Add signature to node below the <g>
+          node.append("text")
+              .attr("x", function (d) {
+                var x = -1 * get_width(d) / 2;
+                return x.toString();
+              })
+              .attr("y", function (d) {
+                var x = 3 * get_radius(d);
+                return x.toString();
+              })
+              .text(function (d) {
+                return d.label;
+              })
+              .clone(true).lower()
+              .attr("fill", "none")
+              .attr("stroke", "white")
+              .attr("stroke-width", 3);
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.passim + " (id=" + d.id + " S=" + d.scount + ")"; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+            .text(function (d) { return d.value; });
+
+          // ====================== HELP FUNCTIONS =============================
+          function get_radius(d) {
+            var scount = d.scount;
+            var iSize = Math.max(5, scount / 4);
+            return iSize;
+          }
+
+          function get_width(d) {
+            return 10 * d.label.length;
+          }
+
+          function get_height(d) {
+            var r = get_radius(d);
+            return r * 4;
+          }
+
+          // Define the 'ticked' function
+          function ticked() {
+            //var q = d3.quadtree(options['nodes']),
+            //    i = 0,
+            //    n = options['nodes'].length;
+
+            //// Visit all points
+            //while (++i < n) {
+            //  q.visit(collide(options['nodes'][i]));
+            //}
+
+            node.attr("transform", function (d) {
+              var radius = 10, ix, iy;
+              if (d.scount !== undefined) { radius = get_radius(d); }
+              ix = Math.max(radius, Math.min(width - radius, d.x));
+              iy = Math.max(radius, Math.min(height - radius, d.y));
+              return `translate(${ix},${iy})`
+            });
+
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+          }
+
+          function rectCollide(node) {
+            var nodes, sizes, masses;
+            var strength = 1;
+            var iterations = 1;
+            var nodeCenterX;
+            var nodeMass;
+            var nodeCenterY;
+
+            function force() {
+
+              var node;
+              var i = -1;
+              while (++i < iterations) { iterate(); }
+              function iterate() {
+                var quadtree = d3.quadtree(nodes, xCenter, yCenter);
+                var j = -1
+                while (++j < nodes.length) {
+                  node = nodes[j];
+                  nodeMass = masses[j];
+                  nodeCenterX = xCenter(node);
+                  nodeCenterY = yCenter(node);
+                  quadtree.visit(collisionDetection);
+                }
+              }
+            }
+
+            function collisionDetection(quad, x0, y0, x1, y1) {
+              var updated = false;
+              var data = quad.data;
+              if (data) {
+                if (data.index > node.index) {
+
+                  let xSize = (node.width + data.width) / 2;
+                  let ySize = (node.height + data.height) / 2;
+                  let dataCenterX = xCenter(data);
+                  let dataCenterY = yCenter(data);
+                  let dx = nodeCenterX - dataCenterX;
+                  let dy = nodeCenterY - dataCenterY;
+                  let absX = Math.abs(dx);
+                  let absY = Math.abs(dy);
+                  let xDiff = absX - xSize;
+                  let yDiff = absY - ySize;
+
+                  if (xDiff < 0 && yDiff < 0) {
+                    //collision has occurred
+
+                    //separation vector
+                    let sx = xSize - absX;
+                    let sy = ySize - absY;
+                    if (sx < sy) {
+                      if (sx > 0) {
+                        sy = 0;
+                      }
+                    } else {
+                      if (sy > 0) {
+                        sx = 0;
+                      }
+                    }
+                    if (dx < 0) {
+                      sx = -sx;
+                    }
+                    if (dy < 0) {
+                      sy = -sy;
+                    }
+
+                    let distance = Math.sqrt(sx * sx + sy * sy);
+                    let vCollisionNorm = { x: sx / distance, y: sy / distance };
+                    let vRelativeVelocity = { x: data.vx - node.vx, y: data.vy - node.vy };
+                    let speed = vRelativeVelocity.x * vCollisionNorm.x + vRelativeVelocity.y * vCollisionNorm.y;
+                    if (speed < 0) {
+                      //negative speed = rectangles moving away
+                    } else {
+                      var collisionImpulse = 2 * speed / (masses[data.index] + masses[node.index]);
+                      if (Math.abs(xDiff) < Math.abs(yDiff)) {
+                        //x overlap is less
+                        data.vx -= (collisionImpulse * masses[node.index] * vCollisionNorm.x);
+                        node.vx += (collisionImpulse * masses[data.index] * vCollisionNorm.x);
+                      } else {
+                        //y overlap is less
+                        data.vy -= (collisionImpulse * masses[node.index] * vCollisionNorm.y);
+                        node.vy += (collisionImpulse * masses[data.index] * vCollisionNorm.y);
+                      }
+
+                      updated = true;
+                    }
+                  }
+                }
+              }
+              return updated
+            }
+
+            function xCenter(d) {
+              return d.x;
+            }
+            function yCenter(d) {
+              return d.y;
+            }
+
+            force.initialize = function (_) {
+              sizes = (nodes = _).map(function (d) { return [d.width, d.height] })
+              masses = sizes.map(function (d) { return d[0] * d[1] })
+            };
+
+            force.size = function (_) {
+              return (arguments.length
+                   ? (size = typeof _ === 'function' ? _ : constant(_), force)
+                   : size)
+            }
+
+            force.strength = function (_) {
+              return (arguments.length ? (strength = +_, force) : strength)
+            }
+
+            force.iterations = function (_) {
+              return (arguments.length ? (iterations = +_, force) : iterations)
+            }
+
+            return force;
+          }
+
+          function collide(node) {
+            var r = get_radius(node),
+                w = get_width(node),
+                nx1 = node.x - w / 2,
+                nx2 = node.x + w / 2,
+                ny1 = node.y - r,
+                ny2 = node.y + r * 3;
+            try {
+              return function (quad, x1, y1, x2, y2) {
+                var x = 0,
+                    y = 0,
+                    l = 0,
+                    r = 0;
+
+                if (quad.point && (quad.point !== node)) {
+                  x = node.x - quad.point.x;
+                  y = node.y - quad.point.y;
+                  l = Math.sqrt(x * x + y * y);
+                  r = node.radius + quad.point.radius;
+                  if (l < r) {
+                    l = (l - r) / l * 0.5;
+                    node.x -= x *= l;
+                    node.y -= y *= l;
+                    quad.point.x += x;
+                    quad.point.y += y;
+                  }
+                }
+                return (x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1);
+              };
+            } catch (ex) {
+              private_methods.errMsg("collide", ex);
+              return false;
+            }
+
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            col_result = scale(d.group);
+            return col_result;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.4).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network_overlap", ex);
+          return false;
+        }
+      },
+
+      /**
        * draw_network_trans
        *    draw a force-directed network (e.g. medieval text transmission)
        *
@@ -5137,6 +5509,91 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("network_graph", ex);
+        }
+      },
+
+      /**
+       * network_overlap
+       *   Create and show a SSG-overlap network
+       *
+       */
+      network_overlap: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 1000,
+            max_value = 0,
+            divTarget = "super_network_overlap",
+            divWait = "#super_network_overlap_wait",
+            divNetwork = "#ssg_network_overlap";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+                  options['degree'] = 1;
+                  if ("networkslider" in response) {
+                    $("#network_overlap_slider_value").html(response.networkslider);
+                    options['degree'] = parseInt(response.networkslider, 10);
+                  }
+                  // Calculate the width we have right now
+                  iWidth = $("#" + divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network_overlap(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_overlap)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap", ex);
         }
       },
 

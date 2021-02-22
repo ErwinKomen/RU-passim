@@ -8494,8 +8494,11 @@ class SermonDescrEqual(models.Model):
         # Return the proper response
         return response
 
-    def get_label(self, do_incexpl=False):
-        sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))
+    def get_label(self, do_incexpl=False, show_linktype=False):
+        if show_linktype:
+            sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))
+        else:
+            sBack = self.super.get_label(do_incexpl)
         return sBack
 
     def unique_list():

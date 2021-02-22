@@ -83,6 +83,38 @@ def get_ssg_corpus(profile, instance):
         oErr.DoError("get_ssg_corpus")       
     return ssg_corpus, lock_status
 
+def get_ssg_sig(ssg_id):
+    oErr = ErrHandle()
+    sig = ""
+    try:
+        # Get the Signature that is most appropriate
+        sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
+        sig = "" if sig_obj == None else sig_obj.code
+        if ',' in sig:
+            sig = sig.split(",")[0].strip()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_ssg_sig")
+    return sig
+
+def get_ssg_passim(ssg_id, obj=None):
+    oErr = ErrHandle()
+    code = ""
+    try:
+        # Get the Passim Code
+        if obj == None:
+            obj = EqualGold.objects.filter(id=ssg_id).first()
+        if obj.code == None:
+            code = "eqg_{}".format(obj.id)
+        else:
+            code = obj.code.split(" ")[1]
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_ssg_passim")
+    return code
+
+
+
 
 class DrawPieChart(BasicPart):
     """Fetch data for a particular type of pie-chart for the home page
@@ -91,6 +123,130 @@ class DrawPieChart(BasicPart):
     """
 
     pass
+
+
+class EqualGoldOverlap(BasicPart):
+    """Network of textual overlap between SSGs"""
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        try:
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            # The networkslider determines whether we are looking for 1st degree, 2nd degree or more
+            networkslider = self.qd.get("network_overlap_slider", "1")            
+            if isinstance(networkslider, str):
+                networkslider = int(networkslider)
+
+            # Initializations
+            ssg_link = {}
+
+            # Read the table with links from SSG to SSG
+            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values('src', 'dst')
+            # Transform into a dictionary with src as key and list-of-dst as value
+            for item in eqg_link:
+                src = item['src']
+                dst = item['dst']
+                # Make room for the SRC if needed
+                if not src in ssg_link: ssg_link[src] = []
+                # Add this link to the list
+                ssg_link[src].append(dst)
+
+            # Create the overlap network
+            node_list, link_list, max_value = self.do_overlap(ssg_link, networkslider)
+
+            # Add the information to the context in data
+            context['data'] = dict(node_list=node_list, 
+                                   link_list=link_list,
+                                   max_value=max_value,
+                                   networkslider=networkslider,
+                                   legend="SSG overlap network")
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldOverlap/add_to_context")
+
+        return context
+
+    def do_overlap(self, ssg_link, degree):
+        """Calculate the overlap network up until 'degree'"""
+
+        def add_nodeset(ssg_id, group):
+            node_key = ssg_id
+            # Possibly add the node to the set
+            if not node_key in node_set:
+                code_sig = get_ssg_sig(ssg_id)
+                ssg = EqualGold.objects.filter(id=ssg_id).first()
+                code_pas = get_ssg_passim(ssg_id, ssg)
+                scount = ssg.scount
+
+                node_value = dict(label=code_sig, id=ssg_id, group=group, passim=code_pas, scount=scount)
+                node_set[node_key] = node_value
+                
+        node_list = []
+        link_list = []
+        node_set = {}
+        link_set = {}
+        max_value = 0
+        oErr = ErrHandle()
+
+        try:
+            # Degree 0: direct contacts
+            ssg_id = self.obj.id
+
+            ssg_queue = [ ssg_id ]
+            ssg_add = []
+            group = 1
+            while len(ssg_queue) > 0 and degree >= 0:
+                # Get the next available node
+                node_key = ssg_queue.pop()
+
+                # Possibly add the node to the set
+                add_nodeset(node_key, group)
+
+                # Add links from this SSG to others
+                if node_key in ssg_link:
+                    dst_list = ssg_link[node_key]
+                    for dst in dst_list:
+                        # Add this one to the add list
+                        ssg_add.append(dst)
+                        link_key = "{}_{}".format(node_key, dst)
+                        if not link_key in link_set:
+                            oLink = dict(source=node_key,
+                                         target=dst,
+                                         value=0)
+                            # Add the link to the set
+                            link_set[link_key] = oLink
+                            # Add the destination node to nodeset
+                            add_nodeset(dst, group + 1)
+
+                        # Increment the link value
+                        link_set[link_key]['value'] += 1
+
+                # Go to the next degree
+                if len(ssg_queue) == 0 and degree >= 0:
+                    # Decrement the degree
+                    degree -= 1
+                    group += 1
+                    # Add the items from ssg_add into the queue
+                    while len(ssg_add) > 0:
+                        ssg_queue.append(ssg_add.pop())
+
+
+            # Turn the sets into lists
+            node_list = [v for k,v in node_set.items()]
+            link_list = [v for k,v in link_set.items()]
+            
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldOverlap/do_overlap")
+
+        return node_list, link_list, max_value
 
 
 class EqualGoldTrans(BasicPart):
@@ -124,8 +280,6 @@ class EqualGoldTrans(BasicPart):
             for idx, manu in enumerate(manu_list):
                 manu_dict[manu['manu_id']] = idx + 1
 
-            # author_dict = {}
-
             ssg_corpus, lock_status = get_ssg_corpus(profile, instance)
 
             if lock_status != "ready":
@@ -144,16 +298,10 @@ class EqualGoldTrans(BasicPart):
                         obj = EqualGoldCorpusItem.objects.create(
                             corpus=ssg_corpus, equal=ssg, 
                             authorname=authorname, scount=scount)
-                        ## Add author to dictionary
-                        #if not authorname in author_dict: author_dict[authorname] = 0
-                        #author_dict[authorname] += 1
 
                 # Add this list to the ssg_corpus
                 ssg_corpus.status = "ready"
                 ssg_corpus.save()
-                ## Create list of authors
-                #author_list = [dict(category=k, count=v) for k,v in author_dict.items()]
-                #author_list = sorted(author_list, key=lambda x: (-1 * x['count'], x['category'].lower()))
 
             node_list, link_list, author_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
 
@@ -211,8 +359,9 @@ class EqualGoldTrans(BasicPart):
                 else:
                     title = code.split(" ")[1]
                 # Get the Signature that is most appropriate
-                sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
-                sig = "" if sig_obj == None else sig_obj.code
+                sig = get_ssg_sig(ssg_id)
+                #sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
+                #sig = "" if sig_obj == None else sig_obj.code
 
                 # Add author to dictionary
                 if not category in author_dict: author_dict[category] = 0

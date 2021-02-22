@@ -11717,6 +11717,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Add a custom button to the manuscript listview: to trigger showing a graph
                 html = []
                 if use_network_graph:
+                    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
+                    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
                     html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
                     html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
                     html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
@@ -11735,6 +11737,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 if use_network_graph:
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
                     context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
+                    context['equalgold_overlap'] = reverse("equalgold_overlap", kwargs={'pk': instance.id})
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
                 context['manuscripts'] = qs_s.count()
                 lHtml = []

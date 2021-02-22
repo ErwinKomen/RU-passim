@@ -110,6 +110,7 @@ urlpatterns = [
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
     url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
+    url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
