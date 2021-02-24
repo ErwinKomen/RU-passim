@@ -502,6 +502,16 @@ def get_current_datetime():
     """Get the current time"""
     return timezone.now()
 
+def treat_bom(sHtml):
+    """REmove the BOM marker except at the beginning of the string"""
+
+    # Check if it is in the beginning
+    bStartsWithBom = sHtml.startswith(u'\ufeff')
+    # Remove everywhere
+    sHtml = sHtml.replace(u'\ufeff', '')
+    # Return what we have
+    return sHtml
+
 
 # The views that are defined by 'basic'
 
@@ -1777,7 +1787,8 @@ class BasicPart(View):
                                 if formObj['forminstance'].changed_data != None:
                                     details['changes'] = action_model_changes(formObj['forminstance'], instance)
                                 if 'action' in formObj: details['savetype'] = formObj['action']
-                                Action.add(request.user.username, self.MainModel.__name__, instance.id, "save", json.dumps(details))
+                                # Action.add(request.user.username, self.MainModel.__name__, instance.id, "save", json.dumps(details))
+                                self.action_add(instance, details, "save")
                                 # Set the context
                                 context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
                                 # Put the instance in the form object
@@ -1856,7 +1867,8 @@ class BasicPart(View):
                                                     if self.before_delete(prefix, form.instance):
                                                         # Log the delete action
                                                         details = {'id': form.instance.id}
-                                                        Action.add(request.user.username, itemtype, form.instance.id, "delete", json.dumps(details))
+                                                        # Action.add(request.user.username, itemtype, form.instance.id, "delete", json.dumps(details))
+                                                        self.action_add(form.instance, details, "delete")
                                                         # Delete this one
                                                         form.instance.delete()
                                                         # NOTE: the template knows this one is deleted by looking at form.DELETE
@@ -1879,7 +1891,8 @@ class BasicPart(View):
                                                         details = {'id': sub_instance.id}
                                                         if form.changed_data != None:
                                                             details['changes'] = action_model_changes(form, sub_instance)
-                                                        Action.add(request.user.username, itemtype,sub_instance.id, "save", json.dumps(details))
+                                                        # Action.add(request.user.username, itemtype,sub_instance.id, "save", json.dumps(details))
+                                                        self.action_add(sub_instance, details, "save")
                                                         # Store the instance id in the data
                                                         self.data[prefix + '_instanceid'] = sub_instance.id
                                                         # Any action after saving this form
@@ -1993,7 +2006,8 @@ class BasicPart(View):
                 if self.before_delete():
                     # Log the delete action
                     details = {'id': self.obj.id}
-                    Action.add(request.user.username, self.MainModel.__name__, self.obj.id, "delete", json.dumps(details))
+                    # Action.add(request.user.username, self.MainModel.__name__, self.obj.id, "delete", json.dumps(details))
+                    self.action_add(self.obj, details, "delete")
                     # We have permission to delete the instance
                     self.obj.delete()
                     context['deleted'] = True
@@ -2157,6 +2171,13 @@ class BasicPart(View):
 
         # Return the information
         return JsonResponse(self.data)
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+
+        # Example: 
+        #   Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
+        pass
       
     def checkAuthentication(self,request):
         # first check for authentication

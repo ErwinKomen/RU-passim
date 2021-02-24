@@ -526,6 +526,30 @@ class LocationOneWidget(ModelSelect2Widget):
         return Location.objects.all().order_by('name').distinct()
 
 
+class LocTypeWidget(ModelSelect2MultipleWidget):
+    model = LocationType
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.level)
+        return sLabel
+
+    def get_queryset(self):
+        return LocationType.objects.all().order_by('level').distinct()
+
+
+class LoctypeOneWidget(ModelSelect2Widget):
+    model = LocationType
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.level)
+        return sLabel
+
+    def get_queryset(self):
+        return LocationType.objects.all().order_by('level').distinct()
+
+
 class ManuidWidget(ModelSelect2MultipleWidget):
     model = Manuscript
     search_fields = [ 'idno__icontains']
@@ -3357,8 +3381,16 @@ class TemplateForm(PassimModelForm):
 
 
 class LocationForm(forms.ModelForm):
+    loctypechooser = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LocTypeWidget(attrs={'data-placeholder': 'Location type...', 'style': 'width: 100%;'}))
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  
+                                               'style': 'width: 100%;'}))
+    locchooser = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                            widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
+                 widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -3366,13 +3398,24 @@ class LocationForm(forms.ModelForm):
         model = Location
         fields = ['name', 'loctype']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 #'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 'loctype':     LoctypeOneWidget(attrs={'data-placeholder': 'Select one type...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(LocationForm, self).__init__(*args, **kwargs)
-        # All fields are required
+        # No fields are required for best processing
+        self.fields['name'].required = False
+        self.fields['loctype'].required = False
+        self.fields['loctypechooser'].required = False
+        self.fields['name'].required = False
+        self.fields['location_ta'].required = False
+        self.fields['locchooser'].required = False
+        qs = Location.objects.all().order_by('loctype__level', 'name')
+        self.fields['locationlist'].queryset = qs
+        self.fields['locchooser'].queryset = qs
+        self.fields['loctypechooser'].queryset = LocationType.objects.all().order_by('level')
         # Get the instance
         if 'instance' in kwargs:
             # Set the items that *may* be shown
@@ -3380,6 +3423,8 @@ class LocationForm(forms.ModelForm):
             qs = Location.objects.exclude(id=instance.id).order_by('loctype__level', 'name')
             self.fields['locationlist'].queryset = qs
             self.fields['locationlist'].widget.queryset = qs
+            self.fields['locchooser'].queryset = qs
+            self.fields['locchooser'].widget.queryset = qs
 
             # Set the list of initial items
             my_list = [x.id for x in instance.hierarchy(False)]

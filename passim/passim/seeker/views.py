@@ -84,7 +84,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item
 
 
 # Some constants that can be used
@@ -3923,563 +3923,6 @@ def get_pie_data():
 
 
 
-class BasicPart(View):
-    """This is my own versatile handling view.
-
-    Note: this version works with <pk> and not with <object_id>
-    """
-
-    # Initialisations
-    arErr = []              # errors   
-    template_name = None    # The template to be used
-    template_err_view = None
-    form_validated = True   # Used for POST form validation
-    savedate = None         # When saving information, the savedate is returned in the context
-    add = False             # Are we adding a new record or editing an existing one?
-    obj = None              # The instance of the MainModel
-    action = ""             # The action to be undertaken
-    MainModel = None        # The model that is mainly used for this form
-    form_objects = []       # List of forms to be processed
-    formset_objects = []    # List of formsets to be processed
-    previous = None         # Return to this
-    bDebug = False          # Debugging information
-    redirectpage = ""       # Where to redirect to
-    data = {'status': 'ok', 'html': ''}       # Create data to be returned    
-    
-    def post(self, request, pk=None):
-        # A POST request means we are trying to SAVE something
-        self.initializations(request, pk)
-        # Initialize typeahead list
-        lst_typeahead = []
-
-        # Explicitly set the status to OK
-        self.data['status'] = "ok"
-        
-        if self.checkAuthentication(request):
-            # Build the context
-            context = dict(object_id = pk, savedate=None)
-            context['authenticated'] = user_is_authenticated(request)
-            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-            context['is_app_editor'] = user_is_ingroup(request, app_editor)
-
-            # Action depends on 'action' value
-            if self.action == "":
-                if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
-                # Walk all the forms for preparation of the formObj contents
-                for formObj in self.form_objects:
-                    # Are we SAVING a NEW item?
-                    if self.add:
-                        # We are saving a NEW item
-                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'])
-                        formObj['action'] = "new"
-                    else:
-                        # We are saving an EXISTING item
-                        # Determine the instance to be passed on
-                        instance = self.get_instance(formObj['prefix'])
-                        # Make the instance available in the form-object
-                        formObj['instance'] = instance
-                        # Get an instance of the form
-                        formObj['forminstance'] = formObj['form'](request.POST, prefix=formObj['prefix'], instance=instance)
-                        formObj['action'] = "change"
-
-                # Initially we are assuming this just is a review
-                context['savedate']="reviewed at {}".format(get_current_datetime().strftime("%X"))
-
-                # Iterate again
-                for formObj in self.form_objects:
-                    prefix = formObj['prefix']
-                    # Adapt if it is not readonly
-                    if not formObj['readonly']:
-                        # Check validity of form
-                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
-                            # Save it preliminarily
-                            instance = formObj['forminstance'].save(commit=False)
-                            # The instance must be made available (even though it is only 'preliminary')
-                            formObj['instance'] = instance
-                            # Perform actions to this form BEFORE FINAL saving
-                            bNeedSaving = formObj['forminstance'].has_changed()
-                            if self.before_save(prefix, request, instance=instance, form=formObj['forminstance']): bNeedSaving = True
-                            if formObj['forminstance'].instance.id == None: bNeedSaving = True
-                            if bNeedSaving:
-                                # Perform the saving
-                                instance.save()
-                                # Log the SAVE action
-                                details = {'id': instance.id}
-                                if formObj['forminstance'].changed_data != None:
-                                    details['changes'] = action_model_changes(formObj['forminstance'], instance)
-                                if 'action' in formObj: details['savetype'] = formObj['action']
-                                Action.add(request.user.username, self.MainModel.__name__, instance.id, "save", json.dumps(details))
-                                # Set the context
-                                context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
-                                # Put the instance in the form object
-                                formObj['instance'] = instance
-                                # Store the instance id in the data
-                                self.data[prefix + '_instanceid'] = instance.id
-                                # Any action after saving this form
-                                self.after_save(prefix, instance=instance, form=formObj['forminstance'])
-                            # Also get the cleaned data from the form
-                            formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
-                        else:
-                            self.arErr.append(formObj['forminstance'].errors)
-                            self.form_validated = False
-                            formObj['cleaned_data'] = None
-                    else:
-                        # Form is readonly
-
-                        # Check validity of form
-                        if formObj['forminstance'].is_valid() and self.is_custom_valid(prefix, formObj['forminstance']):
-                            # At least get the cleaned data from the form
-                            formObj['cleaned_data'] = formObj['forminstance'].cleaned_data
-
-                            # x = json.dumps(sorted(self.qd.items(), key=lambda kv: kv[0]), indent=2)
-                    # Add instance to the context object
-                    context[prefix + "Form"] = formObj['forminstance']
-                    # Get any possible typeahead parameters
-                    lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
-                    if lst_form_ta != None:
-                        for item in lst_form_ta:
-                            lst_typeahead.append(item)
-                # Walk all the formset objects
-                for formsetObj in self.formset_objects:
-                    prefix  = formsetObj['prefix']
-                    if self.can_process_formset(prefix):
-                        formsetClass = formsetObj['formsetClass']
-                        form_kwargs = self.get_form_kwargs(prefix)
-                        if self.add:
-                            # Saving a NEW item
-                            if 'initial' in formsetObj:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, initial=formsetObj['initial'], form_kwargs = form_kwargs)
-                            else:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, form_kwargs = form_kwargs)
-                        else:
-                            # Saving an EXISTING item
-                            instance = self.get_instance(prefix)
-                            qs = self.get_queryset(prefix)
-                            if qs == None:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, form_kwargs = form_kwargs)
-                            else:
-                                formset = formsetClass(request.POST, request.FILES, prefix=prefix, instance=instance, queryset=qs, form_kwargs = form_kwargs)
-                        # Process all the forms in the formset
-                        self.process_formset(prefix, request, formset)
-                        # Store the instance
-                        formsetObj['formsetinstance'] = formset
-                        # Make sure we know what we are dealing with
-                        itemtype = "form_{}".format(prefix)
-                        # Adapt the formset contents only, when it is NOT READONLY
-                        if not formsetObj['readonly']:
-                            # Is the formset valid?
-                            if formset.is_valid():
-                                # Possibly handle the clean() for this formset
-                                if 'clean' in formsetObj:
-                                    # Call the clean function
-                                    self.clean(formset, prefix)
-                                has_deletions = False
-                                if len(self.arErr) == 0:
-                                    # Make sure all changes are saved in one database-go
-                                    with transaction.atomic():
-                                        # Walk all the forms in the formset
-                                        for form in formset:
-                                            # At least check for validity
-                                            if form.is_valid() and self.is_custom_valid(prefix, form):
-                                                # Should we delete?
-                                                if 'DELETE' in form.cleaned_data and form.cleaned_data['DELETE']:
-                                                    # Check if deletion should be done
-                                                    if self.before_delete(prefix, form.instance):
-                                                        # Log the delete action
-                                                        details = {'id': form.instance.id}
-                                                        Action.add(request.user.username, itemtype, form.instance.id, "delete", json.dumps(details))
-                                                        # Delete this one
-                                                        form.instance.delete()
-                                                        # NOTE: the template knows this one is deleted by looking at form.DELETE
-                                                        has_deletions = True
-                                                else:
-                                                    # Check if anything has changed so far
-                                                    has_changed = form.has_changed()
-                                                    # Save it preliminarily
-                                                    sub_instance = form.save(commit=False)
-                                                    # Any actions before saving
-                                                    if self.before_save(prefix, request, sub_instance, form):
-                                                        has_changed = True
-                                                    # Save this construction
-                                                    if has_changed and len(self.arErr) == 0: 
-                                                        # Save the instance
-                                                        sub_instance.save()
-                                                        # Adapt the last save time
-                                                        context['savedate']="saved at {}".format(get_current_datetime().strftime("%X"))
-                                                        # Log the delete action
-                                                        details = {'id': sub_instance.id}
-                                                        if form.changed_data != None:
-                                                            details['changes'] = action_model_changes(form, sub_instance)
-                                                        Action.add(request.user.username, itemtype,sub_instance.id, "save", json.dumps(details))
-                                                        # Store the instance id in the data
-                                                        self.data[prefix + '_instanceid'] = sub_instance.id
-                                                        # Any action after saving this form
-                                                        self.after_save(prefix, sub_instance)
-                                            else:
-                                                if len(form.errors) > 0:
-                                                    self.arErr.append(form.errors)
-                                
-                                    # Rebuild the formset if it contains deleted forms
-                                    if has_deletions or not has_deletions:
-                                        # Or: ALWAYS
-                                        if qs == None:
-                                            formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                                        else:
-                                            formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, form_kwargs=form_kwargs)
-                                        formsetObj['formsetinstance'] = formset
-                            else:
-                                # Iterate over all errors
-                                for idx, err_this in enumerate(formset.errors):
-                                    if '__all__' in err_this:
-                                        self.arErr.append(err_this['__all__'][0])
-                                    elif err_this != {}:
-                                        # There is an error in item # [idx+1], field 
-                                        problem = err_this 
-                                        for k,v in err_this.items():
-                                            fieldName = k
-                                            errmsg = "Item #{} has an error at field [{}]: {}".format(idx+1, k, v[0])
-                                            self.arErr.append(errmsg)
-
-                            # self.arErr.append(formset.errors)
-                    else:
-                        formset = []
-                    # Get any possible typeahead parameters
-                    lst_formset_ta = getattr(formset.form, "typeaheads", None)
-                    if lst_formset_ta != None:
-                        for item in lst_formset_ta:
-                            lst_typeahead.append(item)
-                    # Add the formset to the context
-                    context[prefix + "_formset"] = formset
-            elif self.action == "download":
-                # We are being asked to download something
-                if self.dtype != "":
-                    plain_type = ["xlsx", "csv", "excel"]
-                    # Initialise return status
-                    oBack = {'status': 'ok'}
-                    sType = "csv" if (self.dtype == "xlsx") else self.dtype
-
-                    # Get the data
-                    sData = ""
-                    if self.dtype != "excel":
-                        sData = self.get_data('', self.dtype)
-                    # Decode the data and compress it using gzip
-                    bUtf8 = (self.dtype != "db")
-                    bUsePlain = (self.dtype in plain_type)
-
-                    # Create name for download
-                    # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
-                    modelname = self.MainModel.__name__
-                    obj_id = "n" if self.obj == None else self.obj.id
-                    extension = "xlsx" if self.dtype == "excel" else self.dtype
-                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
-                    sContentType = ""
-                    if self.dtype == "csv":
-                        sContentType = "text/tab-separated-values"
-                    elif self.dtype == "json":
-                        sContentType = "application/json"
-                    elif self.dtype == "xlsx" or self.dtype == "excel":
-                        sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    elif self.dtype == "hist-svg":
-                        sContentType = "application/svg"
-                        sData = self.qd['downloaddata']
-                        # Set the filename correctly
-                        sDbName = "passim_{}_{}.svg".format(modelname, obj_id)
-                    elif self.dtype == "hist-png":
-                        sContentType = "image/png"
-                        # Read the base64 encoded part
-                        sData = self.qd['downloaddata']
-                        arPart = sData.split(";")
-                        if len(arPart) > 1:
-                            dSecond = arPart[1]
-                            # Strip off preceding base64 part
-                            sData = dSecond.replace("base64,", "")
-                            # Convert string to bytestring
-                            sData = sData.encode()
-                            # Decode base64 into binary
-                            sData = base64.decodestring(sData)
-                            # Set the filename correctly
-                            sDbName = "passim_{}_{}.png".format(modelname, obj_id)
-
-                    # Excel needs additional conversion
-                    if self.dtype == "xlsx":
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = csv_to_excel(sData, response)
-                    elif self.dtype == "excel":
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = self.get_data('', self.dtype, response)
-                    else:
-                        response = HttpResponse(sData, content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-
-                    # Continue for all formats
-                        
-                    # return gzip_middleware.process_response(request, response)
-                    return response
-            elif self.action == "delete":
-                # The user requests this to be deleted
-                if self.before_delete():
-                    # Log the delete action
-                    details = {'id': self.obj.id}
-                    Action.add(request.user.username, self.MainModel.__name__, self.obj.id, "delete", json.dumps(details))
-                    # We have permission to delete the instance
-                    self.obj.delete()
-                    context['deleted'] = True
-
-            # Allow user to add to the context
-            context = self.add_to_context(context)
-            
-            # Possibly add data from [context.data]
-            if 'data' in context:
-                for k,v in context['data'].items():
-                    self.data[k] = v
-
-            # First look at redirect page
-            self.data['redirecturl'] = ""
-            if self.redirectpage != "":
-                self.data['redirecturl'] = self.redirectpage
-            # Check if 'afternewurl' needs adding
-            # NOTE: this should only be used after a *NEW* instance has been made -hence the self.add check
-            if 'afternewurl' in context and self.add:
-                self.data['afternewurl'] = context['afternewurl']
-            else:
-                self.data['afternewurl'] = ""
-            if 'afterdelurl' in context:
-                self.data['afterdelurl'] = context['afterdelurl']
-
-            # Make sure we have a list of any errors
-            error_list = [str(item) for item in self.arErr]
-            context['error_list'] = error_list
-            context['errors'] = json.dumps( self.arErr)
-            if len(self.arErr) > 0:
-                # Indicate that we have errors
-                self.data['has_errors'] = True
-                self.data['status'] = "error"
-            else:
-                self.data['has_errors'] = False
-            # Standard: add request user to context
-            context['requestuser'] = request.user
-
-            # Set any possible typeaheads
-            self.data['typeaheads'] = lst_typeahead
-
-            # Get the HTML response
-            if len(self.arErr) > 0:
-                if self.template_err_view != None:
-                     # Create a list of errors
-                    self.data['err_view'] = render_to_string(self.template_err_view, context, request)
-                else:
-                    self.data['error_list'] = error_list
-                    self.data['errors'] = self.arErr
-                self.data['html'] = ''
-                # We may not redirect if there is an error!
-                self.data['redirecturl'] = ''
-            elif self.action == "delete":
-                self.data['html'] = "deleted" 
-            elif self.template_name != None:
-                # In this case reset the errors - they should be shown within the template
-                sHtml = render_to_string(self.template_name, context, request)
-                sHtml = treat_bom(sHtml)
-                self.data['html'] = sHtml
-            else:
-                self.data['html'] = 'no template_name specified'
-
-            # At any rate: empty the error basket
-            self.arErr = []
-            error_list = []
-
-        else:
-            self.data['html'] = "Please log in before continuing"
-
-        # Return the information
-        return JsonResponse(self.data)
-        
-    def get(self, request, pk=None): 
-        self.data['status'] = 'ok'
-        # Perform the initializations that need to be made anyway
-        self.initializations(request, pk)
-        # Initialize typeahead list
-        lst_typeahead = []
-
-        # Continue if authorized
-        if self.checkAuthentication(request):
-            context = dict(object_id = pk, savedate=None)
-            context['prevpage'] = self.previous
-            context['authenticated'] = user_is_authenticated(request)
-            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-            context['is_app_editor'] = user_is_ingroup(request, app_editor)
-            # Walk all the form objects
-            for formObj in self.form_objects:        
-                # Used to populate a NEW research project
-                # - CREATE a NEW research form, populating it with any initial data in the request
-                initial = dict(request.GET.items())
-                if self.add:
-                    # Create a new form
-                    formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
-                else:
-                    # Used to show EXISTING information
-                    instance = self.get_instance(formObj['prefix'])
-                    # We should show the data belonging to the current Research [obj]
-                    formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
-                # Add instance to the context object
-                context[formObj['prefix'] + "Form"] = formObj['forminstance']
-                # Get any possible typeahead parameters
-                lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
-                if lst_form_ta != None:
-                    for item in lst_form_ta:
-                        lst_typeahead.append(item)
-            # Walk all the formset objects
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                form_kwargs = self.get_form_kwargs(prefix)
-                if self.add:
-                    # - CREATE a NEW formset, populating it with any initial data in the request
-                    initial = dict(request.GET.items())
-                    # Saving a NEW item
-                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
-                else:
-                    # Possibly initial (default) values
-                    if 'initial' in formsetObj:
-                        initial = formsetObj['initial']
-                    else:
-                        initial = None
-                    # show the data belonging to the current [obj]
-                    instance = self.get_instance(prefix)
-                    qs = self.get_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
-                    else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
-                # Get any possible typeahead parameters
-                lst_formset_ta = getattr(formset.form, "typeaheads", None)
-                if lst_formset_ta != None:
-                    for item in lst_formset_ta:
-                        lst_typeahead.append(item)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
-            # Allow user to add to the context
-            context = self.add_to_context(context)
-            # Make sure we have a list of any errors
-            error_list = [str(item) for item in self.arErr]
-            context['error_list'] = error_list
-            context['errors'] = self.arErr
-            # Standard: add request user to context
-            context['requestuser'] = request.user
-
-            # Set any possible typeaheads
-            self.data['typeaheads'] = json.dumps(lst_typeahead)
-            
-            # Get the HTML response
-            sHtml = render_to_string(self.template_name, context, request)
-            sHtml = treat_bom(sHtml)
-            self.data['html'] = sHtml
-        else:
-            self.data['html'] = "Please log in before continuing"
-
-        # Return the information
-        return JsonResponse(self.data)
-      
-    def checkAuthentication(self,request):
-        # first check for authentication
-        if not request.user.is_authenticated:
-            # Simply redirect to the home page
-            self.data['html'] = "Please log in to work on this project"
-            return False
-        else:
-            return True
-
-    def rebuild_formset(self, prefix, formset):
-        return formset
-
-    def initializations(self, request, object_id):
-        # Store the previous page
-        #self.previous = get_previous_page(request)
-        # Clear errors
-        self.arErr = []
-        # COpy the request
-        self.request = request
-        # Copy any object id
-        self.object_id = object_id
-        self.add = object_id is None
-        # Get the parameters
-        if request.POST:
-            self.qd = request.POST.copy()
-        else:
-            self.qd = request.GET.copy()
-
-        # Immediately take care of the rangeslider stuff
-        lst_remove = []
-        for k,v in self.qd.items():
-            if "-rangeslider" in k: lst_remove.append(k)
-        for item in lst_remove: self.qd.pop(item)
-        #lst_remove = []
-        #dictionary = {}
-        #for k,v in self.qd.items():
-        #    if "-rangeslider" not in k: 
-        #        dictionary[k] = v
-        #self.qd = dictionary
-
-        # Check for action
-        if 'action' in self.qd:
-            self.action = self.qd['action']
-
-        # Find out what the Main Model instance is, if any
-        if self.add:
-            self.obj = None
-        elif self.MainModel != None:
-            # Get the instance of the Main Model object
-            self.obj =  self.MainModel.objects.filter(pk=object_id).first()
-            # NOTE: if the object doesn't exist, we will NOT get an error here
-        # ALWAYS: perform some custom initialisations
-        self.custom_init()
-
-    def get_instance(self, prefix):
-        return self.obj
-
-    def is_custom_valid(self, prefix, form):
-        return True
-
-    def get_queryset(self, prefix):
-        return None
-
-    def get_form_kwargs(self, prefix):
-        return None
-
-    def get_data(self, prefix, dtype, response=None):
-        return ""
-
-    def before_save(self, prefix, request, instance=None, form=None):
-        return False
-
-    def before_delete(self, prefix=None, instance=None):
-        return True
-
-    def after_save(self, prefix, instance=None, form=None):
-        return True
-
-    def add_to_context(self, context):
-        return context
-
-    def process_formset(self, prefix, request, formset):
-        return None
-
-    def can_process_formset(self, prefix):
-        return True
-
-    def custom_init(self):
-        pass    
-           
-
 class PassimDetails(DetailView):
     """Extension of the normal DetailView class for PASSIM"""
 
@@ -5380,191 +4823,109 @@ class BasicListView(ListView):
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
     
-
-class LocationListView(ListView):
+    
+class LocationListView(BasicList):
     """Listview of locations"""
 
     model = Location
+    listform = LocationForm
     paginate_by = 15
-    template_name = 'seeker/location_list.html'
-    entrycount = 0
+    prefix = "loc"
+    has_select2 = True
+    order_cols = ['name', 'loctype__name', '', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Name',         'order': 'o=1', 'type': 'str', 'custom': 'location', 'linkdetails': True, 'main': True},
+                   {'name': 'Type',         'order': 'o=2', 'type': 'str', 'custom': 'loctype',  'linkdetails': True},
+                   {'name': 'Part of...',   'order': '',    'type': 'str', 'custom': 'partof'},
+                   {'name': '',             'order': '',    'type': 'str', 'custom': 'manulink' }]
+    filters = [ {"name": "Name",    "id": "filter_location",    "enabled": False},
+                {"name": "Type",    "id": "filter_loctype",     "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'location', 'dbfield': 'name',       'keyS': 'location_ta', 'keyList': 'locchooser', 'infield': 'name' },
+            {'filter': 'loctype',  'fkfield': 'loctype',    'keyList': 'loctypechooser', 'infield': 'name' }]}
+        ]
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(LocationListView, self).get_context_data(**kwargs)
-
-        # Get parameters
-        initial = self.request.GET
-
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Get parameters for the search
-        initial = self.request.GET
-        # The searchform is just a list form, but filled with the 'initial' parameters
-        context['searchform'] = LocationForm(initial)
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Passim location info"
-
-        # Check if user may upload
-        context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Locations", True)
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in default class property value.
-        """
-        return self.paginate_by
-  
-    def get_queryset(self):
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.get = get
-
-        lstQ = []
-
-        # Check for author [name]
-        if 'name' in get and get['name'] != '':
-            val = adapt_search(get['name'])
-            # Search in both the name field
-            lstQ.append(Q(name__iregex=val))
-
-        # Check for location type
-        if 'loctype' in get and get['loctype'] != '':
-            val = get['loctype']
-            # Search in both the name field
-            lstQ.append(Q(loctype=val))
-
-        # Calculate the final qs
-        qs = Location.objects.filter(*lstQ).order_by('name').distinct()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Return the resulting filtered and sorted queryset
-        return qs
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "location":
+            html.append(instance.name)
+        elif custom == "loctype":
+            sLocType = "-"
+            if instance.loctype != None:
+                sLocType = instance.loctype.name
+            html.append(sLocType)
+        elif custom == "partof":
+            sName = instance.get_partof_html()
+            if sName == "": sName = "<i>(part of nothing)</i>"
+            html.append(sName)
+        elif custom == "manulink":
+            # This is currently unused
+            pass
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
 
 
-class LocationDetailsView(PassimDetails):
+class LocationEdit(BasicDetails):
     model = Location
     mForm = LocationForm
-    template_name = 'seeker/location_details.html'
-    prefix = 'loc'
-    prefix_type = "simple"
-    title = "LocationDetails"
-    rtype = "html"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('location_list')
-        return True, "" 
+    prefix = "loc"
+    title = "Location details"
+    history_button = True
+    mainitems = []
 
     def add_to_context(self, context, instance):
-        # Add the list of relations in which I am contained
-        contained_locations = []
-        if instance != None:
-            contained_locations = instance.hierarchy(include_self=False)
-        context['contained_locations'] = contained_locations
+        """Add to the existing context"""
 
-        # The standard information
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('location_list')
-        crumbs = []
-        crumbs.append(['Locations', prevpage])
-        current_name = "Location details"
-        if instance:
-            current_name = "Location [{}]".format(instance.name)
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name:",                     'value': instance.name,         'field_key': "name"},
+            {'type': 'line',  'label': "Location type:",            'value': instance.loctype.name, 'field_key': 'loctype'},
+            {'type': 'line',  'label': "This location is part of:", 'value': instance.get_partof_html(),   
+             'field_list': "locationlist"}
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
         return context
 
+    def after_save(self, form, instance):
+        """This is for processing items from the list of available ones"""
 
-class LocationEdit(BasicPart):
-    """The details of one location"""
-
-    MainModel = Location
-    template_name = 'seeker/location_edit.html'  
-    title = "Location" 
-    afternewurl = ""
-    # One form is attached to this 
-    prefix = "loc"
-    form_objects = [{'form': LocationForm, 'prefix': prefix, 'readonly': False}]
-
-    def before_save(self, prefix, request, instance = None, form = None):
-        bNeedSaving = False
-        if prefix == "loc":
-            pass
-
-        return bNeedSaving
-
-    def after_save(self, prefix, instance = None, form = None):
-        bStatus = True
-        if prefix == "loc":
-            # Check if there is a locationlist
-            if 'locationlist' in form.cleaned_data:
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            if getattr(form, 'cleaned_data') != None:
+                # (1) 'locations'
                 locationlist = form.cleaned_data['locationlist']
+                adapt_m2m(LocationRelation, instance, "contained", locationlist, "container")
+            
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
 
-                # Get all the containers inside which [instance] is contained
-                current_qs = Location.objects.filter(container_locrelations__contained=instance)
-                # Walk the new list
-                for item in locationlist:
-                    #if item.id not in current_ids:
-                    if item not in current_qs:
-                        # Add it to the containers
-                        LocationRelation.objects.create(contained=instance, container=item)
-                # Update the current list
-                current_qs = Location.objects.filter(container_locrelations__contained=instance)
-                # Walk the current list
-                remove_list = []
-                for item in current_qs:
-                    if item not in locationlist:
-                        # Add it to the list of to-be-fremoved
-                        remove_list.append(item.id)
-                # Remove them from the container
-                if len(remove_list) > 0:
-                    LocationRelation.objects.filter(contained=instance, container__id__in=remove_list).delete()
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
-        return bStatus
+    def get_history(self, instance):
+        return passim_get_history(instance)
 
-    def add_to_context(self, context):
 
-        # Get the instance
-        instance = self.obj
-
-        if instance != None:
-            pass
-
-        afternew =  reverse('location_list')
-        if 'afternewurl' in self.qd:
-            afternew = self.qd['afternewurl']
-        context['afternewurl'] = afternew
-
-        return context
-
+class LocationDetails(LocationEdit):
+    """Like Location Edit, but then html output"""
+    rtype = "html"
+    
 
 class OriginListView(BasicList):
     """Listview of origins"""
@@ -12583,54 +11944,6 @@ class LibraryDetailsView(PassimDetails):
         else:
             current_name = "Library details"
         context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-        return context
-
-
-class LibraryEdit_ORG(BasicPart):
-    """The details of one library"""
-
-    MainModel = Library
-    template_name = 'seeker/library_edit.html'  
-    title = "Library" 
-    afternewurl = ""
-    # One form is attached to this 
-    prefix = "lib"
-    form_objects = [{'form': LibraryForm, 'prefix': prefix, 'readonly': False}]
-
-    def before_save(self, prefix, request, instance = None, form = None):
-        bNeedSaving = False
-        if prefix == "lib":
-            # Check whether the location has changed
-            if 'location' in form.changed_data:
-                # Get the new location
-                location = form.cleaned_data['location']
-                if location != None:
-                    # Get the hierarchy including myself
-                    hierarchy = location.hierarchy()
-                    for item in hierarchy:
-                        if item.loctype.name == "city":
-                            instance.lcity = item
-                            bNeedSaving = True
-                        elif item.loctype.name == "country":
-                            instance.lcountry = item
-                            bNeedSaving = True
-            pass
-
-        return bNeedSaving
-
-    def add_to_context(self, context):
-
-        # Get the instance
-        instance = self.obj
-
-        if instance != None:
-            pass
-
-        afternew =  reverse('library_list')
-        if 'afternewurl' in self.qd:
-            afternew = self.qd['afternewurl']
-        context['afternewurl'] = afternew
-
         return context
 
 

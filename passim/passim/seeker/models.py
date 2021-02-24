@@ -156,6 +156,16 @@ def get_current_datetime():
     """Get the current time"""
     return timezone.now()
 
+def get_default_loctype():
+    """Get a default value for the loctype"""
+
+    obj = LocationType.objects.filter(name="city").first()
+    if obj == None:
+        value = 0
+    else:
+        value = obj.id
+    return value
+
 def adapt_search(val, do_brackets = True):
     if val == None: return None
     # First trim
@@ -1636,7 +1646,7 @@ class Location(models.Model):
     # [1] obligatory name in ENGLISH
     name = models.CharField("Name (eng)", max_length=STANDARD_LENGTH)
     # [1] Link to the location type of this location
-    loctype = models.ForeignKey(LocationType)
+    loctype = models.ForeignKey(LocationType, on_delete=models.SET_DEFAULT, default=get_default_loctype, related_name="loctypelocations")
 
     # [1] Every Library has a status to keep track of who edited it
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
@@ -1698,6 +1708,14 @@ class Location(models.Model):
 
         obj = self.location_identifiers.filter(idname="idVilleEtab").first()
         return "" if obj == None else obj.idvalue
+
+    def get_partof_html(self):
+        lhtml = []
+        for loc in self.above():
+            sItem = '<span class="badge loctype-{}" title="{}">{}</span>'.format(
+                loc.loctype.name, loc.loctype.name, loc.name)
+            lhtml.append(sItem)
+        return "\n".join(lhtml)
 
     def partof(self):
         """give a list of locations (and their type) of which I am part"""
