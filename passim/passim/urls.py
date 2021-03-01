@@ -73,7 +73,6 @@ urlpatterns = [
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
-    url(r'^report/download(?:/(?P<pk>\d+))?/$', ReportDownload.as_view(), name='report_results'),
 
     url(r'^manuscript/list', ManuscriptListView.as_view(), name='manuscript_list'),
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
@@ -172,7 +171,10 @@ urlpatterns = [
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
 
     url(r'^report/list', ReportListView.as_view(), name='report_list'),
-    url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
+    url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetails.as_view(), name='report_details'),
+    url(r'^report/edit(?:/(?P<pk>\d+))?/$', ReportEdit.as_view(), name='report_edit'),
+    url(r'^report/download(?:/(?P<pk>\d+))?/$', ReportDownload.as_view(), name='report_results'),
+    # url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
 
     url(r'^literature/list', LitRefListView.as_view(), name='literature_list'),
 
@@ -211,7 +213,8 @@ urlpatterns = [
     url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project_edit'),
 
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
-    url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
+    # url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
+    url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetails.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
 
     url(r'^template/list', TemplateListView.as_view(), name='template_list'),
@@ -222,7 +225,7 @@ urlpatterns = [
 
     url(r'^gold/list', SermonGoldListView.as_view(), name='gold_list'),
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
-    url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
+    # url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
     #url(r'^gold/signset(?:/(?P<pk>\d+))?/$', SermonGoldSignset.as_view(), name='gold_signset'),

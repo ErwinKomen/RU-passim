@@ -561,6 +561,20 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
 
 
+class ManuidOneWidget(ModelSelect2Widget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+        return qs
+
+
 class ManuscriptExtWidget(ModelSelect2MultipleWidget):
     model = ManuscriptExt
     search_fields = [ 'url__icontains' ]
@@ -935,6 +949,19 @@ class TemplateOneWidget(ModelSelect2Widget):
         #username = self.attrs.pop('username', '')
         #team_group = self.attrs.pop('team_group', '')
         return Template.objects.all().order_by('name').distinct()
+
+
+class UserWidget(ModelSelect2MultipleWidget):
+    model = User
+    search_fields = [ 'username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.username
+
+    def get_queryset(self):
+        return User.objects.all().order_by('username').distinct()
+
+
 
 
 
@@ -3658,6 +3685,8 @@ class LibrarySearchForm(forms.Form):
 
 
 class ReportEditForm(forms.ModelForm):
+    userlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = Report
@@ -3668,12 +3697,28 @@ class ReportEditForm(forms.ModelForm):
                  'contents':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
                  }
 
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ReportEditForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['created'].required = False
+        self.fields['user'].required = False
+        self.fields['reptype'].required = False
+        self.fields['contents'].required = False
+        
+        # Set queryset(s) - for listview
+        self.fields['userlist'].queryset = User.objects.all().order_by('username')
+
+
 
 class SourceEditForm(forms.ModelForm):
     profile_ta = forms.CharField(label=_("Collector"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching users input-sm', 'placeholder': 'Collector(s)...', 'style': 'width: 100%;'}))
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select collector(s)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    manulist = ModelChoiceField(queryset=None, required=False,
+                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select corresponding manuscript...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = SourceInfo
@@ -3685,13 +3730,34 @@ class SourceEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SourceEditForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['url'].required = False
-        self.fields['code'].required = False
-        self.fields['profile_ta'].required = False
-        # Set the initial value for the profile
-        self.fields['profile'].required = False
-        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['url'].required = False
+            self.fields['code'].required = False
+            self.fields['profile_ta'].required = False
+            # Set the initial value for the profile
+            self.fields['profile'].required = False
+        
+            # Set queryset(s) - for listview
+            self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
+            # Set queryset(s) - for details view
+            self.fields['manulist'].queryset = Manuscript.objects.none()
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                self.fields['profile'].initial = instance.profile.id
+                # Give a choice of manuscripts that are not linked to a SOURCE yet
+                qs = Manuscript.objects.filter(mtype='man', source__isnull=True).order_by('idno')
+                self.fields['manulist'].queryset = qs
+                self.fields['manulist'].widget.queryset = qs
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SourceEditForm")
+        return None
 
 
 class AuthorEditForm(forms.ModelForm):

@@ -39,8 +39,8 @@ import csv, re
 import requests
 import demjson
 import openpyxl
-import sqlite3
 from openpyxl.utils.cell import get_column_letter
+import sqlite3
 from io import StringIO
 from itertools import chain
 
@@ -284,41 +284,41 @@ def is_empty_form(form):
     cleaned = form.cleaned_data
     return (len(cleaned) == 0)
 
-def csv_to_excel(sCsvData, response):
-    """Convert CSV data to an Excel worksheet"""
+#def csv_to_excel(sCsvData, response):
+#    """Convert CSV data to an Excel worksheet"""
 
-    # Start workbook
-    wb = openpyxl.Workbook()
-    ws = wb.get_active_sheet()
-    ws.title="Data"
+#    # Start workbook
+#    wb = openpyxl.Workbook()
+#    ws = wb.get_active_sheet()
+#    ws.title="Data"
 
-    # Start accessing the string data 
-    f = StringIO(sCsvData)
-    reader = csv.reader(f, delimiter=",")
+#    # Start accessing the string data 
+#    f = StringIO(sCsvData)
+#    reader = csv.reader(f, delimiter=",")
 
-    # Read the header cells and make a header row in the worksheet
-    headers = next(reader)
-    for col_num in range(len(headers)):
-        c = ws.cell(row=1, column=col_num+1)
-        c.value = headers[col_num]
-        c.font = openpyxl.styles.Font(bold=True)
-        # Set width to a fixed size
-        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+#    # Read the header cells and make a header row in the worksheet
+#    headers = next(reader)
+#    for col_num in range(len(headers)):
+#        c = ws.cell(row=1, column=col_num+1)
+#        c.value = headers[col_num]
+#        c.font = openpyxl.styles.Font(bold=True)
+#        # Set width to a fixed size
+#        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-    row_num = 1
-    lCsv = []
-    for row in reader:
-        # Keep track of the EXCEL row we are in
-        row_num += 1
-        # Walk the elements in the data row
-        # oRow = {}
-        for idx, cell in enumerate(row):
-            c = ws.cell(row=row_num, column=idx+1)
-            c.value = row[idx]
-            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
-    # Save the result in the response
-    wb.save(response)
-    return response
+#    row_num = 1
+#    lCsv = []
+#    for row in reader:
+#        # Keep track of the EXCEL row we are in
+#        row_num += 1
+#        # Walk the elements in the data row
+#        # oRow = {}
+#        for idx, cell in enumerate(row):
+#            c = ws.cell(row=row_num, column=idx+1)
+#            c.value = row[idx]
+#            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
+#    # Save the result in the response
+#    wb.save(response)
+#    return response
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -10168,132 +10168,6 @@ class SermonGoldListView(BasicList):
         return get_helptext(name)
 
 
-class SermonGoldSelect(BasicPart):
-    """Facilitate searching and selecting one gold sermon"""
-
-    MainModel = SermonGold
-    template_name = "seeker/sermongold_select.html"
-
-    # Pagination
-    paginate_by = paginateSelect
-    page_function = "ru.passim.seeker.gold_page"
-    form_div = "select_gold_button" 
-    entrycount = 0
-    qs = None
-
-    # One form is attached to this 
-    source_id = None
-    prefix = 'gsel'
-    form_objects = [{'form': SelectGoldForm, 'prefix': prefix, 'readonly': True}]
-
-    def get_instance(self, prefix):
-        instance = None
-        if prefix == "gsel":
-            # The instance is the SRC of a link
-            instance = self.obj
-        return instance
-
-    def add_to_context(self, context):
-        """Anything that needs adding to the context"""
-
-        # If possible add source_id
-        if 'source_id' in self.qd:
-            self.source_id = self.qd['source_id']
-        context['source_id'] = self.source_id
-        
-        # Pagination
-        self.do_pagination('gold')
-        context['object_list'] = self.page_obj
-        context['page_obj'] = self.page_obj
-        context['page_function'] = self.page_function
-        context['formdiv'] = self.form_div
-        context['entrycount'] = self.entrycount
-
-        # Add the result to the context
-        context['results'] = self.qs
-        context['authenticated'] = user_is_authenticated(self.request)
-        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-
-        # Return the updated context
-        return context
-
-    def do_pagination(self, prefix):
-        # We need to calculate the queryset immediately
-        self.get_queryset(prefix)
-
-        # Paging...
-        page = self.qd.get('page')
-        page = 1 if page == None else int(page)
-        # Create a list [page_obj] that contains just these results
-        paginator = Paginator(self.qs, self.paginate_by)
-        self.page_obj = paginator.page(page)        
-
-    def get_queryset(self, prefix):
-        qs = SermonGold.objects.none()
-        if prefix == "gold":
-            # Get the cleaned data
-            oFields = None
-            if 'cleaned_data' in self.form_objects[0]:
-                oFields = self.form_objects[0]['cleaned_data']
-            qs = SermonGold.objects.none()
-            if oFields != None and self.request.method == 'POST':
-                # There is valid data to search with
-                lstQ = []
-
-                # (1) Check for author name -- which is in the typeahead parameter
-                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
-                    val = oFields['author']
-                    lstQ.append(Q(author=val))
-                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
-                    val = adapt_search(oFields['authorname'])
-                    lstQ.append(Q(author__name__iregex=val))
-
-                # (2) Process incipit
-                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
-                    val = adapt_search(oFields['incipit'])
-                    lstQ.append(Q(srchincipit__iregex=val))
-
-                # (3) Process explicit
-                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
-                    val = adapt_search(oFields['explicit'])
-                    lstQ.append(Q(srchexplicit__iregex=val))
-
-                # (4) Process signature
-                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
-                    val = adapt_search(oFields['signature'])
-                    lstQ.append(Q(goldsignatures__code__iregex=val))
-
-                # Calculate the final qs
-                if len(lstQ) == 0:
-                    # Show everything excluding myself
-                    qs = SermonGold.objects.all()
-                else:
-                    # Make sure to exclude myself, and then apply the filter
-                    qs = SermonGold.objects.filter(*lstQ)
-
-                # Always exclude the source
-                if self.source_id != None:
-                    qs = qs.exclude(id=self.source_id)
-
-                sort_type = "fast_and_easy"
-
-                if sort_type == "pythonic":
-                    # Sort the python way
-                    qs = sorted(qs, key=lambda x: x.get_sermon_string())
-                elif sort_type == "too_much":
-                    # Make sure sorting is done correctly
-                    qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
-                elif sort_type == "fast_and_easy":
-                    # Sort fast and easy
-                    qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
-            
-            self.entrycount = qs.count()
-            self.qs = qs
-        # Return the resulting filtered and sorted queryset
-        return qs
-
-
 class SermonGoldEdit(BasicDetails):
     """The details of one sermon"""
 
@@ -12074,7 +11948,114 @@ class AuthorListDownload(BasicPart):
         return sData
 
 
-class ReportListView(ListView):
+class ReportListView(BasicList):
+    """Listview of reports"""
+
+    model = Report
+    listform = ReportEditForm
+    has_select2 = True
+    bUseFilter = True
+    new_button = False
+    basic_name = "report"
+    order_cols = ['created', 'user', 'reptype', '']
+    order_default = ['-created', 'user', 'reptype']
+    order_heads = [{'name': 'Date', 'order': 'o=1', 'type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+                   {'name': 'User', 'order': 'o=2', 'type': 'str', 'custom': 'user', 'linkdetails': True},
+                   {'name': 'Type', 'order': 'o=3', 'type': 'str', 'custom': 'reptype', 'main': True, 'linkdetails': True},
+                   {'name': 'Size', 'order': '',    'type': 'str', 'custom': 'size'}]
+    filters = [ {"name": "User",       "id": "filter_user",      "enabled": False} ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'user', 'fkfield': 'user', 'keyFk': 'username', 'keyList': 'userlist', 'infield': 'id'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+        elif custom == "user":
+            sBack = instance.user.username
+        elif custom == "reptype":
+            sBack = instance.get_reptype_display()
+        elif custom == "size":
+            # Get the total number of downloaded elements
+            iSize = 0
+            rep = instance.contents
+            if rep != None and rep != "" and rep[0] == "{":
+                oRep = json.loads(rep)
+                if 'list' in oRep:
+                    iSize = len(oRep['list'])
+            sBack = "{}".format(iSize)
+        return sBack, sTitle
+
+
+class ReportEdit(BasicDetails):
+    model = Report
+    mForm = ReportEditForm
+    prefix = "rpt"
+    title = "ReportDetails"
+    no_delete = True            # Don't allow users to remove a report
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+            {'type': 'line',  'label': "User:",         'value': instance.user.username         },
+            {'type': 'line',  'label': "Report type:",  'value': instance.get_reptype_display() },
+            # {'type': 'safe',  'label': "Download:",     'value': self.get_download_html(instance)},
+            {'type': 'safe',  'label': "Raw data:",     'value': self.get_raw(instance)}
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def get_download_html(self, instance):
+        """Get HTML representation of the report download buttons"""
+
+        sBack = ""
+        template_name = "seeker/report_download.html"
+        oErr = ErrHandle()
+        try:
+            context = dict(report=instance)
+            sBack = render_to_string(template_name, context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ReportEdit/get_download_html")
+        return sBack
+
+    def get_raw(self, instance):
+        """Get HTML representation of the report details"""
+
+        sBack = ""
+        if instance.contents != None and instance.contents != "" and instance.contents[0] == "{":
+            # There is a real report
+            sContents = "-" if instance.contents == None else instance.contents
+            sBack = "<textarea rows='1' style='width: 100%;'>{}</textarea>".format(sContents)
+        return sBack
+
+
+class ReportDetails(ReportEdit):
+    """HTML output for a Report"""
+
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        context = super(ReportDetails, self).add_to_context(context, instance)
+
+        context['after_details'] = self.get_download_html(instance)
+
+        return context
+
+
+class ReportListView_Org(ListView):
     """Listview of reports"""
 
     model = Report
@@ -12146,7 +12127,7 @@ class ReportListView(ListView):
         return qs
 
 
-class ReportDetailsView(PassimDetails):
+class ReportDetailsView_Org(PassimDetails):
     model = Report
     mForm = ReportEditForm
     template_name = 'seeker/report_details.html'
@@ -12216,7 +12197,7 @@ class ReportDownload(BasicPart):
                     row = []
                     for key in headers:
                         if key in item:
-                            row.append(item[key])
+                            row.append(item[key].replace("\r", " ").replace("\n", " "))
                         else:
                             row.append("")
                     csvwriter.writerow(row)
@@ -12235,13 +12216,13 @@ class SourceListView(BasicList):
     listform = SourceEditForm
     has_select2 = True
     bUseFilter = True
-    page_function = "ru.passim.seeker.search_paged_start"
     prefix = "src"
+    new_button = False
     basic_name = "source"
     order_cols = ['created', 'collector', 'url', '']
-    order_default = order_cols
-    order_heads = [{'name': 'Date',           'order': 'o=1', 'type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
-                   {'name': 'Collector',      'order': 'o=2', 'type': 'str', 'field': 'collector'},
+    order_default = ['-created', 'collector', 'url']
+    order_heads = [{'name': 'Date',           'order': 'o=1','type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+                   {'name': 'Collector',      'order': 'o=2', 'type': 'str', 'field': 'collector', 'linkdetails': True},
                    {'name': 'Collected from', 'order': 'o=3', 'type': 'str', 'custom': 'from', 'main': True},
                    {'name': 'Manuscripts',    'order': '',    'type': 'int', 'custom': 'manucount'}]
     filters = [ {"name": "Collector",       "id": "filter_collector",      "enabled": False} ]
@@ -12281,6 +12262,10 @@ class SourceListView(BasicList):
                                 profile=profile)
                             obj.source = source
                             obj.save()
+        # Are there still manuscripts without source?
+        if Manuscript.objects.filter(source__isnull=True).count() > 0:
+            # Make the NEW button available
+            self.new_button = True
         return None
 
     def get_field_value(self, instance, custom):
@@ -12322,87 +12307,57 @@ class SourceListView(BasicList):
     def add_to_context(self, context, initial):
         SourceInfo.init_profile()
         return context
-    
 
-class SourceDetailsView(PassimDetails):
+
+class SourceEdit(BasicDetails):
     model = SourceInfo
     mForm = SourceEditForm
-    template_name = 'seeker/source_details.html'
     prefix = 'source'
     prefix_type = "simple"
     basic_name = 'source'
-    title = "SourceDetails"
-    rtype = "html"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('source_list')
-        if instance != None:
-            # Make sure we do a page redirect
-            self.newRedirect = True
-            self.redirectpage = reverse('source_details', kwargs={'pk': instance.id})
-        return True, "" 
+    title = "SourceInfo"
+    mainitems = []
 
     def add_to_context(self, context, instance):
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('source_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Sources', prevpage])
-        current_name = "Source details"
-        if instance:
-            current_name = "Source {} {}".format(instance.collector, get_crpp_date(instance.created))
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()     },
+            {'type': 'line',  'label': "Collector:",    'value': instance.get_username()    },
+            {'type': 'line',  'label': "URL:",          'value': instance.url,              'field_key': 'url'  },
+            {'type': 'line',  'label': "Code:",         'value': instance.get_code_html(),  'field_key': 'code' },
+            {'type': 'safe',  'label': "Manuscript:",   'value': instance.get_manu_html(),  
+             'field_list': 'manulist' }
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
         return context
 
     def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
+        # Determine the user
+        if self.request.user != None:
             profile = Profile.get_user_profile(self.request.user.username)
             form.instance.profile = profile
+            # Check if a manuscript has been given
+            manulist = form.cleaned_data.get('manulist', None)
+            if manulist != None:
+                #  manuscript has been added
+                manu = Manuscript.objects.filter(id=manulist.id).first()
+                if manu != None:
+                    manu.source = instance
+                    manu.save()
         return True, ""
 
 
-class SourceEdit(BasicPart):
-    """The details of one manuscript"""
+class SourceDetails(SourceEdit):
+    """The HTML variant of [SourceEdit]"""
 
-    MainModel = SourceInfo
-    template_name = 'seeker/source_edit.html'
-    title = "SourceInfo" 
-    afternewurl = ""
-    # One form is attached to this 
-    prefix = "source"
-    form_objects = [{'form': SourceEditForm, 'prefix': prefix, 'readonly': False}]
-
-    def custom_init(self):
-        """Adapt the prefix for [sermo] to fit the kind of prefix provided by PassimDetails"""
-
-        return True
-
-    def add_to_context(self, context):
-
-        # Get the instance
-        instance = self.obj
-
-        # Not sure if this is still needed
-        context['msitem'] = instance
-
-        afternew =  reverse('source_list')
-        if 'afternewurl' in self.qd:
-            afternew = self.qd['afternewurl']
-        context['afternewurl'] = afternew
-        # Define where to go to after deletion
-        context['afterdelurl'] = reverse('source_list')
-
-        return context
-
-    def after_save(self, prefix, instance = None, form = None):
-
-        # There's is no real return value needed here 
-        return True
-
+    rtype = "html"
+    
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""

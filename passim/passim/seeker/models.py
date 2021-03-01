@@ -1290,6 +1290,10 @@ class Report(models.Model):
         # Return the object
         return obj
 
+    def get_created(self):
+        sBack = self.created.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
 
 class Information(models.Model):
     """Specific information that needs to be kept in the database"""
@@ -2197,6 +2201,35 @@ class SourceInfo(models.Model):
                 obj.save()
 
         result = True
+
+    def get_created(self):
+        sBack = self.created.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
+    def get_code_html(self):
+        sCode = "-" if self.code == None else self.code
+        if len(sCode) > 80:
+            button_code = "<a class='btn btn-xs jumbo-1' data-toggle='collapse' data-target='#source_code'>...</a>"
+            sBack = "<pre>{}{}<span id='source_code' class='collapse'>{}</span></pre>".format(sCode[:80], button_code, sCode[80:])
+        else:
+            sBack = "<pre>{}</pre>".format(sCode)
+        return sBack
+
+    def get_username(self):
+        sBack = "(unknown)"
+        if self.profile != None:
+            sBack = self.profile.user.username
+        return sBack
+
+    def get_manu_html(self):
+        """Get the HTML display of the manuscript to which I am attached"""
+
+        sBack = "Make sure to connect this source to a manuscript and save it. Otherwise it will be automatically deleted"
+        manu = self.sourcemanuscripts.first()
+        if manu != None:
+            url = reverse('manuscript_details', kwargs={'pk': manu.id})
+            sBack = "Linked to: <span class='signature ot'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        return sBack
 
 
 class Litref(models.Model):

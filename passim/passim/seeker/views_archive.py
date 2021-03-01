@@ -3,6 +3,214 @@
 
 # ======================================= TO BE REMOVED IN THE FUTURE ===========================================
 
+#class SourceDetailsView_ORG(PassimDetails):
+#    model = SourceInfo
+#    mForm = SourceEditForm
+#    template_name = 'seeker/source_details.html'
+#    prefix = 'source'
+#    prefix_type = "simple"
+#    basic_name = 'source'
+#    title = "SourceDetails"
+#    rtype = "html"
+
+#    def after_new(self, form, instance):
+#        """Action to be performed after adding a new item"""
+
+#        self.afternewurl = reverse('source_list')
+#        if instance != None:
+#            # Make sure we do a page redirect
+#            self.newRedirect = True
+#            self.redirectpage = reverse('source_details', kwargs={'pk': instance.id})
+#        return True, "" 
+
+#    def add_to_context(self, context, instance):
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+#        # Process this visit and get the new breadcrumbs object
+#        prevpage = reverse('source_list')
+#        context['prevpage'] = prevpage
+#        crumbs = []
+#        crumbs.append(['Sources', prevpage])
+#        current_name = "Source details"
+#        if instance:
+#            current_name = "Source {} {}".format(instance.collector, get_crpp_date(instance.created))
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+#        return context
+
+#    def before_save(self, form, instance):
+#        if form != None:
+#            # Search the user profile
+#            profile = Profile.get_user_profile(self.request.user.username)
+#            form.instance.profile = profile
+#        return True, ""
+
+
+#class SourceEdit_ORG(BasicPart):
+#    """The details of one manuscript"""
+
+#    MainModel = SourceInfo
+#    template_name = 'seeker/source_edit.html'
+#    title = "SourceInfo" 
+#    afternewurl = ""
+#    # One form is attached to this 
+#    prefix = "source"
+#    form_objects = [{'form': SourceEditForm, 'prefix': prefix, 'readonly': False}]
+
+#    def custom_init(self):
+#        """Adapt the prefix for [sermo] to fit the kind of prefix provided by PassimDetails"""
+
+#        return True
+
+#    def add_to_context(self, context):
+
+#        # Get the instance
+#        instance = self.obj
+
+#        # Not sure if this is still needed
+#        context['msitem'] = instance
+
+#        afternew =  reverse('source_list')
+#        if 'afternewurl' in self.qd:
+#            afternew = self.qd['afternewurl']
+#        context['afternewurl'] = afternew
+#        # Define where to go to after deletion
+#        context['afterdelurl'] = reverse('source_list')
+
+#        return context
+
+#    def after_save(self, prefix, instance = None, form = None):
+
+#        # There's is no real return value needed here 
+#        return True
+
+
+
+#class SermonGoldSelect(BasicPart):
+#    """Facilitate searching and selecting one gold sermon"""
+
+#    MainModel = SermonGold
+#    template_name = "seeker/sermongold_select.html"
+
+#    # Pagination
+#    paginate_by = paginateSelect
+#    page_function = "ru.passim.seeker.gold_page"
+#    form_div = "select_gold_button" 
+#    entrycount = 0
+#    qs = None
+
+#    # One form is attached to this 
+#    source_id = None
+#    prefix = 'gsel'
+#    form_objects = [{'form': SelectGoldForm, 'prefix': prefix, 'readonly': True}]
+
+#    def get_instance(self, prefix):
+#        instance = None
+#        if prefix == "gsel":
+#            # The instance is the SRC of a link
+#            instance = self.obj
+#        return instance
+
+#    def add_to_context(self, context):
+#        """Anything that needs adding to the context"""
+
+#        # If possible add source_id
+#        if 'source_id' in self.qd:
+#            self.source_id = self.qd['source_id']
+#        context['source_id'] = self.source_id
+        
+#        # Pagination
+#        self.do_pagination('gold')
+#        context['object_list'] = self.page_obj
+#        context['page_obj'] = self.page_obj
+#        context['page_function'] = self.page_function
+#        context['formdiv'] = self.form_div
+#        context['entrycount'] = self.entrycount
+
+#        # Add the result to the context
+#        context['results'] = self.qs
+#        context['authenticated'] = user_is_authenticated(self.request)
+#        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+
+#        # Return the updated context
+#        return context
+
+#    def do_pagination(self, prefix):
+#        # We need to calculate the queryset immediately
+#        self.get_queryset(prefix)
+
+#        # Paging...
+#        page = self.qd.get('page')
+#        page = 1 if page == None else int(page)
+#        # Create a list [page_obj] that contains just these results
+#        paginator = Paginator(self.qs, self.paginate_by)
+#        self.page_obj = paginator.page(page)        
+
+#    def get_queryset(self, prefix):
+#        qs = SermonGold.objects.none()
+#        if prefix == "gold":
+#            # Get the cleaned data
+#            oFields = None
+#            if 'cleaned_data' in self.form_objects[0]:
+#                oFields = self.form_objects[0]['cleaned_data']
+#            qs = SermonGold.objects.none()
+#            if oFields != None and self.request.method == 'POST':
+#                # There is valid data to search with
+#                lstQ = []
+
+#                # (1) Check for author name -- which is in the typeahead parameter
+#                if 'author' in oFields and oFields['author'] != "" and oFields['author'] != None: 
+#                    val = oFields['author']
+#                    lstQ.append(Q(author=val))
+#                elif 'authorname' in oFields and oFields['authorname'] != ""  and oFields['authorname'] != None: 
+#                    val = adapt_search(oFields['authorname'])
+#                    lstQ.append(Q(author__name__iregex=val))
+
+#                # (2) Process incipit
+#                if 'incipit' in oFields and oFields['incipit'] != "" and oFields['incipit'] != None: 
+#                    val = adapt_search(oFields['incipit'])
+#                    lstQ.append(Q(srchincipit__iregex=val))
+
+#                # (3) Process explicit
+#                if 'explicit' in oFields and oFields['explicit'] != "" and oFields['explicit'] != None: 
+#                    val = adapt_search(oFields['explicit'])
+#                    lstQ.append(Q(srchexplicit__iregex=val))
+
+#                # (4) Process signature
+#                if 'signature' in oFields and oFields['signature'] != "" and oFields['signature'] != None: 
+#                    val = adapt_search(oFields['signature'])
+#                    lstQ.append(Q(goldsignatures__code__iregex=val))
+
+#                # Calculate the final qs
+#                if len(lstQ) == 0:
+#                    # Show everything excluding myself
+#                    qs = SermonGold.objects.all()
+#                else:
+#                    # Make sure to exclude myself, and then apply the filter
+#                    qs = SermonGold.objects.filter(*lstQ)
+
+#                # Always exclude the source
+#                if self.source_id != None:
+#                    qs = qs.exclude(id=self.source_id)
+
+#                sort_type = "fast_and_easy"
+
+#                if sort_type == "pythonic":
+#                    # Sort the python way
+#                    qs = sorted(qs, key=lambda x: x.get_sermon_string())
+#                elif sort_type == "too_much":
+#                    # Make sure sorting is done correctly
+#                    qs = qs.order_by('signature__code', 'author__name', 'incipit', 'explicit')
+#                elif sort_type == "fast_and_easy":
+#                    # Sort fast and easy
+#                    qs = qs.order_by('author__name', 'siglist', 'incipit', 'explicit')
+            
+#            self.entrycount = qs.count()
+#            self.qs = qs
+#        # Return the resulting filtered and sorted queryset
+#        return qs
+
+
+
 #class LibraryEdit_ORG(BasicPart):
 #    """The details of one library"""
 

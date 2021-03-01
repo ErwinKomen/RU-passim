@@ -24,6 +24,12 @@ import json
 import fnmatch
 import os
 import base64
+import csv
+import openpyxl
+from openpyxl.utils.cell import get_column_letter
+from io import StringIO
+
+
 from datetime import datetime
 
 # provide error handling
@@ -442,6 +448,9 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         else:
             orderings = []
             for idx, order_item in enumerate(order_default):
+                if idx == 0 and order_item[0] == "-":
+                    bAscending = False
+                    order_item = order_item[1:]
                 # Get the type
                 sType = order_heads[idx]['type']
                 if ";" in order_item:
@@ -511,6 +520,44 @@ def treat_bom(sHtml):
     sHtml = sHtml.replace(u'\ufeff', '')
     # Return what we have
     return sHtml
+
+def csv_to_excel(sCsvData, response):
+    """Convert CSV data to an Excel worksheet"""
+
+    # Start workbook
+    wb = openpyxl.Workbook()
+    ws = wb.get_active_sheet()
+    ws.title="Data"
+
+    # Start accessing the string data 
+    f = StringIO(sCsvData)
+    reader = csv.reader(f, delimiter=",")
+
+    # Read the header cells and make a header row in the worksheet
+    headers = next(reader)
+    for col_num in range(len(headers)):
+        c = ws.cell(row=1, column=col_num+1)
+        c.value = headers[col_num]
+        c.font = openpyxl.styles.Font(bold=True)
+        # Set width to a fixed size
+        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+    row_num = 1
+    lCsv = []
+    for row in reader:
+        # Keep track of the EXCEL row we are in
+        row_num += 1
+        # Walk the elements in the data row
+        # oRow = {}
+        for idx, cell in enumerate(row):
+            c = ws.cell(row=row_num, column=idx+1)
+            c.value = row[idx]
+            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
+    # Save the result in the response
+    wb.save(response)
+    return response
+
+
 
 
 # The views that are defined by 'basic'
@@ -1942,7 +1989,7 @@ class BasicPart(View):
 
                     # Get the data
                     sData = ""
-                    if self.dtype != "excel":
+                    if not self.dtype in ["excel"]:
                         sData = self.get_data('', self.dtype)
                     # Decode the data and compress it using gzip
                     bUtf8 = (self.dtype != "db")
@@ -1983,16 +2030,16 @@ class BasicPart(View):
                             sDbName = "passim_{}_{}.png".format(modelname, obj_id)
 
                     # Excel needs additional conversion
-                    if self.dtype == "xlsx":
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = csv_to_excel(sData, response)
-                    elif self.dtype == "excel":
+                    if self.dtype in ["excel"]:
                         # Convert 'compressed_content' to an Excel worksheet
                         response = HttpResponse(content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
                         response = self.get_data('', self.dtype, response)
+                    elif self.dtype == "xlsx":
+                        # Convert 'compressed_content' to an Excel worksheet
+                        response = HttpResponse(content_type=sContentType)
+                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        response = csv_to_excel(sData, response)
                     else:
                         response = HttpResponse(sData, content_type=sContentType)
                         response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
