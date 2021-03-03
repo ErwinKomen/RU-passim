@@ -10,7 +10,7 @@
 {% block content %}
 
       <!-- Library search area -->
-      <div class="panel panel-default">
+      <div class="panel panel-default container-small"">
         <form id='librarysearch' method='get' targeturl="{% url 'library_search' %}" >
             <!-- Be sure to add csrf -->
             {% csrf_token %}

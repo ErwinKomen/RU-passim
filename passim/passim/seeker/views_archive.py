@@ -3,6 +3,146 @@
 
 # ======================================= TO BE REMOVED IN THE FUTURE ===========================================
 
+#class LibraryListView_ORG(ListView):
+#    """Listview of libraries in countries/cities"""
+
+#    model = Library
+#    paginate_by = 20
+#    template_name = 'seeker/library_list.html'
+#    entrycount = 0
+#    bDoTime = True
+
+#    def get_context_data(self, **kwargs):
+#        # Call the base implementation first to get a context
+#        context = super(LibraryListView, self).get_context_data(**kwargs)
+
+#        # Get parameters for the search
+#        initial = self.request.GET
+#        context['searchform'] = LibrarySearchForm(initial)
+
+#        # Determine the count 
+#        context['entrycount'] = self.entrycount # self.get_queryset().count()
+
+#        # Set the prefix
+#        context['app_prefix'] = APP_PREFIX
+
+#        # Make sure the paginate-values are available
+#        context['paginateValues'] = paginateValues
+
+#        if 'paginate_by' in initial:
+#            context['paginateSize'] = int(initial['paginate_by'])
+#        else:
+#            context['paginateSize'] = paginateSize
+
+#        # Set the title of the application
+#        context['title'] = "Passim Libraries"
+
+#        # Check if user may upload
+#        context['is_authenticated'] = user_is_authenticated(self.request)
+#        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+
+#         # Process this visit and get the new breadcrumbs object
+#        prevpage = reverse('home')
+#        context['prevpage'] = prevpage
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, "Libraries", True)
+
+#        # Return the calculated context
+#        return context
+
+#    def get_paginate_by(self, queryset):
+#        """
+#        Paginate by specified value in querystring, or use default class property value.
+#        """
+#        return self.request.GET.get('paginate_by', self.paginate_by)
+  
+#    def get_queryset(self):
+#        # Measure how long it takes
+#        if self.bDoTime: iStart = get_now_time()
+
+#        # Get the parameters passed on with the GET or the POST request
+#        get = self.request.GET if self.request.method == "GET" else self.request.POST
+#        get = get.copy()
+#        self.get = get
+
+#        # Fix the sort-order
+#        get['sortOrder'] = 'country'
+
+#        lstQ = []
+
+#        # Check for the library [country]
+#        if 'country' in get and get['country'] != '':
+#            val = adapt_search(get['country'])
+#            lstQ.append(Q(country__name__iregex=val) )
+
+#        # Check for the library [city]
+#        if 'city' in get and get['city'] != '':
+#            val = adapt_search(get['city'])
+#            lstQ.append(Q(city__name__iregex=val))
+
+#        # Check for the library [libtype] ('br' or 'pl')
+#        if 'libtype' in get and get['libtype'] != '':
+#            val = adapt_search(get['libtype'])
+#            lstQ.append(Q(libtype__iregex=val))
+
+#        # Check for library [name]
+#        if 'name' in get and get['name'] != '':
+#            val = adapt_search(get['name'])
+#            lstQ.append(Q(name__iregex=val))
+
+#        # Calculate the final qs
+#        qs = Library.objects.filter(*lstQ).order_by('country', 'city').distinct()
+
+#        # Time measurement
+#        if self.bDoTime:
+#            print("LibraryListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
+#            print("LibraryListView query: {}".format(qs.query))
+#            iStart = get_now_time()
+
+#        # Determine the length
+#        self.entrycount = len(qs)
+
+#        # Time measurement
+#        if self.bDoTime:
+#            print("LibraryListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
+
+#        # Return the resulting filtered and sorted queryset
+#        return qs
+
+
+#class LibraryDetailsView(PassimDetails):
+#    model = Library
+#    mForm = LibraryForm
+#    template_name = 'seeker/library_details.html'
+#    prefix = 'lib'
+#    prefix_type = "simple"
+#    title = "LibraryDetails"
+#    rtype = "html"
+
+#    def after_new(self, form, instance):
+#        """Action to be performed after adding a new item"""
+
+#        self.afternewurl = reverse('library_list')
+#        return True, "" 
+
+#    def add_to_context(self, context, instance):
+#        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+#        # Process this visit and get the new breadcrumbs object
+#        prevpage = reverse('library_list')
+#        context['prevpage'] = prevpage
+#        crumbs = []
+#        crumbs.append(['Libraries', prevpage])
+#        if instance:
+#            if instance.name:
+#                current_name = instance.name
+#            else:
+#                current_name = "Library (unnamed)"
+#        else:
+#            current_name = "Library details"
+#        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
+#        return context
+
+
 #class SourceDetailsView_ORG(PassimDetails):
 #    model = SourceInfo
 #    mForm = SourceEditForm

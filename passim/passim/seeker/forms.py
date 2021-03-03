@@ -139,6 +139,23 @@ class CityMonasteryOneWidget(ModelSelect2Widget):
         return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
 
 
+class CityWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loctype = LocationType.objects.filter(name__iexact="city").first()
+        if loctype != None:
+            level = loctype.level
+            qs = Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+        else:
+            qs = Location.objects.all().order_by('name').distinct()
+        return qs
+
+
 class CodeWidget(ModelSelect2MultipleWidget):
     # PASSIM codes defined in EqualGold instances
     model = EqualGold
@@ -247,6 +264,22 @@ class CollOneHistWidget(CollOneWidget):
     """Like CollOne, but then for: EqualGold = super sermon gold"""
     type = "super"
     settype = "hc"
+
+
+class CountryWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loctype = LocationType.objects.filter(name__iexact="country").first()
+        if loctype != None:
+            qs = Location.objects.filter(loctype=loctype).order_by('name').distinct()
+        else:
+            qs = Location.objects.all().order_by('name').distinct()
+        return qs
 
 
 class CountryOneWidget(ModelSelect2Widget):
@@ -449,6 +482,18 @@ class LitrefWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return Litref.objects.exclude(full="").order_by('full').distinct()
+
+
+class LibraryWidget(ModelSelect2MultipleWidget):
+    model = Library
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        qs = Library.objects.all().order_by('name').distinct()
+        return qs
 
 
 class LibraryOneWidget(ModelSelect2Widget):
@@ -3125,6 +3170,48 @@ class OriginForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
+class LibrarySearchForm(forms.ModelForm):
+    country = forms.CharField(label=_("Country"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city = forms.CharField(label=_("City"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    name = forms.CharField(label=_("Library"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    countrylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=CountryWidget(attrs={'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
+    citylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=CityWidget(attrs={'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
+    librarylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LibraryWidget(attrs={'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
+    library_ta = forms.CharField(label=_("Libraru"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Library...',  'style': 'width: 100%;'}))
+    typeaheads = ["countries", "cities", "libraries"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Library
+        fields = ['lcity', 'lcountry']
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Start by executing the standard handling
+            super(LibrarySearchForm, self).__init__(*args, **kwargs)
+            # Set the keyword to optional for best processing
+            self.fields['lcity'].required = False
+            self.fields['lcountry'].required = False
+
+            # Need to initialize the lists
+            self.fields['countrylist'].queryset = Location.objects.all()
+            self.fields['citylist'].queryset = Location.objects.all()
+            self.fields['librarylist'].queryset = Library.objects.all()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("LibrarySearchForm")
+        return None
+
+
 class LibraryForm(forms.ModelForm):
     #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
     #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -3150,6 +3237,7 @@ class LibraryForm(forms.ModelForm):
         # Set the keyword to optional for best processing
         self.fields['name'].required = False
         self.fields['libtype'].required = False
+        self.fields['idLibrEtab'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
         self.fields['location'].queryset = Location.objects.all().order_by('name')
@@ -3674,16 +3762,6 @@ class SearchCollectionForm(forms.Form):
     signature = forms.CharField(label=_("Signature code"), required=False)
 
 
-class LibrarySearchForm(forms.Form):
-    country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    name = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    typeaheads = ["countries", "cities", "libraries"]
-
-
 class ReportEditForm(forms.ModelForm):
     userlist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -3709,8 +3787,7 @@ class ReportEditForm(forms.ModelForm):
         
         # Set queryset(s) - for listview
         self.fields['userlist'].queryset = User.objects.all().order_by('username')
-
-
+        
 
 class SourceEditForm(forms.ModelForm):
     profile_ta = forms.CharField(label=_("Collector"), required=False,

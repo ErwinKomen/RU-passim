@@ -2918,6 +2918,47 @@ def import_gold(request):
     # Return the information
     return JsonResponse(data)
 
+def get_cnrs_manuscripts(city, library):
+    """Get the manuscripts held in the library"""
+
+    oErr = ErrHandle()
+    sBack = ""
+    try:
+        # Get the code of the city
+        obj = City.objects.filter(name__iexact=city.name).first()
+        if obj != None:
+            # Get the code of the city
+            idVille = obj.idVilleEtab
+            # Build the query
+            url = "{}/Manuscrits/manuscritforetablissement".format(cnrs_url)
+            data = {"idEtab": library, "idVille": idVille}
+            try:
+                r = requests.post(url, data=data)
+            except:
+                sMsg = errHandle.get_error_message()
+                errHandle.DoError("Request problem")
+                return "Request problem: {}".format(sMsg)
+            # Decypher the response
+            if r.status_code == 200:
+                # Return positively
+                reply = demjson.decode(r.text.replace("\t", " "))
+                if reply != None and "items" in reply:
+                    results = []
+                    for item in reply['items']:
+                        if item['name'] != "":
+                            results.append(item['name'])
+                    #data = json.dumps(results)
+                    # Interpret the results
+                    lst_manu = []
+                    for item in results:
+                        lst_manu.append("<span class='manuscript'>{}</span>".format(item))
+                    sBack = "\n".join(lst_manu)
+    except:
+        msg = oErr.get_error_message()
+        sBack = "Error: {}".format(msg)
+        oErr.DoError("get_cnrs_manuscripts")
+    return sBack
+
 def get_manuscripts(request):
     """Get a list of manuscripts"""
 
@@ -11582,111 +11623,110 @@ class AuthorListView(BasicList):
         return sBack, sTitle
 
 
-class LibraryListView(ListView):
+class LibraryListView(BasicList):
     """Listview of libraries in countries/cities"""
 
     model = Library
-    paginate_by = 20
-    template_name = 'seeker/library_list.html'
-    entrycount = 0
-    bDoTime = True
+    listform = LibrarySearchForm
+    has_select2 = True
+    prefix = "lib"
+    plural_name = "Libraries"
+    sg_name = "Library"
+    order_cols = ['lcountry__name', 'lcity__name', 'name', 'idLibrEtab', 'mcount', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Country',     'order': 'o=1', 'type': 'str', 'custom': 'country', 'default': "", 'linkdetails': True},
+        {'name': 'City',        'order': 'o=2', 'type': 'str', 'custom': 'city',    'default': "", 'linkdetails': True},
+        {'name': 'Library',     'order': 'o=3', 'type': 'str', 'field':  "name",    "default": "", 'main': True, 'linkdetails': True},
+        {'name': 'CNRS',        'order': 'o=4', 'type': 'int', 'custom': 'cnrs',    'align': 'right' },
+        {'name': 'Manuscripts', 'order': 'o=5', 'type': 'int', 'custom': 'manuscripts'},
+        {'name': 'type',        'order': '',    'type': 'str', 'custom': 'libtype'},
+        # {'name': '',            'order': '',    'type': 'str', 'custom': 'links'}
+        ]
+    filters = [ 
+        {"name": "Country", "id": "filter_country", "enabled": False},
+        {"name": "City",    "id": "filter_city",    "enabled": False},
+        {"name": "Library", "id": "filter_library", "enabled": False}
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'country',   'fkfield': 'lcountry',  'keyList': 'countrylist',    'infield': 'name' },
+            {'filter': 'city',      'fkfield': 'lcity',     'keyList': 'citylist',       'infield': 'name' },
+            {'filter': 'library',   'dbfield': 'name',      'keyList': 'librarylist',    'infield': 'name', 'keyS': 'library_ta' }
+            ]
+         }
+        ]
+    downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'library_results'},
+                 {"label": "csv (tab-separated)", "dtype": "csv", "url": 'library_results'},
+                 {"label": None},
+                 {"label": "json", "dtype": "json", "url": 'library_results'}]
 
-    def get_context_data(self, **kwargs):
-        # Call the base implementation first to get a context
-        context = super(LibraryListView, self).get_context_data(**kwargs)
+    def initializations(self):
+        oErr = ErrHandle()
+        try:
+            # Check if signature adaptation is needed
+            mcounting = Information.get_kvalue("mcounting")
+            if mcounting == None or mcounting != "done":
+                # Perform adaptations
+                with transaction.atomic():
+                    for lib in Library.objects.all():
+                        mcount = lib.library_manuscripts.count()
+                        if lib.mcount != mcount:
+                            lib.mcount = mcount
+                            lib.save()
+                # Success
+                Information.set_kvalue("mcounting", "done")
 
-        # Get parameters for the search
-        initial = self.request.GET
-        context['searchform'] = LibrarySearchForm(initial)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("LibraryListView/initializations")
+        return None
 
-        # Determine the count 
-        context['entrycount'] = self.entrycount # self.get_queryset().count()
-
-        # Set the prefix
-        context['app_prefix'] = APP_PREFIX
-
-        # Make sure the paginate-values are available
-        context['paginateValues'] = paginateValues
-
-        if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
-        else:
-            context['paginateSize'] = paginateSize
-
-        # Set the title of the application
-        context['title'] = "Passim Libraries"
-
-        # Check if user may upload
-        context['is_authenticated'] = user_is_authenticated(self.request)
-        context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-
-         # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('home')
-        context['prevpage'] = prevpage
-        context['breadcrumbs'] = get_breadcrumbs(self.request, "Libraries", True)
-
-        # Return the calculated context
-        return context
-
-    def get_paginate_by(self, queryset):
-        """
-        Paginate by specified value in querystring, or use default class property value.
-        """
-        return self.request.GET.get('paginate_by', self.paginate_by)
-  
-    def get_queryset(self):
-        # Measure how long it takes
-        if self.bDoTime: iStart = get_now_time()
-
-        # Get the parameters passed on with the GET or the POST request
-        get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = get.copy()
-        self.get = get
-
-        # Fix the sort-order
-        get['sortOrder'] = 'country'
-
-        lstQ = []
-
-        # Check for the library [country]
-        if 'country' in get and get['country'] != '':
-            val = adapt_search(get['country'])
-            lstQ.append(Q(country__name__iregex=val) )
-
-        # Check for the library [city]
-        if 'city' in get and get['city'] != '':
-            val = adapt_search(get['city'])
-            lstQ.append(Q(city__name__iregex=val))
-
-        # Check for the library [libtype] ('br' or 'pl')
-        if 'libtype' in get and get['libtype'] != '':
-            val = adapt_search(get['libtype'])
-            lstQ.append(Q(libtype__iregex=val))
-
-        # Check for library [name]
-        if 'name' in get and get['name'] != '':
-            val = adapt_search(get['name'])
-            lstQ.append(Q(name__iregex=val))
-
-        # Calculate the final qs
-        qs = Library.objects.filter(*lstQ).order_by('country', 'city').distinct()
-
-        # Time measurement
-        if self.bDoTime:
-            print("LibraryListView get_queryset point 'a': {:.1f}".format( get_now_time() - iStart))
-            print("LibraryListView query: {}".format(qs.query))
-            iStart = get_now_time()
-
-        # Determine the length
-        self.entrycount = len(qs)
-
-        # Time measurement
-        if self.bDoTime:
-            print("LibraryListView get_queryset point 'b': {:.1f}".format( get_now_time() - iStart))
-
-        # Return the resulting filtered and sorted queryset
-        return qs
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "country":
+            if instance.lcountry != None:
+                sBack = instance.lcountry.name
+        elif custom == "city":
+            if instance.lcity != None:
+                sBack = instance.lcity.name
+        elif custom == "cnrs":
+            if instance.idLibrEtab >= 0:
+                sBack = instance.idLibrEtab
+        elif custom == "manuscripts":
+            count = instance.num_manuscripts()
+            if count == 0:
+                sBack = "-"
+            else:
+                html = []
+                html.append("<span>{}</span>".format(count))
+                # Create the URL
+                url = "{}?manu-library={}".format(reverse('search_manuscript'), instance.id)
+                # Add a link to them
+                html.append('<a role="button" class="btn btn-xs jumbo-3" title="Go to these manuscripts" ')
+                html.append(' href="{}"><span class="glyphicon glyphicon-chevron-right"></span></a>'.format(url))
+                sBack = "\n".join(html)
+        elif custom == "libtype":
+            if instance.libtype != "":
+                sTitle = instance.get_libtype_display()
+                sBack = instance.libtype
+        #elif custom == "links":
+        #    html = []
+        #    # Get the HTML code for the links of this instance
+        #    number = instance.author_goldsermons.count()
+        #    if number > 0:
+        #        url = reverse('search_gold')
+        #        html.append("<span class='badge jumbo-2' title='linked gold sermons'>")
+        #        html.append(" <a class='nostyle' href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
+        #    number = instance.author_sermons.count()
+        #    if number > 0:
+        #        url = reverse('sermon_list')
+        #        html.append("<span class='badge jumbo-1' title='linked sermon descriptions'>")
+        #        html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
+        #    # Combine the HTML code
+        #    sBack = "\n".join(html)
+        return sBack, sTitle
 
 
 class LibraryListDownload(BasicPart):
@@ -11788,39 +11828,6 @@ class LibraryListDownload(BasicPart):
         return sData
 
 
-class LibraryDetailsView(PassimDetails):
-    model = Library
-    mForm = LibraryForm
-    template_name = 'seeker/library_details.html'
-    prefix = 'lib'
-    prefix_type = "simple"
-    title = "LibraryDetails"
-    rtype = "html"
-
-    def after_new(self, form, instance):
-        """Action to be performed after adding a new item"""
-
-        self.afternewurl = reverse('library_list')
-        return True, "" 
-
-    def add_to_context(self, context, instance):
-        context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
-        # Process this visit and get the new breadcrumbs object
-        prevpage = reverse('library_list')
-        context['prevpage'] = prevpage
-        crumbs = []
-        crumbs.append(['Libraries', prevpage])
-        if instance:
-            if instance.name:
-                current_name = instance.name
-            else:
-                current_name = "Library (unnamed)"
-        else:
-            current_name = "Library details"
-        context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
-        return context
-
-
 class LibraryEdit(BasicDetails):
     model = Library
     mForm = LibraryForm
@@ -11879,8 +11886,30 @@ class LibraryEdit(BasicDetails):
     
 
 class LibraryDetails(LibraryEdit):
-    """Just the full HTML version of the edit"""
+    """The full HTML version of the edit, together with French library contents"""
+
     rtype = "html"
+
+    def add_to_context(self, context, instance):
+        # First make sure we have the 'default' context from LibraryEdit
+        context = super(LibraryDetails, self).add_to_context(context, instance)
+
+        # Do we have a city and a library?
+        city = instance.lcity
+        library = instance.name
+        if city != None and library != None:
+            # Go and find out if there are any French connections
+            sLibList = get_cnrs_manuscripts(city, library)
+            sLibList = sLibList.strip()
+            # Add this to 'after details'
+            if sLibList != "":
+                lhtml = []
+                lhtml.append("<h4>Available in the CNRS library</h4>")
+                lhtml.append("<div>{}</div>".format(sLibList))
+                context['after_details'] = "\n".join(lhtml)
+
+        # Return the adapted context
+        return context
 
 
 class AuthorListDownload(BasicPart):

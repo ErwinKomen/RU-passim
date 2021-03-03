@@ -191,7 +191,12 @@ def isempty(value):
     return response
 
 def has_obj_value(field, obj):
-    response = (field != None and field in obj and obj[field] != None)
+    if field == None:
+        response = False
+    elif field in obj and isinstance(obj[field], str):
+        response = (obj[field] != "")
+    else:
+        response = (field != None and field in obj and obj[field] != None )
     return response
 
 def adapt_search(val, regex_function=None):

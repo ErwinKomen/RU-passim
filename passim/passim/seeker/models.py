@@ -1918,16 +1918,22 @@ class Library(models.Model):
     name = models.CharField("Library", max_length=LONG_STRING)
     # [1] Has this library been bracketed?
     libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), max_length=5)
+
+    # ============= These fields should be removed sooner or later ===================
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
     city = models.ForeignKey(City, null=True, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
+    # ================================================================================
 
     # [1] Every Library has a status to keep track of who edited it
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+
+    # One field that is calculated whenever needed
+    mcount = models.IntegerField("Manuscripts for this library", default=0)
 
     # [0-1] Location, as specific as possible, but optional in the end
     location = models.ForeignKey(Location, null=True, related_name="location_libraries")
@@ -3104,6 +3110,12 @@ class Manuscript(models.Model):
         # Adapt the save date
         self.saved = get_current_datetime()
         response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
+        # Possibly adapt the number of manuscripts for the associated library
+        if self.library != None:
+            mcount = Manuscript.objects.filter(library=self.library).count()
+            if self.library.mcount != mcount:
+                self.library.mcount = mcount
+                self.library.save()
         return response
 
     def adapt_hierarchy():
