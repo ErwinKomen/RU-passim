@@ -3842,9 +3842,16 @@ class AuthorEditForm(forms.ModelForm):
     class Meta:
         model = Author
         fields = ['name', 'abbr']
-        widgets={'name':      forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
-                 'abbr':     forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
+        widgets={'name':    forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
+                 'abbr':    forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
                  }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(AuthorEditForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['abbr'].required = False
 
 
 class AuthorSearchForm(forms.ModelForm):
@@ -3862,6 +3869,7 @@ class AuthorSearchForm(forms.ModelForm):
         fields = ('name',)
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
+
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(AuthorSearchForm, self).__init__(*args, **kwargs)

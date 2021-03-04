@@ -4791,6 +4791,12 @@ class Author(models.Model):
             author.save()
         return author
 
+    def get_editable(self):
+        """Get a HTML expression of this author's editability"""
+
+        sBack = "yes" if self.editable else "no"
+        return sBack
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """
