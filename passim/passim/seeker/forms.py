@@ -2561,6 +2561,9 @@ class EqualGoldLinkForm(forms.ModelForm):
             self.fields['dst'].required = False
             self.fields['newsuper'].required = False
 
+            # For searching/listing
+            self.fields['newlinktype'].initial = "prt"
+
             if super_id != None and super_id != "":
                 self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=super_id).order_by('code')
                 # Adapt the widget QS
