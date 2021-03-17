@@ -52,21 +52,24 @@ SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
 MANIFESTATION_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
+YESNO_TYPE = "seeker.yesno"
 VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
+LINK_ECHO = 'ech'
 LINK_SIM = "sim"
 LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
-LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
+LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
 
 # Author certainty levels
 CERTAIN_LOWEST = 'vun'  # very uncertain
@@ -6194,6 +6197,12 @@ class EqualGoldLink(models.Model):
     dst = models.ForeignKey(EqualGold, related_name="equalgold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_EQUAL)
+    # [0-1] Specification of directionality and source
+    spectype = models.CharField("Specification", null=True,blank=True, choices=build_abbr_list(SPEC_TYPE), max_length=5)
+    # [0-1] Alternatives
+    alternativs = models.CharField("Alternatives", null=True,blank=True, choices=build_abbr_list(YESNO_TYPE), max_length=5)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
 
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)

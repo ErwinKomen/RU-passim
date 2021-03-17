@@ -9803,6 +9803,10 @@ class EqualGoldEdit(BasicDetails):
                         # There also must be a linktype
                         if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
                             linktype = cleaned['newlinktype']
+                            # Get optional parameters
+                            note = cleaned.get('note', None)
+                            alternatives = cleaned.get('alternatives', None)
+                            spectype = cleaned.get('newspectype', None)
                             # Check existence
                             obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
                             if obj == None:
@@ -9814,16 +9818,15 @@ class EqualGoldEdit(BasicDetails):
 
                                     # Double check reverse
                                     if linktype in LINK_BIDIR:
-                                        lst_reverse = EqualGoldLink.objects.filter(src=super, dst=instance)
-                                        if lst_reverse.count() == 0:
+                                        rev_link = EqualGoldLink.objects.filter(src=super, dst=instance)
+                                        if rev_link == None:
                                             # Add it
-                                            EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                            rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
                                         else:
                                             # Double check the linktype
-                                            rev = lst_reverse.first()
-                                            if rev.linktype != linktype:
-                                                rev.linktype = linktype
-                                                rev.save()
+                                            if rev_link.linktype != linktype:
+                                                rev_link.linktype = linktype
+                                                rev_link.save()
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)

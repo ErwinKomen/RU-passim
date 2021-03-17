@@ -2533,9 +2533,17 @@ class SuperSermonGoldForm(PassimModelForm):
 class EqualGoldLinkForm(forms.ModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newspectype = forms.ChoiceField(label=_("Spectype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
+                                           'title': 'Direction specification (optional)'}))
+    alternatives = forms.ChoiceField(label=_("Alternatives"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 'tdstyle': 'width: 80px;', 
+                'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
-    gold = forms.CharField(label=_("Destination gold sermon"), required=False)
+    note = forms.ChoiceField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'width: 100%;', 'tdstyle': 'width: 300px;',
+                                              'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2555,9 +2563,14 @@ class EqualGoldLinkForm(forms.ModelForm):
             # Initialize choices for linktype
             init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
             init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
+            init_choices(self, 'newspectype', SPEC_TYPE, bUseAbbr=True, maybe_empty=True, use_helptext=False)
+            init_choices(self, 'alternatives', YESNO_TYPE, bUseAbbr=True,maybe_empty=True, use_helptext=False)
             # Make sure to set required and optional fields
             self.fields['linktype'].required = False
             self.fields['newlinktype'].required = False
+            self.fields['newspectype'].required = False
+            self.fields['alternatives'].required = False
+            self.fields['note'].required = False
             self.fields['dst'].required = False
             self.fields['newsuper'].required = False
 
