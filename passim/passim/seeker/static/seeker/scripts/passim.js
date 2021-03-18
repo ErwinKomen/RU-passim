@@ -1347,7 +1347,11 @@ var ru = (function ($, ru) {
           idVille = $(el).attr("city");
           libName = $(el).attr("library");
           // Prepare the request for information
-          url = base_url + 'api/manuscripts/'
+          if (base_url === "") {
+            url = '/api/manuscripts/';
+          } else {
+            url = base_url + 'api/manuscripts/';
+          }
           frm = $(el).closest("form");
           if (frm !== undefined) { data = $(frm).serializeArray(); }
           data.push({ "name": "city", "value": idVille });

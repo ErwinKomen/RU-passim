@@ -52,21 +52,26 @@ SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
 MANIFESTATION_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
+YESNO_TYPE = "seeker.yesno"
 VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
+LINK_ECHO = 'ech'
 LINK_SIM = "sim"
 LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
-LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_SIM]
+LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
+LINK_SPEC_A = ['usd', 'usi', 'com', 'uns', 'udd', 'udi']
+LINK_SPEC_B = ['udd', 'udi', 'com', 'uns', 'usd', 'usi']
 
 # Author certainty levels
 CERTAIN_LOWEST = 'vun'  # very uncertain
@@ -152,9 +157,29 @@ class HelpChoice(models.Model):
         return sBack
 
 
+def get_reverse_spec(sSpec):
+    """Given a SPECTYPE, provide the reverse one"""
+
+    sReverse = sSpec
+    for idx, spectype in enumerate(LINK_SPEC_A):
+        if spectype == sSpec:
+            sReverse = LINK_SPEC_B[idx]
+            break
+    return sReverse
+
 def get_current_datetime():
     """Get the current time"""
     return timezone.now()
+
+def get_default_loctype():
+    """Get a default value for the loctype"""
+
+    obj = LocationType.objects.filter(name="city").first()
+    if obj == None:
+        value = 0
+    else:
+        value = obj.id
+    return value
 
 def adapt_search(val, do_brackets = True):
     if val == None: return None
@@ -1280,6 +1305,10 @@ class Report(models.Model):
         # Return the object
         return obj
 
+    def get_created(self):
+        sBack = self.created.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
 
 class Information(models.Model):
     """Specific information that needs to be kept in the database"""
@@ -1636,7 +1665,7 @@ class Location(models.Model):
     # [1] obligatory name in ENGLISH
     name = models.CharField("Name (eng)", max_length=STANDARD_LENGTH)
     # [1] Link to the location type of this location
-    loctype = models.ForeignKey(LocationType)
+    loctype = models.ForeignKey(LocationType, on_delete=models.SET_DEFAULT, default=get_default_loctype, related_name="loctypelocations")
 
     # [1] Every Library has a status to keep track of who edited it
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
@@ -1698,6 +1727,14 @@ class Location(models.Model):
 
         obj = self.location_identifiers.filter(idname="idVilleEtab").first()
         return "" if obj == None else obj.idvalue
+
+    def get_partof_html(self):
+        lhtml = []
+        for loc in self.above():
+            sItem = '<span class="badge loctype-{}" title="{}">{}</span>'.format(
+                loc.loctype.name, loc.loctype.name, loc.name)
+            lhtml.append(sItem)
+        return "\n".join(lhtml)
 
     def partof(self):
         """give a list of locations (and their type) of which I am part"""
@@ -1896,16 +1933,22 @@ class Library(models.Model):
     name = models.CharField("Library", max_length=LONG_STRING)
     # [1] Has this library been bracketed?
     libtype = models.CharField("Library type", choices=build_abbr_list(LIBRARY_TYPE), max_length=5)
+
+    # ============= These fields should be removed sooner or later ===================
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
     city = models.ForeignKey(City, null=True, related_name="city_libraries")
     # [1] Name of the country this is in
     country = models.ForeignKey(Country, null=True, related_name="country_libraries")
+    # ================================================================================
 
     # [1] Every Library has a status to keep track of who edited it
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
+
+    # One field that is calculated whenever needed
+    mcount = models.IntegerField("Manuscripts for this library", default=0)
 
     # [0-1] Location, as specific as possible, but optional in the end
     location = models.ForeignKey(Location, null=True, related_name="location_libraries")
@@ -2179,6 +2222,35 @@ class SourceInfo(models.Model):
                 obj.save()
 
         result = True
+
+    def get_created(self):
+        sBack = self.created.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
+    def get_code_html(self):
+        sCode = "-" if self.code == None else self.code
+        if len(sCode) > 80:
+            button_code = "<a class='btn btn-xs jumbo-1' data-toggle='collapse' data-target='#source_code'>...</a>"
+            sBack = "<pre>{}{}<span id='source_code' class='collapse'>{}</span></pre>".format(sCode[:80], button_code, sCode[80:])
+        else:
+            sBack = "<pre>{}</pre>".format(sCode)
+        return sBack
+
+    def get_username(self):
+        sBack = "(unknown)"
+        if self.profile != None:
+            sBack = self.profile.user.username
+        return sBack
+
+    def get_manu_html(self):
+        """Get the HTML display of the manuscript to which I am attached"""
+
+        sBack = "Make sure to connect this source to a manuscript and save it. Otherwise it will be automatically deleted"
+        manu = self.sourcemanuscripts.first()
+        if manu != None:
+            url = reverse('manuscript_details', kwargs={'pk': manu.id})
+            sBack = "Linked to: <span class='signature ot'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        return sBack
 
 
 class Litref(models.Model):
@@ -3053,6 +3125,12 @@ class Manuscript(models.Model):
         # Adapt the save date
         self.saved = get_current_datetime()
         response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
+        # Possibly adapt the number of manuscripts for the associated library
+        if self.library != None:
+            mcount = Manuscript.objects.filter(library=self.library).count()
+            if self.library.mcount != mcount:
+                self.library.mcount = mcount
+                self.library.save()
         return response
 
     def adapt_hierarchy():
@@ -4728,6 +4806,12 @@ class Author(models.Model):
             author.save()
         return author
 
+    def get_editable(self):
+        """Get a HTML expression of this author's editability"""
+
+        sBack = "yes" if self.editable else "no"
+        return sBack
+
 
 class Nickname(models.Model):
     """Authors can have 0 or more local names, which we call 'nicknames' """
@@ -5184,6 +5268,10 @@ class EqualGold(models.Model):
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
         return sBack
 
+    def get_passimcode(self):
+        code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
+        return code
+
     def get_passimcode_markdown(self):
         lHtml = []
         # Add the PASSIM code
@@ -5228,9 +5316,20 @@ class EqualGold(models.Model):
         sBack = ""
         for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
             lHtml.append("<tr class='view-row'>")
-            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
+            sSpectype = ""
+            sAlternatives = ""
+            if superlink.spectype != None and len(superlink.spectype) > 1:
+                # Show the specification type
+                sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
+            if superlink.alternatives != None and superlink.alternatives == "true":
+                sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+            lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}{}</td>".format(
+                superlink.get_linktype_display(), sSpectype, sAlternatives))
+            sTitle = ""
+            if superlink.note != None and len(superlink.note) > 1:
+                sTitle = "title='{}'".format(superlink.note)
             url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
-            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.dst.get_view()))
+            lHtml.append("<td valign='top'><a href='{}' {}>{}</a></td>".format(url, sTitle, superlink.dst.get_view()))
             lHtml.append("</tr>")
         if len(lHtml) > 0:
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
@@ -6121,6 +6220,12 @@ class EqualGoldLink(models.Model):
     dst = models.ForeignKey(EqualGold, related_name="equalgold_dst")
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_EQUAL)
+    # [0-1] Specification of directionality and source
+    spectype = models.CharField("Specification", null=True,blank=True, choices=build_abbr_list(SPEC_TYPE), max_length=5)
+    # [0-1] Alternatives
+    alternatives = models.CharField("Alternatives", null=True,blank=True, choices=build_abbr_list(YESNO_TYPE), max_length=5)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
 
     def __str__(self):
         combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)
@@ -7796,7 +7901,7 @@ class SermonDescr(models.Model):
                 response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
 
-    def signature_string(self, include_auto = False):
+    def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
 
         lSign = []
@@ -7812,15 +7917,21 @@ class SermonDescr(models.Model):
 
         # Add the manual signatures
         for item in self.sermonsignatures.all().order_by("-editype", "code"):
-            short = item.short()
-            editype = item.editype
-            url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
-            lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
-                editype, short, url, short[:20]))
+            if do_plain:
+                lSign.append(item.short())
+            else:
+                short = item.short()
+                editype = item.editype
+                url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
+                lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
+                    editype, short, url, short[:20]))
 
 
         # REturn the combination
-        combi = " ".join(lSign)
+        if do_plain:
+            combi = " | ".join(lSign)
+        else:
+            combi = " ".join(lSign)
         if combi == "": combi = "[-]"
         return combi
 
@@ -8279,6 +8390,71 @@ class ManuscriptKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class ManuscriptCorpus(models.Model):
+    """A user-SSG-specific manuscript corpus"""
+
+    # [1] Each corpus is created with a particular SSG as starting point
+    super = models.ForeignKey(EqualGold, related_name="supercorpora", on_delete=models.CASCADE)
+
+    # Links: source.SSG - target.SSG - manu
+    # [1] Link-item 1: source
+    source = models.ForeignKey(EqualGold, related_name="sourcecorpora", on_delete=models.CASCADE)
+    # [1] Link-item 2: target
+    target = models.ForeignKey(EqualGold, related_name="targetcorpora", on_delete=models.CASCADE)
+    # [1] Link-item 3: manuscript
+    manu = models.ForeignKey(Manuscript, related_name="manucorpora", on_delete=models.CASCADE)
+
+    # [1] Each corpus belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profilecorpora", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptCorpusLock(models.Model):
+    """A user-SSG-specific manuscript corpus"""
+
+    # [1] Each lock is created with a particular SSG as starting point
+    super = models.ForeignKey(EqualGold, related_name="supercorpuslocks", on_delete=models.CASCADE)
+    # [1] Each lock belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profilecorpuslocks", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # [1] Status
+    status = models.TextField("Status", default = "empty")
+
+    
+class EqualGoldCorpus(models.Model):
+    """A corpus of SSG's"""
+
+    # [1] Each lock is created with a particular SSG as starting point
+    ssg = models.ForeignKey(EqualGold, related_name="ssgequalcorpora", on_delete=models.CASCADE)
+    # [1] Each lock belongs to a person
+    profile = models.ForeignKey(Profile, related_name="profileequalcorpora", on_delete=models.CASCADE)
+    # [1] List of most frequent words
+    mfw = models.TextField("Most frequent words", default = "[]")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    # [1] Status
+    status = models.TextField("Status", default = "empty")
+
+
+class EqualGoldCorpusItem(models.Model):
+    """One item from the EqualGoldCOrpus"""
+
+    # [1] Link-item 1: source
+    equal = models.ForeignKey(EqualGold, related_name="ssgcorpusequals", on_delete=models.CASCADE)
+    # [1] WOrds in this SSG's incipit and explicit - stringified JSON
+    words = models.TextField("Words", default = "{}")
+    # [1] Number of sermons - the scount
+    scount = models.IntegerField("Sermon count", default = 0)
+    # [1] Name of the author
+    authorname = models.TextField("Author's name", default = "empty")
+    # [1] Link to the corpus itself
+    corpus = models.ForeignKey(EqualGoldCorpus, related_name="corpusitems", on_delete=models.CASCADE)
+
+    
 class UserKeyword(models.Model):
     """Relation between a M/S/SG/SSG and a Keyword - restricted to user"""
 
@@ -8367,6 +8543,8 @@ class SermonDescrEqual(models.Model):
 
     # [1] The sermondescr
     sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_super")
+    # [0-1] The manuscript in which the sermondescr resides
+    manu = models.ForeignKey(Manuscript, related_name="sermondescr_super", blank=True, null=True)
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
@@ -8406,6 +8584,10 @@ class SermonDescrEqual(models.Model):
         return response
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Automatically provide the value for the manuscript through the sermon
+        manu = self.sermon.msitem.manu
+        if self.manu != manu:
+            self.manu = manu
         # First do the saving
         response = super(SermonDescrEqual, self).save(force_insert, force_update, using, update_fields)
         # Perform the scount
@@ -8413,8 +8595,11 @@ class SermonDescrEqual(models.Model):
         # Return the proper response
         return response
 
-    def get_label(self, do_incexpl=False):
-        sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))
+    def get_label(self, do_incexpl=False, show_linktype=False):
+        if show_linktype:
+            sBack = "{}: {}".format(self.get_linktype_display(), self.super.get_label(do_incexpl))
+        else:
+            sBack = self.super.get_label(do_incexpl)
         return sBack
 
     def unique_list():

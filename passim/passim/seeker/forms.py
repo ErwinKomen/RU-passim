@@ -111,6 +111,13 @@ class BookWidget(ModelSelect2Widget):
         return Book.objects.all().order_by('idno').distinct()
 
 
+class CheckboxString(CheckboxInput):
+
+    def value_from_datadict(self, data, files, name):
+        sBack = "true" if name in data else "false"
+        return sBack
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
@@ -137,6 +144,23 @@ class CityMonasteryOneWidget(ModelSelect2Widget):
         #loc_id = LocationType.objects.filter(Q(name="city")|Q(name="village")|Q(name="monastery")).first()
         #return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
         return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+
+
+class CityWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loctype = LocationType.objects.filter(name__iexact="city").first()
+        if loctype != None:
+            level = loctype.level
+            qs = Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+        else:
+            qs = Location.objects.all().order_by('name').distinct()
+        return qs
 
 
 class CodeWidget(ModelSelect2MultipleWidget):
@@ -247,6 +271,22 @@ class CollOneHistWidget(CollOneWidget):
     """Like CollOne, but then for: EqualGold = super sermon gold"""
     type = "super"
     settype = "hc"
+
+
+class CountryWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        loctype = LocationType.objects.filter(name__iexact="country").first()
+        if loctype != None:
+            qs = Location.objects.filter(loctype=loctype).order_by('name').distinct()
+        else:
+            qs = Location.objects.all().order_by('name').distinct()
+        return qs
 
 
 class CountryOneWidget(ModelSelect2Widget):
@@ -451,6 +491,18 @@ class LitrefWidget(ModelSelect2Widget):
         return Litref.objects.exclude(full="").order_by('full').distinct()
 
 
+class LibraryWidget(ModelSelect2MultipleWidget):
+    model = Library
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        qs = Library.objects.all().order_by('name').distinct()
+        return qs
+
+
 class LibraryOneWidget(ModelSelect2Widget):
     model = Library
     search_fields = [ 'name__icontains' ]
@@ -526,6 +578,30 @@ class LocationOneWidget(ModelSelect2Widget):
         return Location.objects.all().order_by('name').distinct()
 
 
+class LocTypeWidget(ModelSelect2MultipleWidget):
+    model = LocationType
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.level)
+        return sLabel
+
+    def get_queryset(self):
+        return LocationType.objects.all().order_by('level').distinct()
+
+
+class LoctypeOneWidget(ModelSelect2Widget):
+    model = LocationType
+    search_fields = [ 'name__icontains']
+
+    def label_from_instance(self, obj):
+        sLabel = "{} ({})".format(obj.name, obj.level)
+        return sLabel
+
+    def get_queryset(self):
+        return LocationType.objects.all().order_by('level').distinct()
+
+
 class ManuidWidget(ModelSelect2MultipleWidget):
     model = Manuscript
     search_fields = [ 'idno__icontains']
@@ -535,6 +611,20 @@ class ManuidWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+
+
+class ManuidOneWidget(ModelSelect2Widget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+        return qs
 
 
 class ManuscriptExtWidget(ModelSelect2MultipleWidget):
@@ -911,6 +1001,19 @@ class TemplateOneWidget(ModelSelect2Widget):
         #username = self.attrs.pop('username', '')
         #team_group = self.attrs.pop('team_group', '')
         return Template.objects.all().order_by('name').distinct()
+
+
+class UserWidget(ModelSelect2MultipleWidget):
+    model = User
+    search_fields = [ 'username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.username
+
+    def get_queryset(self):
+        return User.objects.all().order_by('username').distinct()
+
+
 
 
 
@@ -1946,7 +2049,7 @@ class SermonDescrGoldForm(forms.ModelForm):
 
 
 class SermonDescrSuperForm(forms.ModelForm):
-    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, # help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
     # For the method "nodistance"
     newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
@@ -2437,9 +2540,17 @@ class SuperSermonGoldForm(PassimModelForm):
 class EqualGoldLinkForm(forms.ModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newspectype = forms.ChoiceField(label=_("Spectype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
+                    'title': 'Direction specification (optional)'}))
+    newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
+                widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
+                    'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
-    gold = forms.CharField(label=_("Destination gold sermon"), required=False)
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'width: 100%;', 'tdstyle': 'width: 300px;',
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2459,11 +2570,19 @@ class EqualGoldLinkForm(forms.ModelForm):
             # Initialize choices for linktype
             init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
             init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
+            init_choices(self, 'newspectype', SPEC_TYPE, bUseAbbr=True, maybe_empty=True, use_helptext=False)
+            init_choices(self, 'alternatives', YESNO_TYPE, bUseAbbr=True,maybe_empty=True, use_helptext=False)
             # Make sure to set required and optional fields
             self.fields['linktype'].required = False
             self.fields['newlinktype'].required = False
+            self.fields['newspectype'].required = False
+            self.fields['newalt'].required = False
+            self.fields['note'].required = False
             self.fields['dst'].required = False
             self.fields['newsuper'].required = False
+
+            # For searching/listing
+            self.fields['newlinktype'].initial = "prt"
 
             if super_id != None and super_id != "":
                 self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=super_id).order_by('code')
@@ -2505,6 +2624,8 @@ class EqualGoldLinkForm(forms.ModelForm):
                     raise forms.ValidationError(
                             "This Super Sermon Gold is already linked"
                         )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
 
 
 class SermonGoldSignatureForm(forms.ModelForm):
@@ -3074,6 +3195,48 @@ class OriginForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
+class LibrarySearchForm(forms.ModelForm):
+    country = forms.CharField(label=_("Country"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city = forms.CharField(label=_("City"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    name = forms.CharField(label=_("Library"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    countrylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=CountryWidget(attrs={'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
+    citylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=CityWidget(attrs={'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
+    librarylist = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LibraryWidget(attrs={'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
+    library_ta = forms.CharField(label=_("Libraru"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Library...',  'style': 'width: 100%;'}))
+    typeaheads = ["countries", "cities", "libraries"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = Library
+        fields = ['lcity', 'lcountry']
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Start by executing the standard handling
+            super(LibrarySearchForm, self).__init__(*args, **kwargs)
+            # Set the keyword to optional for best processing
+            self.fields['lcity'].required = False
+            self.fields['lcountry'].required = False
+
+            # Need to initialize the lists
+            self.fields['countrylist'].queryset = Location.objects.all()
+            self.fields['citylist'].queryset = Location.objects.all()
+            self.fields['librarylist'].queryset = Library.objects.all()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("LibrarySearchForm")
+        return None
+
+
 class LibraryForm(forms.ModelForm):
     #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
     #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -3099,6 +3262,7 @@ class LibraryForm(forms.ModelForm):
         # Set the keyword to optional for best processing
         self.fields['name'].required = False
         self.fields['libtype'].required = False
+        self.fields['idLibrEtab'].required = False
         self.fields['location'].required = False
         self.fields['location_ta'].required = False
         self.fields['location'].queryset = Location.objects.all().order_by('name')
@@ -3357,8 +3521,16 @@ class TemplateForm(PassimModelForm):
 
 
 class LocationForm(forms.ModelForm):
+    loctypechooser = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LocTypeWidget(attrs={'data-placeholder': 'Location type...', 'style': 'width: 100%;'}))
+    location_ta = forms.CharField(label=_("Location"), required=False, 
+                 widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  
+                                               'style': 'width: 100%;'}))
+    locchooser = ModelMultipleChoiceField(queryset=None, required=False,
+                 widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                            widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
+                 widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
+    typeaheads = ["locations"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -3366,13 +3538,24 @@ class LocationForm(forms.ModelForm):
         model = Location
         fields = ['name', 'loctype']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 #'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
+                 'loctype':     LoctypeOneWidget(attrs={'data-placeholder': 'Select one type...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(LocationForm, self).__init__(*args, **kwargs)
-        # All fields are required
+        # No fields are required for best processing
+        self.fields['name'].required = False
+        self.fields['loctype'].required = False
+        self.fields['loctypechooser'].required = False
+        self.fields['name'].required = False
+        self.fields['location_ta'].required = False
+        self.fields['locchooser'].required = False
+        qs = Location.objects.all().order_by('loctype__level', 'name')
+        self.fields['locationlist'].queryset = qs
+        self.fields['locchooser'].queryset = qs
+        self.fields['loctypechooser'].queryset = LocationType.objects.all().order_by('level')
         # Get the instance
         if 'instance' in kwargs:
             # Set the items that *may* be shown
@@ -3380,6 +3563,8 @@ class LocationForm(forms.ModelForm):
             qs = Location.objects.exclude(id=instance.id).order_by('loctype__level', 'name')
             self.fields['locationlist'].queryset = qs
             self.fields['locationlist'].widget.queryset = qs
+            self.fields['locchooser'].queryset = qs
+            self.fields['locchooser'].widget.queryset = qs
 
             # Set the list of initial items
             my_list = [x.id for x in instance.hierarchy(False)]
@@ -3602,17 +3787,9 @@ class SearchCollectionForm(forms.Form):
     signature = forms.CharField(label=_("Signature code"), required=False)
 
 
-class LibrarySearchForm(forms.Form):
-    country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    name = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    typeaheads = ["countries", "cities", "libraries"]
-
-
 class ReportEditForm(forms.ModelForm):
+    userlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = Report
@@ -3623,12 +3800,27 @@ class ReportEditForm(forms.ModelForm):
                  'contents':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'})
                  }
 
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ReportEditForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['created'].required = False
+        self.fields['user'].required = False
+        self.fields['reptype'].required = False
+        self.fields['contents'].required = False
+        
+        # Set queryset(s) - for listview
+        self.fields['userlist'].queryset = User.objects.all().order_by('username')
+        
 
 class SourceEditForm(forms.ModelForm):
     profile_ta = forms.CharField(label=_("Collector"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching users input-sm', 'placeholder': 'Collector(s)...', 'style': 'width: 100%;'}))
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select collector(s)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    manulist = ModelChoiceField(queryset=None, required=False,
+                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select corresponding manuscript...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = SourceInfo
@@ -3640,13 +3832,34 @@ class SourceEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(SourceEditForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['url'].required = False
-        self.fields['code'].required = False
-        self.fields['profile_ta'].required = False
-        # Set the initial value for the profile
-        self.fields['profile'].required = False
-        self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['url'].required = False
+            self.fields['code'].required = False
+            self.fields['profile_ta'].required = False
+            # Set the initial value for the profile
+            self.fields['profile'].required = False
+        
+            # Set queryset(s) - for listview
+            self.fields['profilelist'].queryset = Profile.objects.all().order_by('user')
+            # Set queryset(s) - for details view
+            self.fields['manulist'].queryset = Manuscript.objects.none()
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                self.fields['profile'].initial = instance.profile.id
+                # Give a choice of manuscripts that are not linked to a SOURCE yet
+                qs = Manuscript.objects.filter(mtype='man', source__isnull=True).order_by('idno')
+                self.fields['manulist'].queryset = qs
+                self.fields['manulist'].widget.queryset = qs
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SourceEditForm")
+        return None
 
 
 class AuthorEditForm(forms.ModelForm):
@@ -3654,9 +3867,16 @@ class AuthorEditForm(forms.ModelForm):
     class Meta:
         model = Author
         fields = ['name', 'abbr']
-        widgets={'name':      forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
-                 'abbr':     forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
+        widgets={'name':    forms.TextInput(attrs={'placeholder': 'Name of this author', 'style': 'width: 100%;'}),
+                 'abbr':    forms.TextInput(attrs={'placeholder': 'Abbreviation as e.g. used in Gryson', 'style': 'width: 100%;'})
                  }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(AuthorEditForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['abbr'].required = False
 
 
 class AuthorSearchForm(forms.ModelForm):
@@ -3674,6 +3894,7 @@ class AuthorSearchForm(forms.ModelForm):
         fields = ('name',)
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
+
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(AuthorSearchForm, self).__init__(*args, **kwargs)

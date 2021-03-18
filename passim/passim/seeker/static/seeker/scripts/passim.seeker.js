@@ -29,6 +29,8 @@ var ru = (function ($, ru) {
     var loc_example = "",
         loc_bManuSaved = false,
         loc_vscrolling = 0,
+        loc_simulation = null,
+        loc_network_options = {},
         loc_newSermonNumber = 0,
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
@@ -83,6 +85,40 @@ var ru = (function ($, ru) {
     // Private methods specification
     var private_methods = {
       /**
+       *
+       */
+      addLegend: function (options) {
+        var sMethod = "", // Sampling method
+            iSize = 0,    // Sample size
+            sExcl = "";   // Exclusion string
+
+        try {
+          // Check to see if the correct options are there
+          if (!('divsvg' in options && 'x' in options &&
+                 'y' in options && 'legend' in options)) {
+            private_methods.errMsg("Error in addLegend: missing option");
+            return false;
+          }
+          d3.select(options['divsvg']).append("svg:g")
+              .append("svg:text")
+              .attr("x", options['x'])
+              .attr("y", options['y'])
+              .attr("class", "ca-legendtext")
+              .text(options['legend']);
+          d3.select(options['divsvg']).append("svg:g")
+              .append("svg:text")
+              .attr("x", options['x'])
+              .attr("y", options['y'] + 15)
+              .attr("class", "ca-legendtext");
+
+          return true;
+        } catch (err) {
+          private_methods.errMsg("addLegend", err);
+          return false;
+        }
+      },
+
+      /**
        * fitFeatureBox
        *    Initialize the <svg> in the @sDiv
        * 
@@ -117,6 +153,61 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("fitFeatureBox", ex);
           return oBound;
+        }
+      },
+
+      /**
+       * getIntParam - get a numerical parameter from the qdict
+       *  
+       * @param {object} qdict
+       * @param {string} sParamName
+       * @param {int}    iDefault
+       * @returns {Number}
+       */
+      getIntParam: function (qdict, sParamName, iDefault) {
+        var iBack = 0,  // Integer value
+          sBack = "";   // Value as string
+
+        try {
+          // Validate
+          if (qdict === undefined || qdict === null) return -1;
+          if (sParamName === undefined || sParamName === "") return -1;
+          if (qdict.hasOwnProperty(sParamName)) {
+            sBack = qdict[sParamName];
+            if (/^\+?(0|[1-9]\d*)$/.test(sBack)) {
+              iBack = Number(sBack);
+            }
+          } else if (iDefault !== undefined) {
+            iBack = iDefault;
+          }
+          // Return what we have found
+          return iBack;
+        } catch (err) {
+          private_methods.errMsg("getIntParam", err);
+          return -1;
+        }
+      },
+
+      /**
+       * getStringParam - get a string parameter from the qdict
+       *  
+       * @param {type} qdict
+       * @param {type} sParamName
+       * @returns {String}
+       */
+      getStringParam: function (qdict, sParamName) {
+        var sBack = "";
+        try {
+          // Validate
+          if (qdict === undefined || qdict === null) return "";
+          if (sParamName === undefined || sParamName === "") return "";
+          if (qdict.hasOwnProperty(sParamName)) {
+            sBack = qdict[sParamName].toString().trim();
+          }
+          return sBack;
+        } catch (err) {
+          private_methods.errMsg("getStringParam", err);
+          return "";
         }
       },
 
@@ -1378,6 +1469,786 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * draw_network
+       *    draw a force-directed network (e.g. for Cluster Analysis)
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            divSvg,   // The target svg div
+            color,    // D3 color scheme
+            factor,
+            width,
+            height,
+            gravityvalue = 10,
+            gravityid = "#gravityvalue",
+            p = {},
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          color = network_color;
+
+          // Append a legend
+          private_methods.addLegend({
+            'x': width / 2,
+            'y': height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation =  d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result;
+                // This determines the size of each link
+                // Should be: result = d.value * factor;
+                result = d.id;
+                return result;
+              }).distance(function (d) { return 40; })
+              )
+              // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(options['links'])
+                    .join("line")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(2 * d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(options['nodes'])
+                    .join("circle")
+                    .attr("r", function (d) {
+                      var scount = d.scount;
+                      var iSize = Math.max(10, scount / 2);
+                      return iSize;
+                    })
+                    .attr("fill", color)
+                    .call(network_drag(loc_simulation));
+
+
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.id; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+                  .text(function (d) { return d.value; });
+
+          // Then execute the simulation
+          // loc_simulation.restart();
+
+          // Define the 'ticked' function
+          function ticked() {
+            node.attr("cx", function (d) {
+              var radius = 10;
+              if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2);}
+              return d.x = Math.max(radius, Math.min(width - radius, d.x));
+            })
+                .attr("cy", function (d) {
+                  var radius = 10;
+                  if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
+                  return d.y = Math.max(radius, Math.min(height - radius, d.y));
+                });
+            link.attr("x1", function (d) { return d.source.x; })
+                .attr("y1", function (d) { return d.source.y; })
+                .attr("x2", function (d) { return d.target.x; })
+                .attr("y2", function (d) { return d.target.y; });
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            if (d.group > 1) {
+              col_result = "aap";
+            }
+            col_result = scale(d.group);
+            return col_result;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.3).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network", ex);
+          return false;
+        }
+      },
+
+      /**
+       * draw_network_overlap
+       *    draw a force-directed network similar to the on by Boodts & Denis "A sermon by any other name?"
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network_overlap: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            divSvg,   // The target svg div
+            color,    // D3 color scheme
+            factor,
+            width,
+            height,
+            i,
+            count,
+            maxcount = 0,
+            gravityvalue = 100,
+            gravityid = "#gravity_overlap_value",
+            degree = 1,
+            p = {},
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+          degree = options['degree'];
+
+          // Calculate the maxcount within the nodes 'scount' feature
+          for (i = 0; i < options['nodes'].length; i++) {
+            count = options['nodes'][i]['scount'];
+            if (count > maxcount) {
+              maxcount = count;
+            }
+          }
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          // Add a viewbox
+          svg.attr("viewBox", [0, 0, width, height])
+          color = network_color;
+
+          // Append a legend (with the title): top center
+          private_methods.addLegend({
+            'x': 50,          // width / 2,
+            'y': 50,          // height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation = d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result = d.id;
+                return result;
+              }).distance(function (d) { return 10 * maxcount / degree; })
+              )
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .force("collide", d3.forceCollide(d => 65).radius(function (d) {
+                return get_height(d) + 1;
+              }).iterations(3))
+              // .force("collision", rectCollide().size(function (d) {
+              //  return [get_width(d), get_height(d)];
+              //}))
+              //.nodes(options['nodes']);
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(options['links'])
+                    .join("line")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(2 * d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("g")
+                    .data(options['nodes'])
+                    .join("g")
+                    .call(network_drag(loc_simulation));
+
+          // Add the circle below the <g>
+          node.append("circle")
+              .attr("r", get_radius)
+              .attr('fill', color);
+
+          // Add signature to node below the <g>
+          node.append("text")
+              .attr("x", function (d) {
+                var x = -1 * get_width(d) / 2;
+                return x.toString();
+              })
+              .attr("y", function (d) {
+                var x = 3 * get_radius(d);
+                return x.toString();
+              })
+              .text(function (d) {
+                return d.label;
+              })
+              .clone(true).lower()
+              .attr("fill", "none")
+              .attr("stroke", "white")
+              .attr("stroke-width", 3);
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.passim + " (id=" + d.id + " S=" + d.scount + ")"; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+            .text(function (d) { return d.value; });
+
+          // ====================== HELP FUNCTIONS =============================
+          function get_radius(d) {
+            var scount = d.scount;
+            var iSize = Math.max(5, scount / 4);
+            return iSize;
+          }
+
+          function get_width(d) {
+            return 10 * d.label.length;
+          }
+
+          function get_height(d) {
+            var r = get_radius(d);
+            return r * 4;
+          }
+
+          // Define the 'ticked' function
+          function ticked() {
+            //var q = d3.quadtree(options['nodes']),
+            //    i = 0,
+            //    n = options['nodes'].length;
+
+            //// Visit all points
+            //while (++i < n) {
+            //  q.visit(collide(options['nodes'][i]));
+            //}
+
+            node.attr("transform", function (d) {
+              var radius = 10, ix, iy;
+              if (d.scount !== undefined) { radius = get_radius(d); }
+              ix = Math.max(radius, Math.min(width - radius, d.x));
+              iy = Math.max(radius, Math.min(height - radius, d.y));
+              return `translate(${ix},${iy})`
+            });
+
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+          }
+
+          function rectCollide(node) {
+            var nodes, sizes, masses;
+            var strength = 1;
+            var iterations = 1;
+            var nodeCenterX;
+            var nodeMass;
+            var nodeCenterY;
+
+            function force() {
+
+              var node;
+              var i = -1;
+              while (++i < iterations) { iterate(); }
+              function iterate() {
+                var quadtree = d3.quadtree(nodes, xCenter, yCenter);
+                var j = -1
+                while (++j < nodes.length) {
+                  node = nodes[j];
+                  nodeMass = masses[j];
+                  nodeCenterX = xCenter(node);
+                  nodeCenterY = yCenter(node);
+                  quadtree.visit(collisionDetection);
+                }
+              }
+            }
+
+            function collisionDetection(quad, x0, y0, x1, y1) {
+              var updated = false;
+              var data = quad.data;
+              if (data) {
+                if (data.index > node.index) {
+
+                  let xSize = (node.width + data.width) / 2;
+                  let ySize = (node.height + data.height) / 2;
+                  let dataCenterX = xCenter(data);
+                  let dataCenterY = yCenter(data);
+                  let dx = nodeCenterX - dataCenterX;
+                  let dy = nodeCenterY - dataCenterY;
+                  let absX = Math.abs(dx);
+                  let absY = Math.abs(dy);
+                  let xDiff = absX - xSize;
+                  let yDiff = absY - ySize;
+
+                  if (xDiff < 0 && yDiff < 0) {
+                    //collision has occurred
+
+                    //separation vector
+                    let sx = xSize - absX;
+                    let sy = ySize - absY;
+                    if (sx < sy) {
+                      if (sx > 0) {
+                        sy = 0;
+                      }
+                    } else {
+                      if (sy > 0) {
+                        sx = 0;
+                      }
+                    }
+                    if (dx < 0) {
+                      sx = -sx;
+                    }
+                    if (dy < 0) {
+                      sy = -sy;
+                    }
+
+                    let distance = Math.sqrt(sx * sx + sy * sy);
+                    let vCollisionNorm = { x: sx / distance, y: sy / distance };
+                    let vRelativeVelocity = { x: data.vx - node.vx, y: data.vy - node.vy };
+                    let speed = vRelativeVelocity.x * vCollisionNorm.x + vRelativeVelocity.y * vCollisionNorm.y;
+                    if (speed < 0) {
+                      //negative speed = rectangles moving away
+                    } else {
+                      var collisionImpulse = 2 * speed / (masses[data.index] + masses[node.index]);
+                      if (Math.abs(xDiff) < Math.abs(yDiff)) {
+                        //x overlap is less
+                        data.vx -= (collisionImpulse * masses[node.index] * vCollisionNorm.x);
+                        node.vx += (collisionImpulse * masses[data.index] * vCollisionNorm.x);
+                      } else {
+                        //y overlap is less
+                        data.vy -= (collisionImpulse * masses[node.index] * vCollisionNorm.y);
+                        node.vy += (collisionImpulse * masses[data.index] * vCollisionNorm.y);
+                      }
+
+                      updated = true;
+                    }
+                  }
+                }
+              }
+              return updated
+            }
+
+            function xCenter(d) {
+              return d.x;
+            }
+            function yCenter(d) {
+              return d.y;
+            }
+
+            force.initialize = function (_) {
+              sizes = (nodes = _).map(function (d) { return [d.width, d.height] })
+              masses = sizes.map(function (d) { return d[0] * d[1] })
+            };
+
+            force.size = function (_) {
+              return (arguments.length
+                   ? (size = typeof _ === 'function' ? _ : constant(_), force)
+                   : size)
+            }
+
+            force.strength = function (_) {
+              return (arguments.length ? (strength = +_, force) : strength)
+            }
+
+            force.iterations = function (_) {
+              return (arguments.length ? (iterations = +_, force) : iterations)
+            }
+
+            return force;
+          }
+
+          function collide(node) {
+            var r = get_radius(node),
+                w = get_width(node),
+                nx1 = node.x - w / 2,
+                nx2 = node.x + w / 2,
+                ny1 = node.y - r,
+                ny2 = node.y + r * 3;
+            try {
+              return function (quad, x1, y1, x2, y2) {
+                var x = 0,
+                    y = 0,
+                    l = 0,
+                    r = 0;
+
+                if (quad.point && (quad.point !== node)) {
+                  x = node.x - quad.point.x;
+                  y = node.y - quad.point.y;
+                  l = Math.sqrt(x * x + y * y);
+                  r = node.radius + quad.point.radius;
+                  if (l < r) {
+                    l = (l - r) / l * 0.5;
+                    node.x -= x *= l;
+                    node.y -= y *= l;
+                    quad.point.x += x;
+                    quad.point.y += y;
+                  }
+                }
+                return (x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1);
+              };
+            } catch (ex) {
+              private_methods.errMsg("collide", ex);
+              return false;
+            }
+
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            col_result = scale(d.group);
+            return col_result;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.4).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network_overlap", ex);
+          return false;
+        }
+      },
+
+      /**
+       * draw_network_trans
+       *    draw a force-directed network (e.g. medieval text transmission)
+       *
+       * See: https://observablehq.com/@d3/force-directed-graph
+       *
+       * node: {id: "Champtercier", group: 1}
+       * link: {source: "CountessdeLo", target: "Myriel", value: 1}
+       * 
+       * @param {type} options
+       * @returns {Boolean}
+       */
+      draw_network_trans: function (options) {
+        var svg,      // the SVG element within the DOM that is being used
+            svgA,     // Author svg element
+            divSvg,   // The target svg div
+            divAuthor,
+            color,    // D3 color scheme
+            factor,
+            size = 10,  //Size of each author selection square
+            width,
+            height,
+            i,
+            count,
+            maxcount = 0,
+            gravityvalue = 100,
+            gravityid = "#gravity_trans_value",
+            p = {},
+            author,
+            link,
+            node;
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        try {
+          // Validate the options
+          if (!('nodes' in options && 'links' in options &&
+                options['nodes'] !== undefined && options['links'] !== undefined &&
+                'target' in options && 'width' in options &&
+                'height' in options)) { return false; }
+
+          // Initialize
+          loc_simulation = null;
+          if ($(gravityid).length > 0) {
+            gravityvalue = parseInt($(gravityid).text(), 10);
+          }
+
+          // Get parameters
+          width = options['width'];
+          height = options['height'];
+          factor = options['factor'];
+
+          // Calculate the maxcount
+          for (i = 0; i < options['nodes'].length; i++) {
+            count = options['nodes'][i]['scount'];
+            if (count > maxcount) {
+              maxcount = count;
+            }
+          }
+
+          // Define the SVG element and the color scheme
+          divSvg = "#" + options['target'] + " svg";
+          $(divSvg).empty();
+          svg = d3.select(divSvg);
+          // Add a viewbox
+          svg.attr("viewBox", [0, 0, width, height])
+          color = network_color;
+
+          // Append a legend: top center
+          private_methods.addLegend({
+            'x': 50,          // width / 2,
+            'y': 50,          // height - 50,
+            'divsvg': divSvg,
+            'legend': options['legend']
+          });
+
+          // This is based on D3 version *6* !!! (not version 3)
+          loc_simulation = d3.forceSimulation(options['nodes'])
+              .force("link", d3.forceLink(options['links']).id(function (d) {
+                var result;
+                // This determines the size of each link
+                // Should be: result = d.value * factor;
+                result = d.id;
+                return result;
+              }).distance(function (d) { return 2 * maxcount; })
+              )
+              // .force("charge", d3.forceManyBody().strength(-100)) // Was: .charge(-100)
+              .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
+              .force("center", d3.forceCenter(width / 2, height / 2))
+              .force("collide", d3.forceCollide(d => 65).radius(function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize + 1;
+              }).iterations(3))
+              .on("tick", ticked);
+
+          // Define a d3 function based on the information in 'nodes' and 'links'
+          link = svg.append("g")
+                    .attr("fill", "none")
+                    .attr("class", "links")
+                    .selectAll("path")
+                    .data(options['links'])
+                    .join("path")
+                    // .attr("stroke", "black")
+                    .attr("stroke-width", function (d) {
+                      return Math.sqrt(2 * d.value);
+                    });
+          node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("g")
+                    .data(options['nodes'])
+                    .join("g")
+                    .call(network_drag(loc_simulation));
+
+          // Add the circle below the <g>
+          node.append("circle")
+              .attr("r", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize;
+              })
+              .attr('fill', color);
+
+          // Add signature to node below the <g>
+          node.append("text")
+              .attr("x", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize;
+              })
+              .attr("y", "0.31em")
+              .text(function (d) {
+                return d.sig;
+              })
+              .clone(true).lower()
+              .attr("fill", "none")
+              .attr("stroke", "white")
+              .attr("stroke-width", 3);
+
+          // Add popup title to nodes;
+          node.append("title")
+            .text(function (d) { return d.label; });
+          // Add popup title to links: this provides the actual weight
+          link.append("title")
+                  .text(function (d) { return d.value; });
+
+          // ====================== Author SVG element =========================
+          divAuthor = "#" + options['targetA'] + " svg";
+          $(divAuthor).empty()
+          svgA = d3.select(divAuthor);
+          // Add a viewbox
+          svgA.attr("viewBox", [0, 0, 2 * width / 10, height])
+
+          // Add a rectangle for each author
+          author = svgA.append("g")
+              .selectAll("g")
+              .data(options['authors'])
+              .join("g");
+
+
+          // Add a rectangle for each author
+          author.append("rect").attr("x", 5)
+              .attr("y", function (d, i) { return 50 + i * (size + 5); })
+              .attr("width", size).attr("height", size)
+              .style("fill", function (d) {
+                return network_color(d);
+              });
+
+          // Add a name (legend) for each author
+          author.append("text")
+                .attr("x", 5 + size * 1.2)
+                .attr("y", function (d, i) { return 50 + i * (size + 5) + (size ) }) // 50 is where the first dot appears. 25 is the distance between dots
+                .style("fill", function (d) {
+                  return network_color(d);
+                })
+                .text(function (d) {
+                  return d.category + " (" + d.count + ")";
+                })
+                .attr("text-anchor", "left")
+                .style("alignment-baseline", "middle");
+
+          // ====================== HELP FUNCTIONS =============================
+          // Define the 'ticked' function
+          function ticked() {
+            node.attr("transform", function (d) {
+              var radius = 10, ix, iy;
+              if (d.scount !== undefined) { radius = Math.max(10, d.scount / 2); }
+              ix = Math.max(radius, Math.min(width - radius, d.x));
+              iy = Math.max(radius, Math.min(height - radius, d.y));
+              return `translate(${ix},${iy})`
+            });
+ 
+            link.attr("d", linkArc);
+          }
+
+          function network_color(d) {
+            var col_result = "";
+            //if (d.category > 1) {
+            //  col_result = "aap";
+            //}
+            col_result = scale(d.category);
+            return col_result;
+          }
+
+          function linkArc(d) {
+            const r = Math.hypot(d.target.x - d.source.x, d.target.y - d.source.y);
+            return `M${d.source.x},${d.source.y} A${r},${r} 0 0,1 ${d.target.x},${d.target.y}`;
+          }
+
+          function network_drag(simulation) {
+            function dragstarted(event) {
+              if (!event.active) simulation.alphaTarget(0.4).restart();
+              event.subject.fx = event.subject.x;
+              event.subject.fy = event.subject.y;
+            }
+
+            function dragged(event) {
+              event.subject.fx = event.x;
+              event.subject.fy = event.y;
+            }
+
+            function dragended(event) {
+              if (!event.active) simulation.alphaTarget(0);
+              event.subject.fx = null;
+              event.subject.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+          }
+
+
+          // Return positively
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("draw_network_trans", ex);
+          return false;
+        }
+      },
+
       errMsg: function (sMsg, ex, bNoCode) {
         var sHtml = "",
             bCode = true;
@@ -1444,6 +2315,8 @@ var ru = (function ($, ru) {
           $(el).addClass("hidden");
         }
       }
+
+
     }
 
     // Public methods
@@ -4558,6 +5431,330 @@ var ru = (function ($, ru) {
           $(el).closest("div.elevate-confirm").addClass("hidden");
         } catch (ex) {
           private_methods.errMsg("elevate_cancel", ex);
+        }
+      },
+
+      /**
+       * network_graph
+       *   Create and show a network graph
+       *
+       */
+      network_graph: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            iWidth = 800,
+            iHeight = 500,
+            max_value = 0,
+            divTarget = "super_network",
+            divWait = "#super_network_wait",
+            divNetwork = "#ssg_network";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+                  if ("networkslider" in response) {
+                    $("#networkslidervalue").html(response.networkslider);
+                  }
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_graph)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_graph", ex);
+        }
+      },
+
+      /**
+       * network_overlap
+       *   Create and show a SSG-overlap network
+       *
+       */
+      network_overlap: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 1000,
+            max_value = 0,
+            divTarget = "super_network_overlap",
+            divWait = "#super_network_overlap_wait",
+            divNetwork = "#ssg_network_overlap";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+                  options['degree'] = 1;
+                  if ("networkslider" in response) {
+                    $("#network_overlap_slider_value").html(response.networkslider);
+                    options['degree'] = parseInt(response.networkslider, 10);
+                  }
+                  // Calculate the width we have right now
+                  iWidth = $("#" + divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network_overlap(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_overlap)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap", ex);
+        }
+      },
+
+      /**
+       * network_transmission
+       *   Create and show a sermon-transmission network
+       *
+       */
+      network_transmission: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 1000,
+            max_value = 0,
+            divTargetA = "super_network_trans_authors",
+            divTarget = "super_network_trans",
+            divWait = "#super_network_trans_wait",
+            divNetwork = "#ssg_network_trans";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+                  options['authors'] = response.author_list;
+                  if ("networkslider" in response) {
+                    $("#network_trans_slider_value").html(response.networkslider);
+                  }
+                  // Calculate the width we have right now
+                  iWidth = $("#"+divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['targetA'] = divTargetA;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network_trans(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_transmission)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_transmission", ex);
+        }
+      },
+
+      /**
+       * network_pca
+       *   Create and show a PCA of SSGs
+       *
+       */
+      network_pca: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            iWidth = 800,
+            iHeight = 500,
+            max_value = 0,
+            divTarget = "super_pca",
+            divWait = "#super_pca_wait",
+            divNetwork = "#ssg_pca";
+
+        try {
+          // Show what we can about the network
+          $(divNetwork).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+          // Get the target url
+          frm = $(divNetwork).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Then retrieve the data here: two lists
+                  options['nodes'] = response.node_list;
+                  options['links'] = response.link_list;
+
+                  // Other data
+                  max_value = response.max_value;
+                  options['target'] = divTarget;
+                  options['width'] = iWidth;
+                  options['height'] = iHeight;
+                  options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  options['legend'] = response.legend;
+
+                  loc_network_options = options;
+
+                  // Use D3 to draw a force-directed network
+                  private_methods.draw_network(options);
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker network_pca)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_pca", ex);
         }
       },
 
