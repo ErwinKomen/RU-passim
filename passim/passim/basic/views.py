@@ -1688,7 +1688,7 @@ class BasicDetails(DetailView):
                         bResult, msg = self.after_save(frm, obj)
                     else:
                         context['errors'] = {'save': msg }
-                else:
+                elif frm.errors:
                     # We need to pass on to the user that there are errors
                     context['errors'] = frm.errors
                     oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))

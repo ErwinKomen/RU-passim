@@ -111,6 +111,13 @@ class BookWidget(ModelSelect2Widget):
         return Book.objects.all().order_by('idno').distinct()
 
 
+class CheckboxString(CheckboxInput):
+
+    def value_from_datadict(self, data, files, name):
+        sBack = "true" if name in data else "false"
+        return sBack
+
+
 class CityOneWidget(ModelSelect2Widget):
     model = Location
     search_fields = [ 'name__icontains' ]
@@ -2535,15 +2542,15 @@ class EqualGoldLinkForm(forms.ModelForm):
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     newspectype = forms.ChoiceField(label=_("Spectype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
-                                           'title': 'Direction specification (optional)'}))
-    alternatives = forms.ChoiceField(label=_("Alternatives"), required=False, help_text="editable", 
-                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 'tdstyle': 'width: 80px;', 
-                'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
+                    'title': 'Direction specification (optional)'}))
+    newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
+                widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
+                    'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
-    note = forms.ChoiceField(label=_("Notes"), required=False, help_text="editable", 
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'width: 100%;', 'tdstyle': 'width: 300px;',
-                                              'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2569,7 +2576,7 @@ class EqualGoldLinkForm(forms.ModelForm):
             self.fields['linktype'].required = False
             self.fields['newlinktype'].required = False
             self.fields['newspectype'].required = False
-            self.fields['alternatives'].required = False
+            self.fields['newalt'].required = False
             self.fields['note'].required = False
             self.fields['dst'].required = False
             self.fields['newsuper'].required = False
@@ -2617,6 +2624,8 @@ class EqualGoldLinkForm(forms.ModelForm):
                     raise forms.ValidationError(
                             "This Super Sermon Gold is already linked"
                         )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
 
 
 class SermonGoldSignatureForm(forms.ModelForm):

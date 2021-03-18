@@ -79,7 +79,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-   LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
+    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 
@@ -132,7 +132,6 @@ def get_usercomments(type, instance, profile):
 
     # REturn the list
     return qs
-
 
 def treat_bom(sHtml):
     """REmove the BOM marker except at the beginning of the string"""
@@ -9805,8 +9804,9 @@ class EqualGoldEdit(BasicDetails):
                             linktype = cleaned['newlinktype']
                             # Get optional parameters
                             note = cleaned.get('note', None)
-                            alternatives = cleaned.get('alternatives', None)
                             spectype = cleaned.get('newspectype', None)
+                            # Alternatives: this is true if it is in there, and false otherwise
+                            alternatives = cleaned.get("newalt", None)
                             # Check existence
                             obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
                             if obj == None:
@@ -9815,10 +9815,15 @@ class EqualGoldEdit(BasicDetails):
                                     # Set the right parameters for creation later on
                                     form.instance.linktype = linktype
                                     form.instance.dst = super
+                                    if note != None and note != "": 
+                                        form.instance.note = note
+                                    if spectype != None and len(spectype) > 1:
+                                        form.instance.spectype = spectype
+                                    form.instance.alternatives = alternatives
 
                                     # Double check reverse
                                     if linktype in LINK_BIDIR:
-                                        rev_link = EqualGoldLink.objects.filter(src=super, dst=instance)
+                                        rev_link = EqualGoldLink.objects.filter(src=super, dst=instance).first()
                                         if rev_link == None:
                                             # Add it
                                             rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
@@ -9826,7 +9831,12 @@ class EqualGoldEdit(BasicDetails):
                                             # Double check the linktype
                                             if rev_link.linktype != linktype:
                                                 rev_link.linktype = linktype
-                                                rev_link.save()
+                                        if note != None and note != "": 
+                                            rev_link.note = note
+                                        if spectype != None and len(spectype) > 1:
+                                            rev_link.spectype = get_reverse_spec(spectype)
+                                        rev_link.alternatives = alternatives
+                                        rev_link.save()
                     # Note: it will get saved with form.save()
             else:
                 errors.append(form.errors)
@@ -9869,7 +9879,8 @@ class EqualGoldEdit(BasicDetails):
             superlist = form.cleaned_data['superlist']
             super_added = []
             super_deleted = []
-            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", extra = ['linktype'], related_is_through=True,
+            adapt_m2m(EqualGoldLink, instance, "src", superlist, "dst", 
+                      extra = ['linktype', 'alternatives', 'spectype', 'note'], related_is_through=True,
                       added=super_added, deleted=super_deleted)
             # Check for partial links in 'deleted'
             for obj in super_deleted:
@@ -9897,7 +9908,8 @@ class EqualGoldEdit(BasicDetails):
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
             profile = Profile.get_user_profile(self.request.user.username)
-            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'super'})
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, 
+                      extrargs = {'profile': profile, 'type': 'super'})
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG

@@ -70,6 +70,8 @@ LINK_SIM = "sim"
 LINK_UNSPECIFIED = "uns"
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
+LINK_SPEC_A = ['usd', 'usi', 'com', 'uns', 'udd', 'udi']
+LINK_SPEC_B = ['udd', 'udi', 'com', 'uns', 'usd', 'usi']
 
 # Author certainty levels
 CERTAIN_LOWEST = 'vun'  # very uncertain
@@ -154,6 +156,16 @@ class HelpChoice(models.Model):
             oErr.DoError("get_help")
         return sBack
 
+
+def get_reverse_spec(sSpec):
+    """Given a SPECTYPE, provide the reverse one"""
+
+    sReverse = sSpec
+    for idx, spectype in enumerate(LINK_SPEC_A):
+        if spectype == sSpec:
+            sReverse = LINK_SPEC_B[idx]
+            break
+    return sReverse
 
 def get_current_datetime():
     """Get the current time"""
@@ -5304,9 +5316,20 @@ class EqualGold(models.Model):
         sBack = ""
         for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
             lHtml.append("<tr class='view-row'>")
-            lHtml.append("<td valign='top'><span class='badge signature ot'>{}</span></td>".format(superlink.get_linktype_display()))
+            sSpectype = ""
+            sAlternatives = ""
+            if superlink.spectype != None and len(superlink.spectype) > 1:
+                # Show the specification type
+                sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
+            if superlink.alternatives != None and superlink.alternatives == "true":
+                sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+            lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}{}</td>".format(
+                superlink.get_linktype_display(), sSpectype, sAlternatives))
+            sTitle = ""
+            if superlink.note != None and len(superlink.note) > 1:
+                sTitle = "title='{}'".format(superlink.note)
             url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
-            lHtml.append("<td valign='top'><a href='{}'>{}</a></td>".format(url, superlink.dst.get_view()))
+            lHtml.append("<td valign='top'><a href='{}' {}>{}</a></td>".format(url, sTitle, superlink.dst.get_view()))
             lHtml.append("</tr>")
         if len(lHtml) > 0:
             sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
@@ -6200,7 +6223,7 @@ class EqualGoldLink(models.Model):
     # [0-1] Specification of directionality and source
     spectype = models.CharField("Specification", null=True,blank=True, choices=build_abbr_list(SPEC_TYPE), max_length=5)
     # [0-1] Alternatives
-    alternativs = models.CharField("Alternatives", null=True,blank=True, choices=build_abbr_list(YESNO_TYPE), max_length=5)
+    alternatives = models.CharField("Alternatives", null=True,blank=True, choices=build_abbr_list(YESNO_TYPE), max_length=5)
     # [0-1] Notes
     note = models.TextField("Notes on this link", blank=True, null=True)
 
