@@ -566,7 +566,12 @@ form .panel-heading.row {
   color: lavender !important;
   fill: #ff2400;
 }
-.jumbo-2 text, .jumbo-3 text, .jumbo-4 text {
+.jumbo-5 {
+  background-color: blue;
+  color: white !important;
+  fill: white;
+}
+.jumbo-2 text, .jumbo-3 text, .jumbo-4 text, .jumbo-5 text {
   fill: lavender;
 }
 
@@ -586,9 +591,15 @@ form .panel-heading.row {
     cursor: pointer;
     /* stroke: white; */
 }
+.jumbo-5:hover {
+    color: white;
+    background-color: darkblue;
+    fill: lightblue;
+    cursor: pointer;
+}
 
 /* What to do when the button is disabled */
-.jumbo-1:disabled, .jumbo-2:disabled, .jumbo-3:disabled, .jumbo-4:disabled {
+.jumbo-1:disabled, .jumbo-2:disabled, .jumbo-3:disabled, .jumbo-4:disabled, .jumbo-5:disabled {
     color: lightgray;
     background-color: darkgray;
     fill: darkgray;
@@ -1280,7 +1291,6 @@ span.badge.signature.cl {
 span.badge.signature.ot, span.badge.signature.eqset  {
   background-color: lightgoldenrodyellow;
 }
-
 
 span.badge.signature {
   background-color: lightgray;
