@@ -106,8 +106,10 @@ def get_ssg_passim(ssg_id, obj=None):
             obj = EqualGold.objects.filter(id=ssg_id).first()
         if obj.code == None:
             code = "eqg_{}".format(obj.id)
-        else:
+        elif " " in obj.code:
             code = obj.code.split(" ")[1]
+        else:
+            code = obj.code
     except:
         msg = oErr.get_error_message()
         oErr.DoError("get_ssg_passim")
