@@ -40,6 +40,7 @@ use_testapp = False
 urlpatterns = [
     # Examples:
     url(r'^$', passim.seeker.views.home, name='home'),
+    url(r'^favicon\.ico$',RedirectView.as_view(url='/static/seeker/content/favicon.ico')),
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
@@ -82,15 +83,9 @@ urlpatterns = [
     url(r'^manuscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
 
-    #url(r'^manuscript/provset(?:/(?P<pk>\d+))?/$', ManuscriptProvset.as_view(), name='manu_provset'),
-    #url(r'^manuscript/extset(?:/(?P<pk>\d+))?/$', ManuscriptExtset.as_view(), name='manu_extset'),
-    #url(r'^manuscript/litset(?:/(?P<pk>\d+))?/$', ManuscriptLitset.as_view(), name='manu_litset'),
-    #url(r'^manuscript/kwset(?:/(?P<pk>\d+))?/$', ManuscriptKwset.as_view(), name='manu_kwset'),
-
     url(r'^location/list', LocationListView.as_view(), name='location_list'),
     url(r'^location/details(?:/(?P<pk>\d+))?/$', LocationDetails.as_view(), name='location_details'),
     url(r'^location/edit(?:/(?P<pk>\d+))?/$', LocationEdit.as_view(), name='location_edit'),
-    #url(r'^location/relset(?:/(?P<pk>\d+))?/$', LocationRelset.as_view(), name='loc_relset'),
 
     url(r'^origin/list', OriginListView.as_view(), name='origin_list'),
     url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetails.as_view(), name='origin_details'),
@@ -103,8 +98,6 @@ urlpatterns = [
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
-    #url(r'^ssg/eqset(?:/(?P<pk>\d+))?/$', EqualGoldEqualset.as_view(), name='equalgold_eqset'),
-    #url(r'^ssg/linkset(?:/(?P<pk>\d+))?/$', EqualGoldLinkset.as_view(), name='equalgold_linkset'),
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
@@ -113,15 +106,8 @@ urlpatterns = [
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
-    #url(r'^sermon/signset(?:/(?P<pk>\d+))?/$', SermonSignset.as_view(), name='sermon_signset'),
-    #url(r'^sermon/linkset(?:/(?P<pk>\d+))?/$', SermonLinkset.as_view(), name='sermon_linkset'),
-    #url(r'^sermon/kwset(?:/(?P<pk>\d+))?/$', SermonKwset.as_view(), name='sermon_kwset'),
-    #url(r'^sermon/ediset(?:/(?P<pk>\d+))?/$', SermonEdiset.as_view(), name='sermon_ediset'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     
-    #url(r'^sermon/litset(?:/(?P<pk>\d+))?/$', SermonLitset.as_view(), name='sermon_litset'),
-    #url(r'^sermon/colset(?:/(?P<pk>\d+))?/$', SermonColset.as_view(), name='sermon_colset'),
-
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'),
     url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),
     url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
@@ -174,7 +160,6 @@ urlpatterns = [
     url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetails.as_view(), name='report_details'),
     url(r'^report/edit(?:/(?P<pk>\d+))?/$', ReportEdit.as_view(), name='report_edit'),
     url(r'^report/download(?:/(?P<pk>\d+))?/$', ReportDownload.as_view(), name='report_results'),
-    # url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetailsView.as_view(), name='report_details'),
 
     url(r'^literature/list', LitRefListView.as_view(), name='literature_list'),
 
@@ -225,14 +210,8 @@ urlpatterns = [
 
     url(r'^gold/list', SermonGoldListView.as_view(), name='gold_list'),
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
-    # url(r'^gold/select(?:/(?P<pk>\d+))?/$', SermonGoldSelect.as_view(), name='select_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
-    #url(r'^gold/signset(?:/(?P<pk>\d+))?/$', SermonGoldSignset.as_view(), name='gold_signset'),
-    #url(r'^gold/ediset(?:/(?P<pk>\d+))?/$', SermonGoldEdiset.as_view(), name='gold_ediset'),
-    #url(r'^gold/ftxtset(?:/(?P<pk>\d+))?/$', SermonGoldFtxtset.as_view(), name='gold_ftxtset'),
-    #url(r'^gold/kwset(?:/(?P<pk>\d+))?/$', SermonGoldKwset.as_view(), name='gold_kwset'),
-    #url(r'^gold/litset(?:/(?P<pk>\d+))?/$', SermonGoldLitset.as_view(), name='gold_litset'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
