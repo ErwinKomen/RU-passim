@@ -2462,10 +2462,10 @@ class Litref(models.Model):
                     volume = "?" if "volume" not in data else data['volume']
                     
                     # Get the coding for edition ("ed") or catalogue ("cat")
-                    extra = data['extra']
+                    extra = data.get('extra', "")
                     
                     # Get the name of the series
-                    series = data['series']
+                    series = data.get('series', "")
                     
                     # Get the series number
                     series_number = "(no series number)" if "seriesNumber" not in data else data['seriesNumber']
@@ -2759,6 +2759,7 @@ class Litref(models.Model):
         except Exception as e:
             print("read_zotero error", str(e))
             msg = oErr.get_error_message()
+            oErr.DoError("read_zotero")
             back = False
         # Return ability
         return back
@@ -7229,24 +7230,28 @@ class SermonDescr(models.Model):
                         # Possibly create an appropriate Bibrange object (or emend it)
                         # Note: this will also add BibVerse objects
                         obj = BibRange.get_range(self, book, chvslist, intro, added)
-
-                        # Add BibVerse objects if needed
-                        verses_new = oScrref.get("scr_refs", [])
-                        verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
-                        # Remove outdated verses
-                        deletable = []
-                        for item in verses_old:
-                            if item not in verses_new: deletable.append(item)
-                        if len(deletable) > 0:
-                            obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
-                        # Add new verses
-                        with transaction.atomic():
-                            for item in verses_new:
-                                if not item in verses_old:
-                                    verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+                        
+                        if obj == None:
+                            # Show that something went wrong
+                            print("do_ranges0 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                        else:
+                            # Add BibVerse objects if needed
+                            verses_new = oScrref.get("scr_refs", [])
+                            verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                            # Remove outdated verses
+                            deletable = []
+                            for item in verses_old:
+                                if item not in verses_new: deletable.append(item)
+                            if len(deletable) > 0:
+                                obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                            # Add new verses
+                            with transaction.atomic():
+                                for item in verses_new:
+                                    if not item in verses_old:
+                                        verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
-                    print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
+                    print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
         return None
     
     def do_signatures(self):
@@ -8334,6 +8339,10 @@ class BibRange(models.Model):
         bNeedSaving = False
         oErr = ErrHandle()
         try:
+            # Sanity check
+            if book is None or book == "":
+                return None
+            # Now we can try to search for an entry...
             obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
             if obj == None:
                 obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)

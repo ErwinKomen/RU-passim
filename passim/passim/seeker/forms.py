@@ -2543,11 +2543,11 @@ class EqualGoldLinkForm(forms.ModelForm):
     newspectype = forms.ChoiceField(label=_("Spectype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
                     'title': 'Direction specification (optional)'}))
+    newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
                 widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
                     'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
-    newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'width: 100%;', 'tdstyle': 'width: 300px;',
                     'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
