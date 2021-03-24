@@ -2549,9 +2549,9 @@ class EqualGoldLinkForm(forms.ModelForm):
                 widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
                     'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
     note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
-                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'width: 100%;', 'tdstyle': 'width: 300px;',
+                widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
+                    'tdstyle': 'width: 300px;', 'rows': 1, 
                     'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
-
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 

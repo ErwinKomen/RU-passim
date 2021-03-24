@@ -9947,7 +9947,7 @@ class EqualGoldDetails(EqualGoldEdit):
         """Add to the existing context"""
 
         # Start by executing the standard handling
-        super(EqualGoldDetails, self).add_to_context(context, instance)
+        context = super(EqualGoldDetails, self).add_to_context(context, instance)
 
         oErr = ErrHandle()
         try:
