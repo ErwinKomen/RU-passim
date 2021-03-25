@@ -48,12 +48,12 @@ import xml.etree.ElementTree as ElementTree
 
 
 # ======= imports from my own application ======
-from passim.settings import APP_PREFIX, MEDIA_DIR
+from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Report, STYPE_IMPORTED
+    Report, Keyword, ManuscriptKeyword, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails
@@ -697,8 +697,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     order = 0   
     # Overal keeping track of manuscripts
     lst_manus = []
-    # Overall keeping track of ms items
-    # TH: what should be done with this list?
+    # Overall keeping track of ms items  
     lst_msitem = []
     
     try:
@@ -720,20 +719,34 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         manu_info = xmldoc.find("//eadheader")
         manuidno_end = "0"
         
-        # Import wishlist.csv that holds the shelfmarks of the selected A+M manuscripts       
-        with open('d:/wishlist_final.csv') as f:
+        # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 1
+        # When the script is to be used in the live site, the first two lines have to be used
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
+        with open(filename) as f:
+               
+        # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 2
+        # The first line has to be used when using the local version of the site
+        # with open('d:/wishlist_final_total.csv') as f: 
             reader = csv.reader(f, dialect='excel', delimiter=';')
+            # Transpose the result     
+            shelfmark, digitization = zip(*reader)       
             
-            # Make list of strings (instead of lists)
-            shelfmark_list = list([row[0] for row in reader])
+            # Make lists of the tuples
+            shelfmark_list = list(shelfmark)
+            digitized_list = list(digitization)  
             
-            # Delete the first row (with fieldname "Shelfmark")
+            # Delete the first rows of both lists (with fieldname "Shelfmark" / "Digitization")
             shelfmark_list.pop(0)
-             
+            digitized_list.pop(0)
+            
             # Make set of the list, sm_shelfmark is to be used to compare 
             # each shelfmark of each manuscript in all available A+M XML's
             shelfmark_set = set(shelfmark_list)  
-
+            
+            # Make a dictionary that can be used to find out if a shelfmark has
+            # been digitized or not
+            shelf_digit = dict(zip(shelfmark_list, digitized_list))
+                     
         # Iterate through the list of ALL manuscripts (manu_list)      
         for manu in manu_list:          
 
@@ -891,8 +904,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         unit_yearstart_high = int(unitdate_normal_high)
                         unit_yearfinish_high = int(unitdate_normal_high)
                     else:
-                        unit_yearstart_high = int(ardate[0])
-                        unit_yearfinish_high = int(ardate[1])
+                        unit_yearstart_high = int(ardate_high[0])
+                        unit_yearfinish_high = int(ardate_high[1])
                 
                 # In case 'normal' not in attributes:
                 elif unitdate_high != None and unitdate_high != "" and 'normal' not in unitdate_high.attrib:
@@ -902,8 +915,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         ardate_high = re.split('[\-\(\)]', unitdate_complete_high)
                     
                         # use positions 3 and to to grab the first and last year
-                        unit_yearstart_high = int(ardate[-3]) 
-                        unit_yearfinish_high = int(ardate[-2])
+                        unit_yearstart_high = int(ardate_high[-3]) 
+                        unit_yearfinish_high = int(ardate_high[-2])
 
                     # use the century indication in Roman numerals to create "virtual" 
                     # start and finish years                     
@@ -983,8 +996,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         provtemp_custh_high = prov_custh_high.text 
                         prov_custh_high_list.append(provtemp_custh_high)
                 
-                # Get the URL of the manuscript (HIGH) TH: check
-                            
+                # Get the URL of the manuscript (HIGH) 
+                #                             
                 # Look for URL of the manuscript - if it exists      
                 # The URL needs to be added to the manuscript
                 uniturl_high = manu.find("./dao")
@@ -1000,8 +1013,24 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 manu_obj.idno = manuidno
                 
                 # Print the shelfmark to keep track of process during import
-                print(manu_obj.idno)
+                print(manu_obj.idno)                
                 
+                # Check if the shelfmark is registered as "not digitized"
+                if shelf_digit[manuidno] == "not_digitized":
+                    name = "Not digitized"
+                    description = "This manuscript has been marked as 'not digitized."                                        
+                    # Try to find if the keyword already exists:
+                    keywordfound = Keyword.objects.filter(name__iexact=name).first()
+                    if keywordfound == None:
+                        # If the keyword does not already exist, it needs to be added to the database
+                        keyword = Keyword.objects.create(name = name, description = description)
+                        # And a link should be made between this new keyword and the manuscript
+                        ManuscriptKeyword.objects.create(keyword = keyword, manuscript = manu_obj)
+                    else:
+                        # If the keyword already exists than only a link should be made 
+                        # between manuscript and keyword
+                        ManuscriptKeyword.objects.create(keyword = keywordfound, manuscript = manu_obj) 
+                                        
                 # Add shelfmark to list of processed manuscripts                
                 lst_manus.append(manuidno)
                 
@@ -1061,16 +1090,16 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Now the title of the manuscript can be stored in the database
                     manu_obj.name = unittitle_final                        
                     
-                # Get the ANCIENNE COTES of the manuscript              
+                    # Get the ANCIENNE COTES of the manuscript              
                   
-                # The old shelfmarks of the manuscript need to be stored in the notes section
-                # of the manuscript
+                    # The old shelfmarks of the manuscript need to be stored in the notes section
+                    # of the manuscript
 
-                # Create two new string for the storage of ancienne cotes
+                    # Create two new string for the storage of ancienne cotes
                     old_sm_temp = ""
                     unit_anccote_final_low = ""
 
-                # Find all old shelfmarks and store them in a string
+                    # Find all old shelfmarks and store them in a string
                     for unit_anccote in manu.findall("./did/unitid[@type='ancienne cote']"): 
                         old_sm = unit_anccote.text
                         old_sm_temp += old_sm + "_"
@@ -1176,8 +1205,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     
                     # Now the extent of the manuscript can be stored in the database
                     manu_obj.extent = unitextent_final
+                                       
                     
-                    # Get the ORIGIN of the manuscript (LOW) TH: WERKT!!! nu nog de andere checken
+                    # Get the ORIGIN of the manuscript (LOW) 
 
                     # Look for the origin of the manuscript - if it exists, 
                     # in two places: directly under <physdesc> and under <physdesc/physfacet>
@@ -1377,7 +1407,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     manu_obj.notes = "{}// Please set provenance manually  [{}] // [{}]".format(intro, pname, notes_orig)
                                     manu_obj.save()   
                         else: 
-                            # Make a copy of provfound TH: niet zeker of location aspects in orde zijn
+                            # Make a copy of provfound 
                             provenance = Provenance.objects.create(name=provfound.name, location=provfound.location)
                             # Make link between provenance and manuscript 
                             ProvenanceMan.objects.create(manuscript=manu_obj, provenance=provenance, note=notes_orig)                           
@@ -1774,7 +1804,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                 msitems_children = []
 
                                 # Opslaan van de inhoud van de lijst
-                                # Create new Sermon Description TH: werkt het nou goed? 
+                                # Create new Sermon Description 
                                 for title in sermon_manif_titles_3:                                    
                                     # Create MsItem to store the correct sequence of title, head and manifestations
                                     # Use order to count the number of MsItems, add the parent of the item
@@ -1829,92 +1859,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             # Create new ManuscriptExt object
                             mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
             pass
-            
-               
-     #def read_msitem(msItem, oParent, lMsItem, level=0):
-     #   """Recursively process one <msItem> and return in an object"""
-        
-     #   errHandle = ErrHandle()
-     #   sError = ""
-     #   nonlocal order
-            
-     #   level += 1
-     #   order  += 1
-     #   try:
-     #       # Create a new item
-     #       oMsItem = {}
-     #       oMsItem['level'] = level
-     #       oMsItem['order'] = order 
-     #       oMsItem['childof'] = 0 if len(oParent) == 0 else oParent['order']
-
-     #       # Already put it into the overall list
-     #       lMsItem.append(oMsItem)
-
-     #       # Check if we have a title
-     #       if not 'unittitle' in oMsItem:
-     #           # Perhaps we have a parent <msItem> that contains a title
-     #           parent = msItem.parentNode
-     #           if parent.nodeName == "msItem":
-     #               # Check if this one has a title
-     #               if 'unittitle' in parent.childNodes:
-     #                   oMsItem['unittitle'] = getText(parent.childNodes['unittitle'])
-
-     #       # If there is no author, then supply the default author (if that exists)
-     #       if not 'author' in oMsItem and 'author' in oParent:
-     #           oMsItem['author'] = oParent['author']
-
-     #       # Process all child nodes
-     #       lastChild = None
-     #       lAdditional = []
-     #       for item in msItem.childNodes:
-     #           if item.nodeType == minidom.Node.ELEMENT_NODE:
-     #               # Get the tag name of this item
-     #               sTag = item.tagName
-     #               # Action depends on the tag
-     #               if sTag in mapItem:
-     #                   oMsItem[mapItem[sTag]] = getText(item)
-     #               elif sTag == "note":
-     #                   if not 'note' in oMsItem:
-     #                       oMsItem['note'] = ""
-     #                   oMsItem['note'] = oMsItem['note'] + getText(item) + " "
-     #               elif sTag == "msItem":
-     #                   # This is another <msItem>, a child of mine
-     #                   bResult, oChild, msg = read_msitem(item, oMsItem, lMsItem, level=level)
-     #                   if bResult:
-     #                       if 'firstChild' in oMsItem:
-     #                           lastChild['next'] = oChild
-     #                       else:
-     #                           oMsItem['firstChild'] = oChild
-     #                           lastChild = oChild
-     #                   else:
-     #                       sError = msg
-     #                       break
-     #               else:
-     #                   # Add the text to 'additional'
-     #                   sAdd = getText(item).strip()
-     #                   if sAdd != "":
-     #                       lAdditional.append(sAdd)
-     #       # Process the additional stuff
-     #       if len(lAdditional) > 0:
-     #           oMsItem['additional'] = " | ".join(lAdditional)
-     #       # Return what we made
-     #       return True, oMsItem, "" 
-     #   except:
-     #       if sError == "":
-     #           sError = errHandle.get_error_message()
-     #       return False, None, sError
-    
-    #def add_msitem(msItem, type="recursive"):
-    #    """Add one item to the list of sermons for this manuscript"""
-
-    #    errHandle = ErrHandle()
-    #    sError = ""
-    #    nonlocal iSermCount
+   
         # After all manuscripts that are requested in the shelfmarkset
         # are processed, the shelfmarks are stored in a CSV-file, together with the 
-        # name of the xml-file that was processed
-        # Location: source\repos\RU-passim\passim       
-        with open('processed_manuscripts.csv', 'a', newline='') as csvfile:    
+        # name of the xml-file that was processed    
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'processed_manuscripts.csv'))
+        with open(filename, 'a', newline='') as csvfile:
             manuwriter = csv.writer(csvfile)
             for manu in lst_manus:
                 print(manu)
@@ -1952,7 +1902,7 @@ def import_ead(request):
         # Remove previous status object for this user
         Status.objects.filter(user=username).delete()
         
-        # Create a status object # TH: type goed aangepast?
+        # Create a status object 
         oStatus = Status(user=username, type="ead", status="preparing")
         oStatus.save()
 
@@ -1960,10 +1910,10 @@ def import_ead(request):
         lResults = []
         if form.is_valid():
             # NOTE: from here a breakpoint may be inserted!
-            print('import_ead: valid form') # TH: import_ aangepast import ead_am?
+            print('import_ead: valid form') 
 
             # Create a SourceInfo object for this extraction
-            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username) # TH: aanpassen, klopt niet, ccfr
+            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username) 
             source.save()
             file_list = []
 
@@ -1989,16 +1939,17 @@ def import_ead(request):
                         oResult = None
                         if extension == "xml":
                             # This is an XML file
-                            oResult = read_ecodex(username, data_file, filename, arErr, source=source) # TH:aanpassen , models.py
+                            oResult = read_ecodex(username, data_file, filename, arErr, source=source) 
 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
                         if oResult == None:
                             arErr.append("There was an error. No manuscripts have been added")
                         else:
-                            lResults.append(oResult)
+                            lResults.append(oResult)                        
+
             # Adapt the 'source' to tell what we did
-            source.code = "Imported using the [import_ead??] function on these XML files: {}".format(", ".join(file_list)) # TH: aanpassen
+            source.code = "Imported using the [import_ead??] function on these XML files: {}".format(", ".join(file_list)) 
             source.save()
             # Indicate we are ready
             oStatus.set("ready")
@@ -2190,7 +2141,7 @@ def import_ecodex(request):
                             else:
                                 lResults.append(oResult)
 
-                # Adapt the 'source' to tell what we did TH: waar staat import_ecodex?
+                # Adapt the 'source' to tell what we did 
                 source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
                 source.save()
                 # Indicate we are ready
