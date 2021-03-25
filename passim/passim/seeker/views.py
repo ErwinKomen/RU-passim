@@ -859,11 +859,15 @@ def sync_start(request):
                 oStatus.set("loading")
 
                 # Update the models with the new information
-                oResult = Litref.sync_zotero(force=force, oStatus=oStatus)
-                if oResult == None or oResult['status'] == "error":
-                    data.status = 'error'
-                elif oResult != None:
+                oResult, msg = Litref.sync_zotero(force=force, oStatus=oStatus)
+
+                if oResult != None and 'status' in oResult:
                     data['count'] = oResult
+                else:
+                #if oResult == None or oResult['status'] == "error":
+                    data.status = 'error {}'.format(msg)
+                #elif oResult != None:
+                #    data['count'] = oResult
 
 
     except:
@@ -9943,7 +9947,7 @@ class EqualGoldDetails(EqualGoldEdit):
         """Add to the existing context"""
 
         # Start by executing the standard handling
-        super(EqualGoldDetails, self).add_to_context(context, instance)
+        context = super(EqualGoldDetails, self).add_to_context(context, instance)
 
         oErr = ErrHandle()
         try:

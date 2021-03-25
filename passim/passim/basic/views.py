@@ -501,9 +501,9 @@ def add_rel_item(rel_item, value, resizable=False, title=None, align=None, link=
     return True
 
 def base64_encode(sInput):
-    message_bytes = sInput.encode("ascii")
+    message_bytes = sInput.encode("utf8")
     base64_bytes = base64.b64encode(message_bytes)
-    sOutput = base64_bytes.decode("ascii")
+    sOutput = base64_bytes.decode("utf8")
     return sOutput
 
 def base64_decode(sInput):

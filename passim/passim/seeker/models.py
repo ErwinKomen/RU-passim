@@ -2462,10 +2462,10 @@ class Litref(models.Model):
                     volume = "?" if "volume" not in data else data['volume']
                     
                     # Get the coding for edition ("ed") or catalogue ("cat")
-                    extra = data['extra']
+                    extra = data.get('extra', "")
                     
                     # Get the name of the series
-                    series = data['series']
+                    series = data.get('series', "")
                     
                     # Get the series number
                     series_number = "(no series number)" if "seriesNumber" not in data else data['seriesNumber']
@@ -2759,6 +2759,7 @@ class Litref(models.Model):
         except Exception as e:
             print("read_zotero error", str(e))
             msg = oErr.get_error_message()
+            oErr.DoError("read_zotero")
             back = False
         # Return ability
         return back
@@ -5314,25 +5315,37 @@ class EqualGold(models.Model):
 
         lHtml = []
         sBack = ""
-        for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-            lHtml.append("<tr class='view-row'>")
-            sSpectype = ""
-            sAlternatives = ""
-            if superlink.spectype != None and len(superlink.spectype) > 1:
-                # Show the specification type
-                sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
-            if superlink.alternatives != None and superlink.alternatives == "true":
-                sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
-            lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}{}</td>".format(
-                superlink.get_linktype_display(), sSpectype, sAlternatives))
-            sTitle = ""
-            if superlink.note != None and len(superlink.note) > 1:
-                sTitle = "title='{}'".format(superlink.note)
-            url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
-            lHtml.append("<td valign='top'><a href='{}' {}>{}</a></td>".format(url, sTitle, superlink.dst.get_view()))
-            lHtml.append("</tr>")
-        if len(lHtml) > 0:
-            sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        oErr = ErrHandle()
+        try:
+            for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+                lHtml.append("<tr class='view-row'>")
+                sSpectype = ""
+                sAlternatives = ""
+                if superlink.spectype != None and len(superlink.spectype) > 1:
+                    # Show the specification type
+                    sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
+                if superlink.alternatives != None and superlink.alternatives == "true":
+                    sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}</td>".format(
+                    superlink.get_linktype_display(), sSpectype))
+                sTitle = ""
+                sNoteShow = ""
+                sNoteDiv = ""
+                if superlink.note != None and len(superlink.note) > 1:
+                    sTitle = "title='{}'".format(superlink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
+                        superlink.id)
+                    sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
+                        superlink.id, superlink.note)
+                url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
+                lHtml.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
+                    url, sTitle, superlink.dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+                lHtml.append("</tr>")
+            if len(lHtml) > 0:
+                sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_superlinks_markdown")
         return sBack
 
     def get_text(self):
@@ -7229,24 +7242,28 @@ class SermonDescr(models.Model):
                         # Possibly create an appropriate Bibrange object (or emend it)
                         # Note: this will also add BibVerse objects
                         obj = BibRange.get_range(self, book, chvslist, intro, added)
-
-                        # Add BibVerse objects if needed
-                        verses_new = oScrref.get("scr_refs", [])
-                        verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
-                        # Remove outdated verses
-                        deletable = []
-                        for item in verses_old:
-                            if item not in verses_new: deletable.append(item)
-                        if len(deletable) > 0:
-                            obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
-                        # Add new verses
-                        with transaction.atomic():
-                            for item in verses_new:
-                                if not item in verses_old:
-                                    verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+                        
+                        if obj == None:
+                            # Show that something went wrong
+                            print("do_ranges0 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                        else:
+                            # Add BibVerse objects if needed
+                            verses_new = oScrref.get("scr_refs", [])
+                            verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                            # Remove outdated verses
+                            deletable = []
+                            for item in verses_old:
+                                if item not in verses_new: deletable.append(item)
+                            if len(deletable) > 0:
+                                obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                            # Add new verses
+                            with transaction.atomic():
+                                for item in verses_new:
+                                    if not item in verses_old:
+                                        verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
                     print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
-                    print("do_ranges2: {}".format(self.bibleref), file=sys.stderr)
+                    print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
         return None
     
     def do_signatures(self):
@@ -8334,6 +8351,10 @@ class BibRange(models.Model):
         bNeedSaving = False
         oErr = ErrHandle()
         try:
+            # Sanity check
+            if book is None or book == "":
+                return None
+            # Now we can try to search for an entry...
             obj = sermon.sermonbibranges.filter(book=book, chvslist=chvslist).first()
             if obj == None:
                 obj = BibRange(sermon=sermon, book=book, chvslist=chvslist)

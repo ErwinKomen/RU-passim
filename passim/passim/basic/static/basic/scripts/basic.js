@@ -36,6 +36,8 @@ var ru = (function ($, ru) {
         loc_params = "",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
+        loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
+        loc_language = [],
         KEYS = {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
           END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46
@@ -1674,7 +1676,7 @@ var ru = (function ($, ru) {
                 // Try to save the form data: send a POST
                 //$.post(targeturl, data,
                 $.ajax({
-                  url: targeturl, type: 'post', data: data,
+                  url: targeturl, type: 'post', data: data, async: true,
                   contentType: false, processData: false,
                   success: function (response) {
                     // Action depends on the response
@@ -1754,6 +1756,7 @@ var ru = (function ($, ru) {
                       $(elAfterDetails).removeClass("hidden");
                       // Perform init again
                       ru.basic.init_events();
+                      ru.passim.init_typeahead();
                     }
                   }
                   }
@@ -2302,7 +2305,7 @@ var ru = (function ($, ru) {
 
                       // Make sure events are re-established
                       // ru.passim.seeker.init_events();
-                      ru.passim.init_typeahead();
+                      ru.basic.init_typeahead();
                       break;
                     case "error":
                       // Show the error
