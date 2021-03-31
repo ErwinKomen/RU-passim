@@ -507,9 +507,9 @@ def base64_encode(sInput):
     return sOutput
 
 def base64_decode(sInput):
-    base64_bytes = sInput.encode('ascii')
+    base64_bytes = sInput.encode('utf8')
     message_bytes = base64.b64decode(base64_bytes)
-    sOutput = message_bytes.decode('ascii')
+    sOutput = message_bytes.decode('utf8')
     return sOutput
 
 def get_current_datetime():
