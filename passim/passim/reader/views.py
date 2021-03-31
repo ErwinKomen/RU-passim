@@ -1005,13 +1005,25 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     url_high = uniturl_high.attrib.get('href')
                          
             # HERE we return the manuscript iteration process
-                                    
+                                                          
             # Check if the shelfmark that is listed in "shelfmark_set"
             if manuidno in shelfmark_set:
             # Create a new Manuscript if this is the case
-                manu_obj = Manuscript.objects.create()
-                manu_obj.idno = manuidno
-                
+                manu_obj = Manuscript.objects.filter(idno=manuidno).first()
+                if manu_obj == None:
+                    manu_obj = Manuscript.objects.create() 
+                    manu_obj.idno = manuidno
+                else:
+                    # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)                     
+                    # First retrieve the id's of the Comments linked to the manuscript
+                    deletables = [x['id'] for x in manu_obj.comments.values('id')]
+                    
+                    # Second remove the Manuscript-Comment link
+                    manu_obj.comments.clear() 
+
+                    # Third delete the linked Comments                    
+                    Comment.objects.filter(id__in=deletables).delete() 
+                                    
                 # Print the shelfmark to keep track of process during import
                 print(manu_obj.idno)                
                 
@@ -1027,9 +1039,11 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         # And a link should be made between this new keyword and the manuscript
                         ManuscriptKeyword.objects.create(keyword = keyword, manuscript = manu_obj)
                     else:
-                        # If the keyword already exists than only a link should be made 
-                        # between manuscript and keyword
-                        ManuscriptKeyword.objects.create(keyword = keywordfound, manuscript = manu_obj) 
+                        manukeylink = ManuscriptKeyword.objects.filter(keyword = keywordfound, manuscript = manu_obj).first()
+                        if manukeylink == None:
+                            # If the keyword already exists, but not the link, than only a link should be 
+                            # made between manuscript and keyword
+                            ManuscriptKeyword.objects.create(keyword = keywordfound, manuscript = manu_obj) 
                                         
                 # Add shelfmark to list of processed manuscripts                
                 lst_manus.append(manuidno)
@@ -1326,20 +1340,22 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             
                                 # If there is also no existing provenance found via the location id,  
                                 # the provenance should be added to the manuscript manually. The message to do so, 
-                                # and the complete contents of <orignation> are added to manu_obj.notes    
+                                # and the complete contents of <custodhist> are added to manu_obj.notes    
                                 if provfound == None:                                                            
                                     intro = ""
                                     if manu_obj.notes != "": 
                                         intro = "{}. ".format(manu_obj.notes) 
-                                        manu_obj.notes = "{}// Please set provenance manually  [{}]".format(intro, pcname)
+                                        manu_obj.notes = "{}// Please set provenance manually [{}]".format(intro, pcname)
                                         manu_obj.save()   
                             else: 
-                                # Make a copy of provfound 
-                                provenance = Provenance.objects.create(name=provfound.name, location=provfound.location)
-                                # Make link between provenance and manuscript 
-                                ProvenanceMan.objects.create(manuscript=manu_obj, provenance=provenance, note=custodhist_notes) 
-                       
-                                
+                                # In case there is a provfound, check for a link, if so, nothing should happen, 
+                                # than there is already a link between a manuscript and a provenance
+                                manuprovlink = ProvenanceMan.objects.filter(manuscript = manu_obj, provenance = provfound).first()
+                                # If the provenance already exists than only a link should be 
+                                # made between manuscript and provfound, and notes should be added.
+                                if manuprovlink == None:
+                                    ProvenanceMan.objects.create(manuscript=manu_obj, provenance=provfound, note=custodhist_notes) 
+
                     # Provenance in ORIGINATION 
 
                     # Look for the <origination> element of the manuscript - if it exists
@@ -1407,11 +1423,14 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     manu_obj.notes = "{}// Please set provenance manually  [{}] // [{}]".format(intro, pname, notes_orig)
                                     manu_obj.save()   
                         else: 
-                            # Make a copy of provfound 
-                            provenance = Provenance.objects.create(name=provfound.name, location=provfound.location)
-                            # Make link between provenance and manuscript 
-                            ProvenanceMan.objects.create(manuscript=manu_obj, provenance=provenance, note=notes_orig)                           
-                           
+                            # In case there is a provfound, check for a link, if so, nothing should happen, 
+                            # than there is already a link between a manuscript and a provenance
+                            manuprovlink = ProvenanceMan.objects.filter(manuscript = manu_obj, provenance = provfound).first()
+                            # If the provenance already exists than only a link should be 
+                            # made between manuscript and provfound, and notes should be added.
+                            if manuprovlink == None:
+                                ProvenanceMan.objects.create(manuscript=manu_obj, provenance=provfound, note=notes_orig) 
+
                     # Get the XML FILENAME of the range of manuscripts
 
                     # Look for the filename of the XML in which the manuscripts are stored
@@ -1858,7 +1877,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         if url != None:
                             # Create new ManuscriptExt object
                             mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
-            pass
+           #pass
    
         # After all manuscripts that are requested in the shelfmarkset
         # are processed, the shelfmarks are stored in a CSV-file, together with the 
