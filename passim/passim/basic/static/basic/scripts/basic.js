@@ -2230,16 +2230,38 @@ var ru = (function ($, ru) {
        *    Gather the information in the form's fields and then do a submit
        *
        */
-      search_start: function (elStart, method, iPage, sOrder) {
+      search_start: function (elStart, method, iPage, sOrder, sRemove) {
         var frm = null,
             url = "",
+            iRemove = -1,
             targetid = null,
             targeturl = "",
+            order_lst = [],
+            i = 0,
             data = null;
 
         try {
           // If there is a sort order, we need to process it
           if (sOrder !== undefined) {
+            // If there is a [sRemove], it should be taken out of this order
+            if (sRemove !== undefined) {
+              if (sRemove.indexOf("=") > 0) {
+                sRemove = sRemove.split("=")[1];
+              }
+              iRemove = parseInt(sRemove, 10);
+              // Convert the [sOrder] into a list
+              order_lst = sOrder.split(".");
+              for (i = 0; i < order_lst.length; i++) {
+                if (iRemove === Math.abs(parseInt(order_lst[i], 10))) {
+                  // Remove this item from the list
+                  order_lst.splice(i, 1);
+                  // Then break out of the for-loop
+                  break;
+                }
+              }
+              // Join list into string
+              sOrder = order_lst.join(".");
+            }
             $(elStart).find("input[name=o]").each(function (el) {
               $(this).val(sOrder);
             });
@@ -2333,14 +2355,14 @@ var ru = (function ($, ru) {
        *    Perform a simple 'submit' call to search_start
        *
        */
-      search_ordered_start: function (order) {
+      search_ordered_start: function (order, remove) {
         var elStart = null;
 
         try {
           // And then go to the first element within the form that is of any use
           elStart = $(".search_ordered_start").first();
           // Only now continue
-          ru.basic.search_start(elStart, 'submit', 1, order)
+          ru.basic.search_start(elStart, 'submit', 1, order, remove)
         } catch (ex) {
           private_methods.errMsg("search_ordered_start", ex);
         }

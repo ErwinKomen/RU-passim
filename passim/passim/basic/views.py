@@ -419,6 +419,124 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         colnum = ""
         # reset 'used' feature for all heads
         for item in order_heads: item['used'] = None
+        # Set the default sort order numbers
+        for item in order_heads:
+            sorting = ""
+            if "order" in item:
+                sorting = item['order']
+                if "=" in sorting: sorting = sorting.split("=")[1]
+            item['sorting'] = sorting
+            item['direction'] = ""
+            item['priority'] = ""
+        # Check out the 'o' parameter...
+        if 'o' in qd and qd['o'] != "":
+            # Initializations
+            order = []
+            colnum = qd['o']
+
+            # Get the current 'o' parameter value and turn it into a list of column sortables
+            sort_list = [int(x) for x in qd['o'].split(".")]
+
+            # Walk through and implement the sort list
+            priority = 1
+            for iOrderCol in sort_list:
+
+                bAscending = (iOrderCol>0)
+                iOrderCol = abs(iOrderCol)
+
+                # Set the column that it is in use
+                order_heads[iOrderCol-1]['used'] = 1
+                # Set priority and direction
+                if len(sort_list) > 1:
+                    order_heads[iOrderCol-1]['priority'] = priority
+                    priority += 1
+                order_heads[iOrderCol-1]['direction'] = "up" if bAscending else "down"
+
+                # Get the type
+                sType = order_heads[iOrderCol-1]['type']
+                for order_item in order_cols[iOrderCol-1].split(";"):
+                    if order_item != "":
+                        if sType == 'str':
+                            if bAscending:
+                                order.append(Lower(order_item).asc(nulls_last=True))
+                            else:
+                                order.append(Lower(order_item).desc(nulls_last=True))
+                        else:
+                            if bAscending:
+                                order.append(F(order_item).asc(nulls_last=True))
+                            else:
+                                order.append(F(order_item).desc(nulls_last=True))
+ 
+            # Adapt the 'sorting' parameter for all heads that need it
+            for order_head in order_heads:
+                # Get the current default sorting (the column number)
+                sorting_default = item['sorting']
+                # Is this one sortable?
+                if 'order' in order_head and '=' in order_head['order']:
+                    # Get the column number
+                    col_num = int(order_head['order'].split("=")[1])
+                    col_num_neg = -1 * col_num
+                    order_combined = [str(x) for x in sort_list]
+                    # Is this column in the sort_list or not?
+                    if col_num in sort_list or col_num_neg in sort_list:
+                        # This column is in the sort list: suggest the negation of what is there
+                        for idx, order_one in enumerate(order_combined):
+                            if abs(int(order_one)) == col_num:
+                                order_combined[idx] = str(-1 * int(order_one))
+                                break
+                    else:
+                        # This colum is not in the sort list: just combine
+                        order_combined.append(str(col_num))
+                    order_head['sorting'] = ".".join(order_combined)
+        else:
+            orderings = []
+            for idx, order_item in enumerate(order_default):
+                if idx == 0 and order_item[0] == "-":
+                    bAscending = False
+                    order_item = order_item[1:]
+                # Get the type
+                sType = order_heads[idx]['type']
+                if ";" in order_item:
+                    for sub_item in order_item.split(";"):
+                        orderings.append(dict(type=sType, item=sub_item))
+                else:
+                    orderings.append(dict(type=sType, item=order_item))
+            for item in orderings:
+                sType = item['type']
+                order_item = item['item']
+                if order_item != "":
+                    if sType == "int":
+                        order.append(order_item)
+                    else:
+                        order.append(Lower(order_item))
+
+           #  order.append(Lower(order_cols[0]))
+        if sType == 'str':
+            if len(order) > 0:
+                qs = qs.order_by(*order)
+        else:
+            qs = qs.order_by(*order)
+        ## Possibly reverse the order
+        #if not bAscending:
+        #    qs = qs.reverse()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("make_ordering")
+        lstQ = []
+
+    return qs, order_heads, colnum
+
+def make_ordering_original(qs, qd, order_default, order_cols, order_heads):
+
+    oErr = ErrHandle()
+
+    try:
+        bAscending = True
+        sType = 'str'
+        order = []
+        colnum = ""
+        # reset 'used' feature for all heads
+        for item in order_heads: item['used'] = None
         if 'o' in qd and qd['o'] != "":
             colnum = qd['o']
             if '=' in colnum:
@@ -483,7 +601,7 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
             qs = qs.reverse()
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("make_ordering")
+        oErr.DoError("make_ordering_original")
         lstQ = []
 
     return qs, order_heads, colnum
@@ -1048,7 +1166,7 @@ class BasicList(ListView):
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         else:
-            # No filter and no basked: show all
+            # No filter and no basket: show all
             self.basketview = False
             if self.basic_filter:
                 qs = self.model.objects.filter(self.basic_filter).distinct()
