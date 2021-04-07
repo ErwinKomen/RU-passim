@@ -721,12 +721,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         
         # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 1
         # When the script is to be used in the live site, the first two lines have to be used
-        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
-        with open(filename) as f:
+        #filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
+        #with open(filename) as f:
                
         # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 2
         # The first line has to be used when using the local version of the site
-        # with open('d:/wishlist_final_total.csv') as f: 
+        with open('d:/wishlist_final_total.csv') as f: 
             reader = csv.reader(f, dialect='excel', delimiter=';')
             # Transpose the result     
             shelfmark, digitization = zip(*reader)       
@@ -1014,16 +1014,23 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     manu_obj = Manuscript.objects.create() 
                     manu_obj.idno = manuidno
                 else:
-                    # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)                     
+                    # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)  
+                                                            
                     # First retrieve the id's of the Comments linked to the manuscript
                     deletables = [x['id'] for x in manu_obj.comments.values('id')]
                     
                     # Second remove the Manuscript-Comment link
                     manu_obj.comments.clear() 
-
+                    
                     # Third delete the linked Comments                    
                     Comment.objects.filter(id__in=deletables).delete() 
-                                    
+                    
+                    # Remove *ALL* existing Manuscript-External records (for this manuscript)
+                    ManuscriptExt.objects.filter(manuscript=manu_obj).delete()
+
+                    # Remove *ALL* existing Manuscript-DateRange records (for this manuscript)
+                    Daterange.objects.filter(manuscript=manu_obj).delete()
+
                 # Print the shelfmark to keep track of process during import
                 print(manu_obj.idno)                
                 
@@ -1044,7 +1051,28 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             # If the keyword already exists, but not the link, than only a link should be 
                             # made between manuscript and keyword
                             ManuscriptKeyword.objects.create(keyword = keywordfound, manuscript = manu_obj) 
-                                        
+                
+                # Add Keyword to each manuscript in order to filter out the A+M manuscripts after import
+                name = "Archives et Manuscrit import"
+                description = "This manuscript belongs to the Archives et Manuscrit collection."  
+                # Try to find if the keyword already exists:
+                keywordfound = Keyword.objects.filter(name__iexact=name).first()
+                if keywordfound == None:
+                    # If the keyword does not already exist, it needs to be added to the database
+                    keyword = Keyword.objects.create(name = name, description = description)
+                    # And a link should be made between this new keyword and the manuscript
+                    ManuscriptKeyword.objects.create(keyword = keyword, manuscript = manu_obj)
+                else:
+                    manukeylink = ManuscriptKeyword.objects.filter(keyword = keywordfound, manuscript = manu_obj).first()
+                    if manukeylink == None:
+                        # If the keyword already exists, but not the link, than only a link should be 
+                        # made between the manuscript and keyword
+                        ManuscriptKeyword.objects.create(keyword = keywordfound, manuscript = manu_obj)
+                
+                # Set the default status type
+                manu_obj.stype = STYPE_IMPORTED
+                print(manu_obj.stype)
+
                 # Add shelfmark to list of processed manuscripts                
                 lst_manus.append(manuidno)
                 
@@ -1442,12 +1470,22 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Get the URL of the manuscript
                             
                     # Look for URL of the manuscript - if it exists   
-                    # The URL needs to be added to the manuscript
+                    # The URL needs to be added to the manuscript TH: nog geen link met HIGH! url_high
                     uniturl = manu.find("./dao")
                     if uniturl != None and uniturl != "":
-                        url = uniturl.attrib.get('href')
-                        manu_obj.url = url                    
-                   
+                        url_low = uniturl.attrib.get('href')
+                    else:
+                        url_low = ""
+                    
+                    # Check if there is a higher level extent available, in case of combined manuscripts.              
+                    if manuidno_number <= manuidno_end:                     
+                        url_final = url_high + url_low                    
+                    else:
+                        url_final = url_low
+                        if url_final != None and url_final != "":
+                            # Create new ManuscriptExt object to store 
+                            mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url_final)
+                                 
                     # Get the DATE(s) of the manuscript             
                     
                     # Look for the date of the manuscript - if it exists
@@ -1869,16 +1907,15 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Save the results
                     manu_obj.save()
                 
-                    # Look for external references 
-                    for extref in manu.findall("./bibliography/bibref/extref"):
-                        if extref is None:
-                            continue
-                        url = extref.attrib.get('href')
-                        if url != None:
-                            # Create new ManuscriptExt object
-                            mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
-           #pass
-   
+                    # Look for external references TH: ERUIT
+                    #for extref in manu.findall("./bibliography/bibref/extref"):
+                    #    if extref is None:
+                    #        continue
+                    #    url = extref.attrib.get('href')
+                    #    if url != None:
+                    #        # Create new ManuscriptExt object
+                    #        mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url)
+              
         # After all manuscripts that are requested in the shelfmarkset
         # are processed, the shelfmarks are stored in a CSV-file, together with the 
         # name of the xml-file that was processed    
