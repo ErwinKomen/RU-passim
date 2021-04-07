@@ -721,12 +721,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         
         # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 1
         # When the script is to be used in the live site, the first two lines have to be used
-        #filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
-        #with open(filename) as f:
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
+        with open(filename) as f:
                
         # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 2
         # The first line has to be used when using the local version of the site
-        with open('d:/wishlist_final_total.csv') as f: 
+        #with open('d:/wishlist_final_total.csv') as f: 
             reader = csv.reader(f, dialect='excel', delimiter=';')
             # Transpose the result     
             shelfmark, digitization = zip(*reader)       
