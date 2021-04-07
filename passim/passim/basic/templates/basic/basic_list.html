@@ -388,7 +388,25 @@
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
-                              <a class="clickable {% if hd.used %}ordered{% endif %}" onclick="ru.basic.search_ordered_start('{{hd.order}}');">{{hd.name}}</a>
+                                <a class="clickable {% if hd.used %}sorted{% endif %}" 
+                                   onclick="ru.basic.search_ordered_start('{{hd.sorting}}');">
+                                  {{hd.name}}
+                                </a>
+                                <span class="sortoptions">
+                                  {% if hd.used %}
+                                    <a class="sortremove" title="Clear this sort column"
+                                       onclick="ru.basic.search_ordered_start('{{hd.sorting}}', '{{hd.order}}');">
+                                      <span class="fa fa-sort"></span>
+                                    </a>
+                                  {% endif %}
+                                  {% if hd.priority %}
+                                    <span class="sortpriority" title="sorteerprioriteit: {{hd.priority}}">{{hd.priority}}</span>
+                                  {% endif %}
+                                  <a class="clickable"
+                                     onclick="ru.basic.search_ordered_start('{{hd.sorting}}');">
+                                    <span class="fa fa-sort{% if hd.direction %}-{{hd.direction}}{% endif %} sortmulti"></span>
+                                  </a>
+                                </span>
                               {% endif %}
                             </div>
                           </th>
