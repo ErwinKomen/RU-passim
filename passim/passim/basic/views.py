@@ -731,6 +731,7 @@ class BasicList(ListView):
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
+    col_wrap = ""
     param_list = []
     qs = None
     page_function = "ru.basic.search_paged_start"
@@ -824,6 +825,7 @@ class BasicList(ListView):
         context['result_list'] = self.get_result_list(context['object_list'])
 
         context['sortOrder'] = self.sort_order
+        context['colWrap'] = self.col_wrap
 
         context['new_button'] = self.new_button
         context['add_text'] = self.add_text
@@ -1013,6 +1015,8 @@ class BasicList(ListView):
                 if 'align' in head and head['align'] != "":
                     fobj['align'] = head['align'] 
                 fobj['classes'] = " ".join(classes)
+                if 'colwrap' in head:
+                    fobj['colwrap'] = True
                 fields.append(fobj)
             # Make the list of field-values available
             result['fields'] = fields
@@ -1175,6 +1179,20 @@ class BasicList(ListView):
             order = self.order_default
             qs, tmp_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
         self.sort_order = colnum
+
+        # Process column wrapping...
+        for oHead in self.order_heads:
+            if 'colwrap' in oHead:
+                del oHead['colwrap']
+        colwrap = self.qd.get("w", None)
+        if colwrap != None:
+            self.col_wrap = colwrap
+            # Process the column wrapping
+            lColWrap = json.loads(colwrap)
+            for idx, oHead in enumerate(self.order_heads):
+                if idx+1 in lColWrap:
+                    # Indicate that this column must be hidden
+                    oHead['colwrap'] = True
 
         # Determine the length
         self.entrycount = len(qs)

@@ -85,6 +85,12 @@
 
                 </span>
               {% endif %}
+              <!-- Always: show/hide the row to show/hide columns -->
+              <span class="">
+                  <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_colwrap" role="button" title="Show/hide column(s)...">
+                    <span class="glyphicon glyphicon-tasks"></span>
+                  </a>
+              </span>
             </div>
           </div>
         </div>
@@ -99,6 +105,7 @@
           <!-- entrypoint for search_ordered_start -->
           <div class="hidden search_ordered_start">
             <input name="o" type="text" value="{{sortOrder}}" />
+            <input name="w" type="text" value="{{colWrap}}" />
           </div>
 
           {% if downloads %}
@@ -364,16 +371,26 @@
             </div>
 
             {% if object_list %}
+              <!-- Column Wrapping tab -->
+              <div class="{% if colWrap and colWrap != '[]' %}{% else %}collapse{% endif %}" id="tab_colwrap" >
+                <span>Show or hide columns: </span>
+                {% for hd in order_heads %}
+                  {% if hd.name %}
+                    <a role="button" class="btn btn-xs {% if hd.colwrap %}{% else %}jumbo-1{% endif %}"
+                       offset="{{forloop.counter}}"
+                       onclick="ru.basic.colwrap(this);">{{hd.name}}</a>
+                  {% endif %}
+                {% endfor %}
+              </div>
+
               <!-- Top pagination -->
               <div class="row">
-                  <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
-                  <div class="col-sm-8">
+                <div class="col-sm-4"><span>Total: </span><span>{{entrycount}}</span></div>
+                <div class="col-sm-8">
                   <span class="step-links pull-right">
-
-                  {% include 'paginationpost.html' %}
-
+                    {% include 'paginationpost.html' %}
                   </span>
-                  </div>
+                </div>
               </div>
 
               <!-- Table that contains a list of the basic list items -->
@@ -384,7 +401,7 @@
                       <tr>
                         <th class="hidden">id</th>
                         {% for hd in order_heads %}
-                          <th class="sortable tdnowrap" scope="col" {% if hd.title %}title="{{hd.title}}"{% endif %}>
+                          <th class="sortable tdnowrap {% if hd.colwrap %}hidden{% endif %}" scope="col" {% if hd.title %}title="{{hd.title}}"{% endif %}>
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
@@ -423,7 +440,7 @@
 
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
-                          <td class="{{field.classes}}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
+                          <td class="{{field.classes}}  {% if field.colwrap %}hidden{% endif %}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
                               <a href="{% url basic_details result.id %}{% if params %}?params={{params}}{% endif %}" 
                                  class="nostyle" title="Show details of this {{titlesg}}">

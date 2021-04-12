@@ -34,6 +34,7 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
@@ -72,6 +73,35 @@ var ru = (function ($, ru) {
         $(div).attr("colidx", colidx.toString());
         // REturn the div that has been made
         return div;
+      },
+
+      /** 
+       *  colwrap_switch - switch a column on or off
+       */
+      colwrap_switch: function (colnum, set) {
+        var lColWrap = null,
+            elW = null,
+            idx = -1;
+
+        try {
+          // Get the current value
+          idx = loc_colwrap.indexOf(colnum);
+          if (set) {
+            if (idx < 0) {
+              loc_colwrap.push(colnum);
+            }
+          } else {
+            if (idx >= 0) {
+              loc_colwrap.splice(idx, 1);
+            }
+          }
+          // Set the correct 'w' parameter
+          elW = document.getElementsByName("w");
+          $(elW).val(JSON.stringify(loc_colwrap));
+        } catch (ex) {
+          private_methods.showError("colwrap_switch", ex);
+          return "";
+        }
       },
 
       /** 
@@ -746,6 +776,52 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * colwrap
+       *   Show or hide a column
+       *
+       */
+      colwrap: function (el) {
+        var offset = 0,
+            colnum = 0,
+            onclass = "jumbo-1",
+            elTable = null;
+
+        try {
+          // Sanity check
+          if (el === undefined ) { return; }
+          // Get the column number
+          offset = parseInt($(el).attr("offset"), 10);
+          colnum = offset;
+          elTable = $("#tab_list").find("table").first();
+          // Determine what to do
+          if ($(el).hasClass(onclass)) {
+            // Need to switch off this column
+            $(el).removeClass(onclass);
+            $(elTable).find("thead tr th").eq(colnum).addClass("hidden");
+            // Process all rows
+            $(elTable).find("tbody tr").each(function (idx, elThis) {
+              $(elThis).find("td").eq(colnum).addClass("hidden");
+            });
+            // TODO: make this known to the server
+            private_methods.colwrap_switch(colnum, true);
+          } else {
+            // Need to switch on this column
+            $(el).addClass(onclass);
+            // Process header
+            $(elTable).find("thead tr th").eq(colnum).removeClass("hidden");
+            // Process all rows
+            $(elTable).find("tbody tr").each(function (idx, elThis) {
+              $(elThis).find("td").eq(colnum).removeClass("hidden");
+            });
+            // TODO: make this known to the server
+            private_methods.colwrap_switch(colnum, false);
+          }
+        } catch (ex) {
+          private_methods.errMsg("colwrap", ex);
+        }
+      },
+
+      /**
        * delete_cancel
        *   Hide this <tr> and cancel the delete
        *
@@ -1081,6 +1157,8 @@ var ru = (function ($, ru) {
             elA = null,
             object_id = "",
             targetid = null,
+            elW = null,
+            sColwrap = "",
             post_loads = [],
             sHtml = "";
 
@@ -1089,6 +1167,17 @@ var ru = (function ($, ru) {
 
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
+
+          // Set the value of loc_colwrap
+          elW = document.getElementsByName("w");
+          if ($(elW).length > 0) {
+            sColwrap = $(elW).val();
+            if (sColwrap === "") {
+              loc_colwrap = [];
+            } else {
+              loc_colwrap = JSON.parse(sColwrap);
+            }
+          }
 
           // Make sure we catch changes
           $("input[type='range']").on("change", function (evt) {
