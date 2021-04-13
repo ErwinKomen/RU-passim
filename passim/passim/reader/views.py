@@ -56,7 +56,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     Report, Keyword, ManuscriptKeyword, STYPE_IMPORTED
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails
+from passim.basic.views import BasicList, BasicDetails, BasicPart
 
 # =================== This is imported by seeker/views.py ===============
 # OLD METHODS
@@ -2633,3 +2633,63 @@ class ReaderEad(ReaderImport):
             bOkay = False
             code = oErr.get_error_message()
         return bOkay, code
+
+
+class ManuEadDownload(BasicPart):
+    MainModel = Manuscript
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        # THe name of the file where EAD progress is being monitored
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'processed_manuscripts.csv'))
+        
+        # Load the contents
+        lData = []
+        with open(filename, "r") as fp:
+            sData = fp.read()
+            arData = sData.split("\n")
+            for sLine in arData:
+                if sLine.strip() != "" and "," in sLine:
+                    arLine = sLine.split(",")
+                    oLine = dict(idno=arLine[0], filename=arLine[1])
+                    lData.append(oLine)
+
+        if dtype == "json":
+            # convert to string
+            sData = json.dumps(lData, indent=2)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['idno', 'filename']
+            csvwriter.writerow(headers)
+            for obj in lData:
+                idno = obj.get('idno')
+                filename = obj.get('filename')
+                row = [idno, filename]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+

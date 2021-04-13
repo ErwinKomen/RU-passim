@@ -74,6 +74,7 @@ urlpatterns = [
 
     url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
     url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
+    url(r'^manuscript/ead/download', ManuEadDownload.as_view(), name='ead_results'),
 
     url(r'^manuscript/list', ManuscriptListView.as_view(), name='manuscript_list'),
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),

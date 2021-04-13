@@ -115,6 +115,7 @@ PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_developer = "{}_developer".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
 
@@ -8704,6 +8705,10 @@ class ManuscriptListView(BasicList):
             ]}
          ]
     uploads = reader_uploads
+    downloads = [{"label": "Ead:Excel", "dtype": "xlsx", "url": 'ead_results'},
+                 {"label": "Ead:csv (tab-separated)", "dtype": "csv", "url": 'ead_results'},
+                 {"label": None},
+                 {"label": "Ead:json", "dtype": "json", "url": 'ead_results'}]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
@@ -8720,6 +8725,10 @@ class ManuscriptListView(BasicList):
                           type="multiple",
                           msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
+
+        # Possibly *NOT* show the downloads
+        if not user_is_ingroup(self.request, app_developer):
+            self.downloads = []
 
         # ======== One-time adaptations ==============
         # Check if signature adaptation is needed
