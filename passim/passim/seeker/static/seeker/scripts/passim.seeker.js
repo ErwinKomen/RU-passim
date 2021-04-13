@@ -3381,6 +3381,7 @@ var ru = (function ($, ru) {
             elCopy = $("#sermon_tree_copy"),
             elMain = $("#sermon_tree_main"),
             elTree = $("#sermon_tree"),
+            maxwidth = 0,
             yoffset = 0,
             hList = null,
             data = null;
@@ -3435,6 +3436,23 @@ var ru = (function ($, ru) {
                 //window.scrollTo(window.pageXoffset, yoffset);
                 loc_vscrolling = -100;
               }
+              // Re-calculate and set the width of 'sermonnumber' and 'sermonlocus'
+              maxwidth = 0;
+              $(elMain).find(".sermonnumber").each(function (idx, el) {
+                var iwidth = parseInt(el.clientWidth, 10);
+                if (iwidth > maxwidth) { maxwidth = iwidth;}
+              });
+              $(elMain).find(".sermonnumber").each(function (idx, el) {
+                $(el).css("min-width", maxwidth.toString() + "px");
+              });
+              maxwidth = 0;
+              $(elMain).find(".sermonlocus").each(function (idx, el) {
+                var iwidth = parseInt(el.clientWidth, 10);
+                if (iwidth > maxwidth) { maxwidth = iwidth; }
+              });
+              $(elMain).find(".sermonlocus").each(function (idx, el) {
+                $(el).css("min-width", maxwidth.toString() + "px");
+              });
               break;
           }
 

@@ -1338,12 +1338,18 @@ a.sermon:link, a.sermon:visited {
 .sermonnumber {
     cursor: cell;
     background-color: white;
+    width: 14px;
+    max-width: 20px;
 }
 .sermonnumber.selected {
     background-color: yellow;
 }
 .sermonnumber.selected:visited {
     background-color: white;
+}
+
+.sermonlocus {
+    width: 
 }
 
 .signature {

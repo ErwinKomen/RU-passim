@@ -1186,13 +1186,14 @@ class BasicList(ListView):
                 del oHead['colwrap']
         colwrap = self.qd.get("w", None)
         if colwrap != None:
-            self.col_wrap = colwrap
-            # Process the column wrapping
-            lColWrap = json.loads(colwrap)
-            for idx, oHead in enumerate(self.order_heads):
-                if idx+1 in lColWrap:
-                    # Indicate that this column must be hidden
-                    oHead['colwrap'] = True
+            self.col_wrap = colwrap.strip()
+            if colwrap != "" and colwrap[0] == "[":
+                # Process the column wrapping
+                lColWrap = json.loads(colwrap)
+                for idx, oHead in enumerate(self.order_heads):
+                    if idx+1 in lColWrap:
+                        # Indicate that this column must be hidden
+                        oHead['colwrap'] = True
 
         # Determine the length
         self.entrycount = len(qs)
