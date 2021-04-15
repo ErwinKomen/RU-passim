@@ -1492,6 +1492,7 @@ var ru = (function ($, ru) {
             gravityvalue = 10,
             gravityid = "#gravityvalue",
             p = {},
+            g = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1518,6 +1519,7 @@ var ru = (function ($, ru) {
           divSvg = "#" + options['target'] + " svg";
           $(divSvg).empty();
           svg = d3.select(divSvg);
+          g = svg.append("g");
           color = network_color;
 
           // Append a legend
@@ -1543,8 +1545,14 @@ var ru = (function ($, ru) {
               .force("center", d3.forceCenter(width / 2, height / 2))
               .on("tick", ticked);
 
+          // Define the zooming
+          svg.call(d3.zoom()
+            .extent([[0, 0], [width, height]])
+            .scaleExtent([1, 10])
+            .on("zoom", zoomed));
+
           // Define a d3 function based on the information in 'nodes' and 'links'
-          link = svg.append("g")
+          link = g.append("g")
                     .attr("class", "links")
                     .selectAll("line")
                     .data(options['links'])
@@ -1552,7 +1560,7 @@ var ru = (function ($, ru) {
                     .attr("stroke-width", function (d) {
                       return Math.sqrt(2 * d.value);
                     });
-          node = svg.append("g")
+          node = g.append("g")
                     .attr("class", "nodes")
                     .selectAll("circle")
                     .data(options['nodes'])
@@ -1576,6 +1584,11 @@ var ru = (function ($, ru) {
 
           // Then execute the simulation
           // loc_simulation.restart();
+
+          // Defind the 'zoomed' function
+          function zoomed(event) {
+            g.attr("transform", event.transform);
+          }
 
           // Define the 'ticked' function
           function ticked() {
