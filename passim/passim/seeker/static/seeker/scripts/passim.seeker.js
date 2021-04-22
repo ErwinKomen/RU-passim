@@ -1518,6 +1518,11 @@ var ru = (function ($, ru) {
           // Define the SVG element and the color scheme
           divSvg = "#" + options['target'] + " svg";
           $(divSvg).empty();
+
+          // Get the width and height
+          width = $(divSvg).width();
+          height = $(divSvg).height();
+
           svg = d3.select(divSvg);
           svg.attr("width", width)
             .attr("height", height)
@@ -1528,8 +1533,8 @@ var ru = (function ($, ru) {
 
           // Append a legend
           private_methods.addLegend({
-            'x': width / 2,
-            'y': height - 50,
+            'x': 50,  // width / 2,
+            'y': 50,  // height - 50,
             'divsvg': divSvg,
             'legend': options['legend']
           });
