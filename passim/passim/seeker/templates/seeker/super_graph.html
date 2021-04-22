@@ -1,8 +1,12 @@
-﻿<div id="ssg_network_trans" class="hidden">
+<div id="ssg_network_trans" class="hidden container-small">
   <form action="{{equalgold_trans}}" method="post" >
     {% csrf_token %}
+    <div id="downloadcenter" class="hidden">
+      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+    </div>
     <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
+      <div class="col-md-5 col-md-offset-3 align-right">
         <span>Minimum number of manuscripts in which SSGs co-occur: </span>
         <span id="network_trans_slider_value">1</span>
       </div>
@@ -10,15 +14,27 @@
         <input name="network_trans_slider" id="id_network_trans_slider" valueid="network_trans_slider_value"
                 type="range" min="1" max="{{manuscripts}}" value="1" class="slider" />
       </div>
+
+      <!-- Button to stop -->
+      <div class="col-md-1 align-right">
+        <a role="button" class="btn btn-xs jumbo-2"
+           targeturl={{equalgold_trans}}
+           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+      </div>
     </div>
     <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
+      <div class="col-md-5 col-md-offset-3 align-right">
         <span>Gravity: </span>
         <span id="gravity_trans_value">100</span>
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="gravity_trans_slider" id="id_gravity_trans_slider" valueid="gravity_trans_value"
                 type="range" min="-100" max="300" value="100" class="slider" />
+      </div>
+
+      <!-- Download button -->
+      <div class="col-md-1 align-right">
+        {% include 'seeker/download.html' with downloadid="trans" urlname="equalgold_trans_download" object_id=object.id %}
       </div>
     </div>
   </form>
@@ -38,46 +54,123 @@
 
     <!-- The transmission network -->
     <div class="col-md-10">
-      <div id="super_network_trans" style="width: 100%; ">
+      <div id="super_network_trans" class="visborder" style="width: 100%; ">
         <svg viewBox="0,0,800,500"></svg>
       </div>
     </div>
   </div>
+
 </div>
 
-<div id="ssg_network" class="hidden">
+<div id="ssg_network_graph" class="hidden container-small">
   <form action="{{equalgold_graph}}" method="post" >
     {% csrf_token %}
-    <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
-        <span>Minimum number of manuscripts in which SSGs co-occur: </span>
-        <span id="networkslidervalue">1</span>
-      </div>
-      <div class="col-md-3 slidecontainer">
-        <input name="networkslider" id="id_networkslider" valueid="networkslidervalue"
-                type="range" min="1" max="{{manuscripts}}" value="1" class="slider" />
-      </div>
+    <div id="downloadcenter" class="hidden">
+      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
     <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
-        <span>Gravity: </span>
-        <span id="gravityvalue">10</span>
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Minimum number of manuscripts in which SSGs co-occur: </span>
+        <span id="network_graph_slider_value">1</span>
       </div>
       <div class="col-md-3 slidecontainer">
-        <input name="gravityslider" id="id_gravityslider" valueid="gravityvalue"
+        <input name="networkslider" id="id_networkslider" valueid="network_graph_slider_value"
+                type="range" min="1" max="{{manuscripts}}" value="1" class="slider" />
+      </div>
+
+      <!-- Button to stop -->
+      <div class="col-md-1 align-right">
+        <a role="button" class="btn btn-xs jumbo-2"
+           targeturl={{equalgold_graph}}
+           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+      </div>
+
+    </div>
+    <div class="row">
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Gravity: </span>
+        <span id="gravity_graph_value">10</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="gravityslider" id="id_gravityslider" valueid="gravity_graph_value"
                 type="range" min="1" max="100" value="10" class="slider" />
+      </div>
+
+      <!-- Download button -->
+      <div class="col-md-1 align-right">
+        {% include 'seeker/download.html' with downloadid="graph" urlname="equalgold_graph_download" object_id=object.id %}
       </div>
     </div>
   </form>
 
-  <div id="super_network_wait" class="hidden">
+  <div id="super_network_graph_wait" class="hidden">
     <span>Calculating SSG co-occurrance network...</span>
     <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
   </div>
 
-  <div id="super_network" style="width: 800px; height: 500px;">
+  <div id="super_network_graph" style="width: 800px; height: 500px;" class="visborder" >
     <svg viewBox="0,0,800,500"></svg>
   </div>
+
+</div>
+
+<div id="ssg_network_overlap" class="hidden container-small">
+
+  <form action="{{equalgold_overlap}}" method="post" >
+    {% csrf_token %}
+    <div id="downloadcenter" class="hidden">
+      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+    </div>
+    <div class="row">
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Overlap network degree: </span>
+        <span id="network_overlap_slider_value">1</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="network_overlap_slider" id="id_network_overlap_slider" valueid="network_overlap_slider_value"
+                type="range" min="1" max="10" value="1" class="slider" />
+      </div>
+
+      <!-- Button to stop -->
+      <div class="col-md-1 align-right">
+        <a role="button" class="btn btn-xs jumbo-2"
+           targeturl={{equalgold_overlap}}
+           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Gravity: </span>
+        <span id="gravity_overlap_value">100</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="gravity_overlap_slider" id="id_gravity_overlap_slider" valueid="gravity_overlap_value"
+                type="range" min="-100" max="300" value="100" class="slider" />
+      </div>
+
+      <!-- Download button -->
+      <div class="col-md-1 align-right">
+        {% include 'seeker/download.html' with downloadid="overlap" urlname="equalgold_overlap_download" object_id=object.id %}
+      </div>
+    </div>
+  </form>
+
+  <div id="super_network_overlap_wait" class="hidden">
+    <span>Calculating SSG overlap network...</span>
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
+
+  <div class="row" style="height: 500px;">
+    <!-- The overlap network -->
+    <div class="col-md-12">
+      <div id="super_network_overlap" style="width: 100%; " class="visborder" >
+        <svg viewBox="0,0,800,500"></svg>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id="ssg_pca" class="hidden">
@@ -93,46 +186,5 @@
   <div id="super_pca" style="width: 800px; height: 500px;">
     <svg viewBox="0,0,800,500"></svg>
   </div>
-</div>
-
-<div id="ssg_network_overlap" class="hidden">
-  <form action="{{equalgold_overlap}}" method="post" >
-    {% csrf_token %}
-    <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
-        <span>Overlap network degree: </span>
-        <span id="network_overlap_slider_value">1</span>
-      </div>
-      <div class="col-md-3 slidecontainer">
-        <input name="network_overlap_slider" id="id_network_overlap_slider" valueid="network_overlap_slider_value"
-                type="range" min="1" max="10" value="1" class="slider" />
-      </div>
-    </div>
-    <div class="row">
-      <div class="col-md-5 col-md-offset-4 align-right">
-        <span>Gravity: </span>
-        <span id="gravity_overlap_value">100</span>
-      </div>
-      <div class="col-md-3 slidecontainer">
-        <input name="gravity_overlap_slider" id="id_gravity_overlap_slider" valueid="gravity_overlap_value"
-                type="range" min="-100" max="300" value="100" class="slider" />
-      </div>
-    </div>
-  </form>
-
-  <div id="super_network_overlap_wait" class="hidden">
-    <span>Calculating SSG overlap network...</span>
-    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-  </div>
-
-  <div class="row" style="height: 800px;">
-    <!-- The overlap network -->
-    <div class="col-md-12">
-      <div id="super_network_overlap" style="width: 100%; ">
-        <svg viewBox="0,0,800,500"></svg>
-      </div>
-    </div>
-  </div>
-
 </div>
 

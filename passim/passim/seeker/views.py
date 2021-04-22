@@ -10126,8 +10126,8 @@ class EqualGoldDetails(EqualGoldEdit):
                     html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
                     html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
                     html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
+                #html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
+                #html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
                 custombutton = "\n".join(html)
                 manuscripts['custombutton'] = custombutton
 
@@ -10638,6 +10638,71 @@ class EqualGoldScountDownload(BasicPart):
             output.close()
 
         return sData
+
+
+class EqualGoldVisDownload(BasicPart):
+    """Generic treatment of Visualization downloads for SSGs"""
+
+    MainModel = EqualGold
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "hist-svg"
+    vistype = ""
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Retrieve the actual data from self.data
+            oData = dict(legend=self.data['legend'],
+                         link_list=self.data['link_list'],
+                         node_list=self.data['node_list'])
+            sData = json.dumps(oData, indent=2)
+        elif dtype == "hist-svg":
+            pass
+        elif dtype == "hist-png":
+            pass
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            pass
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+class EqualGoldGraphDownload(EqualGoldVisDownload):
+    """Network graph"""
+    vistype = "graph"
+
+
+class EqualGoldTransDownload(EqualGoldVisDownload):
+    """Transmission graph"""
+    vistype = "trans"
+
+
+class EqualGoldOverlapDownload(EqualGoldVisDownload):
+    """Overlap graph"""
+    vistype = "overlap"
 
 
 class AuthorEdit(BasicDetails):

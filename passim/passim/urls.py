@@ -99,11 +99,15 @@ urlpatterns = [
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
-    url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
+    url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
-    url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
+
+    url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
+    url(r'^ssg/graph/download(?:/(?P<pk>\d+))?/$', EqualGoldGraphDownload.as_view(), name='equalgold_graph_download'),
+    url(r'^ssg/trans/download(?:/(?P<pk>\d+))?/$', EqualGoldTransDownload.as_view(), name='equalgold_trans_download'),
+    url(r'^ssg/overlap/download(?:/(?P<pk>\d+))?/$', EqualGoldOverlapDownload.as_view(), name='equalgold_overlap_download'),
 
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
