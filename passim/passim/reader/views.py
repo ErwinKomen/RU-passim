@@ -45,15 +45,14 @@ from itertools import chain
 from xml.dom import minidom
 # See: http://effbot.org/zone/celementtree.htm
 import xml.etree.ElementTree as ElementTree
-
-
+ 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     Library, Location, SermonSignature, Author, Feast, Project, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Report, Keyword, ManuscriptKeyword, STYPE_IMPORTED
+    Report, Keyword, ManuscriptKeyword, STYPE_IMPORTED, get_current_datetime
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -719,15 +718,12 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         manu_info = xmldoc.find("//eadheader")
         manuidno_end = "0"
         
-        # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 1
-        # When the script is to be used in the live site, the first two lines have to be used
+        # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 
         filename = os.path.abspath(os.path.join(MEDIA_DIR, 'wishlist_final_total.csv'))
-        with open(filename) as f:
-               
-        # Import wishlist_final_total.csv that holds the shelfmarks of the selected A+M manuscripts 2
-        # The first line has to be used when using the local version of the site
-        #with open('d:/wishlist_final_total.csv') as f: 
+        with open(filename) as f:            
+
             reader = csv.reader(f, dialect='excel', delimiter=';')
+            
             # Transpose the result     
             shelfmark, digitization = zip(*reader)       
             
@@ -781,7 +777,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             title_high_temp = ""
             
             # Seek out the combined manuscripts (but steer away from manuscripts like "Latin 646B (1-2)"
-            if "-" in manuidno and not "(" in manuidno:
+            # And from Latin "774A-C" (works) 
+            if "-" in manuidno and not "(" in manuidno and not "A" in manuidno and not "B" in manuidno and not "C" in manuidno:
 
                 # Store start and end shelfmarks to help in the check when the title of the 
                 # combined manuscript must be added to the titles lower level manuscripts. 
@@ -1003,6 +1000,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 uniturl_high = manu.find("./dao")
                 if uniturl_high != None and uniturl_high != "":
                     url_high = uniturl_high.attrib.get('href')
+                else:
+                    url_high = ""
                          
             # HERE we return the manuscript iteration process
                                                           
@@ -1011,28 +1010,29 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # Create a new Manuscript if this is the case
                 manu_obj = Manuscript.objects.filter(idno=manuidno).first()
                 if manu_obj == None:
+                    # Now we can create a completely fresh manuscript
                     manu_obj = Manuscript.objects.create() 
                     manu_obj.idno = manuidno
                 else:
-                    # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)  
-                                                            
-                    # First retrieve the id's of the Comments linked to the manuscript
-                    deletables = [x['id'] for x in manu_obj.comments.values('id')]
-                    
-                    # Second remove the Manuscript-Comment link
-                    manu_obj.comments.clear() 
-                    
-                    # Third delete the linked Comments                    
+                    # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)                     
+                    # Retrieve the id's of the Comments linked to the manuscript
+                    deletables = [x['id'] for x in manu_obj.comments.values('id')]                    
+                    # Remove the Manuscript-Comment link
+                    manu_obj.comments.clear()                     
+                    # Delete the linked Comments                    
                     Comment.objects.filter(id__in=deletables).delete() 
-                    
+               
                     # Remove *ALL* existing Manuscript-External records (for this manuscript)
                     ManuscriptExt.objects.filter(manuscript=manu_obj).delete()
 
                     # Remove *ALL* existing Manuscript-DateRange records (for this manuscript)
                     Daterange.objects.filter(manuscript=manu_obj).delete()
-
+                    
+                    # Remove *ALL* existing Manuscript-Sermon records (for this manuscript)
+                    MsItem.objects.filter(manu=manu_obj).delete()  
+                
                 # Print the shelfmark to keep track of process during import
-                print(manu_obj.idno)                
+                print(manuidno)  
                 
                 # Check if the shelfmark is registered as "not digitized"
                 if shelf_digit[manuidno] == "not_digitized":
@@ -1466,20 +1466,24 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     unitfilename = manu_info.find("./eadid")
                     if unitfilename != None and unitfilename != "":
                         manu_obj.filename = unitfilename.text
-                    
+                   
+                 
                     # Get the URL of the manuscript
                             
                     # Look for URL of the manuscript - if it exists   
-                    # The URL needs to be added to the manuscript TH: nog geen link met HIGH! url_high
+                    # The URL needs to be added to the manuscript 
                     uniturl = manu.find("./dao")
                     if uniturl != None and uniturl != "":
                         url_low = uniturl.attrib.get('href')
                     else:
                         url_low = ""
                     
-                    # Check if there is a higher level extent available, in case of combined manuscripts.              
+                    # Check if there is a higher level extent available, in case of combined manuscripts.  
                     if manuidno_number <= manuidno_end:                     
-                        url_final = url_high + url_low                    
+                        url_final = url_high + url_low # werkt nu wel
+                        if url_final != None and url_final != "":
+                            # Create new ManuscriptExt object to store 
+                            mext = ManuscriptExt.objects.create(manuscript=manu_obj, url=url_final)
                     else:
                         url_final = url_low
                         if url_final != None and url_final != "":
@@ -1508,15 +1512,59 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 
                     elif unitdate != None and unitdate != "" and 'normal' not in unitdate.attrib:
                         unitdate_complete = unitdate.text
-                        if "-" in unitdate_complete:
+                        if "-" in unitdate_complete and not "X" in unitdate_complete:
                             # use regex to split up string, will result in list with 4 items. 
                             ardate = re.split('[\-\(\)]', unitdate_complete)
                     
-                            # use positions 3 and to to grab the first and last year
+                            # use positions 3 and to to grab the first and last year # 5304 gaat hier mis
                             unit_yearstart_low = ardate[-3] 
                             unit_yearfinish_low = ardate[-2]
-                            # use the century indication in Roman numerals to create "virtual" 
-                            # start and finish years                  
+                        # In case of two Roman numerals, with an "-" in between:
+                        elif "-" in unitdate_complete and "X" in unitdate_complete:
+                            # Split on "e"
+                            split1 = unitdate_complete.split('e ')
+                            # Take the first part
+                            part1 = split1[0]                      
+                            # Strip part1, here is the first Roman numeral:
+                            unit_centurystart_low = part1.strip()
+
+                            # Match the Roman numerals for unit_yearstart_low and 
+                            # unit_yearfinish_low with the corresponding Arabic numerals:                      
+                            if unit_centurystart_low =="IX":
+                                unit_yearstart_low = "900"
+                            elif unit_centurystart_low =="X":
+                                unit_yearstart_low = "1000"
+                            elif unit_centurystart_low =="XI":
+                                unit_yearstart_low = "1100"
+                            elif unit_centurystart_low =="XII":
+                                unit_yearstart_low = "1200"
+                            elif unit_centurystart_low =="XIII":
+                                unit_yearstart_low = "1300"
+
+                            # Now we look for the second one: dit loopt nog niet                            
+                            part2 = split1[1]
+                            # 
+                            part2_stripped=part2.strip()
+                            # Split it
+                            part2_split = re.split('[\-\(\)]', part2_stripped)
+                            # Take the second part
+                            unit_centuryfinish_low = part2_split[1]                            
+                            
+                            # Match the Roman numerals for unit_yearstart_low and 
+                            # unit_yearfinish_low with the corresponding Arabic numerals:                              
+                            if unit_centuryfinish_low =="IX":
+                                unit_yearfinish_low = "900"
+                            elif unit_centuryfinish_low =="X":
+                                unit_yearfinish_low = "1000"
+                            elif unit_centuryfinish_low =="XI":
+                                unit_yearfinish_low = "1100"
+                            elif unit_centuryfinish_low =="XII":
+                                unit_yearfinish_low = "1200"
+                            elif unit_centuryfinish_low =="XIII":
+                                unit_yearfinish_low = "1300"
+                            
+                        # use the century indication in Roman numerals to create "virtual" 
+                        # start and finish years
                         elif "-" not in unitdate_complete:
                             ardate = unitdate_complete.split('e ')
                             if len(ardate) < 3:  
@@ -1554,10 +1602,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         drange = Daterange.objects.create(manuscript=manu_obj, yearstart = unit_yearstart, yearfinish = unit_yearfinish)
                         print(drange)
                     
-                    # Add id's of project, library, city and country to the Manuscript table.
-                        
-                    # instance.project = Project.get_default(self.request.user.username)
-                    project = Project.get_default(username) # Werkt, geeft PASSIM, maar geen code
+                    # Add id's of project, library, city and country to the Manuscript table.                                            
+                    project = Project.get_default(username) 
                     
                     # Add project id to the manuscript                               
                     manu_obj.project = project
@@ -1579,27 +1625,29 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Get the NOTES/COMMENTS 
                                        
                     # Find notes/comments in scopecontents only when there is a <c> element with manifestations
-                    # Example: Latin 196
+                    # Example: Latin 196 1920 maar dan anders...
 
                     # First get the contents 
                     check_on_c_element = manu.findall("./c")
                     # See if there are nested <c> elements...
-                    if len(check_on_c_element) > 0: 
+                    if len(check_on_c_element) > 0: # 5304
                         # and if there are, pick up the <p> elements in scopecontents, these are NOT manifestations
-                        # but should be considerend as notes/comments belonging to the manuscript
+                        # but should be considered as notes/comments belonging to the manuscript
                         for unit_p in manu.findall("./scopecontent/p"):
                             if len(unit_p) > 0: 
-                                note = ElementTree.tostring(unit_p, encoding="unicode")
+                                note = ElementTree.tostring(unit_p, encoding="unicode", method='text') # Laatste is heel handig!!
                                 print(note)
                                 # Maybe clean string from elements and stuff
                                 # Maybe change the sequence
                                 note_1 = re.sub("[\n\s]+"," ", note)
                                 note_2 = note_1.replace('<p>', '')
                                 note_3 = note_2.replace('</p>', '')
+                                                              
+                                # Extra for Latin 1920 ??                                
 
                                 # Get profile      
                                 profile = Profile.get_user_profile(username) 
-                                otype = "sermo"
+                                otype = "manu"
                                                                 
                                 # Create new Comment object, add profile, otype and the comment
                                 comment_obj = Comment.objects.create(profile=profile, content=note_3, otype=otype)
@@ -1630,6 +1678,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # notes field of MANUSCRIPT table in the database, after the ancienne cotes.
                     # This way all information on the sermons can be found when manually adding the sermons.                   
 
+                    # Hier komt Latin 3267 en gaat het ergens mis, 
+
                     if len(check_on_c_element) < 1: 
                      
                         # Find the scopecontent element if it exists.
@@ -1645,23 +1695,22 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                                         
                             # Third strip string of spaces 
                             scopecontent_3 = scopecontent_2.strip()
-                            print(scopecontent_3)
+                            print(scopecontent_3) 
 
                             # Now the combined old shelfmarks can be stored in the database in the notes field
                             # If there is no section <scopecontent> then only the ancienne cotes should be stored. 
-                            
-                            # manu_obj.notes = unit_anccote_final + " // " + scopecontent_3
+                                                      
                             intro = ""
                             if manu_obj.notes != "": 
                                 intro = "{}. ".format(manu_obj.notes) 
                                 manu_obj.notes = "{}// Please add possible sermons manually (from <scopecontents>) [{}]".format(intro, scopecontent_3)
-                                manu_obj.save()   
+                                manu_obj.save() # tot hier goed en daarna mis, maar waarom? moet die manu_obj.save hier staan?
                             else:
                                 manu_obj.notes = scopecontent_3
 
 
                     # IN CASE OF NESTED <c> ELEMENTS (SermHead, DateRange, SermDescr)
-                    # than these elements should be processed as sermons
+                    # than these elements should be processed as sermons (Latin 1920 gaat hier mis, len=2, idem 2710, 5304 )
 
                     elif len(check_on_c_element) > 0: 
                         # Create list to store the parents of the msitems (of the manifestations)
@@ -1671,13 +1720,22 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             
                             # First: find FOLIO
 
-                            # Bij Latin 1970 gaat dit mis, is sowieso een aparte zo te zien
-                            # ook geen unittitle en gedoe met jaartal ff uit de lijst
+                            # For Latin 196
                             sermon_head = unit_c.find("./head")
 
-                            if sermon_head != None and sermon_head != "":
+                            # For Latin 1920
+                            sermon_id = unit_c.find("./did/unitid")
+
+                            # For Latin 2710: no id or head
+
+                            # Check if there is a head or id available
+                            if sermon_head == None and sermon_id== None:
+                                serm_folio = ""                                
+                            elif sermon_head != None and sermon_head != "":
                                 serm_folio = sermon_head.text
-                                                        
+                            elif sermon_id != None and sermon_id != "":
+                                    serm_folio = sermon_id.text
+                                
                             # Second: find DATE 
                                                         
                             # Date should be stored at the Manuscript level (in Daterange) 
@@ -1711,7 +1769,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                 # If there is no range, we assume that Roman numerals are used
                                 if "-" not in sermon_date_complete:
                                     date_split = sermon_date_complete.split('e ')
-                                    if len(date_split) < 3:  
+                                    if len(date_split) < 3:  # Mis met 5304
                                         # Take the first of the list
                                         sermon_century = date_split[0]
                                         # See what century in Roman numerals is refered to and
@@ -1741,7 +1799,36 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                         elif sermon_century == "XIII":
                                             sermon_yearstart = "1200"
                                             sermon_yearfinish = "1300"
-
+                                    elif len(date_split) == 3:  # 5304
+                                        # Take the first of the list
+                                        sermon_century = date_split[0]
+                                        # See what century in Roman numerals is refered to and
+                                        # store the beginning of that century in yearstart and the
+                                        # end in yearfinish
+                                        if sermon_century == "V":
+                                            sermon_yearstart = "400"
+                                            sermon_yearfinish = "500"
+                                        elif sermon_century == "VI":
+                                            sermon_yearstart = "500"
+                                            sermon_yearfinish = "600"
+                                        elif sermon_century == "VII":
+                                            sermon_yearstart = "700"
+                                            sermon_yearfinish = "800"
+                                        elif sermon_century == "IX":
+                                            sermon_yearstart = "800"
+                                            sermon_yearfinish = "900"
+                                        elif sermon_century == "X":
+                                            sermon_yearstart = "900"
+                                            sermon_yearfinish = "1000"
+                                        elif sermon_century == "XI":
+                                            sermon_yearstart = "1000"
+                                            sermon_yearfinish = "1100"
+                                        elif sermon_century == "XII":
+                                            sermon_yearstart = "1100"
+                                            sermon_yearfinish = "1200"
+                                        elif sermon_century == "XIII":
+                                            sermon_yearstart = "1200"
+                                            sermon_yearfinish = "1300"
                             # Create new Daterange object, store yearstart and year finish with a link to the manuscript
                             # only when 9999 is not in sermon_yearstart
                             if sermon_yearstart != "9999":
@@ -1782,9 +1869,10 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             # Add 1 to order
                             order += 1 
                            
-                            # Store title and folio in SermHead with MsItem:                            
+                            # Store title and folio in SermHead with MsItem: TH: ok for Latin 1920                            
                             sermhead_obj = SermonHead.objects.create(msitem = msitem_parent, title = sermon_title_3_total, locus = serm_folio)
-                                                    
+                                                       
+
                             # MANIFESTATIONS (with <c> element)
                             
                             # All separate elements are stored in title since we are not able to automate the splitting up
@@ -1792,107 +1880,123 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 
                             # Grab contents in p under scopecontent in order to
                             # later on store the sermon manifestations
-                            scopecontent_p = unit_c.find("./scopecontent/p")
+                            #scopecontent_p = unit_c.find("./scopecontent/p")
+                            
+                            # In case there are multiple <p> elements (Latin 2710 en 3267??)
+                            for scopecontent_p in unit_c.findall("./scopecontent/p"):                         
+                            # Latin 1920 geen scopecontent, 2710 meerdere elementen
+                            #if scopecontent_p != None and scopecontent_p != "":                                                 
+                            
+                                # Create sermon manifestation title 
+                                # (store only if there are no multiple sermon manifestations)                            
+                                serm_manif_title = '%%'.join(scopecontent_p.itertext())
+                                sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode", method='text')
 
-                            # Create sermon manifestation title 
-                            # (store only if there are no multiple sermon manifestations)                            
-                            serm_manif_title = '%%'.join(scopecontent_p.itertext())
-                            sermon_manif_titles_1 = ElementTree.tostring(scopecontent_p, encoding="unicode")
-
-                            # Differentiatie between scopecontent_p with 1 or more manifestaties, 
-                            # separated with an <lb/> element, first 1 manifestation (scopecontent without <lb>)
-                            if '<lb />' not in sermon_manif_titles_1:                           
-                                # Split the serm_manif_title up...
-                                title_split_1 = serm_manif_title.split(" ")                             
-                                # ...in order to grab the folio numbers...
-                                folio_1 = title_split_1[1]
-                                # ...and clean them up
-                                folio_2 = re.sub(",", "", folio_1)
+                                # Differentiate between scopecontent_p with 1 or more manifestaties, 
+                                # separated with an <lb/> element, first 1 manifestation (scopecontent without <lb>)
+                                if '<lb />' not in sermon_manif_titles_1:                           
+                                    title_test = sermon_manif_titles_1
+                                    #print(title_test)
                                 
-                                # Grab title (without folio), first split up serm_manif_title again...                               
-                                title_split_2 = serm_manif_title.split(" ", 2)
-                                # ... and grab the third part
-                                title_cleaned = title_split_2[2]                             
+                                    # Maybe clean string from elements and stuff
+                                    # Maybe change the sequence
+                                    title = re.sub("[\n\s]+"," ", title_test)
+                                    print(title)
+
+                                    # Split the serm_manif_title up...
+                                    # title_split_1 = serm_manif_title.split(" ")                             
                                 
-                                # Create a list to store the msitems from the manifestations
-                                # for processing later on                            
-                                msitems_children = []
-
-                                # Create MsItem to store the correct sequence of title, head and manifestations
-                                # Use order to count the number of MsItems next parent child
-                                # Nu zit het nummer van de parent al 
-                                msitem = MsItem.objects.create(manu=manu_obj, order=order, parent= msitem_parent)
+                                    # ...in order to grab the folio numbers...
+                                    # folio_1 = title_split_1[1]
                                 
-                                # Add each msitem for each manifestation to the list
-                                msitems_children.append(msitem)
-
-                                # Add 1 to order
-                                order += 1
-
-                                # Store manifestations in SermDescr with MsItem, this means title, locus 
-                                # and the complete manifestation in note                                
-                                serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title_cleaned, locus = folio_2, note = serm_manif_title)
-                             
-                            # Second, with multiple manifesations:                                                        
-                            elif '<lb />' in sermon_manif_titles_1:                               
-                                # Create list that gets wiped clean with each new <c> element
-                                sermon_manif_titles_3 = []
-
-                                # Split up sermon_manif_titles_1 into a list to get all elements separated by the <lb> elements
-                                # Each element is considered to be a manifestation
-                                sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
+                                    # ...and clean them up
+                                    # folio_2 = re.sub(",", "", folio_1)
                                 
-                                # Iterate over the list and clean up he                                
-                                for title in sermon_manif_titles_2:
-                                    title_1 = re.sub("[\n\s]+"," ", title)
-                                                                        
-                                    # Get rid of all the elements
-                                    title_2a = re.sub('<[^>]+>', '', title_1)
-                                    
-                                    # Strip the title
-                                    title_2b = title_2a.strip()                                   
+                                    # Grab title (without folio), first split up serm_manif_title again...                               
+                                    #title_split_2 = serm_manif_title.split(" ", 2)
+                                    # ... and grab the third part
+                                    #title_cleaned = title_split_2[2]                             
+                                
+                                    # Create a list to store the msitems from the manifestations
+                                    # for processing later on                            
+                                    msitems_children = []
 
-                                    # Add the cleaned title to the list
-                                    if title_2b != "":
-                                        sermon_manif_titles_3.append(title_2b)
-                                                                        
-                                # Create a list to store the msitems from the manifestations
-                                # for processing later on                                                            
-                                msitems_children = []
-
-                                # Opslaan van de inhoud van de lijst
-                                # Create new Sermon Description 
-                                for title in sermon_manif_titles_3:                                    
                                     # Create MsItem to store the correct sequence of title, head and manifestations
-                                    # Use order to count the number of MsItems, add the parent of the item
-                                    # What happens if there is not a parent?
+                                    # Use order to count the number of MsItems next parent child
+                                    # Nu zit het nummer van de parent al 
                                     msitem = MsItem.objects.create(manu=manu_obj, order=order, parent= msitem_parent)
-
+                                
                                     # Add each msitem for each manifestation to the list
                                     msitems_children.append(msitem)
 
                                     # Add 1 to order
                                     order += 1
 
-                                    # Store manifestations in title in SermDescr with MsItems:
-                                    # order moet ook hier erin komen te staan volgens mij
-                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
+                                    # Store manifestations in SermDescr with MsItem, this means title, locus 
+                                    # and the complete manifestation in note                                
+                                    serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title, note = serm_manif_title)
+                             
+                                # Second, with multiple manifesations:                                                        
+                                elif '<lb />' in sermon_manif_titles_1:                               
+                                    # Create list that gets wiped clean with each new <c> element
+                                    sermon_manif_titles_3 = []
+
+                                    # Split up sermon_manif_titles_1 into a list to get all elements separated by the <lb> elements
+                                    # Each element is considered to be a manifestation
+                                    sermon_manif_titles_2 = sermon_manif_titles_1.split('<lb />')
+                                
+                                    # Iterate over the list and clean up he                                
+                                    for title in sermon_manif_titles_2:
+                                        title_1 = re.sub("[\n\s]+"," ", title)
+                                                                        
+                                        # Get rid of all the elements
+                                        title_2a = re.sub('<[^>]+>', '', title_1)
+                                    
+                                        # Strip the title
+                                        title_2b = title_2a.strip()                                   
+
+                                        # Add the cleaned title to the list
+                                        if title_2b != "":
+                                            sermon_manif_titles_3.append(title_2b)
+                                                                        
+                                    # Create a list to store the msitems from the manifestations
+                                    # for processing later on                                                            
+                                    msitems_children = []
+
+                                    # Opslaan van de inhoud van de lijst
+                                    # Create new Sermon Description 
+                                    for title in sermon_manif_titles_3:                                    
+                                        # Create MsItem to store the correct sequence of title, head and manifestations
+                                        # Use order to count the number of MsItems, add the parent of the item
+                                        # What happens if there is not a parent?
+                                        msitem = MsItem.objects.create(manu=manu_obj, order=order, parent= msitem_parent)
+
+                                        # Add each msitem for each manifestation to the list
+                                        msitems_children.append(msitem)
+
+                                        # Add 1 to order
+                                        order += 1
+
+                                        # Store manifestations in title in SermDescr with MsItems:
+                                        # order moet ook hier erin komen te staan volgens mij
+                                        serm_obj = SermonDescr.objects.create(manu = manu_obj, msitem = msitem, title = title)
                             
-                            # Now all children are in msitem_children!                            
-                            # Lijkt te werken voor de manifestaties, next_id voor manifestaties ook
-                            # next_id nog te implementeren voor niveau sermhead (verwijst naar eigen niveau)                            
-                                with transaction.atomic():
-                                    for idx, msitem in enumerate(msitems_children):
-                                        # Treat the first child
-                                        if idx==0:
-                                            # Set the first child of the msitem parent!
-                                            msitem_parent.firstchild = msitem
-                                            msitem_parent.save()
-                                        # Treat the next T: laatste lijkt niet te kloppen, die verwijst naar boven
-                                        if idx < len(msitems_children) - 1:
-                                            msitem.next = msitems_children[idx+1]
-                                            msitem.save()
-                                                
+                                    # Now all children are in msitem_children!                            
+                                    # Lijkt te werken voor de manifestaties, next_id voor manifestaties ook
+                                    # next_id nog te implementeren voor niveau sermhead (verwijst naar eigen niveau)                            
+                                    with transaction.atomic():
+                                        for idx, msitem in enumerate(msitems_children):
+                                            # Treat the first child
+                                            if idx==0:
+                                                # Set the first child of the msitem parent!
+                                                msitem_parent.firstchild = msitem
+                                                msitem_parent.save()
+                                            # Treat the next T: laatste lijkt niet te kloppen, die verwijst naar boven
+                                            if idx < len(msitems_children) - 1:
+                                                msitem.next = msitems_children[idx+1]
+                                                msitem.save()
+                            else:
+                                pass
                             # The last part related to the MsItems is adding the next_id to 
                             # the msitem parents (not the last one!)                             
                         with transaction.atomic():
@@ -1923,9 +2027,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         with open(filename, 'a', newline='') as csvfile:
             manuwriter = csv.writer(csvfile)
             for manu in lst_manus:
-                print(manu)
-                manuwriter.writerow([manu, manu_obj.filename])
-        
+                timestamp = get_current_datetime().strftime("%d/%b/%Y %H:%M")
+                manuwriter.writerow([manu, manu_obj.filename, timestamp])
+                
     except:
         sError = errHandle.get_error_message()
         oBack['filename'] = filename
@@ -2654,19 +2758,19 @@ class ManuEadDownload(BasicPart):
         # Initialize
         lData = []
         sData = ""
-        # THe name of the file where EAD progress is being monitored
+        # The name of the file where EAD progress is being monitored
         filename = os.path.abspath(os.path.join(MEDIA_DIR, 'processed_manuscripts.csv'))
         
         # Load the contents
         lData = []
         with open(filename, "r") as fp:
-            sData = fp.read()
-            arData = sData.split("\n")
-            for sLine in arData:
+            sData = fp.read() 
+            arData = sData.split("\n") 
+            for sLine in arData: 
                 if sLine.strip() != "" and "," in sLine:
                     arLine = sLine.split(",")
-                    oLine = dict(idno=arLine[0], filename=arLine[1])
-                    lData.append(oLine)
+                    oLine = dict(idno=arLine[0], filename=arLine[1], timestamp=arLine[2])
+                    lData.append(oLine) 
 
         if dtype == "json":
             # convert to string
@@ -2677,15 +2781,16 @@ class ManuEadDownload(BasicPart):
             delimiter = "\t" if dtype == "csv" else ","
             csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
             # Headers
-            headers = ['idno', 'filename']
+            headers = ['idno', 'filename','timestamp']
             csvwriter.writerow(headers)
             for obj in lData:
                 idno = obj.get('idno')
                 filename = obj.get('filename')
-                row = [idno, filename]
+                timestamp = obj.get('timestamp')
+                row = [idno, filename, timestamp]
                 csvwriter.writerow(row)
 
-            # Convert to string
+            # Convert to string 
             sData = output.getvalue()
             output.close()
 

@@ -1338,12 +1338,18 @@ a.sermon:link, a.sermon:visited {
 .sermonnumber {
     cursor: cell;
     background-color: white;
+    width: 14px;
+    max-width: 20px;
 }
 .sermonnumber.selected {
     background-color: yellow;
 }
 .sermonnumber.selected:visited {
     background-color: white;
+}
+
+.sermonlocus {
+    width: 
 }
 
 .signature {
@@ -1384,6 +1390,7 @@ tr.selected > td.selectable:hover {
 /* Hide default HTML checkbox */
 .switch input, .badge.filter input { opacity: 0; width: 0; height: 0;}
 /* Slider of the switch */
+/*
 .slider {
   position: absolute;
   cursor: pointer;
@@ -1417,6 +1424,7 @@ input:checked + .slider:before {
   -ms-transform: translateX(26px);
   transform: translateX(26px);
 }
+*/
 
 /* Rounded sliders */
 .slider.round {   border-radius: 34px; }
@@ -1596,4 +1604,19 @@ svg .histogram-bar:focus {
     animation-fill-mode: forwards;
 }
 
+svg .links {
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
+svg .nodes {
+    stroke: #fff;
+    stroke-width: 1.5;
+}
+svg .nodes text {
+    fill: currentColor;
+    stroke: none;
+}
+
 /* END OF D3 Section */
+
+
