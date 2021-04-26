@@ -4740,6 +4740,7 @@ class SermonListView(BasicList):
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
+                {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
@@ -4776,6 +4777,7 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'atype',                                         'keyS': 'authortype',  'help': 'authorhelp'},
             {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
@@ -4944,6 +4946,19 @@ class SermonListView(BasicList):
                 sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
 
                 fields['bibrefbk'] = Q(id__in=sermonlist)
+
+            # Adapt the search for empty authors
+            if 'authortype' in fields:
+                authortype = fields['authortype']
+                if authortype == "non":
+                    lstExclude = []
+                    lstExclude.append(Q(author__isnull=False))
+                elif authortype == "spe":
+                    lstExclude = []
+                    lstExclude.append(Q(author__isnull=True))
+                else:
+                    # Reset the authortype
+                    fields['authortype'] = ""
 
         except:
             msg = oErr.get_error_message()
@@ -10768,15 +10783,17 @@ class AuthorListView(BasicList):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['abbr', 'number', 'name', '', '']
     order_default = ['name', 'abbr', 'number', '', '']
-    order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
+    order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 
+                    'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
                    {'name': 'Number',      'order': 'o=2', 'type': 'int', 'title': 'Passim author number', 'field': 'number', 'default': 10000, 'align': 'right'},
                    {'name': 'Author name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
-    filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
+    filters = [ {"name": "Author",  "id": "filter_author",  "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }]}
+            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }
+            ]}
         ]
     downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'author_results'},
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'author_results'},
