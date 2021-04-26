@@ -35,6 +35,7 @@ def user_is_in_team(username, team_group, userplus=None):
     return bResult
 
 CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+AUTHOR_TYPE = [('-', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 
@@ -1296,6 +1297,8 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    authortype  = forms.ChoiceField(label=_("Author type"), required=False, 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Author...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1416,6 +1419,10 @@ class SermonForm(PassimModelForm):
             self.fields['manu'].required = False
             self.fields['stype'].required = False
             self.fields['mtype'].required = False
+            self.fields['authortype'].required = False
+
+            # Choice field initialization
+            self.fields['authortype'].choices = AUTHOR_TYPE
 
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
@@ -3881,7 +3888,7 @@ class AuthorEditForm(forms.ModelForm):
 
 class AuthorSearchForm(forms.ModelForm):
     author_ta = forms.CharField(label=_("Author"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author namee(s)...', 'style': 'width: 100%;'}))
     authlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors"]
@@ -3900,6 +3907,7 @@ class AuthorSearchForm(forms.ModelForm):
         super(AuthorSearchForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['name'].required = False
+
         self.fields['authlist'].queryset = Author.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:

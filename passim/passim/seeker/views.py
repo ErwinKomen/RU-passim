@@ -4740,6 +4740,7 @@ class SermonListView(BasicList):
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
+                {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
@@ -4776,6 +4777,7 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
+            {'filter': 'atype',                                         'keyS': 'authortype',  'help': 'authorhelp'},
             {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
@@ -4944,6 +4946,19 @@ class SermonListView(BasicList):
                 sermonlist = [x.id for x in SermonDescr.objects.filter(*lstQ).order_by('id').distinct()]
 
                 fields['bibrefbk'] = Q(id__in=sermonlist)
+
+            # Adapt the search for empty authors
+            if 'authortype' in fields:
+                authortype = fields['authortype']
+                if authortype == "non":
+                    lstExclude = []
+                    lstExclude.append(Q(author__isnull=False))
+                elif authortype == "spe":
+                    lstExclude = []
+                    lstExclude.append(Q(author__isnull=True))
+                else:
+                    # Reset the authortype
+                    fields['authortype'] = ""
 
         except:
             msg = oErr.get_error_message()
@@ -7930,33 +7945,50 @@ class CommentListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "username":
-            sBack = instance.profile.user.username
-        elif custom == "created":
-            sBack = instance.get_created()
-        elif custom == "otype":
-            sBack = instance.get_otype()
-        elif custom == "link":
-            url = ""
-            label = ""
-            if instance.otype == "manu":
-                obj = instance.comments_manuscript.first()
-                url = reverse("manuscript_details", kwargs={'pk': obj.id})
-                label = "manu_{}".format(obj.id)
-            elif instance.otype == "sermo":
-                obj = instance.comments_sermon.first()
-                url = reverse("sermon_details", kwargs={'pk': obj.id})
-                label = "sermo_{}".format(obj.id)
-            elif instance.otype == "gold":
-                obj = instance.comments_gold.first()
-                url = reverse("sermongold_details", kwargs={'pk': obj.id})
-                label = "gold_{}".format(obj.id)
-            elif instance.otype == "super":
-                obj = instance.comments_super.first()
-                url = reverse("equalgold_details", kwargs={'pk': obj.id})
-                label = "super_{}".format(obj.id)
-            if url != "":
-                sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+        oErr = ErrHandle()
+        try:
+            if custom == "username":
+                sBack = instance.profile.user.username
+            elif custom == "created":
+                sBack = instance.get_created()
+            elif custom == "otype":
+                sBack = instance.get_otype()
+            elif custom == "link":
+                url = ""
+                label = ""
+                if instance.otype == "manu":
+                    obj = instance.comments_manuscript.first()
+                    if not obj is None:
+                        url = reverse("manuscript_details", kwargs={'pk': obj.id})
+                        label = "manu_{}".format(obj.id)
+                    else:
+                        iStop = 1
+                elif instance.otype == "sermo":
+                    obj = instance.comments_sermon.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("sermon_details", kwargs={'pk': obj.id})
+                        label = "sermo_{}".format(obj.id)
+                elif instance.otype == "gold":
+                    obj = instance.comments_gold.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("sermongold_details", kwargs={'pk': obj.id})
+                        label = "gold_{}".format(obj.id)
+                elif instance.otype == "super":
+                    obj = instance.comments_super.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("equalgold_details", kwargs={'pk': obj.id})
+                        label = "super_{}".format(obj.id)
+                if url != "":
+                    sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentListView/get_field_value")
         return sBack, sTitle
 
 
@@ -10126,8 +10158,8 @@ class EqualGoldDetails(EqualGoldEdit):
                     html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
                     html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
                     html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
+                #html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
+                #html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
                 custombutton = "\n".join(html)
                 manuscripts['custombutton'] = custombutton
 
@@ -10640,6 +10672,71 @@ class EqualGoldScountDownload(BasicPart):
         return sData
 
 
+class EqualGoldVisDownload(BasicPart):
+    """Generic treatment of Visualization downloads for SSGs"""
+
+    MainModel = EqualGold
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "hist-svg"
+    vistype = ""
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Retrieve the actual data from self.data
+            oData = dict(legend=self.data['legend'],
+                         link_list=self.data['link_list'],
+                         node_list=self.data['node_list'])
+            sData = json.dumps(oData, indent=2)
+        elif dtype == "hist-svg":
+            pass
+        elif dtype == "hist-png":
+            pass
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            pass
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+class EqualGoldGraphDownload(EqualGoldVisDownload):
+    """Network graph"""
+    vistype = "graph"
+
+
+class EqualGoldTransDownload(EqualGoldVisDownload):
+    """Transmission graph"""
+    vistype = "trans"
+
+
+class EqualGoldOverlapDownload(EqualGoldVisDownload):
+    """Overlap graph"""
+    vistype = "overlap"
+
+
 class AuthorEdit(BasicDetails):
     """The details of one author"""
 
@@ -10686,15 +10783,17 @@ class AuthorListView(BasicList):
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['abbr', 'number', 'name', '', '']
     order_default = ['name', 'abbr', 'number', '', '']
-    order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
+    order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 
+                    'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
                    {'name': 'Number',      'order': 'o=2', 'type': 'int', 'title': 'Passim author number', 'field': 'number', 'default': 10000, 'align': 'right'},
                    {'name': 'Author name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
-    filters = [ {"name": "Author",         "id": "filter_author",     "enabled": False}]
+    filters = [ {"name": "Author",  "id": "filter_author",  "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }]}
+            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }
+            ]}
         ]
     downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'author_results'},
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'author_results'},

@@ -19,7 +19,6 @@ var $ = jQuery;
 })(django.jQuery);
 
 
-
 // based on the type, action will be loaded
 
 // var $ = django.jQuery.noConflict();
@@ -458,6 +457,100 @@ var ru = (function ($, ru) {
 
       },
 
+      /**
+       * converts an svg string to base64 png using the domUrl
+       * @param {string} svgText the svgtext
+       * @param {number} [margin=0] the width of the border - the image size will be height+margin by width+margin
+       * @param {string} [fill] optionally backgrund canvas fill
+       * @return {Promise} a promise to the bas64 png image
+       */
+      svgToPng: function (svgText, options /*margin,fill */) {
+        var margin, fill;
+
+        // convert an svg text to png using the browser
+        return new Promise(function (resolve, reject) {
+          var match = null,
+              height = 200,
+              width = 200;
+
+          try {
+            // can use the domUrl function from the browser
+            var domUrl = window.URL || window.webkitURL || window;
+            if (!domUrl) {
+              throw new Error("(browser doesnt support this)")
+            }
+        
+            // figure out the height and width from svg text
+            if (options.height) {
+              height = options.height;
+            } else {
+              match = svgText.match(/height=\"(\d+)/m);
+              height = match && match[1] ? parseInt(match[1], 10) : 200;
+            }
+            if (options.width) {
+              width = options.width;
+            } else {
+              match = svgText.match(/width=\"(\d+)/m);
+              width = match && match[1] ? parseInt(match[1], 10) : 200;
+            }
+            margin = margin || 0;
+        
+            // it needs a namespace
+            if (!svgText.match(/xmlns=\"/mi)){
+              svgText = svgText.replace ('<svg ','<svg xmlns="http://www.w3.org/2000/svg" ') ;  
+            }
+        
+            // create a canvas element to pass through
+            var canvas = document.createElement("canvas");
+            canvas.width = height+margin*2;
+            canvas.height = width+margin*2;
+            var ctx = canvas.getContext("2d");
+        
+        
+            // make a blob from the svg
+            var svg = new Blob([svgText], {
+              type: "image/svg+xml;charset=utf-8"
+            });
+        
+            // create a dom object for that image
+            var url = domUrl.createObjectURL(svg);
+        
+            // create a new image to hold it the converted type
+            var img = new Image;
+        
+            // when the image is loaded we can get it as base64 url
+            img.onload = function() {
+              // draw it to the canvas
+              ctx.drawImage(this, margin, margin);
+          
+              // if it needs some styling, we need a new canvas
+              if (fill) {
+                var styled = document.createElement("canvas");
+                styled.width = canvas.width;
+                styled.height = canvas.height;
+                var styledCtx = styled.getContext("2d");
+                styledCtx.save();
+                styledCtx.fillStyle = fill;   
+                styledCtx.fillRect(0,0,canvas.width,canvas.height);
+                styledCtx.strokeRect(0,0,canvas.width,canvas.height);
+                styledCtx.restore();
+                styledCtx.drawImage (canvas, 0,0);
+                canvas = styled;
+              }
+              // we don't need the original any more
+              domUrl.revokeObjectURL(url);
+              // now we can resolve the promise, passing the base64 url
+              resolve(canvas.toDataURL());
+            };
+        
+            // load the image
+            img.src = url;
+        
+          } catch (err) {
+            reject('failed to convert svg to png ' + err);
+          }
+        });
+      },
       /** 
        *  toggle_column - show or hide column
        */
@@ -1990,15 +2083,20 @@ var ru = (function ($, ru) {
         */
       post_download: function (elStart) {
         var ajaxurl = "",
+            action = "",
             contentid = null,
             response = null,
             scaleFactor = 4,  // Scaling of images to make sure the result is not blurry
             frm = null,
             el = null,
+            canvas = null,
+            elData = null,
             sHtml = "",
             oBack = null,
+            options = {},
             dtype = "",
             sMsg = "",
+            svgText = "",
             method = "normal",
             data = [];
 
@@ -2042,23 +2140,29 @@ var ru = (function ($, ru) {
               break;
             default:
               // Set the 'action; attribute in the form
+              action = frm.attr("action");
               frm.attr("action", ajaxurl);
               // Make sure we do a POST
               frm.attr("method", "POST");
 
               // Do we have a contentid?
               if (contentid !== undefined && contentid !== null && contentid !== "") {
+                // Generic
+                elData = $(frm).find("#downloaddata");
                 // Process download data
                 switch (dtype) {
                   case "hist-png":  // Download histogram as PNG
                     // Convert the HTML into a canvas and turn the canvas into a PNG
                     el = $(contentid).first().get(0);
 
-                    html2canvas(el, { scale: scaleFactor })
+                    el.scrollIntoView();
+                    html2canvas(el, { scale: scaleFactor, y: window.scrollY  })
                       .then(function (canvas) {
                         // Convert to data
                         var imageData = canvas.toDataURL("image/png");
-                        $(frm).find("#downloaddata").val(imageData);
+                        if (elData.length > 0) {
+                          $(elData).val(imageData);
+                        }
                         // Now submit the form
                         oBack = frm.submit();
                       });
@@ -2066,7 +2170,13 @@ var ru = (function ($, ru) {
                   case "hist-svg":
                     sHtml = private_methods.prepend_styles(contentid, "svg");
                     // Set it
-                    $(frm).find("#downloaddata").val(sHtml);
+                    if (elData.length > 0) {
+                      $(elData).val(sHtml);
+                    }
+                    // Now submit the form
+                    oBack = frm.submit();
+                    break;
+                  case "json":
                     // Now submit the form
                     oBack = frm.submit();
                     break;

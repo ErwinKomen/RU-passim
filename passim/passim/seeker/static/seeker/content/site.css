@@ -360,9 +360,18 @@ a:not(.btn) span.glyphicon-remove {
     color: darkred;
 }
 
+.visborder {
+    border: 1px solid blue;
+}
+
 svg {
     stroke-width: 1;
 }
+
+svg line {
+    vector-effect: non-scaling-stroke;
+}
+    
 svg .lithium-conn path:hover {
     stroke: red;
     stroke-width: 2;

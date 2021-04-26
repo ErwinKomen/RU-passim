@@ -373,6 +373,9 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             s_q = oFields[keyS]
                         enable_filter(filter_type, head_id)
 
+                elif keyS != "" and has_string_value(keyS, oFields):
+                    enable_filter(filter_type, head_id)
+
                 # Check for list of specific signatures
                 if has_list_value(keyList, oFields):
                     s_q_lst = ""

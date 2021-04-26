@@ -1492,6 +1492,7 @@ var ru = (function ($, ru) {
             gravityvalue = 10,
             gravityid = "#gravityvalue",
             p = {},
+            g = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1517,13 +1518,23 @@ var ru = (function ($, ru) {
           // Define the SVG element and the color scheme
           divSvg = "#" + options['target'] + " svg";
           $(divSvg).empty();
+
+          // Get the width and height
+          width = $(divSvg).width();
+          height = $(divSvg).height();
+
           svg = d3.select(divSvg);
+          svg.attr("width", width)
+            .attr("height", height)
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
+          g = svg.append("g");
           color = network_color;
 
           // Append a legend
           private_methods.addLegend({
-            'x': width / 2,
-            'y': height - 50,
+            'x': 50,  // width / 2,
+            'y': 50,  // height - 50,
             'divsvg': divSvg,
             'legend': options['legend']
           });
@@ -1543,8 +1554,14 @@ var ru = (function ($, ru) {
               .force("center", d3.forceCenter(width / 2, height / 2))
               .on("tick", ticked);
 
+          // Define the zooming
+          svg.call(d3.zoom()
+            .extent([[0, 0], [width, height]])
+            .scaleExtent([0.2, 100])
+            .on("zoom", zoomed));
+
           // Define a d3 function based on the information in 'nodes' and 'links'
-          link = svg.append("g")
+          link = g.append("g")
                     .attr("class", "links")
                     .selectAll("line")
                     .data(options['links'])
@@ -1552,7 +1569,7 @@ var ru = (function ($, ru) {
                     .attr("stroke-width", function (d) {
                       return Math.sqrt(2 * d.value);
                     });
-          node = svg.append("g")
+          node = g.append("g")
                     .attr("class", "nodes")
                     .selectAll("circle")
                     .data(options['nodes'])
@@ -1563,6 +1580,8 @@ var ru = (function ($, ru) {
                       return iSize;
                     })
                     .attr("fill", color)
+                    .attr("stroke", "white")
+                    .attr("stroke-width", "1")
                     .call(network_drag(loc_simulation));
 
 
@@ -1574,8 +1593,33 @@ var ru = (function ($, ru) {
           link.append("title")
                   .text(function (d) { return d.value; });
 
-          // Then execute the simulation
-          // loc_simulation.restart();
+          // Defind the 'zoomed' function
+          function zoomed(event) {
+            // Get the transform
+            var transform = event.transform;
+            var scale = event.transform.k;
+
+            // THis is geometric re-scale:
+            // (but note: CSS prevents lines from scaling)
+            g.attr("transform", event.transform);
+
+            link.style("stroke-width", function (d) {
+              return Math.sqrt(2 * d.value);
+            });
+
+            node.style("stroke-width", function (d) {
+              return 1 / scale;
+            });
+            node.attr("r", function (d) {
+              var scount = d.scount;
+              var iSize = Math.max(10, scount / 2);
+              return iSize /scale;
+            });
+
+            // Semantic rescale: just the size of the circles
+            //g.selectAll("circle")
+            //  .attr('transform', event.transform);
+          }
 
           // Define the 'ticked' function
           function ticked() {
@@ -1656,13 +1700,17 @@ var ru = (function ($, ru) {
             factor,
             width,
             height,
+            calcW,
+            calcH,
             i,
             count,
+            bDoTransform = true,
             maxcount = 0,
             gravityvalue = 100,
             gravityid = "#gravity_overlap_value",
             degree = 1,
             p = {},
+            g = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1698,9 +1746,17 @@ var ru = (function ($, ru) {
           divSvg = "#" + options['target'] + " svg";
           $(divSvg).empty();
           svg = d3.select(divSvg);
+          calcW = $(svg).parent().width();
+          calcH = $(svg).parent().height();
           // Add a viewbox
           svg.attr("viewBox", [0, 0, width, height])
+          svg.attr("width", width )
+            .attr("height", height )
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
           color = network_color;
+          // Needed for e.g. zooming
+          g = svg.append("g");
 
           // Append a legend (with the title): top center
           private_methods.addLegend({
@@ -1727,9 +1783,17 @@ var ru = (function ($, ru) {
               //}))
               //.nodes(options['nodes']);
               .on("tick", ticked);
+          
+          if (bDoTransform) {
+            // Define the zooming
+            svg.call(d3.zoom()
+              .extent([[0, 0], [width, height]])
+              .scaleExtent([0.2, 100])
+              .on("zoom", zoomed));
+          }
 
           // Define a d3 function based on the information in 'nodes' and 'links'
-          link = svg.append("g")
+          link = g.append("g")
                     .attr("class", "links")
                     .selectAll("line")
                     .data(options['links'])
@@ -1737,7 +1801,7 @@ var ru = (function ($, ru) {
                     .attr("stroke-width", function (d) {
                       return Math.sqrt(2 * d.value);
                     });
-          node = svg.append("g")
+          node = g.append("g")
                     .attr("class", "nodes")
                     .selectAll("g")
                     .data(options['nodes'])
@@ -1788,6 +1852,48 @@ var ru = (function ($, ru) {
           function get_height(d) {
             var r = get_radius(d);
             return r * 4;
+          }
+
+          // Defind the 'zoomed' function
+          function zoomed(event) {
+            // Get the transform
+            var transform = event.transform;
+            var scale = event.transform.k;
+
+            // THis is geometric re-scale:
+            // (but note: CSS prevents lines from scaling)
+            g.attr("transform", event.transform);
+
+            link.style("stroke-width", function (d) {
+              return Math.sqrt(2 * d.value);
+            });
+
+            // Make sure that the circle retain their size by dividing by the scale factor
+            node.selectAll("circle")
+              .attr("r", function (d) {
+                var iSize = get_radius(d);
+                return iSize / scale;
+              })
+              .attr("stroke-width", function (d) {
+                return 3 / scale;
+              });
+            node.selectAll("text")
+              .attr("x", function (d) {
+                var x = (-1 * get_width(d) / 2) / scale;
+                return x.toString();
+              })
+              .attr("y", function (d) {
+                var x = (3 * get_radius(d)) / scale;
+                return x.toString();
+              })
+              .style("font-size", function (d) {
+                var iSize = Math.round( 14 / scale);
+                return (scale < 1) ? "14px" : iSize.toString() + "px";
+              });
+
+            // Semantic rescale: just the size of the circles
+            //g.selectAll("circle")
+            //  .attr('transform', event.transform);
           }
 
           // Define the 'ticked' function
@@ -2034,9 +2140,11 @@ var ru = (function ($, ru) {
             i,
             count,
             maxcount = 0,
+            bDoTransform = true,
             gravityvalue = 100,
             gravityid = "#gravity_trans_value",
             p = {},
+            g = null,
             author,
             link,
             node;
@@ -2074,7 +2182,13 @@ var ru = (function ($, ru) {
           svg = d3.select(divSvg);
           // Add a viewbox
           svg.attr("viewBox", [0, 0, width, height])
+          svg.attr("width", width)
+            .attr("height", height)
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
           color = network_color;
+          // Make sure to tie everything under a <g> element
+          g = svg.append("g");
 
           // Append a legend: top center
           private_methods.addLegend({
@@ -2104,8 +2218,16 @@ var ru = (function ($, ru) {
               }).iterations(3))
               .on("tick", ticked);
 
+          if (bDoTransform) {
+            // Define the zooming
+            svg.call(d3.zoom()
+              .extent([[0, 0], [width, height]])
+              .scaleExtent([0.2, 100])
+              .on("zoom", zoomed));
+          }
+
           // Define a d3 function based on the information in 'nodes' and 'links'
-          link = svg.append("g")
+          link = g.append("g")
                     .attr("fill", "none")
                     .attr("class", "links")
                     .selectAll("path")
@@ -2115,7 +2237,7 @@ var ru = (function ($, ru) {
                     .attr("stroke-width", function (d) {
                       return Math.sqrt(2 * d.value);
                     });
-          node = svg.append("g")
+          node = g.append("g")
                     .attr("class", "nodes")
                     .selectAll("g")
                     .data(options['nodes'])
@@ -2152,7 +2274,7 @@ var ru = (function ($, ru) {
             .text(function (d) { return d.label; });
           // Add popup title to links: this provides the actual weight
           link.append("title")
-                  .text(function (d) { return d.value; });
+            .text(function (d) { return d.value; });
 
           // ====================== Author SVG element =========================
           divAuthor = "#" + options['targetA'] + " svg";
@@ -2190,6 +2312,43 @@ var ru = (function ($, ru) {
                 .style("alignment-baseline", "middle");
 
           // ====================== HELP FUNCTIONS =============================
+          // Defind the 'zoomed' function
+          function zoomed(event) {
+            // Get the transform
+            var transform = event.transform;
+            var scale = event.transform.k;
+
+            // THis is geometric re-scale:
+            // (but note: CSS prevents lines from scaling)
+            g.attr("transform", event.transform);
+
+            link.style("stroke-width", function (d) {
+              return Math.sqrt(2 * d.value) / scale;
+            });
+
+            // Make sure that the circle retain their size by dividing by the scale factor
+            node.selectAll("circle")
+              .attr("r", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize / scale;
+              })
+              .attr("stroke-width", function (d) {
+                return 3 / scale;
+              });
+            node.selectAll("text")
+              .attr("x", function (d) {
+                var scount = d.scount;
+                var iSize = Math.max(10, scount / 2);
+                return iSize / scale;
+              })
+              .style("font-size", function (d) {
+                var iSize = Math.round(14 / scale);
+                return (scale < 1) ? "14px" : iSize.toString() + "px";
+              });
+
+          }
+
           // Define the 'ticked' function
           function ticked() {
             node.attr("transform", function (d) {
@@ -3181,7 +3340,6 @@ var ru = (function ($, ru) {
           private_methods.errMsg("scount_histogram_show", ex);
         }
       },
-
 
       /**
        * histogram_click
@@ -5454,6 +5612,32 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * network_stop
+       *   Stop the visualization within [elStart]
+       *
+       */
+      network_stop: function (elStart) {
+        var elMain = null,
+            targeturl = "",
+            frm = null,
+            elSvg = null;
+        try {
+          // Get to the container inside which I am
+          elMain = $(elStart).closest(".container-small");
+          targeturl = $(elStart).attr("targeturl");
+          // REmove the SVG
+          elSvg = $(elMain).find("svg").first().html("");
+          // Hide myself
+          $(elMain).addClass("hidden");
+          // Make sure the form's action is correct
+          frm = $(elMain).find("form").first();
+          $(frm).attr("action", targeturl);
+        } catch (ex) {
+          private_methods.errMsg("network_stop", ex);
+        }
+      },
+
+      /**
        * network_graph
        *   Create and show a network graph
        *
@@ -5469,9 +5653,9 @@ var ru = (function ($, ru) {
             iWidth = 800,
             iHeight = 500,
             max_value = 0,
-            divTarget = "super_network",
-            divWait = "#super_network_wait",
-            divNetwork = "#ssg_network";
+            divTarget = "super_network_graph",
+            divWait = "#super_network_graph_wait",
+            divNetwork = "#ssg_network_graph";
 
         try {
           // Show what we can about the network
@@ -5486,7 +5670,7 @@ var ru = (function ($, ru) {
           // Go and call...
           $.post(targeturl, data, function (response) {
             // Action depends on the response
-            if (response === undefined || response === null || !("status" in response)) {
+            if (response === undefined || response === null || typeof (response) === "string" || !("status" in response)) {
               private_methods.errMsg("No status returned");
             } else {
               $(divWait).addClass("hidden");
@@ -5565,7 +5749,7 @@ var ru = (function ($, ru) {
           // Go and call...
           $.post(targeturl, data, function (response) {
             // Action depends on the response
-            if (response === undefined || response === null || !("status" in response)) {
+            if (response === undefined || response === null || typeof(response) === "string" || !("status" in response)) {
               private_methods.errMsg("No status returned");
             } else {
               $(divWait).addClass("hidden");
