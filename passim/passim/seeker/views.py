@@ -7930,33 +7930,50 @@ class CommentListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "username":
-            sBack = instance.profile.user.username
-        elif custom == "created":
-            sBack = instance.get_created()
-        elif custom == "otype":
-            sBack = instance.get_otype()
-        elif custom == "link":
-            url = ""
-            label = ""
-            if instance.otype == "manu":
-                obj = instance.comments_manuscript.first()
-                url = reverse("manuscript_details", kwargs={'pk': obj.id})
-                label = "manu_{}".format(obj.id)
-            elif instance.otype == "sermo":
-                obj = instance.comments_sermon.first()
-                url = reverse("sermon_details", kwargs={'pk': obj.id})
-                label = "sermo_{}".format(obj.id)
-            elif instance.otype == "gold":
-                obj = instance.comments_gold.first()
-                url = reverse("sermongold_details", kwargs={'pk': obj.id})
-                label = "gold_{}".format(obj.id)
-            elif instance.otype == "super":
-                obj = instance.comments_super.first()
-                url = reverse("equalgold_details", kwargs={'pk': obj.id})
-                label = "super_{}".format(obj.id)
-            if url != "":
-                sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+        oErr = ErrHandle()
+        try:
+            if custom == "username":
+                sBack = instance.profile.user.username
+            elif custom == "created":
+                sBack = instance.get_created()
+            elif custom == "otype":
+                sBack = instance.get_otype()
+            elif custom == "link":
+                url = ""
+                label = ""
+                if instance.otype == "manu":
+                    obj = instance.comments_manuscript.first()
+                    if not obj is None:
+                        url = reverse("manuscript_details", kwargs={'pk': obj.id})
+                        label = "manu_{}".format(obj.id)
+                    else:
+                        iStop = 1
+                elif instance.otype == "sermo":
+                    obj = instance.comments_sermon.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("sermon_details", kwargs={'pk': obj.id})
+                        label = "sermo_{}".format(obj.id)
+                elif instance.otype == "gold":
+                    obj = instance.comments_gold.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("sermongold_details", kwargs={'pk': obj.id})
+                        label = "gold_{}".format(obj.id)
+                elif instance.otype == "super":
+                    obj = instance.comments_super.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("equalgold_details", kwargs={'pk': obj.id})
+                        label = "super_{}".format(obj.id)
+                if url != "":
+                    sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentListView/get_field_value")
         return sBack, sTitle
 
 
