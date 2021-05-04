@@ -69,7 +69,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm
-from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
+from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
@@ -84,7 +84,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
 
 
 # Some constants that can be used
@@ -4726,7 +4726,7 @@ class SermonListView(BasicList):
     template_help = "seeker/filter_help.html"
     has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
@@ -4734,23 +4734,30 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
+        {'name': 'Title',       'order': 'o=5', 'type': 'str', 'custom': 'title', 
+         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},
+        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+         'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=7', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
+                {"name": "Title",            "id": "filter_title",          "enabled": False},
+                {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
-                {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
+                {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
-                {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
+                {"name": "Free",             "id": "filter_freetext",       "enabled": False},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
+                {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
@@ -4769,11 +4776,15 @@ class SermonListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
-            {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'title',         'dbfield': 'title',             'keyS': 'srch_title'},
+            {'filter': 'sectiontitle',  'dbfield': 'sectiontitle',      'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_term'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_include'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_exclude'},
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -4894,6 +4905,16 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "title":
+            sTitle = ""
+            if instance.title != None and instance.title != "":
+                sTitle = instance.title
+            html.append(sTitle)
+        elif custom == "sectiontitle":
+            sSection = ""
+            if instance.sectiontitle != None and instance.sectiontitle != "":
+                sSection = instance.sectiontitle
+            html.append(sSection)
         elif custom == "links":
             for gold in instance.goldsermons.all():
                 for link_def in gold.link_oview():
@@ -4960,6 +4981,49 @@ class SermonListView(BasicList):
                     # Reset the authortype
                     fields['authortype'] = ""
 
+            # Adapt according to the 'free' fields
+            free_term = fields.get("free_term", "")
+            if free_term != None and free_term != "":
+                free_include = fields.get("free_include", [])
+                free_exclude = fields.get("free_exclude", [])
+
+                # Look for include fields
+                s_q_i_lst = ""
+                for obj in free_include:
+                    val = free_term
+                    if "*" in val or "#" in val:
+                        val = adapt_search(val)
+                        s_q = Q(**{"{}__iregex".format(obj.field): val})
+                    else:
+                        s_q = Q(**{"{}__iexact".format(obj.field): val})
+                    if s_q_i_lst == "":
+                        s_q_i_lst = s_q
+                    else:
+                        s_q_i_lst |= s_q
+
+                # Look for exclude fields
+                s_q_e_lst = ""
+                for obj in free_exclude:
+                    val = free_term
+                    if "*" in val or "#" in val:
+                        val = adapt_search(val)
+                        s_q = Q(**{"{}__iregex".format(obj.field): val})
+                    else:
+                        s_q = Q(**{"{}__iexact".format(obj.field): val})
+                    if s_q_e_lst == "":
+                        s_q_e_lst = s_q
+                    else:
+                        s_q_e_lst |= s_q
+
+                if s_q_i_lst != "":
+                    qAlternative = s_q_i_lst
+                if s_q_e_lst != "":
+                    lstExclude = [ s_q_e_lst ]
+
+                # CLear the fields
+                fields['free_term'] = "yes"
+                fields['free_include'] = ""
+                fields['free_exclude'] = ""
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListView/adapt_search")

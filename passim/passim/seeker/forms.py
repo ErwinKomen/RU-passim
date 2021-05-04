@@ -418,6 +418,20 @@ class FeastWidget(ModelSelect2MultipleWidget):
         return Feast.objects.all().order_by('name').distinct()
 
 
+class FreeWidget(ModelSelect2MultipleWidget):
+    model = Free
+    search_fields = ['name__icontains', 'field__icontains']
+    main = ""
+
+    def label_from_instance(self, obj):
+        # Provide a suitable reference label
+        return obj.name
+
+    def get_queryset(self):
+        qs = Free.objects.filter(main=self.main).order_by("name")
+        return qs
+
+
 class FtextlinkWidget(ModelSelect2MultipleWidget):
     model = Ftextlink
     search_fields = [ 'url__icontains' ]
@@ -1336,6 +1350,22 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
 
+    # Free text searching
+    free_term  = forms.CharField(label=_("Term to look for"), required=False, 
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 30%;', 
+                                             'class': 'searching', 'placeholder': 'Term to look for (use * or #)'}))
+                #widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Term to look for (use * or #)'}))
+    free_include = forms.ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FreeWidget(attrs={'data-placeholder': 'May occur in any of...', 'style': 'width: 35%;', 'class': 'searching'}))
+    free_exclude = forms.ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FreeWidget(attrs={'data-placeholder': 'Must NOT occur in...', 'style': 'width: 30%;', 'class': 'searching'}))
+
+    # Specifically for searching...
+    srch_title = forms.CharField(required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'placeholder': 'Title (use wildcards)...', 'style': 'width: 100%;'}))
+    srch_sectiontitle = forms.CharField(required=False, 
+                widget=forms.TextInput(attrs={'class': 'searching', 'placeholder': 'Section title (use wildcards)...', 'style': 'width: 100%;'}))
+
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -1446,6 +1476,11 @@ class SermonForm(PassimModelForm):
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+
+            self.fields['free_include'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
+            self.fields['free_exclude'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
+            self.fields['free_include'].widget.main = "SermonDescr"
+            self.fields['free_exclude'].widget.main = "SermonDescr"
 
             # Some lists need to be initialized to NONE:
             self.fields['bibreflist'].queryset = Daterange.objects.none()

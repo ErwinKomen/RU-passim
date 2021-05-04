@@ -4872,6 +4872,21 @@ class Feast(models.Model):
         return sBack
 
 
+class Free(models.Model):
+    """Free text fields to be searched per main model"""
+
+    # [1] Name for the user
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Inernal field name
+    field = models.CharField("Field", max_length=LONG_STRING)
+    # [1] Name of the model
+    main = models.CharField("Model", max_length=LONG_STRING)
+
+    def __str__(self):
+        sCombi = "{}:{}".format(self.main, self.field)
+        return sCombi
+
+
 class Provenance(models.Model):
     """The 'origin' is a location where manuscripts were originally created"""
 

@@ -126,6 +126,14 @@ class ActionAdmin(admin.ModelAdmin):
         }
 
 
+class FreeAdmin(admin.ModelAdmin):
+
+    list_display = ['name', 'field', 'main']
+    list_filter = ['main']
+    search_fields = ['name', 'field']
+    fields = ['name', 'field', 'main']
+
+
 class ProfileAdmin(admin.ModelAdmin):
     """Display user profiles"""
 
@@ -225,6 +233,7 @@ admin.site.register(City, CityAdmin)
 admin.site.register(Library, LibraryAdmin)
 admin.site.register(Keyword)
 admin.site.register(Origin)
+admin.site.register(Free, FreeAdmin)
 admin.site.register(LocationType, LocationTypeAdmin)
 admin.site.register(Location, LocationAdmin)
 admin.site.register(SourceInfo, SourceInfoAdmin)
