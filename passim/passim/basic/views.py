@@ -35,6 +35,8 @@ from datetime import datetime
 # provide error handling
 from .utils import ErrHandle
 
+from passim.basic.models import UserSearch
+
 
 # Some constants that can be used
 paginateSize = 20
@@ -1133,6 +1135,9 @@ class BasicList(ListView):
                 for k,v in self.qd.items():
                     if lookfor in k and not isempty(v):
                         self.param_list.append("{}={}".format(k,v))
+
+                # Store the paramlist
+                UserSearch.add_search(request.path, self.param_list, request.user.username)
                 
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
