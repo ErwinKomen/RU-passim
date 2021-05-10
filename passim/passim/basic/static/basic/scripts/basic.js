@@ -54,6 +54,77 @@ var ru = (function ($, ru) {
         return "something";
       },
 
+      copyToClipboard: function(elem) {
+        // create hidden text element, if it doesn't already exist
+        var targetId = "_hiddenCopyText_";
+        var elConfirm = "";
+        var isInput = "";
+        var origSelectionStart, origSelectionEnd;
+
+        try {
+          // Get to the right element
+          if (elem.tagName === "A") {
+            elem = $(elem).closest("div").find("textarea").first().get(0);
+          }
+          isInput = elem.tagName === "INPUT" || elem.tagName === "TEXTAREA";
+          if (isInput) {
+            // can just use the original source element for the selection and copy
+            target = elem;
+            origSelectionStart = elem.selectionStart;
+            origSelectionEnd = elem.selectionEnd;
+          } else {
+            // must use a temporary form element for the selection and copy
+            target = document.getElementById(targetId);
+            if (!target) {
+              var target = document.createElement("textarea");
+              target.style.position = "absolute";
+              target.style.left = "-9999px";
+              target.style.top = "0";
+              target.id = targetId;
+              document.body.appendChild(target);
+            }
+            target.textContent = elem.textContent;
+          }
+          // select the content
+          var currentFocus = document.activeElement;
+          target.focus();
+          target.setSelectionRange(0, target.value.length);
+
+          // copy the selection
+          var succeed;
+          try {
+            succeed = document.execCommand("copy");
+            console.log("Copied: " + target.value);
+            elConfirm = $(elem).closest("div").find(".clipboard-confirm").first();
+            $(elConfirm).html("Copied!");
+            setTimeout(function () {
+              $(elConfirm).fadeOut().empty();
+            }, 4000);
+          } catch (e) {
+            succeed = false;
+            console.log("Could not copy");
+          }
+          // restore original focus
+          if (currentFocus && typeof currentFocus.focus === "function") {
+            currentFocus.focus();
+          }
+
+          if (isInput) {
+            // restore prior selection
+            elem.setSelectionRange(origSelectionStart, origSelectionEnd);
+          } else {
+            // clear temporary content
+            target.textContent = "";
+          }
+          
+          return succeed;
+        } catch (ex) {
+          private_methods.errMsg("copyToClipboard", ex);
+          return "";
+        }
+
+      },
+
       /** 
        *  createDiv - needed for resizableGrid
        */
@@ -98,7 +169,7 @@ var ru = (function ($, ru) {
           elW = document.getElementsByName("w");
           $(elW).val(JSON.stringify(loc_colwrap));
         } catch (ex) {
-          private_methods.showError("colwrap_switch", ex);
+          private_methods.errMsg("colwrap_switch", ex);
           return "";
         }
       },
@@ -915,6 +986,38 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * copy_to_clipboard
+       *   Copy text to clipboard
+       *
+       */
+      copy_to_clipboard: function (el) {
+        var elSpan = null,
+            copyText = null,
+            range = null,
+            sText = "";
+
+        try {
+          // Get the span
+          elSpan = $(el).closest("div").find("textarea").first();
+          copyText = document.getElementById("search_copy");
+          copyText.select();
+          copyText.setSelectionRange(0, 99999);
+          document.execCommand("copy");
+
+          // Set the range correctly
+          range = document.createRange();
+          range.selectNode(copyText);
+          window.getSelection().addRange(range);
+          document.execCommand("copy");
+
+          // sText = $(el).attr("targeturl");
+
+        } catch (ex) {
+          private_methods.errMsg("copy_to_clipboard", ex);
+        }
+      },
+
+      /**
        * delete_cancel
        *   Hide this <tr> and cancel the delete
        *
@@ -1260,6 +1363,11 @@ var ru = (function ($, ru) {
 
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
+
+          // clipboard copying
+          $(".clipboard-copy").unbind("click").on("click", function (evt) {
+            private_methods.copyToClipboard(this);
+          });
 
           // Set the value of loc_colwrap
           elW = document.getElementsByName("w");

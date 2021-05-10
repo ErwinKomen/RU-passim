@@ -733,6 +733,7 @@ class BasicList(ListView):
     use_team_group = False
     admin_editable = False
     permission = True
+    usersearch_id = ""
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
@@ -960,6 +961,13 @@ class BasicList(ListView):
 
         context['permission'] = self.permission
 
+        # Add the search url
+        if self.usersearch_id == "":
+            context['usersearch'] = ""
+        else:
+            context['usersearch'] = "{}://{}{}?usersearch={}".format(
+                self.request.scheme, self.request.get_host(), self.request.path, self.usersearch_id)
+
         # Allow others to add to context
         context = self.add_to_context(context, initial)
 
@@ -1069,11 +1077,12 @@ class BasicList(ListView):
     def get_queryset(self, request = None):
 
         if request == None: request = self.request
-        # Get the parameters passed on with the GET or the POST request
-        # get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = request.GET if request.method == "GET" else request.POST
-        get = get.copy()
-        self.qd = get
+        ## Get the parameters passed on with the GET or the POST request
+        #get = request.GET if request.method == "GET" else request.POST
+        #get = get.copy()
+        ## Possibly get 
+        #self.qd = get
+        get = self.qd
 
         # Immediately take care of the rangeslider stuff
         lst_remove = []
@@ -1136,8 +1145,14 @@ class BasicList(ListView):
                     if lookfor in k and not isempty(v):
                         self.param_list.append("{}={}".format(k,v))
 
-                # Store the paramlist
-                UserSearch.add_search(request.path, self.param_list, request.user.username)
+                # Store the paramlist - but only if this is not a repetition
+                if "usersearch" in self.qd:
+                    # Make sure we have the user search number
+                    self.usersearch_id = self.qd.get("usersearch")
+                else:
+                    oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
+                    if oSearch != None:
+                        self.usersearch_id = oSearch.id
                 
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
@@ -1240,6 +1255,16 @@ class BasicList(ListView):
         else:
             # FIrst do my own initializations
             self.initializations()
+
+            # Get the parameters passed on with the GET or the POST request
+            get = request.GET if request.method == "GET" else request.POST
+            get = get.copy()
+            # If this is a 'usersearch' then replace the parameters
+            usersearch_id = get.get("usersearch")
+            if usersearch_id != None:
+                get = UserSearch.load_parameters(usersearch_id, get)
+            self.qd = get
+
             # Then check if we have a redirect or not
             if self.redirectpage == "":
                 # We can continue with the normal 'get()'
