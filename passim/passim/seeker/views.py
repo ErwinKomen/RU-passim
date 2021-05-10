@@ -134,6 +134,13 @@ def get_usercomments(type, instance, profile):
     # REturn the list
     return qs
 
+def get_application_context(request, context):
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    return context
+
 def treat_bom(sHtml):
     """REmove the BOM marker except at the beginning of the string"""
 
@@ -283,42 +290,6 @@ def is_empty_form(form):
         form.is_valid()
     cleaned = form.cleaned_data
     return (len(cleaned) == 0)
-
-#def csv_to_excel(sCsvData, response):
-#    """Convert CSV data to an Excel worksheet"""
-
-#    # Start workbook
-#    wb = openpyxl.Workbook()
-#    ws = wb.get_active_sheet()
-#    ws.title="Data"
-
-#    # Start accessing the string data 
-#    f = StringIO(sCsvData)
-#    reader = csv.reader(f, delimiter=",")
-
-#    # Read the header cells and make a header row in the worksheet
-#    headers = next(reader)
-#    for col_num in range(len(headers)):
-#        c = ws.cell(row=1, column=col_num+1)
-#        c.value = headers[col_num]
-#        c.font = openpyxl.styles.Font(bold=True)
-#        # Set width to a fixed size
-#        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
-
-#    row_num = 1
-#    lCsv = []
-#    for row in reader:
-#        # Keep track of the EXCEL row we are in
-#        row_num += 1
-#        # Walk the elements in the data row
-#        # oRow = {}
-#        for idx, cell in enumerate(row):
-#            c = ws.cell(row=row_num, column=idx+1)
-#            c.value = row[idx]
-#            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
-#    # Save the result in the response
-#    wb.save(response)
-#    return response
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -662,6 +633,22 @@ def guide(request):
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
+
+    return render(request,template_name, context)
+
+def mypassim(request):
+    """Renders the user-manual (guide) page."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'mypassim.html'
+    context =  {'title':'My Passim',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context = get_application_context(request, context)
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
 
     return render(request,template_name, context)
 
