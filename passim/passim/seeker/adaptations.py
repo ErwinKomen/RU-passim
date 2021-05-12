@@ -1,3 +1,10 @@
+"""
+Adaptations of the database that are called up from the (list)views in the SEEKER app.
+"""
+
+from django.db import transaction
+import re
+
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
@@ -10,6 +17,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
+    Codico, CodicoKeyword, ProvenanceCod, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 
 
@@ -136,13 +144,89 @@ def adapt_codicocopy():
     oErr = ErrHandle()
     bResult = True
     msg = ""
+
+    def get_number(items, bFirst):
+        """Extract the first or last consecutive number from the string"""
+
+        number = -1
+        if len(items) > 0:
+            if bFirst:
+                # Find the first number
+                for sInput in items:
+                    arNumber = re.findall(r'\d+', sInput)
+                    if len(arNumber) > 0:
+                        number = int(arNumber[0])
+                        break
+            else:
+                # Find the last number
+                for sInput in reversed(items):
+                    arNumber = re.findall(r'\d+', sInput)
+                    if len(arNumber) > 0:
+                        number = int(arNumber[-1])
+                        break
+
+        return number
     
     try:
         # TODO: add code here and change to True
         bResult = False
+
+        # Walk through all manuscripts (that are not templates)
+        manu_lst = []
+        for manu in Manuscript.objects.filter(mtype="man"):
+            # Check if this manuscript already has Codico's
+            if manu.manuscriptcodicounits.count() == 0:
+                # Note that Codico's must be made for this manuscript
+                manu_lst.append(manu.id)
+        # Create the codico's for the manuscripts
+        with transaction.atomic():
+            for idx, manu_id in enumerate(manu_lst):
+                oErr.Status("Doing {} of {}".format(idx+1, len(manu_lst)))
+                if manu_id == 1686: 
+                    iStop = 1
+                manu = Manuscript.objects.filter(id=manu_id).first()
+                if manu != None:
+                    # Check if the codico exists
+                    codi = Codico.objects.filter(manuscript=manu).first()
+                    if codi == None:
+                        # Get first and last sermons and then their pages
+                        items = [x['itemsermons__locus'] for x in manu.manuitems.filter(itemsermons__locus__isnull=False).order_by(
+                            'order').values('itemsermons__locus')]
+                        if len(items) > 0:
+                            pagefirst = get_number(items, True)
+                            pagelast = get_number(items, False)
+                        else:
+                            pagefirst = 1
+                            pagelast = 1
+                        # Create the codico
+                        codi = Codico.objects.create(
+                            name=manu.name, support=manu.support, extent=manu.extent,
+                            format=manu.format, order=1, pagefirst=pagefirst, pagelast=pagelast,
+                            origin=manu.origin, manuscript=manu
+                            )
+                    # Copy provenances
+                    if codi.codico_provenances.count() == 0:
+                        for mp in manu.manuscripts_provenances.all():
+                            obj = ProvenanceCod.objects.create(
+                                provenance=mp.provenance, codico=codi, note=mp.note)
+
+                    # Copy keywords
+                    if codi.codico_kw.count() == 0:
+                        for mk in manu.manuscript_kw.all():
+                            obj = CodicoKeyword.objects.create(
+                                codico=codi, keyword=mk.keyword)
+
+                    # Copy date ranges
+                    if codi.codico_dateranges.count() == 0:
+                        for md in manu.manuscript_dateranges.all():
+                            md.codico = codi
+                            md.save()
+
+        # Note that we are indeed ready
+        bResult = True
     except:
-        bResult = False
         msg = oErr.get_error_message()
+        bResult = False
     return bResult, msg
 
 

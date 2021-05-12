@@ -68,7 +68,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
-    TemplateForm, TemplateImportForm
+    TemplateForm, TemplateImportForm, \
+    CodicoForm, CodicoProvForm, ProvenanceCodForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -79,6 +80,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
+    Codico, ProvenanceCod, CodicoKeyword, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -5684,6 +5686,47 @@ class ProvenanceManDetails(ProvenanceManEdit):
     rtype = "html"
         
 
+class ProvenanceCodEdit(BasicDetails):
+    """The details of one 'provenance'"""
+
+    model = ProvenanceCod
+    mForm = ProvenanceCodForm
+    prefix = 'cprov'
+    title = "CodicoProvenance"
+    rtype = "json"
+    history_button = False # True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Provenance:",   'value': instance.get_provenance()},
+            {'type': 'plain', 'label': "Note:",         'value': instance.note,   'field_key': 'note'     },
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        context['listview'] = reverse("codico_details", kwargs={'pk': instance.codico.id})
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class ProvenanceCodDetails(ProvenanceCodEdit):
+    """Like ProvenanceCod Edit, but then html output"""
+    rtype = "html"
+        
+
 class BibRangeEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
 
@@ -8117,12 +8160,12 @@ class ManuscriptEdit(BasicDetails):
                  'title': 'City, village or abbey (monastery) of the library'},
                 {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
                 {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
-                {'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-                {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
-                {'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
-                {'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
-                {'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
+                #{'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
+                #{'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
+                # 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
+                #{'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
+                #{'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
+                #{'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
                 {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
@@ -8137,11 +8180,9 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                    {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                    #{'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
                         'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
-                    #{'type': 'plain', 'label': "Provenances:",  'value': instance.get_provenance_markdown(), 
-                    #    'multiple': True, 'field_list': 'provlist', 'fso': self.formset_objects[3] }
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -8219,6 +8260,15 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
+            # Add Codico items
+            codicos = instance.manuscriptcodicounits.all().order_by('order')
+            codico_list = []
+            for codico in codicos:
+                url = reverse("codico_details", kwargs={'pk': codico.id})
+                codico_list.append( dict(url=url, kvlist=self.get_kvlist(codico)) )
+            context['codico_list'] = codico_list
+            lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
+
             # Add comment modal stuff
             initial = dict(otype="manu", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
@@ -8235,6 +8285,29 @@ class ManuscriptEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_kvlist(self, instance):
+        """Get a list of fields and values"""
+
+        lkv = []
+        lkv.append(dict(label="Order", value=instance.order))
+        lkv.append(dict(label="Title", value=instance.name))
+        lkv.append(dict(label="Date", value=instance.get_date_markdown()))
+        lkv.append(dict(label="Support", value=instance.support))
+        lkv.append(dict(label="Extent", value=instance.extent))
+        lkv.append(dict(label="Format", value=instance.format))
+        lkv.append(dict(label="Keywords", value=instance.get_keywords_markdown()))
+        lkv.append(dict(label="Origin", value=instance.get_origin_markdown()))
+        lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(instance)))
+        lkv.append(dict(label="Notes", value=instance.notes))
+        return lkv
+
+    def get_codiprovenance_markdown(self, instance):
+        """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
+
+        context = dict(codi=instance)
+        sBack = render_to_string("seeker/codi_provs.html", context, self.request)
+        return sBack
 
     def get_provenance_markdown(self, instance):
         """Calculate a collapsible table view of the provenances for this manuscript, for Manu details view"""
@@ -9135,6 +9208,375 @@ class ManuscriptDownload(BasicPart):
 
 
         return sData
+
+
+class CodicoEdit(BasicDetails):
+    """The details of one codicological unit"""
+
+    model = Codico  
+    mForm = CodicoForm
+    prefix = 'codi'
+    title = "Codicological Unit"
+    rtype = "json"
+    new_button = True
+    backbutton = False
+    mainitems = []
+    use_team_group = True
+    history_button = True
+    
+    CdrFormSet = inlineformset_factory(Codico, Daterange,
+                                         form=DaterangeForm, min_num=0,
+                                         fk_name = "codico",
+                                         extra=0, can_delete=True, can_order=False)
+    CprovFormSet = inlineformset_factory(Codico, ProvenanceCod,
+                                         form=CodicoProvForm, min_num=0,
+                                         fk_name = "codico",
+                                         extra=0, can_delete=True, can_order=False)
+
+    formset_objects = [{'formsetClass': CdrFormSet,   'prefix': 'cdr',   'readonly': False, 'noinit': True, 'linkfield': 'codico'},
+                       {'formsetClass': CprovFormSet, 'prefix': 'cprov', 'readonly': False, 'noinit': True, 'linkfield': 'codico'}]
+
+    stype_edi_fields = ['name', 'order', 'origin', 'support', 'extent', 'format', 
+                        'Daterange', 'datelist',
+                        'ProvenanceCod', 'cprovlist']
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+
+            # Define the main items to show and edit
+            context['mainitems'] = []
+
+            manu_id = None if instance == None else instance.manuscript.id
+
+            # Add a button back to the Manuscript
+            topleftlist = []
+            if manu_id != None:
+                buttonspecs = {'label': "M", 
+                     'title': "Go to manuscript {}".format(instance.manuscript.idno), 
+                     'url': reverse('manuscript_details', kwargs={'pk': manu_id})}
+                topleftlist.append(buttonspecs)
+            context['topleftbuttons'] = topleftlist
+
+            # Get the main items
+            mainitems_main = [
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),    'field_key': 'stype'},
+                # -------- HIDDEN field values ---------------
+                {'type': 'plain', 'label': "Manuscript id", 'value': manu_id,   'field_key': "manuscript",  'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'plain', 'label': "Manuscript:",   'value': instance.get_manu_markdown()},
+                {'type': 'plain', 'label': "Title:",        'value': instance.name,                     'field_key': 'name'},
+                {'type': 'safe',  'label': "Order:",        'value': instance.order},
+                {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
+                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
+                {'type': 'plain', 'label': "Support:",      'value': instance.support,                  'field_key': 'support'},
+                {'type': 'plain', 'label': "Extent:",       'value': instance.extent,                   'field_key': 'extent'},
+                {'type': 'plain', 'label': "Format:",       'value': instance.format,                   'field_key': 'format'},
+                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown()}
+                ]
+            for item in mainitems_main: context['mainitems'].append(item)
+            username = profile.user.username
+            team_group = app_editor
+            mainitems_m2m = [
+                {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),  'field_list': 'kwlist'},
+                {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
+                    'multiple': True, 'field_list': 'cprovlist', 'fso': self.formset_objects[1] }
+                ]
+            for item in mainitems_m2m: context['mainitems'].append(item)
+
+            # Possibly append notes view
+            if user_is_ingroup(self.request, app_editor):
+                context['mainitems'].append(
+                    {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+
+            # Signal that we have select2
+            context['has_select2'] = True
+
+            # Specify that the manuscript info should appear at the right
+            title_right = '<span style="font-size: xx-small">{}</span>'.format(instance.get_full_name())
+            context['title_right'] = title_right
+
+            # Note: non-app editors may still add a comment
+            lhtml = []
+            if context['is_app_editor']:
+                lbuttons = []
+
+                # Some buttons are needed anyway...
+                lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
+                lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
+
+                # Build the HTML on the basis of the above
+                lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+                for item in lbuttons:
+                    idfield = ""
+                    if 'click' in item:
+                        ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
+                    elif 'submit' in item:
+                        ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                    elif 'open' in item:
+                        ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                    else:
+                        ref = " href='{}'".format(item['href'])
+                    if 'id' in item:
+                        idfield = " id='{}'".format(item['id'])
+                    lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
+                    lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
+                lhtml.append("</div></div>")
+
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CodicoEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_provenance_markdown(self, instance):
+        """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
+
+        context = dict(codi=instance)
+        sBack = render_to_string("seeker/codi_provs.html", context, self.request)
+        return sBack
+
+    def process_formset(self, prefix, request, formset):
+        errors = []
+        bResult = True
+        instance = formset.instance
+        for form in formset:
+            if form.is_valid():
+                cleaned = form.cleaned_data
+                # Action depends on prefix
+
+                if prefix == "cdr":
+                    # Processing one daterange
+                    newstart = cleaned.get('newstart', None)
+                    newfinish = cleaned.get('newfinish', None)
+                    oneref = cleaned.get('oneref', None)
+                    newpages = cleaned.get('newpages', None)
+
+                    if newstart:
+                        # Possibly set newfinish equal to newstart
+                        if newfinish == None or newfinish == "":
+                            newfinish = newstart
+                        # Double check if this one already exists for the current instance
+                        obj = instance.codico_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
+                        if obj == None:
+                            form.instance.yearstart = int(newstart)
+                            form.instance.yearfinish = int(newfinish)
+                        # Do we have a reference?
+                        if oneref != None:
+                            form.instance.reference = oneref
+                            if newpages != None:
+                                form.instance.pages = newpages
+                        # Note: it will get saved with formset.save()
+                elif prefix == "cprov":
+                    # New method, issue #289 (last part)
+                    note = cleaned.get("note")
+                    prov_new = cleaned.get("prov_new")
+                    if prov_new != None:
+                        form.instance.provenance = prov_new
+                        form.instance.note = note
+
+            else:
+                errors.append(form.errors)
+                bResult = False
+        return None
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # (1) 'keywords'
+            kwlist = form.cleaned_data['kwlist']
+            adapt_m2m(CodicoKeyword, instance, "codico", kwlist, "keyword")
+
+            # (2) 'provenances'
+            cprovlist = form.cleaned_data['cprovlist']
+            adapt_m2m(ProvenanceCod, instance, "codico", cprovlist, "provenance", extra=['note'], related_is_through = True)
+
+            # Process many-to-ONE changes
+            # (1) links from Daterange to Codico
+            datelist = form.cleaned_data['datelist']
+            adapt_m2o(Daterange, instance, "codico", datelist)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class CodicoDetails(CodicoEdit):
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(CodicoDetails, self).add_to_context(context, instance)
+
+        oErr = ErrHandle()
+        try:
+            # Additional sections
+            context['sections'] = []
+
+            # Lists of related objects
+            context['related_objects'] = []
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CodicoDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def before_save(self, form, instance):
+        if instance != None:
+            # Below is for manuscript, not for Codico
+            ## If no project has been selected, then select the default project: Passim
+            #if instance.project == None:
+            #    instance.project = Project.get_default(self.request.user.username)
+            pass
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        return True, ""
+
+
+class CodicoListView(BasicList):
+    """Search and list manuscripts"""
+    
+    model = Codico
+    listform = CodicoForm
+    has_select2 = True
+    use_team_group = True
+    paginate_by = 20
+    bUseFilter = True
+    prefix = "codi"
+    template_help = "seeker/filter_help.html"
+    order_cols = ['manuscript__idno', 'name', 'order', 'yearstart','yearfinish', 'stype']
+    order_default = order_cols
+    order_heads = [{'name': 'Manuscript', 'order': 'o=1', 'type': 'str', 'custom': 'manu'},
+                   {'name': 'Title',     'order': 'o=2', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+                   {'name': 'Unit',     'order': 'o=3', 'type': 'int', 'custom': 'order',   'align': 'right'},
+                   {'name': 'From',     'order': 'o=4', 'type': 'int', 'custom': 'from',    'align': 'right'},
+                   {'name': 'Until',    'order': 'o=5', 'type': 'int', 'custom': 'until',   'align': 'right'},
+                   {'name': 'Status',   'order': 'o=6', 'type': 'str', 'custom': 'status'}]
+    filters = [ 
+        {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
+        {"name": "Title",           "id": "filter_title",            "enabled": False},
+        {"name": "Origin",          "id": "filter_origin",           "enabled": False},
+        {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
+        {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
+        {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
+        {"name": "Status",          "id": "filter_stype",            "enabled": False},
+        {"name": "Project",         "id": "filter_project",          "enabled": False, "head_id": "filter_other"},
+      ]
+
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'manuid',        'fkfield': 'manuscript',       'keyS': 'manuidno',      
+             'keyFk': 'idno', 'keyList': 'manuidlist', 'infield': 'id'},
+            {'filter': 'provenance',    'fkfield': 'provenances__location',  'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'title',         'dbfield': 'name',                   'keyS': 'name_ta'},
+            {'filter': 'origin',        'fkfield': 'origin',                 'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
+            {'filter': 'daterange',     'dbfield': 'codico_dateranges__yearstart__gte',         'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'codico_dateranges__yearfinish__lte',        'keyS': 'date_until'},
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'project',   'fkfield': 'manuscript__project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' }
+            ]}
+         ]
+
+    def add_to_context(self, context, initial):
+
+        # Add a form to enter a URL
+        context['searchurlform'] = SearchUrlForm()
+        
+        return context
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        if custom == "manu":
+            if instance.manuscript != None:
+                url = reverse("manuscript_details", kwargs={'pk': instance.manuscript.id})
+                html.append("<span class='manuscript-idno'><a class='nostyle' href='{}'>{}</a></span>".format(url,instance.manuscript.idno))
+        elif custom == "name":
+            if instance.name:
+                html.append("<span class='manuscript-title'>{}</span>".format(instance.name[:100]))
+                sTitle = instance.name
+        elif custom == "order":
+            html.append("{}".format(instance.order))
+        elif custom == "from":
+            for item in instance.codico_dateranges.all():
+                html.append("<div>{}</div>".format(item.yearstart))
+        elif custom == "until":
+            for item in instance.codico_dateranges.all():
+                html.append("<div>{}</div>".format(item.yearfinish))
+        elif custom == "status":
+            html.append(instance.get_stype_light())
+            sTitle = instance.get_stype_display()
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        prjlist = None
+        # Check if a list of keywords is given
+        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+            # Get the list
+            kwlist = fields['kwlist']
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Check on what kind of user I am
+            if not user_is_ingroup(self.request, app_editor):
+                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                fields['kwlist'] = kwlist
+
+        # Check if the prjlist is identified
+        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+            # Get the default project
+            qs = Project.objects.all()
+            if qs.count() > 0:
+                prj_default = qs.first()
+                qs = Project.objects.filter(id=prj_default.id)
+                fields['prjlist'] = qs
+                prjlist = qs
+
+        return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
 
 
 class SermonGoldListView(BasicList):

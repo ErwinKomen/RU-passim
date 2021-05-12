@@ -3042,12 +3042,12 @@ class Manuscript(models.Model):
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
 
-    # =============== OVERTAKEN BY DATERANGE ==============================
+    # =============== THese are the Minimum start and the Maximum finish =========================
     # [1] Date estimate: starting from this year
     yearstart = models.IntegerField("Year from", null=False, default=100)
     # [1] Date estimate: finishing with this year
     yearfinish = models.IntegerField("Year until", null=False, default=100)
-    # =====================================================================
+    # =============================================================================================
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
@@ -3517,22 +3517,6 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
-    def get_full_name(self):
-        lhtml = []
-        # (1) City
-        if self.lcity != None:
-            lhtml.append(self.lcity.name)
-        elif self.library != None:
-            lhtml.append(self.library.lcity.name)
-        # (2) Library
-        if self.library != None:
-            lhtml.append(self.library.name)
-        # (3) Idno
-        if self.idno != None:
-            lhtml.append(self.idno)
-
-        return ", ".join(lhtml)
-
     def get_city(self):
         city = "-"
         oErr = ErrHandle()
@@ -3618,6 +3602,22 @@ class Manuscript(models.Model):
         else:
             sBack = ", ".join(lHtml)
         return sBack
+
+    def get_full_name(self):
+        lhtml = []
+        # (1) City
+        if self.lcity != None:
+            lhtml.append(self.lcity.name)
+        elif self.library != None:
+            lhtml.append(self.library.lcity.name)
+        # (2) Library
+        if self.library != None:
+            lhtml.append(self.library.name)
+        # (3) Idno
+        if self.idno != None:
+            lhtml.append(self.idno)
+
+        return ", ".join(lhtml)
 
     def get_keywords_markdown(self, plain=False):
         lHtml = []
@@ -4594,6 +4594,13 @@ class Codico(models.Model):
     # [1] The finishing page of this unit
     pagelast = models.IntegerField("Last page", default=0)
 
+    # =============== THese are the Minimum start and the Maximum finish =========================
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)
+    # =============================================================================================
+
     # [1] Every codicological unit has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
@@ -4607,12 +4614,24 @@ class Codico(models.Model):
     # [0] One codicological unit can only belong to one particular manuscript
     manuscript = models.ForeignKey(Manuscript, on_delete = models.CASCADE, related_name="manuscriptcodicounits")
 
+    # ============== MANYTOMANY connections
+    # [m] Many-to-many: one codico can have a series of provenances
+    provenances = models.ManyToManyField("Provenance", through="ProvenanceCod")
+     # [m] Many-to-many: keywords per Codico
+    keywords = models.ManyToManyField(Keyword, through="CodicoKeyword", related_name="keywords_codi")
+
     class Meta:
         verbose_name = "Codicological unit"
         verbose_name_plural = "Codicological units"
 
     def __str__(self):
         return self.manuscript.idno
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(Codico, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
@@ -4638,6 +4657,40 @@ class Codico(models.Model):
 
         return "\n".join(lhtml)
 
+    def get_full_name(self):
+        sBack = "-"
+        manu = self.manuscript
+        if manu != None:
+            sBack = manu.get_full_name()
+        return sBack
+
+    def get_keywords_markdown(self, plain=False):
+        lHtml = []
+        # Visit all keywords
+        for keyword in self.keywords.all().order_by('name'):
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?codi-kwlist={}".format(reverse('codico_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_manu_markdown(self):
+        """Visualize manuscript with link for details view"""
+        sBack = "-"
+        manu = self.manuscript
+        if manu != None and manu.idno != None:
+            url = reverse("manuscript_details", kwargs={'pk': manu.id})
+            sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        return sBack
+
     def get_origin(self):
         sBack = "-"
         if self.origin:
@@ -4660,6 +4713,69 @@ class Codico(models.Model):
             url = reverse('origin_details', kwargs={'pk': self.origin.id})
             # Adapt what we return
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
+        return sBack
+
+    def get_project_markdown(self):
+        sBack = "-"
+        if self.manuscript != None and self.manuscript.project != None:
+            sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
+        return sBack
+
+    def get_provenance_markdown(self, plain=False, table=True):
+        lHtml = []
+        # Visit all literature references
+        order = 0
+        if not plain: 
+            if table: lHtml.append("<table><tbody>")
+        # for prov in self.provenances.all().order_by('name'):
+        for cprov in self.codico_provenances.all().order_by('provenance__name'):
+            order += 1
+            # Get the URL
+            prov = cprov.provenance
+            url = reverse("provenance_details", kwargs = {'pk': prov.id})
+            sNote = cprov.note
+            if sNote == None: sNote = ""
+
+            if not plain: 
+                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+            sLocName = "" 
+            if prov.location!=None:
+                if plain:
+                    sLocName = prov.location.name
+                else:
+                    sLocName = " ({})".format(prov.location.name)
+            sName = "-" if prov.name == "" else prov.name
+            sLoc = "{} {}".format(sName, sLocName)
+
+            if plain:
+                sCprov = dict(prov=prov.name, location=sLocName)
+            else:
+                sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                if table:
+                    sCprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        sProvLink, sNote)
+                else:
+                    sCprov = sProvLink
+
+            lHtml.append(sCprov)
+
+        if not plain: 
+            if table: lHtml.append("</tbody></table>")
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            # sBack = ", ".join(lHtml)
+            sBack = "".join(lHtml)
+        return sBack
+
+    def get_stype_light(self, usercomment=False):
+        count = 0
+        if usercomment:
+            # This is from Manuscript, but we don't have Comments...
+            # count = self.comments.count()
+            pass
+        sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
 
 
@@ -4709,7 +4825,8 @@ class Daterange(models.Model):
         for dr in self.manuscript.manuscript_dateranges.all():
             if dr.yearstart < current_start: current_start = dr.yearstart
             if dr.yearfinish > current_finish: current_finish = dr.yearfinish
-        # Need any changes?
+
+        # Need any changes in *MANUSCRIPT*?
         bNeedSaving = False
         if manu_start != current_start:
             self.manuscript.yearstart = current_start
@@ -4718,6 +4835,20 @@ class Daterange(models.Model):
             self.manuscript.yearfinish = current_finish
             bNeedSaving = True
         if bNeedSaving: self.manuscript.save()
+
+        # Need any changes in *CODICO*?
+        bNeedSaving = False
+        codi_start = self.codico.yearstart
+        codi_finish = self.codico.yearfinish
+        if codi_start != current_start:
+            self.codico.yearstart = current_start
+            bNeedSaving = True
+        if codi_finish != current_finish:
+            self.codico.yearfinish = current_finish
+            bNeedSaving = True
+        if bNeedSaving: self.codico.save()
+
+
         return True
 
 

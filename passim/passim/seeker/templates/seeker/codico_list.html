@@ -1,0 +1,35 @@
+
+<div class="panel panel-default panel-plain" >
+  <div class="panel-heading collapsed" data-toggle="collapse" data-target="#codi-units">Codicological units</div>
+  <div class="panel-body collapse" id="codi-units">
+    {% for codico in codico_list %}
+      <table style='width: 100%;'>
+        <thead></thead>
+        <tbody>
+          {% for item in codico.kvlist %}
+            <tr class="view-row">
+              <!-- Name of this codico-field -->
+              <td valign="top" class='tdnowrap' >{{item.label}}</td>
+
+              <!-- Value of this codico-field -->
+              <td valign="top" class='hoverable' style="width: 100%;" >
+                <div class="view-mode">
+                  {{item.value|safe}}
+                  {% if forloop.first %}
+                    <a class="btn btn-xs jumbo-3" href="{{codico.url}}"
+                       title="Open the details view of this codicological unit">Details</a>
+                  {% endif %}
+                </div> 
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <!-- Possibly add horizontal ruler-->
+      {% if not forloop.last %}
+        <div><hr /></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+</div>

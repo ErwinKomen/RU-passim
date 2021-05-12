@@ -1303,6 +1303,7 @@ class BasicDetails(DetailView):
     no_delete = False
     afterdelurl = None
     listview = None
+    backbutton = True
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
@@ -1535,6 +1536,7 @@ class BasicDetails(DetailView):
 
         context['new_button'] = self.new_button
         context['add_text'] = self.add_text
+        context['backbutton'] = self.backbutton
 
         if self.is_basic and context.get('afterdelurl') == None :
             if self.afterdelurl != None:

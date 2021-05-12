@@ -85,6 +85,10 @@ urlpatterns = [
     url(r'^manuscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
 
+    url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
+    url(r'^codico/details(?:/(?P<pk>\d+))?/$', CodicoDetails.as_view(), name='codico_details'),
+    url(r'^codico/edit(?:/(?P<pk>\d+))?/$', CodicoEdit.as_view(), name='codico_edit'),
+
     url(r'^location/list', LocationListView.as_view(), name='location_list'),
     url(r'^location/details(?:/(?P<pk>\d+))?/$', LocationDetails.as_view(), name='location_details'),
     url(r'^location/edit(?:/(?P<pk>\d+))?/$', LocationEdit.as_view(), name='location_edit'),
@@ -182,6 +186,8 @@ urlpatterns = [
     url(r'^provenance/edit(?:/(?P<pk>\d+))?/$', ProvenanceEdit.as_view(), name='provenance_edit'),
     url(r'^provman/details(?:/(?P<pk>\d+))?/$', ProvenanceManDetails.as_view(), name='provenanceman_details'),
     url(r'^provman/edit(?:/(?P<pk>\d+))?/$', ProvenanceManEdit.as_view(), name='provenanceman_edit'),
+    url(r'^provcod/details(?:/(?P<pk>\d+))?/$', ProvenanceCodDetails.as_view(), name='provenancecod_details'),
+    url(r'^provcod/edit(?:/(?P<pk>\d+))?/$', ProvenanceCodEdit.as_view(), name='provenancecod_edit'),
 
     url(r'^comment/list', CommentListView.as_view(), name='comment_list'),
     url(r'^comment/details(?:/(?P<pk>\d+))?/$', CommentDetails.as_view(), name='comment_details'),
