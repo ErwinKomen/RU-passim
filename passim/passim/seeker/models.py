@@ -4826,6 +4826,9 @@ class Daterange(models.Model):
         return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Fill in manuscript, if not yet given
+        if self.codico != None and self.manuscript_id == None or self.manuscript == None:
+            self.manuscript = self.codico.manuscript
         # Perform the actual saving
         response = super(Daterange, self).save(force_insert, force_update, using, update_fields)
         # Possibly adapt the dates of the related manuscript
@@ -6977,8 +6980,11 @@ class MsItem(models.Model):
 
     def get_codistart(self):
         oBack = None
-        if self.id == self.codico.codicoitems.order_by('order').first().id:
-            oBack = self.codico
+        if self.codico != None:
+            codi_first = self.codico.codicoitems.order_by('order').first()
+            if codi_first != None:
+                if self.id == self.codico.codicoitems.order_by('order').first().id:
+                    oBack = self.codico
         return oBack
 
 
