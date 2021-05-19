@@ -179,6 +179,9 @@ def adapt_codicocopy(oStatus=None):
             if manu.manuscriptcodicounits.count() == 0:
                 # Note that Codico's must be made for this manuscript
                 manu_lst.append(manu.id)
+        # Status message
+        oBack['total'] = "Got a list of manuscripts: {}".format(len(manu_lst))
+        if oStatus != None: oStatus.set("ok", oBack)
         # Create the codico's for the manuscripts
         with transaction.atomic():
             for idx, manu_id in enumerate(manu_lst):
