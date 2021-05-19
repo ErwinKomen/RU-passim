@@ -3191,6 +3191,10 @@ class Manuscript(models.Model):
             bResult = False
         return bResult, msg
 
+    def add_codico_to_manuscript(self):
+        bResult, msg = add_codico_to_manuscript(self)
+        return bResult, msg
+
     def custom_add(oManu, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
@@ -4815,7 +4819,7 @@ class Daterange(models.Model):
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
     manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
-    codico = models.ForeignKey(Codico, null=False, related_name="codico_dateranges", on_delete=models.CASCADE)
+    codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
 
     def __str__(self):
         sBack = "{}-{}".format(self.yearstart, self.yearfinish)

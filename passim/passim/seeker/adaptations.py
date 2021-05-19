@@ -139,11 +139,12 @@ def adapt_feastupdate():
         msg = oErr.get_error_message()
     return bResult, msg
 
-def adapt_codicocopy():
+def adapt_codicocopy(oStatus=None):
     """Create Codico's and copy Manuscript information to Codico"""
     oErr = ErrHandle()
     bResult = True
     msg = ""
+    oBack = dict(status="ok", msg="")
 
     def get_number(items, bFirst):
         """Extract the first or last consecutive number from the string"""
@@ -181,9 +182,14 @@ def adapt_codicocopy():
         # Create the codico's for the manuscripts
         with transaction.atomic():
             for idx, manu_id in enumerate(manu_lst):
-                oErr.Status("Doing {} of {}".format(idx+1, len(manu_lst)))
-                if manu_id == 1686: 
-                    iStop = 1
+                # Debugging message
+                msg = "Checking manuscript {} of {}".format(idx+1, len(manu_lst))
+                oErr.Status(msg)
+
+                # Status message
+                oBack['total'] = msg
+                if oStatus != None: oStatus.set("ok", oBack)
+
                 manu = Manuscript.objects.filter(id=manu_id).first()
                 if manu != None:
                     # Check if the codico exists
@@ -227,10 +233,66 @@ def adapt_codicocopy():
                         msitem.codico = codi
                         msitem.save()
 
+        if oStatus != None: oStatus.set("finished", oBack)
+
         # Note that we are indeed ready
         bResult = True
     except:
         msg = oErr.get_error_message()
+        bResult = False
+    return bResult, msg
+
+def add_codico_to_manuscript(manu):
+    """Check if a manuscript has a Codico, and if not create it"""
+
+    oErr = ErrHandle()
+    bResult = False
+    msg = ""
+    try:
+        # Check if the codico exists
+        codi = Codico.objects.filter(manuscript=manu).first()
+        if codi == None:
+            # Get first and last sermons and then their pages
+            items = [x['itemsermons__locus'] for x in manu.manuitems.filter(itemsermons__locus__isnull=False).order_by(
+                'order').values('itemsermons__locus')]
+            if len(items) > 0:
+                pagefirst = get_number(items, True)
+                pagelast = get_number(items, False)
+            else:
+                pagefirst = 1
+                pagelast = 1
+            # Create the codico
+            codi = Codico.objects.create(
+                name=manu.name, support=manu.support, extent=manu.extent,
+                format=manu.format, order=1, pagefirst=pagefirst, pagelast=pagelast,
+                origin=manu.origin, manuscript=manu
+                )
+        # Copy provenances
+        if codi.codico_provenances.count() == 0:
+            for mp in manu.manuscripts_provenances.all():
+                obj = ProvenanceCod.objects.create(
+                    provenance=mp.provenance, codico=codi, note=mp.note)
+
+        # Copy keywords
+        if codi.codico_kw.count() == 0:
+            for mk in manu.manuscript_kw.all():
+                obj = CodicoKeyword.objects.create(
+                    codico=codi, keyword=mk.keyword)
+
+        # Copy date ranges
+        if codi.codico_dateranges.count() == 0:
+            for md in manu.manuscript_dateranges.all():
+                md.codico = codi
+                md.save()
+
+        # Tie all MsItems that need be to the Codico
+        for msitem in manu.manuitems.all().order_by('order'):
+            msitem.codico = codi
+            msitem.save()
+        bResult = True
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_codico_to_manuscript")
         bResult = False
     return bResult, msg
 

@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
-from passim.seeker.adaptations import listview_adaptations
+from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
@@ -855,11 +855,19 @@ def sync_start(request):
                 if oResult != None and 'status' in oResult:
                     data['count'] = oResult
                 else:
-                #if oResult == None or oResult['status'] == "error":
-                    data.status = 'error {}'.format(msg)
-                #elif oResult != None:
-                #    data['count'] = oResult
+                    data['status'] = 'error {}'.format(msg)
 
+            elif synctype == "codico":
+                # Use the synchronisation object that contains all relevant information
+                oStatus.set("loading")
+
+                # Perform the adaptation
+                bResult, msg = adapt_codicocopy(oStatus=oStatus)
+                
+                if bResult:
+                    data['count'] = 1
+                else:
+                    data['status'] = "error {}".format(msg) 
 
     except:
         oErr.DoError("sync_start error")

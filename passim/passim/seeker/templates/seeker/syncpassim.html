@@ -1,4 +1,4 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 
 {% block content %}
 
@@ -56,6 +56,37 @@
     </fieldset>
 
     <div class="row">&nbsp;</div>
+
+    <!-- Add codicologial layer to newly imported manuscripts -->
+    {% if user.is_superuser %}
+      <fieldset class="module aligned" >
+        <div class="row" style="border: 1px solid darkgray; padding-top: 15px;  padding-bottom: 15px;">
+          <div class="col-md-4">
+            <h3 class="straight" style="margin-top: 0px; margin-left: 10px;">Codicology</h3>
+              <p style="margin-top: 0px; margin-left: 10px;">This adds a 'codicological layer' to manuscripts that don't yet have it.</p>
+          </div>
+          <div class="col-md-8">
+            <form id="sync_form_codico" method="POST">
+ 
+
+              <div class="row">&nbsp;</div>
+              <div class="row">
+                <div class="col-md-3">
+                  <span><a id="sync_start_codico" class="btn btn-primary btn-xs" 
+                      sync-start="{% url 'sync_start' %}?synctype=codico" 
+                      sync-progress="{% url 'sync_progress' %}?synctype=codico" 
+                      onclick="ru.passim.sync_start('codico')">Update codicological layer</a>
+                  </span>
+                </div>
+                <div id="sync_progress_codico" class="col-md-9">
+                  <!-- This is where the progress will be reported -->
+                </div>
+              </div>
+              <div id="sync_details_codico" class="row"></div>
+            </form>
+          </div>
+        </div>
+      </fieldset>
 
     <!-- Synchronizing LIBRARY entries -->
     {% if user.is_superuser %}
