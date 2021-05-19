@@ -737,7 +737,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             
             # Make set of the list, sm_shelfmark is to be used to compare 
             # each shelfmark of each manuscript in all available A+M XML's
-            shelfmark_set = set(shelfmark_list)  
+            shelfmark_set = set(shelfmark_list)
+            print(shelfmark_set)
             
             # Make a dictionary that can be used to find out if a shelfmark has
             # been digitized or not
