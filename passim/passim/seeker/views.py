@@ -69,7 +69,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm
-from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
+from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
@@ -82,9 +82,10 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
+from passim.seeker.adaptations import listview_adaptations
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
 
 
 # Some constants that can be used
@@ -133,6 +134,13 @@ def get_usercomments(type, instance, profile):
 
     # REturn the list
     return qs
+
+def get_application_context(request, context):
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    return context
 
 def treat_bom(sHtml):
     """REmove the BOM marker except at the beginning of the string"""
@@ -283,42 +291,6 @@ def is_empty_form(form):
         form.is_valid()
     cleaned = form.cleaned_data
     return (len(cleaned) == 0)
-
-#def csv_to_excel(sCsvData, response):
-#    """Convert CSV data to an Excel worksheet"""
-
-#    # Start workbook
-#    wb = openpyxl.Workbook()
-#    ws = wb.get_active_sheet()
-#    ws.title="Data"
-
-#    # Start accessing the string data 
-#    f = StringIO(sCsvData)
-#    reader = csv.reader(f, delimiter=",")
-
-#    # Read the header cells and make a header row in the worksheet
-#    headers = next(reader)
-#    for col_num in range(len(headers)):
-#        c = ws.cell(row=1, column=col_num+1)
-#        c.value = headers[col_num]
-#        c.font = openpyxl.styles.Font(bold=True)
-#        # Set width to a fixed size
-#        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
-
-#    row_num = 1
-#    lCsv = []
-#    for row in reader:
-#        # Keep track of the EXCEL row we are in
-#        row_num += 1
-#        # Walk the elements in the data row
-#        # oRow = {}
-#        for idx, cell in enumerate(row):
-#            c = ws.cell(row=row_num, column=idx+1)
-#            c.value = row[idx]
-#            c.alignment = openpyxl.styles.Alignment(wrap_text=False)
-#    # Save the result in the response
-#    wb.save(response)
-#    return response
 
 def user_is_authenticated(request):
     # Is this user authenticated?
@@ -662,6 +634,22 @@ def guide(request):
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
+
+    return render(request,template_name, context)
+
+def mypassim(request):
+    """Renders the user-manual (guide) page."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'mypassim.html'
+    context =  {'title':'My Passim',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context = get_application_context(request, context)
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
 
     return render(request,template_name, context)
 
@@ -4726,7 +4714,7 @@ class SermonListView(BasicList):
     template_help = "seeker/filter_help.html"
     has_select2 = True
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
@@ -4734,23 +4722,30 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
+        {'name': 'Title',       'order': 'o=5', 'type': 'str', 'custom': 'title', 
+         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},
+        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+         'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=7', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
+                {"name": "Title",            "id": "filter_title",          "enabled": False},
+                {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
-                {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
+                {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
-                {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
+                {"name": "Free",             "id": "filter_freetext",       "enabled": False},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
+                {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
@@ -4769,11 +4764,15 @@ class SermonListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
-            {'filter': 'title',         'dbfield': 'title',             'keyS': 'title'},
+            {'filter': 'title',         'dbfield': 'title',             'keyS': 'srch_title'},
+            {'filter': 'sectiontitle',  'dbfield': 'sectiontitle',      'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_term'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_include'},
+            {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_exclude'},
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
@@ -4894,6 +4893,16 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "title":
+            sTitle = ""
+            if instance.title != None and instance.title != "":
+                sTitle = instance.title
+            html.append(sTitle)
+        elif custom == "sectiontitle":
+            sSection = ""
+            if instance.sectiontitle != None and instance.sectiontitle != "":
+                sSection = instance.sectiontitle
+            html.append(sSection)
         elif custom == "links":
             for gold in instance.goldsermons.all():
                 for link_def in gold.link_oview():
@@ -4960,6 +4969,49 @@ class SermonListView(BasicList):
                     # Reset the authortype
                     fields['authortype'] = ""
 
+            # Adapt according to the 'free' fields
+            free_term = fields.get("free_term", "")
+            if free_term != None and free_term != "":
+                free_include = fields.get("free_include", [])
+                free_exclude = fields.get("free_exclude", [])
+
+                # Look for include fields
+                s_q_i_lst = ""
+                for obj in free_include:
+                    val = free_term
+                    if "*" in val or "#" in val:
+                        val = adapt_search(val)
+                        s_q = Q(**{"{}__iregex".format(obj.field): val})
+                    else:
+                        s_q = Q(**{"{}__iexact".format(obj.field): val})
+                    if s_q_i_lst == "":
+                        s_q_i_lst = s_q
+                    else:
+                        s_q_i_lst |= s_q
+
+                # Look for exclude fields
+                s_q_e_lst = ""
+                for obj in free_exclude:
+                    val = free_term
+                    if "*" in val or "#" in val:
+                        val = adapt_search(val)
+                        s_q = Q(**{"{}__iregex".format(obj.field): val})
+                    else:
+                        s_q = Q(**{"{}__iexact".format(obj.field): val})
+                    if s_q_e_lst == "":
+                        s_q_e_lst = s_q
+                    else:
+                        s_q_e_lst |= s_q
+
+                if s_q_i_lst != "":
+                    qAlternative = s_q_i_lst
+                if s_q_e_lst != "":
+                    lstExclude = [ s_q_e_lst ]
+
+                # CLear the fields
+                fields['free_term'] = "yes"
+                fields['free_include'] = ""
+                fields['free_exclude'] = ""
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListView/adapt_search")
@@ -8763,90 +8815,7 @@ class ManuscriptListView(BasicList):
             self.downloads = []
 
         # ======== One-time adaptations ==============
-        # Check if signature adaptation is needed
-        sh_done = Information.get_kvalue("sermonhierarchy")
-        if sh_done == None or sh_done == "":
-            # Perform adaptations
-            bResult, msg = Manuscript.adapt_hierarchy()
-            if bResult:
-                # Success
-                Information.set_kvalue("sermonhierarchy", "done")
-
-        # Check if MsItem cleanup is needed
-        sh_done = Information.get_kvalue("msitemcleanup")
-        if sh_done == None or sh_done == "":
-            method = "UseAdaptations"
-            method = "RemoveOrphans"
-
-            if method == "RemoveOrphans":
-                # Walk all manuscripts
-                for manu in Manuscript.objects.all():
-                    manu.remove_orphans()
-            elif method == "UseAdaptations":
-                # Perform adaptations
-                del_id = []
-                qs = MsItem.objects.annotate(num_heads=Count('itemheads')).annotate(num_sermons=Count('itemsermons'))
-                for obj in qs.filter(num_heads=0, num_sermons=0):
-                    del_id.append(obj.id)
-                # Remove them
-                MsItem.objects.filter(id__in=del_id).delete()
-                # Success
-                Information.set_kvalue("msitemcleanup", "done")
-
-        # Check if adding [lcity] and [lcountry] to locations is needed
-        sh_done = Information.get_kvalue("locationcitycountry")
-        if sh_done == None or sh_done == "":
-            with transaction.atomic():
-                for obj in Location.objects.all():
-                    bNeedSaving = False
-                    lcountry = obj.partof_loctype("country")
-                    lcity = obj.partof_loctype("city")
-                    if obj.lcountry == None and lcountry != None:
-                        obj.lcountry = lcountry
-                        bNeedSaving = True
-                    if obj.lcity == None and lcity != None:
-                        obj.lcity = lcity
-                        bNeedSaving = True
-                    if bNeedSaving:
-                        obj.save()
-            # Success
-            Information.set_kvalue("locationcitycountry", "done")
-
-        # Remove all 'template' manuscripts that are not in the list of templates
-        sh_done = Information.get_kvalue("templatecleanup")
-        if sh_done == None or sh_done == "":
-            # Get a list of all the templates and the manuscript id's in it
-            template_manu_id = [x.manu.id for x in Template.objects.all().order_by('manu__id')]
-
-            # Get all manuscripts that are supposed to be template, but whose ID is not in [templat_manu_id]
-            qs_manu = Manuscript.objects.filter(mtype='tem').exclude(id__in=template_manu_id)
-
-            # Remove these manuscripts (and their associated msitems, sermondescr, sermonhead
-            qs_manu.delete()
-
-            # Success
-            Information.set_kvalue("templatecleanup", "done")
-
-        # Remove all 'template' manuscripts that are not in the list of templates
-        sh_done = Information.get_kvalue("feastupdate")
-        if sh_done == None or sh_done == "":
-            # Get a list of all the templates and the manuscript id's in it
-            feast_lst = [x['feast'] for x in SermonDescr.objects.exclude(feast__isnull=True).order_by('feast').values('feast').distinct()]
-            feast_set = {}
-            # Create the feasts
-            for feastname in feast_lst:
-                obj = Feast.objects.filter(name=feastname).first()
-                if obj == None:
-                    obj = Feast.objects.create(name=feastname)
-                feast_set[feastname] = obj
-
-            with transaction.atomic():
-                for obj in SermonDescr.objects.filter(feast__isnull=False):
-                    obj.feast = feast_set[obj.feast]
-                    obj.save()
-
-            # Success
-            Information.set_kvalue("feastupdate", "done")
+        listview_adaptations("manuscript_list")
 
         return None
 

@@ -4571,6 +4571,98 @@ class Manuscript(models.Model):
         return oBack
         
 
+class Codico(models.Model):
+    """A codicological unit is a physical part (or whole) of a Manuscript"""
+
+    # [1] Name of the codicological unit (that is the TITLE)
+    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
+    # [0-1] Notes field, which may be empty - see issue #298
+    notes = models.TextField("Notes", null=True, blank=True)
+
+    # PHYSICAL features of the manuscript (OPTIONAL)
+    # [0-1] Support: the general type of manuscript
+    support = models.TextField("Support", null=True, blank=True)
+    # [0-1] Extent: the total number of pages
+    extent = models.TextField("Extent", max_length=LONG_STRING, null=True, blank=True)
+    # [0-1] Format: the size
+    format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
+
+    # [1] The order of this logical unit within the manuscript (for sorting)
+    order = models.IntegerField("Order", default=0)
+    # [1] The starting page of this unit
+    pagefirst = models.IntegerField("First page", default=0)
+    # [1] The finishing page of this unit
+    pagelast = models.IntegerField("Last page", default=0)
+
+    # [1] Every codicological unit has a status - this is *NOT* related to model 'Status'
+    stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    # [0-1] Status note
+    snote = models.TextField("Status note(s)", default="[]")
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    # [0-1] If possible we need to know the original location of the codico
+    origin = models.ForeignKey(Origin, null=True, blank=True, on_delete = models.SET_NULL, related_name="origin_codicos")
+    # [0] One codicological unit can only belong to one particular manuscript
+    manuscript = models.ForeignKey(Manuscript, on_delete = models.CASCADE, related_name="manuscriptcodicounits")
+
+    class Meta:
+        verbose_name = "Codicological unit"
+        verbose_name_plural = "Codicological units"
+
+    def __str__(self):
+        return self.manuscript.idno
+
+    def get_date_markdown(self):
+        """Get the date ranges as a HTML string"""
+
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.codico_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " <span style='font-size: x-small;'>(see {}, {})</span>".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " <span style='font-size: x-small;'>(see {})</span>".format(obj.reference.get_full_markdown())
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "<div><span class='badge signature ot'>{}</span>{}</div>".format(years, ref)
+            lhtml.append(item)
+
+        return "\n".join(lhtml)
+
+    def get_origin(self):
+        sBack = "-"
+        if self.origin:
+            # Just take the bare name of the origin
+            sBack = self.origin.name
+            if self.origin.location:
+                # Add the actual location if it is known
+                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+        return sBack
+
+    def get_origin_markdown(self):
+        sBack = "-"
+        if self.origin:
+            # Just take the bare name of the origin
+            sBack = self.origin.name
+            if self.origin.location:
+                # Add the actual location if it is known
+                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+            # Get the url to it
+            url = reverse('origin_details', kwargs={'pk': self.origin.id})
+            # Adapt what we return
+            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
+        return sBack
+
+
 class Daterange(models.Model):
     """Each manuscript can have a number of date ranges attached to it"""
 
@@ -4588,6 +4680,7 @@ class Daterange(models.Model):
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
     manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+    codico = models.ForeignKey(Codico, null=False, related_name="codico_dateranges", on_delete=models.CASCADE)
 
     def __str__(self):
         sBack = "{}-{}".format(self.yearstart, self.yearfinish)
@@ -4870,6 +4963,21 @@ class Feast(models.Model):
         if self.feastdate != None and self.feastdate != "":
             sBack = self.feastdate
         return sBack
+
+
+class Free(models.Model):
+    """Free text fields to be searched per main model"""
+
+    # [1] Name for the user
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] Inernal field name
+    field = models.CharField("Field", max_length=LONG_STRING)
+    # [1] Name of the model
+    main = models.CharField("Model", max_length=LONG_STRING)
+
+    def __str__(self):
+        sCombi = "{}:{}".format(self.main, self.field)
+        return sCombi
 
 
 class Provenance(models.Model):
@@ -8411,6 +8519,17 @@ class ManuscriptKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class CodicoKeyword(models.Model):
+    """Relation between a Codico and a Keyword"""
+
+    # [1] The link is between a Manuscript instance ...
+    codico = models.ForeignKey(Codico, related_name="codico_kw")
+    # [1] ...and a keyword instance
+    keyword = models.ForeignKey(Keyword, related_name="codico_kw")
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
 class ManuscriptCorpus(models.Model):
     """A user-SSG-specific manuscript corpus"""
 
@@ -8879,13 +8998,36 @@ class BasketSuper(models.Model):
     
 
 class ProvenanceMan(models.Model):
+    """Link between Provenance and Codico"""
 
     # [1] The provenance
     provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
-    # [1] The manuscript this sermon is written on 
+    # [1] The manuscript this provenance is written on 
     manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
     # [0-1] Further details are perhaps required too
     note = models.TextField("Manuscript-specific provenance note", blank=True, null=True)
+
+    def get_provenance(self):
+        sBack = ""
+        prov = self.provenance
+        sName = ""
+        sLoc = ""
+        url = reverse("provenance_details", kwargs={'pk': self.id})
+        if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
+        if prov.location != None: sLoc = prov.location.name
+        sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
+        return sBack
+
+
+class ProvenanceCod(models.Model):
+    """Link between Provenance and Codico"""
+
+    # [1] The provenance
+    provenance = models.ForeignKey(Provenance, related_name = "codico_provenances")
+    # [1] The codico this provenance is written on 
+    codico = models.ForeignKey(Codico, related_name = "codico_provenances")
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Codico-specific provenance note", blank=True, null=True)
 
     def get_provenance(self):
         sBack = ""

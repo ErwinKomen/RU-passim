@@ -35,6 +35,8 @@ from datetime import datetime
 # provide error handling
 from .utils import ErrHandle
 
+from passim.basic.models import UserSearch
+
 
 # Some constants that can be used
 paginateSize = 20
@@ -731,6 +733,7 @@ class BasicList(ListView):
     use_team_group = False
     admin_editable = False
     permission = True
+    usersearch_id = ""
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
@@ -958,6 +961,13 @@ class BasicList(ListView):
 
         context['permission'] = self.permission
 
+        # Add the search url
+        if self.usersearch_id == "":
+            context['usersearch'] = ""
+        else:
+            context['usersearch'] = "{}://{}{}?usersearch={}".format(
+                self.request.scheme, self.request.get_host(), self.request.path, self.usersearch_id)
+
         # Allow others to add to context
         context = self.add_to_context(context, initial)
 
@@ -1020,6 +1030,8 @@ class BasicList(ListView):
                 fobj['classes'] = " ".join(classes)
                 if 'colwrap' in head:
                     fobj['colwrap'] = True
+                if 'autohide' in head:
+                    fobj['autohide'] = head['autohide']
                 fields.append(fobj)
             # Make the list of field-values available
             result['fields'] = fields
@@ -1065,11 +1077,12 @@ class BasicList(ListView):
     def get_queryset(self, request = None):
 
         if request == None: request = self.request
-        # Get the parameters passed on with the GET or the POST request
-        # get = self.request.GET if self.request.method == "GET" else self.request.POST
-        get = request.GET if request.method == "GET" else request.POST
-        get = get.copy()
-        self.qd = get
+        ## Get the parameters passed on with the GET or the POST request
+        #get = request.GET if request.method == "GET" else request.POST
+        #get = get.copy()
+        ## Possibly get 
+        #self.qd = get
+        get = self.qd
 
         # Immediately take care of the rangeslider stuff
         lst_remove = []
@@ -1131,6 +1144,15 @@ class BasicList(ListView):
                 for k,v in self.qd.items():
                     if lookfor in k and not isempty(v):
                         self.param_list.append("{}={}".format(k,v))
+
+                # Store the paramlist - but only if this is not a repetition
+                if "usersearch" in self.qd:
+                    # Make sure we have the user search number
+                    self.usersearch_id = self.qd.get("usersearch")
+                else:
+                    oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
+                    if oSearch != None:
+                        self.usersearch_id = oSearch.id
                 
                 # Allow user to adapt the list of search fields
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
@@ -1150,15 +1172,15 @@ class BasicList(ListView):
                     for item in lstQ[1:]:
                         filter = filter & item
                     if qAlternative:
-                        filter = ( filter ) | ( ( qAlternative ) & filter )
+                        # filter = ( filter ) | ( ( qAlternative ) & filter )
+                        filter = ( ( qAlternative ) & filter )
 
                     # Check if excluding is needed
                     if lstExclude:
-                        # qs = self.model.objects.filter(*lstQ).exclude(*lstExclude).distinct()
                         qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
                     else:
-                        # qs = self.model.objects.filter(Q(scount__gte=4))
                         qs = self.model.objects.filter(filter).distinct()
+
                     # Only set the [bFilter] value if there is an overt specified filter
                     for filter in self.filters:
                         if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
@@ -1172,6 +1194,21 @@ class BasicList(ListView):
             # Do the ordering of the results
             order = self.order_default
             qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+
+            # Adapt order_heads 'autohide' if a column has a filter set
+            for oOrderHead in self.order_heads:
+                if 'filter' in oOrderHead:
+                    sFilterId = oOrderHead['filter']
+                    # Initial: on
+                    oOrderHead['autohide'] = "on"
+                    # Look for the correct filter
+                    for oFilter in self.filters:
+                        if oFilter['id'] == sFilterId:
+                            # We found the filter - is it being used?
+                            if oFilter['enabled']:
+                                # It is used, so make sure to switch OFF the autohide
+                                oOrderHead['autohide'] = "off"
+
         else:
             # No filter and no basket: show all
             self.basketview = False
@@ -1218,6 +1255,16 @@ class BasicList(ListView):
         else:
             # FIrst do my own initializations
             self.initializations()
+
+            # Get the parameters passed on with the GET or the POST request
+            get = request.GET if request.method == "GET" else request.POST
+            get = get.copy()
+            # If this is a 'usersearch' then replace the parameters
+            usersearch_id = get.get("usersearch")
+            if usersearch_id != None:
+                get = UserSearch.load_parameters(usersearch_id, get)
+            self.qd = get
+
             # Then check if we have a redirect or not
             if self.redirectpage == "":
                 # We can continue with the normal 'get()'
