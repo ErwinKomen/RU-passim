@@ -4,6 +4,20 @@
     <div sermonid="{{msitem.obj.id}}" level="{{level}}" id="sermon_{{msitem.obj.id}}"
          sermontype="{% if msitem.shead %}head{% else %}sermon{% endif %}"
          class="tree {% if lean_method and level > 1 %} hidden{% endif %}">
+
+      <!-- Possible start of a new codicological unit -->
+      {% if msitem.codistart %}
+        <div class="codi-start {% if is_app_editor and msitem.codiorder > 1 %}draggable{% endif %}" 
+             {% if is_app_editor and msitem.codiorder > 1 %}
+                draggable="true"
+                ondragstart="ru.passim.seeker.sermon_drag(event);"
+             {% endif %}
+             order="{{msitem.codiorder}}"
+             targetid="{{msitem.codistart}}">
+      <hr />
+      </div>
+      {% endif %}
+
       <table class="func-view sermons" style="width: 100%;">
         <tbody>
           <!-- Horizontal ruler that can be expanded -->

@@ -4633,6 +4633,25 @@ class Codico(models.Model):
         response = super(Codico, self).save(force_insert, force_update, using, update_fields)
         return response
 
+    def delete(self, using = None, keep_parents = False):
+        # Move the MsItem objects that are under me to the Codico that is before me
+        manu = self.manuscript
+        codi_first = manu.manuscriptcodicounits.all().order_by("order").first()
+        if codi_first is self:
+            # Can *NOT* remove the first codi
+            return None
+        for item in self.codicoitems.all():
+            item.codico = codi_first
+            item.save()
+
+        # Note: don't touch Daterange, Keyword and Provenance -- those are lost when a codico is removed
+        # (Unless the user wants this differently)
+
+        # Perform the standard delete operation
+        response = super(Codico, self).delete(using, keep_parents)
+        # Return the correct response
+        return response
+
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
 
@@ -6914,6 +6933,9 @@ class MsItem(models.Model):
     #           and when an MsItem is removed, so is its SermonDescr or SermonHead
     manu = models.ForeignKey(Manuscript, null=True, on_delete = models.CASCADE, related_name="manuitems")
 
+    # [1] Every MsItem also belongs to exactly one Codico (which is part of a manuscript)
+    codico = models.ForeignKey(Codico, null=True, on_delete = models.SET_NULL, related_name="codicoitems")
+
     # ============= FIELDS FOR THE HIERARCHICAL STRUCTURE ====================
     # [0-1] Parent sermon, if applicable
     parent = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_parent")
@@ -6948,6 +6970,12 @@ class MsItem(models.Model):
             manu.order_calculate()
         # REturn delete response
         return response
+
+    def get_codistart(self):
+        oBack = None
+        if self.id == self.codico.codicoitems.order_by('order').first().id:
+            oBack = self.codico
+        return oBack
 
 
 class SermonHead(models.Model):
@@ -8123,6 +8151,14 @@ class SermonDescr(models.Model):
                 if bNeedSave:
                     obj.save()
         return True
+
+    def is_codistart(self):
+        sResult = ""
+        if self.msitem != None:
+            if self.msitem.codico != None:
+                if self.msitem.codico.order == 1:
+                    sResult = self.msitem.codico.id
+        return sResult
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit

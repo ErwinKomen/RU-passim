@@ -8191,9 +8191,12 @@ class ManuscriptEdit(BasicDetails):
                     context['mainitems'].append(
                         {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
 
-                # Always append external links
+                # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
                         'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
+                context['mainitems'].append(
+                    {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance)}
+                    )
 
             # Signal that we have select2
             context['has_select2'] = True
@@ -8264,8 +8267,10 @@ class ManuscriptEdit(BasicDetails):
             codicos = instance.manuscriptcodicounits.all().order_by('order')
             codico_list = []
             for codico in codicos:
+                # Get the codico details URL
                 url = reverse("codico_details", kwargs={'pk': codico.id})
-                codico_list.append( dict(url=url, kvlist=self.get_kvlist(codico)) )
+                # Add the information to the codico list
+                codico_list.append( dict(url=url, kvlist=self.get_kvlist(codico), codico_id=codico.id) )
             context['codico_list'] = codico_list
             lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
 
@@ -8286,11 +8291,37 @@ class ManuscriptEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_codico_buttons(self, instance):
+        sBack = ""
+        context = dict(codico_count=instance.manuscriptcodicounits.count())
+        lhtml = []
+        lhtml.append(render_to_string("seeker/codico_buttons.html", context, self.request))
+        sBack = "\n".join(lhtml)
+        return sBack
+
     def get_kvlist(self, instance):
         """Get a list of fields and values"""
 
+        # Get a list of sermon information for this codico
+        sermon_list = []
+        for msitem in instance.codicoitems.all().order_by('order'):
+            for sermon in msitem.itemsermons.all():
+                # Add information of this sermon to the list
+                sermon_url = reverse('sermon_details', kwargs={'pk': sermon.id})
+                sermon_html = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(sermon_url, sermon.locus)
+                sermon_list.append(sermon_html)
+        # Action depends on the size of the list
+        if len(sermon_list) == 0:
+            sermons = "(none)"
+        elif len(sermon_list) == 1:
+            sermons = sermon_list[0]
+        else:
+            sermons = "{}...{}".format(sermon_list[0], sermon_list[-1])
+        # OLD:
+        # sermons = ", ".join(sermon_list)
         lkv = []
         lkv.append(dict(label="Order", value=instance.order))
+        lkv.append(dict(label="Sermons", value=sermons))
         lkv.append(dict(label="Title", value=instance.name))
         lkv.append(dict(label="Date", value=instance.get_date_markdown()))
         lkv.append(dict(label="Support", value=instance.support))
@@ -8565,6 +8596,9 @@ class ManuscriptDetails(ManuscriptEdit):
                     # Is this one a parent of others?
                     if method == "msitem":
                         oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
+                        codi = sermon.get_codistart()
+                        oSermon['codistart'] = "" if codi == None else codi.id
+                        oSermon['codiorder'] = -1 if codi == None else codi.order
                     #else:
                     #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
 
@@ -8583,6 +8617,12 @@ class ManuscriptDetails(ManuscriptEdit):
             # Add instances to the list, noting their childof and order
             context['sermon_list'] = sermon_list
             context['sermon_count'] = len(sermon_list)
+            # List of codicological units that are not yet linked to data
+            codi_empty_list = []
+            for codi in instance.manuscriptcodicounits.all().order_by('order'):
+                if codi.codicoitems.count() == 0:
+                    codi_empty_list.append(codi)
+            context['codi_empty_list'] = codi_empty_list
 
             # Add the list of sermons and the comment button
             context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
@@ -8663,6 +8703,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
                     # Step 2: store the hierarchy
                     changes = {}
                     hierarchy = []
+                    codi = None
                     with transaction.atomic():
                         for idx, item in enumerate(hlist):
                             bNeedSaving = False
@@ -8674,6 +8715,17 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
                             # Get the parent
                             parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
+
+                            # Get a possible codi id
+                            codi_id = item.get("codi")
+                            if codi_id != None:
+                                if codi == None or codi.id != codi_id:
+                                    codi = Codico.objects.filter(id=codi_id).first()
+
+                            # Possibly set the msitem codi
+                            if msitem.codico != codi:
+                                msitem.codico = codi
+                                bNeedSaving = True
 
                             # Possibly adapt the [shead] title and locus
                             itemhead = msitem.itemheads.first()
@@ -9218,6 +9270,7 @@ class CodicoEdit(BasicDetails):
     prefix = 'codi'
     title = "Codicological Unit"
     rtype = "json"
+    prefix_type = "simple"
     new_button = True
     backbutton = False
     mainitems = []
@@ -9240,6 +9293,14 @@ class CodicoEdit(BasicDetails):
                         'Daterange', 'datelist',
                         'ProvenanceCod', 'cprovlist']
     
+    def custom_init(self, instance):
+        if instance != None:
+            manu_id = instance.manuscript.id
+            # Also make sure to change the afterdelurl
+            self.afterdelurl = reverse("manuscript_details", kwargs={'pk': manu_id})
+
+        return None
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -9260,6 +9321,14 @@ class CodicoEdit(BasicDetails):
                      'title': "Go to manuscript {}".format(instance.manuscript.idno), 
                      'url': reverse('manuscript_details', kwargs={'pk': manu_id})}
                 topleftlist.append(buttonspecs)
+
+                ## Also make sure to change the afterdelurl
+                #context['afterdelurl'] = reverse("manuscript_details", kwargs={'pk': manu_id})
+
+                # Check if this is the *first* codico of the manuscript
+                if instance.manuscript.manuscriptcodicounits.all().order_by("order").first().id == instance.id:
+                    # Make sure deleting is not allowed
+                    context['no_delete'] = True
             context['topleftbuttons'] = topleftlist
 
             # Get the main items
@@ -9389,6 +9458,17 @@ class CodicoEdit(BasicDetails):
                 bResult = False
         return None
 
+    def before_save(self, form, instance):
+        if instance != None:
+            # Double check for the correct 'order'
+            if instance.order <= 0:
+                # Calculate how many CODICOs (!) there are
+                codico_count = instance.manuscript.manuscriptcodicounits.count()
+                # Adapt the order of this codico
+                instance.order = codico_count + 1
+                # The number will be automatically saved
+        return True, ""
+
     def after_save(self, form, instance):
         msg = ""
         bResult = True
@@ -9445,15 +9525,6 @@ class CodicoDetails(CodicoEdit):
 
         # Return the context we have made
         return context
-
-    def before_save(self, form, instance):
-        if instance != None:
-            # Below is for manuscript, not for Codico
-            ## If no project has been selected, then select the default project: Passim
-            #if instance.project == None:
-            #    instance.project = Project.get_default(self.request.user.username)
-            pass
-        return True, ""
 
     def process_formset(self, prefix, request, formset):
         return None
@@ -9523,7 +9594,7 @@ class CodicoListView(BasicList):
         if custom == "manu":
             if instance.manuscript != None:
                 url = reverse("manuscript_details", kwargs={'pk': instance.manuscript.id})
-                html.append("<span class='manuscript-idno'><a class='nostyle' href='{}'>{}</a></span>".format(url,instance.manuscript.idno))
+                html.append("<span class='manuscript-idno'><a href='{}'>{}</a></span>".format(url,instance.manuscript.idno))
         elif custom == "name":
             if instance.name:
                 html.append("<span class='manuscript-title'>{}</span>".format(instance.name[:100]))

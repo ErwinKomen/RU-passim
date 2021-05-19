@@ -132,7 +132,20 @@
             {% endif %}
           {% endfor %}
         </div>
+
+        <!-- Possible start of a new codicological unit -->
+        {% for codi in codi_empty_list %}
+          <div class="tree codi-start {% if is_app_editor and codi.order > 1 %}draggable{% endif %} " 
+               id="codi_{{codi.id}}" sermonid="" sermontype="codi"
+               targetid="{{codi.id}}" order="{{codi.order}}"
+               {% if is_app_editor and codi.order > 1 %}
+                  draggable="true"
+                  ondragstart="ru.passim.seeker.sermon_drag(event);"             
+               {% endif %}><hr /></div>
+        {% endfor %}
+
       </div>
+
 
       {% if is_app_editor %}
         <!-- Hidden sermon hierarchy element -->

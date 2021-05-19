@@ -222,6 +222,11 @@ def adapt_codicocopy():
                             md.codico = codi
                             md.save()
 
+                    # Tie all MsItems that need be to the Codico
+                    for msitem in manu.manuitems.all().order_by('order'):
+                        msitem.codico = codi
+                        msitem.save()
+
         # Note that we are indeed ready
         bResult = True
     except:

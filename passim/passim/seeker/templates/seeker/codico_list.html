@@ -1,27 +1,50 @@
 
-<div class="panel panel-default panel-plain" >
-  <div class="panel-heading collapsed" data-toggle="collapse" data-target="#codi-units">Codicological units</div>
-  <div class="panel-body collapse" id="codi-units">
+<div id="codi-units" class="collapse panel panel-default panel-plain" >
+
+  <!-- Room to have the form-link to create a new sermon for this manuscript -->
+  <div class="hidden" >
+    <form id="create_new_codico" action="{% url 'codico_details' %}" method="post" >
+      {% csrf_token %}
+      <input type="text" name="codi-manuscript" value="{{object.id}}" />
+    </form>
+  </div>
+
+  <div class="panel-body " >
     {% for codico in codico_list %}
-      <table style='width: 100%;'>
+      <table style='width: 100%;' id="{{codico.codico_id}}">
         <thead></thead>
         <tbody>
           {% for item in codico.kvlist %}
-            <tr class="view-row">
+            
+            <tr class="view-row {% if not forloop.first %}hidden codico-unit-{{codico.codico_id}} {% endif %}">
               <!-- Name of this codico-field -->
-              <td valign="top" class='tdnowrap' >{{item.label}}</td>
+              <td valign="top" class='tdnowrap' {% if forloop.first %}style="min-width: 100px;"{% endif %} >{{item.label}}</td>
 
               <!-- Value of this codico-field -->
               <td valign="top" class='hoverable' style="width: 100%;" >
                 <div class="view-mode">
-                  {{item.value|safe}}
                   {% if forloop.first %}
+                    <code class="codico-target" 
+                          ondragover="ru.passim.seeker.codico_dragenter(event);"
+                          ondragleave="ru.passim.seeker.codico_dragleave(event);"
+                          ondrop="ru.passim.seeker.codico_drop(event);"
+                          >{{item.value|safe}}</code>
+                  {% else %}
+                    <span style="min-width: 100px; display: inline-block">{{item.value|safe}}</span>
+                  {% endif %}
+                  {% if forloop.first %}
+                    <a class="btn btn-xs jumbo-1" 
+                       onclick="ru.passim.seeker.codico_toggle(this, 'codico-unit-{{codico.codico_id}}');">Hide/View</a>
                     <a class="btn btn-xs jumbo-3" href="{{codico.url}}"
-                       title="Open the details view of this codicological unit">Details</a>
+                       title="Open the details view of this codicological unit">
+                      <span class="glyphicon glyphicon-chevron-right"></span>
+                      Details...
+                    </a>
                   {% endif %}
                 </div> 
               </td>
             </tr>
+            
           {% endfor %}
         </tbody>
       </table>

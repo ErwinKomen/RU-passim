@@ -1063,7 +1063,8 @@ var ru = (function ($, ru) {
        * @returns {bool}
        */
       sermon_hlisttree: function (elRoot) {
-        var hList = [];
+        var hList = [],
+            srm_codi = {};
 
         try {
           $(elRoot).find("div.tree").each(function (idx, el) {
@@ -1072,14 +1073,26 @@ var ru = (function ($, ru) {
                 nextid = "",
                 firstchild = "",
                 parent = "",
+                srm_match = null,
                 elTreeNext = null,
                 elTreePrev = null,
                 elTreeChild = null,
                 elTreeParent = null,
+                elHr = null,
                 oNew = {};
 
             // Get my own sermonid
             sermonid = $(el).attr("sermonid");
+            if (sermonid === "") {
+              // See if there is a following sibling under which this falls
+              srm_match = $(el).nextAll(".tree[sermontype='head'],.tree[sermontype='sermon']").first();
+              if (srm_match !== undefined && srm_match !== null) {
+                // Make a link
+                srm_codi[$(srm_match).attr("sermonid")] = $(el).attr("targetid");
+              }
+              // Cannot process this one
+              return;
+            }
 
             // Get the sermonid of any preceding <div.tree>
             elTreePrev = $(el).prev(".tree").first();
@@ -1105,7 +1118,14 @@ var ru = (function ($, ru) {
               firstchild = $(elTreeChild).attr("sermonid");
             }
 
+            // Look for a possible ruler start
+            elHr = $(el).children(".codi-start").first();
+
             oNew = { id: sermonid, previd: previd, nextid: nextid, parent: parent, firstchild: firstchild };
+
+            if (elHr !== null && $(elHr).length > 0) {
+              oNew['codi'] = $(elHr).attr("targetid");
+            }
 
             // Check if this is a structural element
             if (sermonid.indexOf("new") >= 0) {
@@ -2483,6 +2503,117 @@ var ru = (function ($, ru) {
     return {
 
       /**
+       *  codico_toggle
+       *      Sermon enters codico
+       *
+       */
+      codico_dragenter: function (ev) {
+        var elTree = null,
+            divSrcId = null,
+            divDstId = null,
+            divSrc = null,
+            sermonid = "";
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          if ($(ev.target).hasClass("codico-target")) {
+            // Figure out what the source and destination is
+            elTree = $(ev.target).closest(".tree");
+            divDstId = $(elTree).attr("id");
+            divSrcId = ev.dataTransfer.getData("text");
+            if (divSrcId !== "") {
+              // Nothing yet
+              divSrc = $("#sermon_tree").find("#" + divSrcId);
+
+              if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
+                // This is not allowed
+                return;
+              }
+            }
+
+
+            $(ev.target).addClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("codico_dragenter", ex);
+        }
+      },
+
+      /**
+       *  codico_dragleave
+       *      Sermon leaves this codico
+       *
+       */
+      codico_dragleave: function (ev) {
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          if ($(ev.target).hasClass("codico-target")) {
+
+            $(ev.target).removeClass("dragover");
+          }
+        } catch (ex) {
+          private_methods.errMsg("codico_dragleave", ex);
+        }
+      },
+
+      /**
+       *  codico_drop
+       *      Sermon gets dropped into a (different) codico
+       *
+       */
+      codico_drop: function (ev) {
+        var elTree = null,
+            divSrcId = "",
+            divDstId = "";
+
+        try {
+          // Prevent default handling
+          ev.preventDefault();
+
+          if ($(ev.target).hasClass("codico-target")) {
+            // Remove the dragover class
+            $(ev.target).removeClass("dragover");
+
+            // Figure out what the source and destination is
+            divSrcId = ev.dataTransfer.getData("text");
+            elTree = $(ev.target).closest("table");
+            divDstId = $(elTree).attr("id");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("codico_drop", ex);
+        }
+      },
+
+      /**
+       *  codico_toggle
+       *      Toggle visibility of codico units by class
+       *
+       */
+      codico_toggle: function (elThis, target) {
+        var elBody = null,
+            sClass = "";
+
+        try {
+          elBody = $(elThis).closest("div.panel-body").first();
+          sClass = "." + target;
+          // Double check
+          if ($(elBody).find(sClass).first().hasClass("hidden")) {
+            // Need to show them
+            $(elBody).find(sClass).removeClass("hidden");
+          } else {
+            // Need to hide them
+            $(elBody).find(sClass).addClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("codico_toggle", ex);
+        }
+      },
+
+      /**
        *  init_charts
        *      Check if this is the homepage and then supply charts
        *
@@ -2789,11 +2920,6 @@ var ru = (function ($, ru) {
           elTree = $(ev.target).closest(".tree");
           sermonid = $(elTree).attr("sermonid");
           divId = $(elTree).attr("id");
-          //sermontype = $(elTree).attr("sermontype");
-          //if (sermontype === "head") {
-          //  // Change the sermonid
-          //  divId = divId.replace("sermon", "head");
-          //}
 
           ev.dataTransfer.setData("text", divId);
         } catch (ex) {
@@ -2826,6 +2952,12 @@ var ru = (function ($, ru) {
 
             if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
               // This is not allowed
+              return;
+            } else if (divSrcId === "codico_break" && !$(ev.target).hasClass("ruler")) {
+              // Destination may only be a ruler between sermons
+              return;
+            } else if (divDstId.indexOf("codi") >= 0) {
+              // Destination may *not* be a codico rulder
               return;
             }
           }
@@ -2874,6 +3006,7 @@ var ru = (function ($, ru) {
             divHierarchy = "#sermon_hierarchy_element",
             divSrc = null,
             divDst = null,
+            divCodi = null,
             divParent = null,
             bChanged = false,
             level = 0,
@@ -2898,6 +3031,8 @@ var ru = (function ($, ru) {
           // Prevent foul-play
           if (divSrcId == "sermon_new" && divDstId.indexOf("sermon_new") >= 0) {
             // Get out of here
+            return;
+          } else if (divSrcId.indexOf("codi") >= 0 && !$(ev.target).hasClass("ruler")) {
             return;
           }
 
@@ -2934,7 +3069,7 @@ var ru = (function ($, ru) {
 
           // Do we need to put the source "under" the destination or "before" it?
           if ($(ev.target).hasClass("ruler")) {
-            type = "before";
+            type = "below";
           }
 
           // Action now depends on the type
@@ -2972,6 +3107,21 @@ var ru = (function ($, ru) {
                 divSrc.insertBefore(divDst);
                 // Adapt my level to the one before me
                 $(divSrc).attr("level", $(divDst).attr("level"));
+                // SIgnal change
+                bChanged = true;
+              }
+              break;
+            case "below": // Put src inside the divDst, but not in the table
+              if (divSrcId === divDstId) {
+                console.log("Cannot move me " + divSrcId + " before myself " + divDstId);
+              } else {
+                // Make sure we know what the codi is
+                divCodi = divSrc;
+                if (!divCodi.hasClass("codi-start")) {
+                  divCodi = $(divSrc).find(".codi-start").first();
+                }
+                // Move source inside the destination
+                $(divDst).prepend(divCodi);
                 // SIgnal change
                 bChanged = true;
               }
@@ -3582,6 +3732,8 @@ var ru = (function ($, ru) {
               $(elMain).find(".tree[level!='1']").addClass("hidden");
               break;
             case 'init':
+              // Set the current codicologial borders
+
               // Make a copy of the tree as it is
               $(elCopy).html($(elMain).html());
               // If there is a location movement, select it
