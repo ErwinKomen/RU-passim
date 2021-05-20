@@ -270,7 +270,7 @@ def add_codico_to_manuscript(manu):
         # Copy date ranges
         if codi.codico_dateranges.count() == 0:
             for md in manu.manuscript_dateranges.all():
-                if md.codico_id == None or md.codico == None or md.codic.id != codi.id:
+                if md.codico_id == None or md.codico_id == 0 or md.codico == None or md.codic.id != codi.id:
                     md.codico = codi
                     md.save()
 
