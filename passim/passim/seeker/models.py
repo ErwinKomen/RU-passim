@@ -3019,7 +3019,8 @@ class Comment(models.Model):
         return True
 
     def get_otype(self):
-        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", super="Super Sermon Gold")
+        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
+                      super="Super Sermon Gold", codi="Codicological Unit")
         return otypes[self.otype]
 
 
@@ -3072,6 +3073,8 @@ class Manuscript(models.Model):
     saved = models.DateTimeField(null=True, blank=True)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
+    #     The third alternative is: a reconstruction
+    #     So the options: 'man', 'tem', 'rec'
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
     # [0-1] Bibliography used for the manuscript

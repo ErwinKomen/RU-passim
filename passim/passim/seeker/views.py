@@ -8051,6 +8051,8 @@ class CommentListView(BasicList):
                         obj.otype = "gold"
                     elif obj.comments_super.count() > 0:
                         obj.otype = "super"
+                    elif obj.comments_codi.count() > 0:
+                        obj.otype = "codi"
                     obj.save()
             # Success
             Information.set_kvalue("comment_otype", "done")
@@ -8099,6 +8101,13 @@ class CommentListView(BasicList):
                     else:
                         url = reverse("equalgold_details", kwargs={'pk': obj.id})
                         label = "super_{}".format(obj.id)
+                elif instance.otype == "codi":
+                    obj = instance.comments_codi.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("codico_details", kwargs={'pk': obj.id})
+                        label = "codi_{}".format(obj.id)
                 if url != "":
                     sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
         except:
