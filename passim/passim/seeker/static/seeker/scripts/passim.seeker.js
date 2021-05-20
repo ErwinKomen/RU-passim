@@ -3069,7 +3069,7 @@ var ru = (function ($, ru) {
 
           // Do we need to put the source "under" the destination or "before" it?
           if ($(ev.target).hasClass("ruler")) {
-            if ($(divSrc).hasClass("codi-start")) {
+            if ($(divSrc).hasClass("codi-start") || $(divSrc).children(".codi-start").length > 0) {
               type = "below";
             } else {
               type = "before";

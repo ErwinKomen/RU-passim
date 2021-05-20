@@ -130,6 +130,8 @@ def get_usercomments(type, instance, profile):
     if not username_is_ingroup(profile.user, app_editor):
         # App editors have permission to see *all* comments from all users
         lstQ.append(Q(profile=profile))
+    if type != "":
+        lstQ.append(Q(otype=type))
 
     # Calculate the list
     qs = instance.comments.filter(*lstQ).order_by("-created")
@@ -7876,9 +7878,11 @@ class CommentSend(BasicPart):
     def add_to_context(self, context):
 
         url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
-                     "gold": "sermongold_details", "super": "equalgold_details"}
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details"}
         obj_names = {"manu": "Manuscript", "sermo": "Sermon",
-                     "gold": "Sermon Gold", "super": "Super Sermon Gold"}
+                     "gold": "Sermon Gold", "super": "Super Sermon Gold",
+                     "codi": "Codicological unit"}
         def get_object(otype, objid):
             obj = None
             if otype == "manu":
@@ -7889,6 +7893,8 @@ class CommentSend(BasicPart):
                 obj = SermonGold.objects.filter(id=objid).first()
             elif otype == "super":
                 obj = EqualGold.objects.filter(id=objid).first()
+            elif otype == "codi":
+                obj = Codico.objects.filter(id=objid).first()
             return obj
 
         if self.add:
@@ -9425,6 +9431,13 @@ class CodicoEdit(BasicDetails):
                     lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
                     lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
                 lhtml.append("</div></div>")
+
+            # Add comment modal stuff
+            initial = dict(otype="codi", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
+
+            context['comment_list'] = get_usercomments('codi', instance, profile)
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)

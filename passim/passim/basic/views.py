@@ -1158,7 +1158,8 @@ class BasicList(ListView):
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
 
                 self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
-                
+                # qs = self.model.objects.filter(manuitems__itemsermons__goldsermons__goldsignatures__code__in = "AN Mt h 42")
+
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
