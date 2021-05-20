@@ -4359,7 +4359,13 @@ class SermonEdit(BasicDetails):
         # Changed in issue #241: show the PASSIM code
         context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
-        context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(idno)
+        title_right = ["<span class='manuscript-idno' title='Manuscript'>{}</span>".format(
+            idno)]
+        #    ... as well as the *title* of the Codico to which I belong
+        codico = instance.msitem.codico
+        codi_title = "?" if codico == None or codico.name == "" else codico.name
+        title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
+        context['title_right'] = "".join(title_right)
 
         # Signal that we have select2
         context['has_select2'] = True
