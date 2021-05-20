@@ -146,28 +146,6 @@ def adapt_codicocopy(oStatus=None):
     msg = ""
     oBack = dict(status="ok", msg="")
 
-    def get_number(items, bFirst):
-        """Extract the first or last consecutive number from the string"""
-
-        number = -1
-        if len(items) > 0:
-            if bFirst:
-                # Find the first number
-                for sInput in items:
-                    arNumber = re.findall(r'\d+', sInput)
-                    if len(arNumber) > 0:
-                        number = int(arNumber[0])
-                        break
-            else:
-                # Find the last number
-                for sInput in reversed(items):
-                    arNumber = re.findall(r'\d+', sInput)
-                    if len(arNumber) > 0:
-                        number = int(arNumber[-1])
-                        break
-
-        return number
-    
     try:
         # TODO: add code here and change to True
         bResult = False
@@ -195,46 +173,7 @@ def adapt_codicocopy(oStatus=None):
 
                 manu = Manuscript.objects.filter(id=manu_id).first()
                 if manu != None:
-                    # Check if the codico exists
-                    codi = Codico.objects.filter(manuscript=manu).first()
-                    if codi == None:
-                        # Get first and last sermons and then their pages
-                        items = [x['itemsermons__locus'] for x in manu.manuitems.filter(itemsermons__locus__isnull=False).order_by(
-                            'order').values('itemsermons__locus')]
-                        if len(items) > 0:
-                            pagefirst = get_number(items, True)
-                            pagelast = get_number(items, False)
-                        else:
-                            pagefirst = 1
-                            pagelast = 1
-                        # Create the codico
-                        codi = Codico.objects.create(
-                            name=manu.name, support=manu.support, extent=manu.extent,
-                            format=manu.format, order=1, pagefirst=pagefirst, pagelast=pagelast,
-                            origin=manu.origin, manuscript=manu
-                            )
-                    # Copy provenances
-                    if codi.codico_provenances.count() == 0:
-                        for mp in manu.manuscripts_provenances.all():
-                            obj = ProvenanceCod.objects.create(
-                                provenance=mp.provenance, codico=codi, note=mp.note)
-
-                    # Copy keywords
-                    if codi.codico_kw.count() == 0:
-                        for mk in manu.manuscript_kw.all():
-                            obj = CodicoKeyword.objects.create(
-                                codico=codi, keyword=mk.keyword)
-
-                    # Copy date ranges
-                    if codi.codico_dateranges.count() == 0:
-                        for md in manu.manuscript_dateranges.all():
-                            md.codico = codi
-                            md.save()
-
-                    # Tie all MsItems that need be to the Codico
-                    for msitem in manu.manuitems.all().order_by('order'):
-                        msitem.codico = codi
-                        msitem.save()
+                    bResult, msg = add_codico_to_manuscript(manu)
 
         if oStatus != None: oStatus.set("finished", oBack)
 
@@ -248,6 +187,28 @@ def adapt_codicocopy(oStatus=None):
 def add_codico_to_manuscript(manu):
     """Check if a manuscript has a Codico, and if not create it"""
 
+    def get_number(items, bFirst):
+        """Extract the first or last consecutive number from the string"""
+
+        number = -1
+        if len(items) > 0:
+            if bFirst:
+                # Find the first number
+                for sInput in items:
+                    arNumber = re.findall(r'\d+', sInput)
+                    if len(arNumber) > 0:
+                        number = int(arNumber[0])
+                        break
+            else:
+                # Find the last number
+                for sInput in reversed(items):
+                    arNumber = re.findall(r'\d+', sInput)
+                    if len(arNumber) > 0:
+                        number = int(arNumber[-1])
+                        break
+
+        return number
+    
     oErr = ErrHandle()
     bResult = False
     msg = ""
@@ -270,28 +231,54 @@ def add_codico_to_manuscript(manu):
                 format=manu.format, order=1, pagefirst=pagefirst, pagelast=pagelast,
                 origin=manu.origin, manuscript=manu
                 )
+        else:
+            # Possibly copy stuff from manu to codi
+            bNeedSaving = False
+            if codi.name == "SUPPLY A NAME" and manu.name != "":
+                codi.name = manu.name ; bNeedSaving = True
+            if codi.support == None and manu.support != None:
+                codi.support = manu.support ; bNeedSaving = True
+            if codi.extent == None and manu.extent != None:
+                codi.extent = manu.extent ; bNeedSaving = True
+            if codi.format == None and manu.format != None:
+                codi.format = manu.format ; bNeedSaving = True
+            if codi.order == 0:
+                codi.order = 1 ; bNeedSaving = True
+            if codi.origin == None and manu.origin != None:
+                codi.origin = manu.origin ; bNeedSaving = True
+            # Possibly save changes
+            if bNeedSaving:
+                codi.save()
         # Copy provenances
         if codi.codico_provenances.count() == 0:
             for mp in manu.manuscripts_provenances.all():
-                obj = ProvenanceCod.objects.create(
-                    provenance=mp.provenance, codico=codi, note=mp.note)
+                obj = ProvenanceCod.objects.filter(
+                    provenance=mp.provenance, codico=codi, note=mp.note).first()
+                if obj == None:
+                    obj = ProvenanceCod.objects.create(
+                        provenance=mp.provenance, codico=codi, note=mp.note)
 
         # Copy keywords
         if codi.codico_kw.count() == 0:
             for mk in manu.manuscript_kw.all():
-                obj = CodicoKeyword.objects.create(
-                    codico=codi, keyword=mk.keyword)
+                obj = CodicoKeyword.objects.filter(
+                    codico=codi, keyword=mk.keyword).first()
+                if obj == None:
+                    obj = CodicoKeyword.objects.create(
+                        codico=codi, keyword=mk.keyword)
 
         # Copy date ranges
         if codi.codico_dateranges.count() == 0:
             for md in manu.manuscript_dateranges.all():
-                md.codico = codi
-                md.save()
+                if md.codico_id == None or md.codico == None or md.codic.id != codi.id:
+                    md.codico = codi
+                    md.save()
 
         # Tie all MsItems that need be to the Codico
         for msitem in manu.manuitems.all().order_by('order'):
-            msitem.codico = codi
-            msitem.save()
+            if msitem.codico_id == None or msitem.codico == None or msitem.codico.id != codi.id:
+                msitem.codico = codi
+                msitem.save()
         bResult = True
     except:
         msg = oErr.get_error_message()

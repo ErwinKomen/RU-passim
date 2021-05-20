@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
-from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy
+from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
@@ -8499,6 +8499,19 @@ class ManuscriptEdit(BasicDetails):
             bResult = False
         return bResult, msg
 
+    def after_new(self, form, instance):
+        """When a Manuscript has been created, it needs to get a Codico"""
+
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            bResult, msg = add_codico_to_manuscript(instance)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg 
+
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
@@ -8660,7 +8673,6 @@ class ManuscriptHierarchy(ManuscriptDetails):
 
     def custom_init(self, instance):
         errHandle = ErrHandle()
-        method = "july2020"
 
         def getid(item, key, mapping):
             id_value = item[key]
@@ -8681,147 +8693,156 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
 
-                if method == "july2020":
-                    # The new July20920 method that uses different parameters and uses MsItem
+                #if method == "july2020":
+                # The new July20920 method that uses different parameters and uses MsItem
                     
-                    # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
-                    head_to_id = {}
-                    deletables = []
-                    with transaction.atomic():
-                        for idx, item in enumerate(hlist):
-                            if 'new' in item['id']:
-                                # This is a new structural element - Create an MsItem
-                                msitem = MsItem.objects.create(manu=instance)
-                                # Create a new MsHead item
-                                shead = SermonHead.objects.create(msitem=msitem,title=item['title'])
-                                # Make a mapping
-                                head_to_id[item['id']] = msitem.id
-                                # Testing
-                                id=getid(item, "id", head_to_id)
-                            elif 'action' in item and item['action'] == "delete":
-                                # This one must be deleted
-                                deletables.append(item['id'])
+                # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
+                head_to_id = {}
+                deletables = []
+                with transaction.atomic():
+                    for idx, item in enumerate(hlist):
+                        if 'new' in item['id']:
+                            # This is a new structural element - Create an MsItem
+                            msitem = MsItem.objects.create(manu=instance)
+                            # Create a new MsHead item
+                            shead = SermonHead.objects.create(msitem=msitem,title=item['title'])
+                            # Make a mapping
+                            head_to_id[item['id']] = msitem.id
+                            # Testing
+                            id=getid(item, "id", head_to_id)
+                        elif 'action' in item and item['action'] == "delete":
+                            # This one must be deleted
+                            deletables.append(item['id'])
 
-                    # Step 1b: adapt the list with deletables
-                    hlist[:] = [x for x in hlist if x.get("action") != "delete"]
+                # Step 1b: adapt the list with deletables
+                hlist[:] = [x for x in hlist if x.get("action") != "delete"]
 
-                    # Step 1c: delete those that need it
-                    MsItem.objects.filter(id__in=deletables).delete()
+                # Step 1c: delete those that need it
+                MsItem.objects.filter(id__in=deletables).delete()
 
-                    # Step 2: store the hierarchy
-                    changes = {}
-                    hierarchy = []
-                    codi = None
-                    with transaction.atomic():
-                        for idx, item in enumerate(hlist):
-                            bNeedSaving = False
-                            # Get the msitem of this item
-                            msitem = MsItem.objects.filter(id=getid(item, "id", head_to_id)).first()
-                            # Get the next if any
-                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
-                            # Get the first child
-                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
-                            # Get the parent
-                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
+                # Step 2: store the hierarchy
+                changes = {}
+                hierarchy = []
+                codi = None
+                with transaction.atomic():
+                    for idx, item in enumerate(hlist):
+                        bNeedSaving = False
+                        # Get the msitem of this item
+                        msitem = MsItem.objects.filter(id=getid(item, "id", head_to_id)).first()
+                        # Get the next if any
+                        next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
+                        # Get the first child
+                        firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
+                        # Get the parent
+                        parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
 
-                            # Get a possible codi id
-                            codi_id = item.get("codi")
-                            if codi_id != None:
-                                if codi == None or codi.id != codi_id:
-                                    codi = Codico.objects.filter(id=codi_id).first()
+                        # Get a possible codi id
+                        codi_id = item.get("codi")
+                        if codi_id != None:
+                            if codi == None or codi.id != codi_id:
+                                codi = Codico.objects.filter(id=codi_id).first()
 
-                            # Possibly set the msitem codi
-                            if msitem.codico != codi:
+                        # Possibly set the msitem codi
+                        if msitem.codico != codi:
+                            msitem.codico = codi
+                            bNeedSaving = True
+                        elif codi == None and msitem.codico == None:
+                            # This MsItem is inserted before something that may already have a codico
+                            codi = instance.manuscriptcodicounits.order_by('order').first()
+                            if codi != None:
                                 msitem.codico = codi
                                 bNeedSaving = True
 
-                            # Possibly adapt the [shead] title and locus
-                            itemhead = msitem.itemheads.first()
-                            if itemhead and 'title' in item and 'locus' in item:
-                                title= item['title']
-                                locus = item['locus']
-                                if itemhead.title != title or itemhead.locus != locus:
-                                    itemhead.title = title
-                                    itemhead.locus = locus
-                                    # Save the itemhead
-                                    itemhead.save()
+                        # Possibly adapt the [shead] title and locus
+                        itemhead = msitem.itemheads.first()
+                        if itemhead and 'title' in item and 'locus' in item:
+                            title= item['title']
+                            locus = item['locus']
+                            if itemhead.title != title or itemhead.locus != locus:
+                                itemhead.title = title
+                                itemhead.locus = locus
+                                # Save the itemhead
+                                itemhead.save()
                             
-                            order = idx + 1
+                        order = idx + 1
 
-                            sermon_id = "none"
-                            if msitem.itemsermons.count() > 0:
-                                sermon_id = msitem.itemsermons.first().id
-                            sermonlog = dict(sermon=sermon_id)
-                            bAddSermonLog = False
+                        sermon_id = "none"
+                        if msitem.itemsermons.count() > 0:
+                            sermon_id = msitem.itemsermons.first().id
+                        sermonlog = dict(sermon=sermon_id)
+                        bAddSermonLog = False
 
-                            # Check if anytyhing changed
-                            if msitem.order != order:
-                                # Implement the change
-                                msitem.order = order
-                                bNeedSaving =True
-                            if msitem.parent is not parent:
+                        # Check if anytyhing changed
+                        if msitem.order != order:
+                            # Implement the change
+                            msitem.order = order
+                            bNeedSaving =True
+                        if msitem.parent is not parent:
+                            # Track the change
+                            old_parent_id = "none" if msitem.parent == None else msitem.parent.id
+                            new_parent_id = "none" if parent == None else parent.id
+                            if old_parent_id != new_parent_id:
                                 # Track the change
-                                old_parent_id = "none" if msitem.parent == None else msitem.parent.id
-                                new_parent_id = "none" if parent == None else parent.id
-                                if old_parent_id != new_parent_id:
-                                    # Track the change
-                                    sermonlog['parent_new'] = new_parent_id
-                                    sermonlog['parent_old'] = old_parent_id
-                                    bAddSermonLog = True
-
-                                    # Implement the change
-                                    msitem.parent = parent
-                                    bNeedSaving = True
-                                else:
-                                    no_change = 1
-
-                            if msitem.firstchild != firstchild:
-                                # Implement the change
-                                msitem.firstchild = firstchild
-                                bNeedSaving =True
-                            if msitem.next != next:
-                                # Track the change
-                                old_next_id = "none" if msitem.next == None else msitem.next.id
-                                new_next_id = "none" if next == None else next.id
-                                sermonlog['next_new'] = new_next_id
-                                sermonlog['next_old'] = old_next_id
+                                sermonlog['parent_new'] = new_parent_id
+                                sermonlog['parent_old'] = old_parent_id
                                 bAddSermonLog = True
 
                                 # Implement the change
-                                msitem.next = next
-                                bNeedSaving =True
-                            # Do we need to save this one?
-                            if bNeedSaving:
-                                msitem.save()
-                                if bAddSermonLog:
-                                    # Store the changes
-                                    hierarchy.append(sermonlog)
-
-                    details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
-                    passim_action_add(self, instance, details, "save")
-                else:
-
-                    with transaction.atomic():
-                        for item in hlist:
-                            bNeedSaving = False
-                            # Get the sermon of this item
-                            sermon = SermonDescr.objects.filter(id=item['id']).first()
-                            order = int(item['nodeid']) -1
-                            parent_order = int(item['childof']) - 1
-                            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
-                            # Check if anytyhing changed
-                            if sermon.order != order:
-                                sermon.order = order
-                                bNeedSaving =True
-                            if sermon.parent is not parent:
-                                sermon.parent = parent
-                                # Sanity check...
-                                if sermon.parent.id == parent.id:
-                                    sermon.parent = None
+                                msitem.parent = parent
                                 bNeedSaving = True
-                            # Do we need to save this one?
-                            if bNeedSaving:
-                                sermon.save()
+                            else:
+                                no_change = 1
+
+                        if msitem.firstchild != firstchild:
+                            # Implement the change
+                            msitem.firstchild = firstchild
+                            bNeedSaving =True
+                        if msitem.next != next:
+                            # Track the change
+                            old_next_id = "none" if msitem.next == None else msitem.next.id
+                            new_next_id = "none" if next == None else next.id
+                            sermonlog['next_new'] = new_next_id
+                            sermonlog['next_old'] = old_next_id
+                            bAddSermonLog = True
+
+                            # Implement the change
+                            msitem.next = next
+                            bNeedSaving =True
+                        # Do we need to save this one?
+                        if bNeedSaving:
+                            msitem.save()
+                            if bAddSermonLog:
+                                # Store the changes
+                                hierarchy.append(sermonlog)
+
+                details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
+                passim_action_add(self, instance, details, "save")
+
+
+                # Old method - to be deleted
+                #else:
+
+                #    with transaction.atomic():
+                #        for item in hlist:
+                #            bNeedSaving = False
+                #            # Get the sermon of this item
+                #            sermon = SermonDescr.objects.filter(id=item['id']).first()
+                #            order = int(item['nodeid']) -1
+                #            parent_order = int(item['childof']) - 1
+                #            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
+                #            # Check if anytyhing changed
+                #            if sermon.order != order:
+                #                sermon.order = order
+                #                bNeedSaving =True
+                #            if sermon.parent is not parent:
+                #                sermon.parent = parent
+                #                # Sanity check...
+                #                if sermon.parent.id == parent.id:
+                #                    sermon.parent = None
+                #                bNeedSaving = True
+                #            # Do we need to save this one?
+                #            if bNeedSaving:
+                #                sermon.save()
 
             return True
         except:

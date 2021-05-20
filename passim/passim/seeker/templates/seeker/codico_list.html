@@ -30,7 +30,10 @@
                           ondrop="ru.passim.seeker.codico_drop(event);"
                           >{{item.value|safe}}</code>
                   {% else %}
-                    <span style="min-width: 100px; display: inline-block">{{item.value|safe}}</span>
+                    <span style="min-width: 100px; display: inline-block">
+                      {% if item.value %}{{item.value|safe}}
+                      {% else %}-{% endif %}
+                    </span>
                   {% endif %}
                   {% if forloop.first %}
                     <a class="btn btn-xs jumbo-1" 

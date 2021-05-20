@@ -3069,7 +3069,11 @@ var ru = (function ($, ru) {
 
           // Do we need to put the source "under" the destination or "before" it?
           if ($(ev.target).hasClass("ruler")) {
-            type = "below";
+            if ($(divSrc).hasClass("codi-start")) {
+              type = "below";
+            } else {
+              type = "before";
+            }
           }
 
           // Action now depends on the type
@@ -3107,6 +3111,12 @@ var ru = (function ($, ru) {
                 divSrc.insertBefore(divDst);
                 // Adapt my level to the one before me
                 $(divSrc).attr("level", $(divDst).attr("level"));
+                // Possible adaptations if [divDst] starts a new codico section
+                if (divSrcId.indexOf("sermon_new") === 0 && $(divDst).children(".codi-start").length > 0) {
+                  // Need to move the [.codi-start] to myself...
+                  $(divSrc).prepend($(divDst).children(".codi-start").first());
+                }
+
                 // SIgnal change
                 bChanged = true;
               }

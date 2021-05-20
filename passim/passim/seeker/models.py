@@ -3126,12 +3126,24 @@ class Manuscript(models.Model):
         # Adapt the save date
         self.saved = get_current_datetime()
         response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
+
+        # If this is a new manuscript there is no codi conncted yet
+        # Check if the codico exists
+        codi = Codico.objects.filter(manuscript=self).first()
+        if codi == None:
+            # Create and link a new codico
+            codi = Codico.objects.create(
+                name="SUPPLY A NAME", order=1, pagefirst=1, pagelast=1, manuscript=self
+                )
+
         # Possibly adapt the number of manuscripts for the associated library
         if self.library != None:
             mcount = Manuscript.objects.filter(library=self.library).count()
             if self.library.mcount != mcount:
                 self.library.mcount = mcount
                 self.library.save()
+
+        # Return the response when saving
         return response
 
     def adapt_hierarchy():
@@ -4623,6 +4635,8 @@ class Codico(models.Model):
     provenances = models.ManyToManyField("Provenance", through="ProvenanceCod")
      # [m] Many-to-many: keywords per Codico
     keywords = models.ManyToManyField(Keyword, through="CodicoKeyword", related_name="keywords_codi")
+    # [m] Many-to-many: one codico can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_codi")
 
     class Meta:
         verbose_name = "Codicological unit"
@@ -4796,7 +4810,7 @@ class Codico(models.Model):
         count = 0
         if usercomment:
             # This is from Manuscript, but we don't have Comments...
-            # count = self.comments.count()
+            count = self.comments.count()
             pass
         sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
@@ -6952,6 +6966,19 @@ class MsItem(models.Model):
     next = models.ForeignKey('self', null=True, blank=True, on_delete = models.SET_NULL, related_name="sermon_next")
     # [1]
     order = models.IntegerField("Order", default = -1)
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if a manuscript is specified but not a codico
+        if self.manu != None and self.codico == None:
+            # Find out what the correct codico is from the manuscript
+            codi = self.manu.manuscriptcodicounits.order_by('order').last()
+            if codi != None:
+                # Add this msitem by default to the correct codico
+                self.codico = codi
+        # Perform the actual saving
+        response = super(MsItem, self).save(force_insert, force_update, using, update_fields)
+        # Return the saving response
+        return response
 
     def getdepth(self):
         depth = 1
