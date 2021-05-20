@@ -4841,7 +4841,7 @@ class Daterange(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Fill in manuscript, if not yet given
-        if self.codico != None and self.manuscript_id == None or self.manuscript == None:
+        if self.codico_id != None and self.codico != None and self.manuscript_id == None or self.manuscript == None:
             self.manuscript = self.codico.manuscript
         # Perform the actual saving
         response = super(Daterange, self).save(force_insert, force_update, using, update_fields)
@@ -4878,15 +4878,16 @@ class Daterange(models.Model):
 
         # Need any changes in *CODICO*?
         bNeedSaving = False
-        codi_start = self.codico.yearstart
-        codi_finish = self.codico.yearfinish
-        if codi_start != current_start:
-            self.codico.yearstart = current_start
-            bNeedSaving = True
-        if codi_finish != current_finish:
-            self.codico.yearfinish = current_finish
-            bNeedSaving = True
-        if bNeedSaving: self.codico.save()
+        if self.codico != None:
+            codi_start = self.codico.yearstart
+            codi_finish = self.codico.yearfinish
+            if codi_start != current_start:
+                self.codico.yearstart = current_start
+                bNeedSaving = True
+            if codi_finish != current_finish:
+                self.codico.yearfinish = current_finish
+                bNeedSaving = True
+            if bNeedSaving: self.codico.save()
 
 
         return True
