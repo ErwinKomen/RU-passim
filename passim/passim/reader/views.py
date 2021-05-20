@@ -1056,6 +1056,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 # Add Keyword to each manuscript in order to filter out the A+M manuscripts after import
                 name = "Archives et Manuscrit import"
                 description = "This manuscript belongs to the Archives et Manuscrit collection."  
+                
                 # Try to find if the keyword already exists:
                 keywordfound = Keyword.objects.filter(name__iexact=name).first()
                 if keywordfound == None:
@@ -1277,18 +1278,13 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         # Try find the origin that is found
                         origfound = Origin.objects.filter(name__iexact=orname).first()
                         # If there is no origin name match, check if there is a name 
-                        # that matches in the location table
-                        if origfound == None:                           
-                            origfound = Origin.objects.filter(location__name__iexact=orname).first()
-                            # If there is also no existing origin found via the location id,  
-                            # the origin should be added to the manuscript manually. 
-                            # The message to do so is added to manu_obj.notes.    
-                            if origfound == None:                                                            
-                                intro = ""
-                                if manu_obj.notes != "": 
-                                    intro = "{}. ".format(manu_obj.notes) 
-                                    manu_obj.notes = "{}// Please set origin manually [{}] ".format(intro, orname)
-                                    manu_obj.save()                        
+                        # that matches in the location table 
+                        if origfound == None:                                                            
+                            intro = ""
+                            if manu_obj.notes != "": 
+                                intro = "{}. ".format(manu_obj.notes) 
+                                manu_obj.notes = "{}// Please set origin manually [{}] ".format(intro, orname)
+                                manu_obj.save()                            
                         else: 
                             # The originfound can be tied to the manuscript 
                             manu_obj.origin = origfound
