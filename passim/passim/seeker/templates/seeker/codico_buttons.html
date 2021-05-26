@@ -2,11 +2,13 @@
   <span class="" data-toggle="collapse" data-target="#codi-units">
     <a class="btn btn-xs jumbo-1" >Hide/View ({{codico_count}} units)</a>
   </span>
-  <span>&nbsp;</span>
-  <span class="">
-    <a class="btn btn-xs jumbo-3" 
-        onclick="document.getElementById('create_new_codico').submit();">
-      <span class="glyphicon glyphicon-plus"></span>
-      <span>Add a codicological unit</span>
-    </a>
-  </span>
+  {% if is_app_editor %}
+    <span>&nbsp;</span>
+    <span class="">
+      <a class="btn btn-xs jumbo-3" 
+          onclick="document.getElementById('create_new_codico').submit();">
+        <span class="glyphicon glyphicon-plus"></span>
+        <span>Add new codicological unit</span>
+      </a>
+    </span>
+  {% endif %}

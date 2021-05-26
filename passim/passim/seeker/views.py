@@ -80,7 +80,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, ProvenanceCod, CodicoKeyword, \
+    Codico, ProvenanceCod, CodicoKeyword, Reconstruction, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -8122,7 +8122,7 @@ class ManuscriptEdit(BasicDetails):
     model = Manuscript  
     mForm = ManuscriptForm
     prefix = 'manu'
-    title = "Manuscript"
+    title = "Manuscript identifier"
     rtype = "json"
     new_button = True
     mainitems = []
@@ -8163,7 +8163,7 @@ class ManuscriptEdit(BasicDetails):
                         'LitrefMan', 'litlist',
                         'ProvenanceMan', 'mprovlist'
                         'ManuscriptExt', 'extlist']
-    
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -8171,6 +8171,19 @@ class ManuscriptEdit(BasicDetails):
         try:
             # Need to know who this user (profile) is
             profile = Profile.get_user_profile(self.request.user.username)
+
+            # Check if this is creating a reconstructed manuscript
+            if instance != None and "manu-codicostart" in self.qd:
+                # Get the codicostart
+                codicostart = self.qd.get("manu-codicostart")
+                codico = Codico.objects.filter(id=codicostart).first()
+                if codico != None:
+                    # Set the mtype to Reconstruction
+                    instance.mtype = "rec"
+                    # Create a Reconstruction object
+                    obj = Reconstruction.objects.filter(codico=codico, manuscript=instance).first()
+                    if obj == None:
+                        obj = Reconstruction.objects.create(codico=codico, manuscript=instance, order=1)
 
             istemplate = (instance.mtype == "tem")
 
@@ -8224,7 +8237,7 @@ class ManuscriptEdit(BasicDetails):
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
                         'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
                 context['mainitems'].append(
-                    {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance)}
+                    {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
 
             # Signal that we have select2
@@ -8320,9 +8333,10 @@ class ManuscriptEdit(BasicDetails):
         # Return the context we have made
         return context
 
-    def get_codico_buttons(self, instance):
+    def get_codico_buttons(self, instance, context):
         sBack = ""
-        context = dict(codico_count=instance.manuscriptcodicounits.count())
+        # context = dict(codico_count=instance.manuscriptcodicounits.count())
+        context['codico_count'] = instance.manuscriptcodicounits.count()
         lhtml = []
         lhtml.append(render_to_string("seeker/codico_buttons.html", context, self.request))
         sBack = "\n".join(lhtml)

@@ -36,13 +36,34 @@
                     </span>
                   {% endif %}
                   {% if forloop.first %}
+                    <!-- the Hide and view button -->
                     <a class="btn btn-xs jumbo-1" 
                        onclick="ru.passim.seeker.codico_toggle(this, 'codico-unit-{{codico.codico_id}}');">Hide/View</a>
+
+                    <!-- Button to switch to the details view -->
                     <a class="btn btn-xs jumbo-3" href="{{codico.url}}"
                        title="Open the details view of this codicological unit">
                       <span class="glyphicon glyphicon-chevron-right"></span>
                       Details...
                     </a>
+
+                    {% if is_app_editor %}
+                      <!-- Create a new manuscript on the basis of this codicological unit -->
+                      <a class="btn btn-xs jumbo-3" 
+                         onclick="document.getElementById('create_new_reconstruction_{{forloop.counter}}').submit();"
+                         title="Create a reconstructed manuscript on the bases of this codicological unit">
+                        <span class="glyphicon glyphicon-chevron-right"></span>
+                        Create reconstruction...
+                      </a>
+
+                      <!-- Room to have the form-link to create a new reconstruction manuscript -->
+                      <div class="hidden">
+                        <form action="{% url 'manuscript_details' %}" method="post" id="create_new_reconstruction_{{forloop.counter}}">
+                          {% csrf_token %}
+                          <input type="text" name="manu-codicostart" value="{{codico.codico_id}}">
+                        </form>
+                      </div>
+                    {% endif %}
                   {% endif %}
                 </div> 
               </td>

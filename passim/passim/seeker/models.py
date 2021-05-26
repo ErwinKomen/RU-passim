@@ -4819,6 +4819,21 @@ class Codico(models.Model):
         return sBack
 
 
+class Reconstruction(models.Model):
+    """Combines a Codico with a reconstructed manuscript"""
+
+    # [1] Link to the reconstruction manuscript 
+    manuscript = models.ForeignKey(Manuscript, on_delete = models.CASCADE, related_name="manuscriptreconstructions")
+    # [1] Link to the codico
+    codico = models.ForeignKey(Codico, on_delete = models.CASCADE, related_name = "codicoreconstructions")
+    # [1] The order of this link within the reconstructed manuscript
+    order = models.IntegerField("Order", default=0)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+
 class Daterange(models.Model):
     """Each manuscript can have a number of date ranges attached to it"""
 
