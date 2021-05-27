@@ -9195,7 +9195,10 @@ class ManuscriptListView(BasicList):
             fields['bibrefbk'] = Q(id__in=manulist)
 
         # Make sure we only show manifestations
-        fields['mtype'] = 'man'
+        #fields['mtype'] = 'man'
+        # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
+        lstExclude = [ Q(mtype='tem') ] 
+
         return fields, lstExclude, qAlternative
 
     def view_queryset(self, qs):

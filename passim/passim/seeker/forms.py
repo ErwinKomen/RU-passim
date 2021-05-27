@@ -625,7 +625,7 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return obj.idno
 
     def get_queryset(self):
-        return Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+        return Manuscript.objects.exclude(mtype='tem').order_by('idno').distinct()
 
 
 class ManuidOneWidget(ModelSelect2Widget):
@@ -1315,7 +1315,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['name'].required = False
             #self.fields['yearstart'].required = False
             #self.fields['yearfinish'].required = False
-            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
