@@ -68,7 +68,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
-    TemplateForm, TemplateImportForm, \
+    TemplateForm, TemplateImportForm, ManuReconForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
@@ -8122,7 +8122,7 @@ class ManuscriptEdit(BasicDetails):
     model = Manuscript  
     mForm = ManuscriptForm
     prefix = 'manu'
-    title = "Manuscript identifier"
+    titlesg = "Manuscript identifier"
     rtype = "json"
     new_button = True
     mainitems = []
@@ -8154,6 +8154,7 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+    form_objects = [{'form': ManuReconForm, 'prefix': 'mrec', 'readonly': False}]
 
     stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
                         'hierarchy',
@@ -8163,6 +8164,12 @@ class ManuscriptEdit(BasicDetails):
                         'LitrefMan', 'litlist',
                         'ProvenanceMan', 'mprovlist'
                         'ManuscriptExt', 'extlist']
+
+    def custom_init(self, instance):
+        if instance != None and instance.mtype == "rec":
+            # Also adapt the title
+            self.titlesg = "Reconstructed manuscript"
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -8180,12 +8187,15 @@ class ManuscriptEdit(BasicDetails):
                 if codico != None:
                     # Set the mtype to Reconstruction
                     instance.mtype = "rec"
+                    instance.save()
                     # Create a Reconstruction object
                     obj = Reconstruction.objects.filter(codico=codico, manuscript=instance).first()
                     if obj == None:
                         obj = Reconstruction.objects.create(codico=codico, manuscript=instance, order=1)
 
             istemplate = (instance.mtype == "tem")
+            # Make sure we mark reconstructed in the context
+            context['reconstructed'] = (instance.mtype == "rec")
 
             # Define the main items to show and edit
             context['mainitems'] = []
@@ -8261,14 +8271,15 @@ class ManuscriptEdit(BasicDetails):
                     lbuttons.append(dict(title="Download manuscript as Excel file", 
                                          click="manuscript_download", label="Download"))
 
-                    # Add a button so that the user can import sermons + hierarchy from an existing template
-                    if not has_sermons:
-                        lbuttons.append(dict(title="Import sermon manifestations from a template", 
-                                    id=template_import_button, open="import_from_template", label="Import from template..."))
+                    if instance.mtype != "rec":
+                        # Add a button so that the user can import sermons + hierarchy from an existing template
+                        if not has_sermons:
+                            lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                                        id=template_import_button, open="import_from_template", label="Import from template..."))
 
-                    # Add a button so that the user can turn this manuscript into a `Template`
-                    lbuttons.append(dict(title="Create template from this manuscript", 
-                                 submit="create_new_template", label="Create template..."))
+                        # Add a button so that the user can turn this manuscript into a `Template`
+                        lbuttons.append(dict(title="Create template from this manuscript", 
+                                     submit="create_new_template", label="Create template..."))
                 # Some buttons are needed anyway...
                 lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
                 lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
@@ -8305,15 +8316,22 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
-            # Add Codico items
-            codicos = instance.manuscriptcodicounits.all().order_by('order')
+            # Add Codico items - depending on reconstructed or not
+            if instance.mtype == "rec":
+                # Note: we need to go through Reconstruction, 
+                #       since that table has the correct 'order' values for the reconstruction
+                codicos = [x.codico for x in instance.manuscriptreconstructions.all().order_by('order')]
+            else:
+                # Note: we need to go directly to Codico, since the order values are there
+                codicos = instance.manuscriptcodicounits.all().order_by('order')
             codico_list = []
             for codico in codicos:
                 # Get the codico details URL
                 url = reverse("codico_details", kwargs={'pk': codico.id})
+                url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
                 # Add the information to the codico list
-                codico_list.append( dict(url=url, kvlist=self.get_kvlist(codico), codico_id=codico.id) )
-            context['codico_list'] = codico_list
+                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
+                context['codico_list'] = codico_list
             lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
 
             # Add comment modal stuff
@@ -8342,12 +8360,12 @@ class ManuscriptEdit(BasicDetails):
         sBack = "\n".join(lhtml)
         return sBack
 
-    def get_kvlist(self, instance):
+    def get_kvlist(self, codico, manu):
         """Get a list of fields and values"""
 
         # Get a list of sermon information for this codico
         sermon_list = []
-        for msitem in instance.codicoitems.all().order_by('order'):
+        for msitem in codico.codicoitems.all().order_by('order'):
             for sermon in msitem.itemsermons.all():
                 # Add information of this sermon to the list
                 sermon_url = reverse('sermon_details', kwargs={'pk': sermon.id})
@@ -8363,23 +8381,30 @@ class ManuscriptEdit(BasicDetails):
         # OLD:
         # sermons = ", ".join(sermon_list)
         lkv = []
-        lkv.append(dict(label="Order", value=instance.order))
+        if codico.manuscript.id == manu.id:
+            lkv.append(dict(label="Order", value=codico.order))
+        else:
+            # Get the 'reconstruction' element
+            reconstruction = Reconstruction.objects.filter(manuscript=manu, codico=codico).first()
+            if reconstruction != None:
+                sOrder = "{} (in identifier: {})".format(reconstruction.order, codico.order)
+                lkv.append(dict(label="Order", value=sOrder))
         lkv.append(dict(label="Sermons", value=sermons))
-        lkv.append(dict(label="Title", value=instance.name))
-        lkv.append(dict(label="Date", value=instance.get_date_markdown()))
-        lkv.append(dict(label="Support", value=instance.support))
-        lkv.append(dict(label="Extent", value=instance.extent))
-        lkv.append(dict(label="Format", value=instance.format))
-        lkv.append(dict(label="Keywords", value=instance.get_keywords_markdown()))
-        lkv.append(dict(label="Origin", value=instance.get_origin_markdown()))
-        lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(instance)))
-        lkv.append(dict(label="Notes", value=instance.notes))
+        lkv.append(dict(label="Title", value=codico.name))
+        lkv.append(dict(label="Date", value=codico.get_date_markdown()))
+        lkv.append(dict(label="Support", value=codico.support))
+        lkv.append(dict(label="Extent", value=codico.extent))
+        lkv.append(dict(label="Format", value=codico.format))
+        lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
+        lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
+        lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
+        lkv.append(dict(label="Notes", value=codico.notes))
         return lkv
 
-    def get_codiprovenance_markdown(self, instance):
+    def get_codiprovenance_markdown(self, codico):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
 
-        context = dict(codi=instance)
+        context = dict(codi=codico)
         sBack = render_to_string("seeker/codi_provs.html", context, self.request)
         return sBack
 
@@ -8670,18 +8695,20 @@ class ManuscriptDetails(ManuscriptEdit):
                     oSermon['cols'] = maxdepth - oSermon['level'] + 1
                     if oSermon['group']: oSermon['cols'] -= 1
 
-            # Add instances to the list, noting their childof and order
-            context['sermon_list'] = sermon_list
-            context['sermon_count'] = len(sermon_list)
-            # List of codicological units that are not yet linked to data
-            codi_empty_list = []
-            for codi in instance.manuscriptcodicounits.all().order_by('order'):
-                if codi.codicoitems.count() == 0:
-                    codi_empty_list.append(codi)
-            context['codi_empty_list'] = codi_empty_list
+            # The following only goes for the correct mtype
+            if instance.mtype != "rec":
+                # Add instances to the list, noting their childof and order
+                context['sermon_list'] = sermon_list
+                context['sermon_count'] = len(sermon_list)
+                # List of codicological units that are not yet linked to data
+                codi_empty_list = []
+                for codi in instance.manuscriptcodicounits.all().order_by('order'):
+                    if codi.codicoitems.count() == 0:
+                        codi_empty_list.append(codi)
+                context['codi_empty_list'] = codi_empty_list
 
-            # Add the list of sermons and the comment button
-            context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
+                # Add the list of sermons and the comment button
+                context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDetails/add_to_context")
@@ -8853,36 +8880,44 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
                 passim_action_add(self, instance, details, "save")
 
-
-                # Old method - to be deleted
-                #else:
-
-                #    with transaction.atomic():
-                #        for item in hlist:
-                #            bNeedSaving = False
-                #            # Get the sermon of this item
-                #            sermon = SermonDescr.objects.filter(id=item['id']).first()
-                #            order = int(item['nodeid']) -1
-                #            parent_order = int(item['childof']) - 1
-                #            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
-                #            # Check if anytyhing changed
-                #            if sermon.order != order:
-                #                sermon.order = order
-                #                bNeedSaving =True
-                #            if sermon.parent is not parent:
-                #                sermon.parent = parent
-                #                # Sanity check...
-                #                if sermon.parent.id == parent.id:
-                #                    sermon.parent = None
-                #                bNeedSaving = True
-                #            # Do we need to save this one?
-                #            if bNeedSaving:
-                #                sermon.save()
-
             return True
         except:
             msg = errHandle.get_error_message()
             errHandle.DoError("ManuscriptHierarchy")
+            return False
+
+
+class ManuscriptCodico(ManuscriptDetails):
+    """Link a codico to a manuscript"""
+    
+    initRedirect = True
+
+    def custom_init(self, instance):
+        errHandle = ErrHandle()
+
+        try:
+            # Check if the right parameters have been passed on
+            manu_id = self.qd.get("mrec-rmanu")
+            codico_id = self.qd.get("mrec-codicostart")
+            if manu_id == None or codico_id == None:
+                # Open another place
+                self.redirectpage = reverse("manuscript_list")
+            else:
+
+                # Check if this thing is already existing
+                obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
+                if obj == None:
+                    # Doesn't exist (yet), so create it
+                    order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
+                    obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
+
+                # Make sure to set the correct redirect page
+                self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                # Make sure we set the object to the reconstruction manuscript
+                self.object = obj.manuscript
+        except:
+            msg = errHandle.get_error_message()
+            errHandle.DoError("ManuscriptCodico")
             return False
 
 

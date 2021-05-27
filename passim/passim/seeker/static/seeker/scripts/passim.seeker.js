@@ -3690,6 +3690,26 @@ var ru = (function ($, ru) {
       },
 
       /**
+       *  add_codico
+       *      Add a codico to a manuscript
+       *
+       */
+      add_codico: function (elStart) {
+        var elForm = null,
+            targeturl = "",
+            data = null;
+
+        try {
+          // Get to the form
+          elForm = $(elStart).closest("form").first();
+          // Submit it
+          $(elForm).submit();
+        } catch (ex) {
+          private_methods.errMsg("add_codico", ex);
+        }
+      },
+
+      /**
        *  manuscript
        *      Save the current constellation of sermons in the manuscript
        *

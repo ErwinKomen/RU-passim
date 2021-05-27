@@ -642,6 +642,20 @@ class ManuidOneWidget(ModelSelect2Widget):
         return qs
 
 
+class ManuReconWidget(ModelSelect2Widget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = Manuscript.objects.filter(mtype='rec').order_by('idno').distinct()
+        return qs
+
+
 class ManuscriptExtWidget(ModelSelect2MultipleWidget):
     model = ManuscriptExt
     search_fields = [ 'url__icontains' ]
@@ -1164,6 +1178,24 @@ class SelectGoldForm(forms.ModelForm):
             # If there is an instance, then check the author specification
             sAuthor = "" if not instance.author else instance.author.name
             self.fields['authorname'].initial = sAuthor
+
+
+class ManuReconForm(forms.Form):
+    """Search through reconstructed manuscripts"""
+
+    rmanu = ModelChoiceField(queryset=None, required=False,
+            widget=ManuReconWidget(attrs={'data-placeholder': 'Select a reconstructed manuscript...', 'style': 'width: 100%;'}))
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuReconForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            self.fields['rmanu'].queryset = Manuscript.objects.filter(mtype='rec')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("manureconform")
 
 
 class SearchManuscriptForm(forms.Form):
