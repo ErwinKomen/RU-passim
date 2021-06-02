@@ -4704,6 +4704,25 @@ class Codico(models.Model):
             sBack = manu.get_full_name()
         return sBack
 
+    def get_identification(self):
+        """Get a unique identification of myself"""
+
+        sBack = ""
+        combi = []
+        combi.append(self.manuscript.idno)
+        if self.order:
+            combi.append(str(self.order))
+        if self.name:
+            combi.append(self.name)
+        if self.pagefirst > 0:
+            if self.pagelast > 0 and self.pagelast > self.pagefirst:
+                combi.append("{}-{}".format(self.pagefirst, self.pagelast))
+            else:
+                combi.append("p{}".format(self.pagefirst))
+        # Combine it all
+        sBack = "_".join(combi)
+        return sBack
+
     def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords

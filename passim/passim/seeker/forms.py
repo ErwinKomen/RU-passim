@@ -176,6 +176,21 @@ class CodeWidget(ModelSelect2MultipleWidget):
         return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
 
 
+class CodicoOneWidget(ModelSelect2Widget):
+    """Select one COdico"""
+
+    model = Codico
+    search_fields = [ 'manuscript__idno__icontains', 'name__icontains', 'order__icontains']
+
+    def label_from_instance(self, obj):
+        # The name is the MS's [idno] plus credentials of the codico
+        return obj.get_identification()
+
+    def get_queryset(self):
+        return Codico.objects.filter(manuscript__mtype='man').order_by(
+            'manuscript__idno', 'order').distinct()
+
+
 class CollectionWidget(ModelSelect2MultipleWidget):
     model = Collection
     search_fields = [ 'name__icontains' ]
@@ -1185,6 +1200,8 @@ class ManuReconForm(forms.Form):
 
     rmanu = ModelChoiceField(queryset=None, required=False,
             widget=ManuReconWidget(attrs={'data-placeholder': 'Select a reconstructed manuscript...', 'style': 'width: 100%;'}))
+    rcodico = ModelChoiceField(queryset=None, required=False,
+            widget=CodicoOneWidget(attrs={'data-placeholder': 'Select a codicological unit...', 'style': 'width: 100%;'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -1193,6 +1210,8 @@ class ManuReconForm(forms.Form):
         oErr = ErrHandle()
         try:
             self.fields['rmanu'].queryset = Manuscript.objects.filter(mtype='rec')
+            self.fields['rcodico'].queryset = Codico.objects.filter(manuscript__mtype='man').order_by(
+                'manuscript__idno', 'order').distinct()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("manureconform")

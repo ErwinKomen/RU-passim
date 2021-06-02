@@ -13,6 +13,19 @@
     {% endif %}
   </div>
 
+  <!-- Room to add an existing codicological unit -->
+  <div id="add_to_reconstruction" class="collapse">
+    <form action="{% url 'manuscript_codico' %}" method="post">
+      <div class="hidden">
+        {% csrf_token %}
+        <input type="text" name="mrec-manuscript" value="{{object.id}}" />
+      </div>
+      Select the codicological unit that should be linked to this reconstruction:
+      {{mrecForm.rcodico}}
+      <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.add_codico(this);">Add to manuscript</a>
+    </form>
+  </div>
+
   <div class="panel-body " >
     {% for codico in codico_list %}
       <table style='width: 100%;' id="{{codico.codico_id}}">

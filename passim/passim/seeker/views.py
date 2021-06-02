@@ -8820,24 +8820,43 @@ class ManuscriptCodico(ManuscriptDetails):
 
         try:
             # Check if the right parameters have been passed on
-            manu_id = self.qd.get("mrec-rmanu")
-            codico_id = self.qd.get("mrec-codicostart")
-            if manu_id == None or codico_id == None:
-                # Open another place
-                self.redirectpage = reverse("manuscript_list")
-            else:
+            if "mrec-rmanu" in self.qd and "mrec-codicostart" in self.qd:
+                manu_id = self.qd.get("mrec-rmanu")
+                codico_id = self.qd.get("mrec-codicostart")
+                if manu_id == None or codico_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                else:
 
-                # Check if this thing is already existing
-                obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
-                if obj == None:
-                    # Doesn't exist (yet), so create it
-                    order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
-                    obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
+                    # Check if this thing is already existing
+                    obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
+                    if obj == None:
+                        # Doesn't exist (yet), so create it
+                        order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
+                        obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
 
-                # Make sure to set the correct redirect page
-                self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
-                # Make sure we set the object to the reconstruction manuscript
-                self.object = obj.manuscript
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    # Make sure we set the object to the reconstruction manuscript
+                    self.object = obj.manuscript
+            elif "mrec-rcodico" in self.qd and "mrec-manuscript" in self.qd:
+                manu_id = self.qd.get("mrec-manuscript")
+                codico_id = self.qd.get("mrec-rcodico")
+                if manu_id == None or codico_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                else:
+                    # Check if this thing is already existing
+                    obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
+                    if obj == None:
+                        # Doesn't exist (yet), so create it
+                        order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
+                        obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
+
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    # Make sure we set the object to the reconstruction manuscript
+                    self.object = obj.manuscript
         except:
             msg = errHandle.get_error_message()
             errHandle.DoError("ManuscriptCodico")
