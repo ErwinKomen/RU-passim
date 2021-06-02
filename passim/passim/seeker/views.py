@@ -4828,26 +4828,8 @@ class SermonListView(BasicList):
     def initializations(self):
         oErr = ErrHandle()
         try:
-            # Check if signature adaptation is needed
-            nick_done = Information.get_kvalue("nicknames")
-            if nick_done == None or nick_done == "":
-                # Perform adaptations
-                bResult, msg = SermonDescr.adapt_nicknames()
-                if bResult:
-                    # Success
-                    Information.set_kvalue("nicknames", "done")
-
-            # Check if signature adaptation is needed
-            bref_done = Information.get_kvalue("biblerefs")
-            if bref_done == None or bref_done != "done":
-                # Remove any previous BibRange objects
-                BibRange.objects.all().delete()
-                # Perform adaptations
-                for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
-                    sermon.do_ranges(force=True)
-                # Success
-                Information.set_kvalue("biblerefs", "done")
-                SermonDescr.objects.all()
+            # ======== One-time adaptations ==============
+            listview_adaptations("sermon_list")
 
             # Check if there are any sermons not connected to a manuscript: remove these
             delete_id = SermonDescr.objects.filter(Q(msitem__isnull=True)|Q(msitem__manu__isnull=True)).values('id')
@@ -5553,69 +5535,10 @@ class ProvenanceListView(BasicList):
 
         oErr = ErrHandle()
         try:
-            # OUTDATED: Check if otype has already been taken over
-            #manuprov_m2o = Information.get_kvalue("manuprov_m2o")
-            #if manuprov_m2o == None or manuprov_m2o != "done":
-            #    prov_changes = 0
-            #    prov_added = 0
-            #    # Get all the manuscripts
-            #    for manu in Manuscript.objects.all():
-            #        # Treat the provenances for this manuscript
-            #        for provenance in manu.provenances.all():
-            #            # Check if this can be used
-            #            if provenance.manu_id == None or provenance.manu_id == 0 or provenance.manu == None or provenance.manu.id == 0:
-            #                # We can use this one
-            #                provenance.manu = manu
-            #                prov_changes += 1
-            #            else:
-            #                # Need to create a new provenance
-            #                provenance = Provenance.objects.create(
-            #                    manu=manu, name=provenance.name, location=provenance.location, 
-            #                    note=provenance.note)
-            #                prov_added += 1
-            #            # Make sure to save the result
-            #            provenance.save() 
-            #    # Success
-            #    oErr.Status("manuprov_m2o: {} changes, {} additions".format(prov_changes, prov_added))
-            #    Information.set_kvalue("manuprov_m2o", "done")
 
-            # Issue #289: back to m2m connection
-            manuprov_m2m = Information.get_kvalue("manuprov_m2m")
-            if manuprov_m2m == None or manuprov_m2m != "done":
-                prov_changes = 0
-                prov_added = 0
-                # Keep a list of provenance id's that may be kept
-                keep_id = []
+            # ======== One-time adaptations ==============
+            listview_adaptations("provenance_list")
 
-                # Remove all previous ProvenanceMan connections
-                ProvenanceMan.objects.all().delete()
-                # Get all the manuscripts
-                for manu in Manuscript.objects.all():
-                    # Treat all the M2O provenances for this manuscript
-                    for prov in manu.manuprovenances.all():
-                        # Get the *name* and the *loc* for this prov
-                        name = prov.name
-                        loc = prov.location
-                        note = prov.note
-                        # Get the very *first* provenance with name/loc
-                        firstprov = Provenance.objects.filter(name__iexact=name, location=loc).first()
-                        if firstprov == None:
-                            # Create one
-                            firstprov = Provenance.objects.create(name=name, location=loc)
-                        keep_id.append(firstprov.id)
-                        # Add the link
-                        link = ProvenanceMan.objects.create(manuscript=manu, provenance=firstprov, note=note)
-                # Walk all provenances to remove the unused ones
-                delete_id = []
-                for prov in Provenance.objects.all().values('id'):
-                    if not prov['id'] in keep_id:
-                        delete_id.append(prov['id'])
-                oErr.Status("Deleting provenances: {}".format(len(delete_id)))
-                Provenance.objects.filter(id__in=delete_id).delete()
-
-                # Success
-                oErr.Status("manuprov_m2m: {} changes, {} additions".format(prov_changes, prov_added))
-                Information.set_kvalue("manuprov_m2m", "done")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProvenanceListView/initializations")
@@ -9888,13 +9811,8 @@ class SermonGoldListView(BasicList):
         return sBack, sTitle
 
     def initializations(self):
-        # Check if signature adaptation is needed
-        gsig_done = Information.get_kvalue("sermon_gsig")
-        if gsig_done == None or gsig_done == "":
-            # Perform adaptations
-            if SermonSignature.adapt_gsig():
-                # Success
-                Information.set_kvalue("sermon_gsig", "done")
+        # ======== One-time adaptations ==============
+        listview_adaptations("sermongold_list")
 
         return None
 
@@ -10883,165 +10801,8 @@ class EqualGoldListView(BasicList):
 
     def initializations(self):
 
-        re_pattern = r'^\s*(?:\b[A-Z][a-zA-Z]+\b\s*)+(?=[_])'
-        re_name = r'^[A-Z][a-zA-Z]+\s*'
-        oErr = ErrHandle()
-
-        def add_names(main_list, fragment):
-            oErr = ErrHandle()
-            try:
-                for sentence in fragment.replace("_", "").split("."):
-                    # WOrk through non-initial words
-                    words = re.split(r'\s+', sentence)
-                    for word in words[1:]:
-                        if re.match(re_name, word):
-                            if not word in main_list:
-                                main_list.append(word)
-            except:
-                msg = oErr.get_error_message()
-                oErr.DoError("add_names")
-
-        if Information.get_kvalue("author_anonymus") != "done":
-            # Get all SSGs with anyonymus
-            with transaction.atomic():
-                ano = "anonymus"
-                qs = EqualGold.objects.filter(Q(author__name__iexact=ano))
-                for ssg in qs:
-                    ssg.save()
-            Information.set_kvalue("author_anonymus", "done")
-
-        if Information.get_kvalue("latin_names") != "done":
-            # Start list of common names
-            common_names = []
-            # Walk all SSGs that are not templates
-            with transaction.atomic():
-                incexpl_list = EqualGold.objects.values('incipit', 'explicit')
-                for incexpl in incexpl_list:
-                    # Treat incipit and explicit
-                    inc = incexpl['incipit']
-                    if inc != None: add_names(common_names, inc)
-                    expl = incexpl['explicit']
-                    if expl != None:  add_names(common_names, expl)
-                # TRansform word list
-                names_list = sorted(common_names)
-                oErr.Status("Latin common names: {}".format(json.dumps(names_list)))
-            Information.set_kvalue("latin_names", "done")
-
-        if Information.get_kvalue("ssg_bidirectional") != "done":
-            # Put all links in a list
-            lst_link = []
-            lst_remove = []
-            lst_reverse = []
-            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_BIDIR):
-                # Check for any other eqg-links with the same source
-                lst_src = EqualGoldLink.objects.filter(src=obj.src, dst=obj.dst).exclude(id=obj.id)
-                if lst_src.count() > 0:
-                    # Add them to the removal
-                    for item in lst_src:
-                        lst_remove.append(item)
-                else:
-                    # Add the obj to the list
-                    lst_link.append(obj)
-            for obj in lst_link:
-                # Find the reverse link
-                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src)
-                if reverse.count() == 0:
-                    # Create the reversal
-                    reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
-
-            Information.set_kvalue("ssg_bidirectional", "done")
-
-        if Information.get_kvalue("s_to_ssg_link") != "done":
-            qs = SermonDescrEqual.objects.all()
-            with transaction.atomic():
-                for obj in qs:
-                    obj.linktype = LINK_UNSPECIFIED
-                    obj.save()
-            Information.set_kvalue("s_to_ssg_link", "done")
-
-        if Information.get_kvalue("hccount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    hccount = ssg.collections.filter(settype="hc").count()
-                    if hccount != ssg.hccount:
-                        ssg.hccount = hccount
-                        ssg.save()
-            Information.set_kvalue("hccount", "done")
-
-        if Information.get_kvalue("scount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    scount = ssg.equalgold_sermons.count()
-                    if scount != ssg.scount:
-                        ssg.scount = scount
-                        ssg.save()
-            Information.set_kvalue("scount", "done")
-
-        if Information.get_kvalue("ssgcount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    ssgcount = ssg.relations.count()
-                    if ssgcount != ssg.ssgcount:
-                        ssg.ssgcount = ssgcount
-                        ssg.save()
-            Information.set_kvalue("ssgcount", "done")
-
-        if Information.get_kvalue("ssgselflink") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                must_delete = []
-                # Walk all SSG links
-                for ssglink in EqualGoldLink.objects.all():
-                    # Is this a self-link?
-                    if ssglink.src == ssglink.dst:
-                        # Add it to must_delete
-                        must_delete.append(ssglink.id)
-                # Remove all self-links
-                EqualGoldLink.objects.filter(id__in=must_delete).delete()
-            Information.set_kvalue("ssgselflink", "done")
-
-        if Information.get_kvalue("add_manu") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                # Walk all SSG links
-                for link in SermonDescrEqual.objects.all():
-                    # Get the manuscript for this sermon
-                    manu = link.sermon.msitem.manu
-                    # Add it
-                    link.manu = manu
-                    link.save()
-            Information.set_kvalue("add_manu", "done")
-
-        if Information.get_kvalue("passim_code") != "done":
-            # Walk all SSGs
-            need_correction = {}
-            for obj in EqualGold.objects.all():
-                code = obj.code
-                if code != None and code != "ZZZ_DETERMINE":
-                    count = EqualGold.objects.filter(code=code).count()
-                    if count > 1:
-                        oErr.Status("Duplicate code={} id={}".format(code, obj.id))
-                        if code in need_correction:
-                            need_correction[code].append(obj.id)
-                        else:                            
-                            need_correction[code] = [obj.id]
-            oErr.Status(json.dumps(need_correction))
-            for k,v in need_correction.items():
-                code = k
-                ssg_list = v
-                for ssg_id in ssg_list[:-1]:
-                    oErr.Status("Changing CODE for id {}".format(ssg_id))
-                    obj = EqualGold.objects.filter(id=ssg_id).first()
-                    if obj != None:
-                        obj.code = None
-                        obj.number = None
-                        obj.save()
-                        oErr.Status("Re-saved id {}, code is now: {}".format(obj.id, obj.code))
-
-            Information.set_kvalue("passim_code", "done")
+        # ======== One-time adaptations ==============
+        listview_adaptations("equalgold_list")
 
         return None
     
