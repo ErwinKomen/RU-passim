@@ -120,6 +120,74 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * codico_hlisttree
+       *    Make an object list of the current codico hierarchy
+       * 
+       * @param {el} elRoot
+       * @returns {list} list of integers
+       */
+      codico_hlisttree: function (elRoot) {
+        var hList = [],
+            srm_codi = {};
+
+        try {
+          // Creae a lis of thecurrent hierarchy
+          $(elRoot).find(".codico-unit > table").each(function (idx, el) {
+            var codico_id = "";
+
+            codico_id = parseInt($(el).attr("id"), 10);
+            hList.push(codico_id);
+          });
+          return hList;
+        } catch (ex) {
+          private_methods.errMsg("codico_hlisttree", ex);
+          return [];
+        }
+      },
+
+      /**
+       * codico_renumber
+       *    Re-number the codicological units of this reconstruction manuscript
+       * 
+       * @param {el} elRoot
+       * @returns {bool}
+       */
+      codico_renumber: function (elRoot) {
+        var counter = 1,
+            sRuler = "<div class=\"codico-ruler\"><hr /></div>",
+            number = 0;
+
+        try {
+          // Get the number of elements
+          number = $(elRoot).find(".codico-target").length;
+          // Get list of current hierarchy
+          $(elRoot).find("table").each(function (idx, el) {
+            var argnode = null;
+
+            argnode = $(el).find(".codico-target");
+            if (argnode.length > 0) {
+              argnode.first().text(counter++);
+              // Double check the presence of a <hr>, unless it is the last one
+              if (idx < (number - 1)) {
+                // There must be a <hr>
+                if ($(el).closest(".codico-unit").find(".codico-ruler").length === 0) {
+                  // A ruler must be inserted
+                  $(sRuler).insertAfter(el);
+                }
+              } else {
+                // There may not be a <hr>
+                $(el).closest(".codico-unit").find(".codico-ruler").remove();
+              }
+            }
+          });
+          return true;
+        } catch (ex) {
+          private_methods.errMsg("codico_renumber", ex);
+          return false;
+        }
+      },
+
+      /**
        * fitFeatureBox
        *    Initialize the <svg> in the @sDiv
        * 
@@ -2508,31 +2576,14 @@ var ru = (function ($, ru) {
        *
        */
       codico_dragenter: function (ev) {
-        var elTree = null,
-            divSrcId = null,
-            divDstId = null,
-            divSrc = null,
-            sermonid = "";
+        var divSrcId = "";
+
         try {
           // Prevent default handling
           ev.preventDefault();
 
           if ($(ev.target).hasClass("codico-target")) {
-            // Figure out what the source and destination is
-            elTree = $(ev.target).closest(".tree");
-            divDstId = $(elTree).attr("id");
             divSrcId = ev.dataTransfer.getData("text");
-            if (divSrcId !== "") {
-              // Nothing yet
-              divSrc = $("#sermon_tree").find("#" + divSrcId);
-
-              if (divDstId === "sermon_new" && $(divSrc).attr("sermontype") !== "head") {
-                // This is not allowed
-                return;
-              }
-            }
-
-
             $(ev.target).addClass("dragover");
           }
         } catch (ex) {
@@ -2546,16 +2597,37 @@ var ru = (function ($, ru) {
        *
        */
       codico_dragleave: function (ev) {
+        var divSrcId = "";
+
         try {
           // Prevent default handling
           ev.preventDefault();
 
           if ($(ev.target).hasClass("codico-target")) {
-
+            divSrcId = ev.dataTransfer.getData("text");
             $(ev.target).removeClass("dragover");
           }
         } catch (ex) {
           private_methods.errMsg("codico_dragleave", ex);
+        }
+      },
+
+      /**
+       *  codico_drag
+       *      Codico starts being dragged
+       *
+       */
+      codico_drag: function (ev) {
+        var elTable = null,
+            divId = "";
+
+        try {
+          elTable = $(ev.target).closest("table");
+          divId = $(elTable).attr("id");
+
+          ev.dataTransfer.setData("text", divId);
+        } catch (ex) {
+          private_methods.errMsg("codico_drag", ex);
         }
       },
 
@@ -2565,7 +2637,13 @@ var ru = (function ($, ru) {
        *
        */
       codico_drop: function (ev) {
-        var elTree = null,
+        var elTable = null,
+            elRoot = null,
+            bChanged = false,
+            orderSrc = "",
+            orderDst = "",
+            divSrc = null,  // The div.codico-unit
+            divDst = null,  // THe div.codico-unit
             divSrcId = "",
             divDstId = "";
 
@@ -2579,12 +2657,95 @@ var ru = (function ($, ru) {
 
             // Figure out what the source and destination is
             divSrcId = ev.dataTransfer.getData("text");
-            elTree = $(ev.target).closest("table");
-            divDstId = $(elTree).attr("id");
+            elTable = $(ev.target).closest("table");
+            divDstId = $(elTable).attr("id");
+            elRoot = $(elTable).closest(".codico-list");
+
+            // Do not move to myself:
+            if (divSrcId === divDstId) {
+              // We don't do anything
+            } else {
+              // Find out what the order values are
+              orderSrc = parseInt( $("table[id=" + divSrcId + "] .codico-target").first().text().trim(), 10);
+              orderDst = parseInt($("table[id=" + divDstId + "] .codico-target").first().text().trim(), 10);
+              // Make sure we don't move just one down, because that doesn't work
+              if (orderSrc !== (orderDst - 1)) {
+                // The target is correct!!! 
+                divSrc = $("table[id=" + divSrcId + "]").closest(".codico-unit");
+                divDst = $("table[id=" + divDstId + "]").closest(".codico-unit");
+                // Put the [divSrc] *right before* the [divDst]
+                $(divSrc).insertBefore(divDst);
+
+                // Indicate that changes have been made
+                bChanged = true;
+              }
+            }
+
+            // What if change happened?
+            if (bChanged) {
+              // Show the SAVE and RESTORE buttons
+              $("#save_section").removeClass("hidden");
+              // Now re-number the codicological units + make sure that 
+              private_methods.codico_renumber(elRoot);
+            }
           }
 
         } catch (ex) {
           private_methods.errMsg("codico_drop", ex);
+        }
+      },
+
+      /**
+       *  codico_remove
+       *      Remove this codico unit
+       *
+       */
+      codico_remove: function (elThis) {
+        var elTr = null,
+            elRoot = null;
+
+        try {
+          // Find the right row to remove
+          elTr = $(elThis).closest(".codico-unit");
+          elRoot = $(elTr).closest(".codico-list");
+          // Make sure the save button is visible
+          $("#save_section").removeClass("hidden");
+          // Remove it
+          $(elTr).remove();
+          // Now re-number the codicological units
+          private_methods.codico_renumber(elRoot);
+        } catch (ex) {
+          private_methods.errMsg("codico_remove", ex);
+        }
+      },
+
+      /**
+       *  codico_process
+       *      Process one or more codico's of a manuscript
+       *
+       */
+      codico_process: function (elStart, codico_type) {
+        var elForm = null,
+            targeturl = "",
+            elRoot = null,
+            hList = null,
+            data = null;
+
+        try {
+          // Get to the form
+          elForm = $(elStart).closest("form").first();
+          elRoot = $(".codico-list").first();
+          // check for saving
+          if (codico_type !== undefined && codico_type === "save") {
+            // 'Read' the current hierarchy...
+            hList = private_methods.codico_hlisttree(elRoot);
+            // Set the <input> value to return the contents of [hList]
+            $("#id_mrec-codicolist").val(JSON.stringify(hList));
+          }
+          // Submit it
+          $(elForm).submit();
+        } catch (ex) {
+          private_methods.errMsg("codico_process", ex);
         }
       },
 
@@ -3686,26 +3847,6 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("form_row_select", ex);
-        }
-      },
-
-      /**
-       *  add_codico
-       *      Add a codico to a manuscript
-       *
-       */
-      add_codico: function (elStart) {
-        var elForm = null,
-            targeturl = "",
-            data = null;
-
-        try {
-          // Get to the form
-          elForm = $(elStart).closest("form").first();
-          // Submit it
-          $(elForm).submit();
-        } catch (ex) {
-          private_methods.errMsg("add_codico", ex);
         }
       },
 

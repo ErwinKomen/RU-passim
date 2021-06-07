@@ -8310,7 +8310,8 @@ class ManuscriptEdit(BasicDetails):
             # Get the 'reconstruction' element
             reconstruction = Reconstruction.objects.filter(manuscript=manu, codico=codico).first()
             if reconstruction != None:
-                sOrder = "{} (in identifier: {})".format(reconstruction.order, codico.order)
+                # sOrder = "{} (in identifier: {})".format(reconstruction.order, codico.order)
+                sOrder = "{}".format(reconstruction.order)
                 lkv.append(dict(label="Order", value=sOrder))
         lkv.append(dict(label="Sermons", value=sermons))
         lkv.append(dict(label="Title", value=codico.name))
@@ -8857,6 +8858,41 @@ class ManuscriptCodico(ManuscriptDetails):
                     self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
                     # Make sure we set the object to the reconstruction manuscript
                     self.object = obj.manuscript
+            elif "mrec-codicolist" in self.qd and "mrec-manuscript" in self.qd:
+                manu_id = self.qd.get("mrec-manuscript")
+                codico_str = self.qd.get("mrec-codicolist")
+                if manu_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                elif codico_str == None or codico_str == "[]":
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                else:
+                    delete_lst = []
+                    current_lst = Reconstruction.objects.filter(manuscript=manu_id).order_by("order")
+                    codico_lst = json.loads(codico_str)
+                    for obj in current_lst:
+                        if obj.codico.id not in codico_lst:
+                            delete_lst.append(obj.id)
+                    # Remove those that need deletion
+                    if len(delete_lst) > 0:
+                        Reconstruction.objects.filter(id__in=delete_lst).delete()
+                    # Add and re-order
+                    order = 1
+                    with transaction.atomic():
+                        for id in codico_lst:
+                            # Check if this one is there
+                            obj = Reconstruction.objects.filter(manuscript=manu_id, codico=id).first()
+                            if obj == None:
+                                # Add it
+                                obj = Reconstruction.objects.create(manuscript=manu_id, codico=id)
+                            obj.order = order
+                            obj.save()
+                            order += 1
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+            # Return positively
+            return True
         except:
             msg = errHandle.get_error_message()
             errHandle.DoError("ManuscriptCodico")
