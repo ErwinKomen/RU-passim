@@ -180,7 +180,12 @@ class CodicoOneWidget(ModelSelect2Widget):
     """Select one COdico"""
 
     model = Codico
-    search_fields = [ 'manuscript__idno__icontains', 'name__icontains', 'order__icontains']
+    search_fields = [ 
+        'manuscript__lcity__name__icontains', 
+        'manuscript__library__name__icontains',
+        'manuscript__idno__icontains', 
+        #'name__icontains', 
+        'order__icontains']
 
     def label_from_instance(self, obj):
         # The name is the MS's [idno] plus credentials of the codico

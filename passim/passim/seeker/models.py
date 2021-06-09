@@ -4705,20 +4705,31 @@ class Codico(models.Model):
         return sBack
 
     def get_identification(self):
-        """Get a unique identification of myself"""
+        """Get a unique identification of myself
+        
+        Target output:
+             manuscriptCity+Library+Identifier ‘_’ codico volgnummer ‘_’ beginpagina-eindpagina
+        """
 
         sBack = ""
         combi = []
-        combi.append(self.manuscript.idno)
+        # Look for the city+library+identifier
+        combi.append(self.manuscript.get_full_name())
+        # Possibly add codico order number
         if self.order:
             combi.append(str(self.order))
-        if self.name:
-            combi.append(self.name)
+
+        # do *NOT* use the name (=title) of the codico
+        #if self.name:
+        #    combi.append(self.name)
+
+        # Add the page-range
         if self.pagefirst > 0:
             if self.pagelast > 0 and self.pagelast > self.pagefirst:
                 combi.append("{}-{}".format(self.pagefirst, self.pagelast))
             else:
                 combi.append("p{}".format(self.pagefirst))
+
         # Combine it all
         sBack = "_".join(combi)
         return sBack
