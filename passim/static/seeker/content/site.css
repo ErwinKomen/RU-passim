@@ -106,6 +106,13 @@ div.inline-group a.add-related {
     padding-right: 15px;
 }
 
+.panel-plain {
+    margin-left: 0px !important;
+    margin-right: 0px !important;
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+}
+
 .panel-news {
   margin-top: 5px;
 	/* margin-bottom:20px;
@@ -360,9 +367,18 @@ a:not(.btn) span.glyphicon-remove {
     color: darkred;
 }
 
+.visborder {
+    border: 1px solid blue;
+}
+
 svg {
     stroke-width: 1;
 }
+
+svg line {
+    vector-effect: non-scaling-stroke;
+}
+    
 svg .lithium-conn path:hover {
     stroke: red;
     stroke-width: 2;
@@ -1619,4 +1635,15 @@ svg .nodes text {
 
 /* END OF D3 Section */
 
+.codico-target {
+    min-width: 100px; 
+    display: inline-block;
+}
+
+.codi-start hr {
+    height: 5px;
+    background-color: mediumseagreen;
+    margin-top: 1px;
+    margin-bottom: 1px;
+}
 
