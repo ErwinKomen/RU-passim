@@ -1158,7 +1158,8 @@ class BasicList(ListView):
                 oFields, lstExclude, qAlternative = self.adapt_search(oFields)
 
                 self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
-                
+                # qs = self.model.objects.filter(manuitems__itemsermons__goldsermons__goldsignatures__code__in = "AN Mt h 42")
+
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
@@ -1722,7 +1723,7 @@ class BasicDetails(DetailView):
                     prevpage = context['listview']
                     context['prevpage'] = prevpage
                     crumbs = []
-                    crumbs.append([title, prevpage])
+                    crumbs.append([title + " list", prevpage])
                     current_name = title if instance else "{} (new)".format(title)
                     context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 
@@ -1923,6 +1924,9 @@ class BasicDetails(DetailView):
                     # This is only for *NEW* forms (right now)
                     form = formClass(prefix=prefix)
                     context[prefix + "Form"] = form
+                    if not 'forminstance' in formObj:
+                        # Create a new instance
+                        formObj['forminstance'] = formObj['form'](self.request.POST, prefix=formObj['prefix'])
                     # Get any possible typeahead parameters
                     lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
                     if lst_form_ta != None:

@@ -1139,6 +1139,21 @@ table.compact-table td:hover {
     cursor: pointer;
 }
 
+.codico-title {
+    color: darkred;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 9pt;
+    padding: 0px 4px;
+}
+.codico-title:hover {
+    color: whitesmoke;
+    background-color: darkred;
+    cursor: pointer;
+}
+
 .manuscript-city, .manuscript-library {
   min-width: 92px;
 }

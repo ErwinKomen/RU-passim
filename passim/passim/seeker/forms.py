@@ -176,6 +176,26 @@ class CodeWidget(ModelSelect2MultipleWidget):
         return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
 
 
+class CodicoOneWidget(ModelSelect2Widget):
+    """Select one COdico"""
+
+    model = Codico
+    search_fields = [ 
+        'manuscript__lcity__name__icontains', 
+        'manuscript__library__name__icontains',
+        'manuscript__idno__icontains', 
+        #'name__icontains', 
+        'order__icontains']
+
+    def label_from_instance(self, obj):
+        # The name is the MS's [idno] plus credentials of the codico
+        return obj.get_identification()
+
+    def get_queryset(self):
+        return Codico.objects.filter(manuscript__mtype='man').order_by(
+            'manuscript__idno', 'order').distinct()
+
+
 class CollectionWidget(ModelSelect2MultipleWidget):
     model = Collection
     search_fields = [ 'name__icontains' ]
@@ -625,7 +645,7 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return obj.idno
 
     def get_queryset(self):
-        return Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+        return Manuscript.objects.exclude(mtype='tem').order_by('idno').distinct()
 
 
 class ManuidOneWidget(ModelSelect2Widget):
@@ -639,6 +659,20 @@ class ManuidOneWidget(ModelSelect2Widget):
         qs = self.queryset
         if qs == None:
             qs = Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+        return qs
+
+
+class ManuReconWidget(ModelSelect2Widget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.idno
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = Manuscript.objects.filter(mtype='rec').order_by('idno').distinct()
         return qs
 
 
@@ -1166,6 +1200,28 @@ class SelectGoldForm(forms.ModelForm):
             self.fields['authorname'].initial = sAuthor
 
 
+class ManuReconForm(forms.Form):
+    """Search through reconstructed manuscripts"""
+
+    rmanu = ModelChoiceField(queryset=None, required=False,
+            widget=ManuReconWidget(attrs={'data-placeholder': 'Select a reconstructed manuscript...', 'style': 'width: 100%;'}))
+    rcodico = ModelChoiceField(queryset=None, required=False,
+            widget=CodicoOneWidget(attrs={'data-placeholder': 'Select a codicological unit...', 'style': 'width: 100%;'}))
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuReconForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            self.fields['rmanu'].queryset = Manuscript.objects.filter(mtype='rec')
+            self.fields['rcodico'].queryset = Codico.objects.filter(manuscript__mtype='man').order_by(
+                'manuscript__idno', 'order').distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("manureconform")
+
+
 class SearchManuscriptForm(forms.Form):
     """Note: only for SEARCHING"""
 
@@ -1283,7 +1339,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['name'].required = False
             #self.fields['yearstart'].required = False
             #self.fields['yearfinish'].required = False
-            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')

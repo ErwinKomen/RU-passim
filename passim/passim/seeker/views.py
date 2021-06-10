@@ -68,7 +68,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
-    TemplateForm, TemplateImportForm, \
+    TemplateForm, TemplateImportForm, ManuReconForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
@@ -80,7 +80,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, ProvenanceCod, CodicoKeyword, \
+    Codico, ProvenanceCod, CodicoKeyword, Reconstruction, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -130,6 +130,8 @@ def get_usercomments(type, instance, profile):
     if not username_is_ingroup(profile.user, app_editor):
         # App editors have permission to see *all* comments from all users
         lstQ.append(Q(profile=profile))
+    if type != "":
+        lstQ.append(Q(otype=type))
 
     # Calculate the list
     qs = instance.comments.filter(*lstQ).order_by("-created")
@@ -4357,7 +4359,13 @@ class SermonEdit(BasicDetails):
         # Changed in issue #241: show the PASSIM code
         context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
-        context['title_right'] = "<span class='manuscript-idno'>{}</span>".format(idno)
+        title_right = ["<span class='manuscript-idno' title='Manuscript'>{}</span>".format(
+            idno)]
+        #    ... as well as the *title* of the Codico to which I belong
+        codico = instance.msitem.codico
+        codi_title = "?" if codico == None or codico.name == "" else codico.name
+        title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
+        context['title_right'] = "".join(title_right)
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -4820,26 +4828,8 @@ class SermonListView(BasicList):
     def initializations(self):
         oErr = ErrHandle()
         try:
-            # Check if signature adaptation is needed
-            nick_done = Information.get_kvalue("nicknames")
-            if nick_done == None or nick_done == "":
-                # Perform adaptations
-                bResult, msg = SermonDescr.adapt_nicknames()
-                if bResult:
-                    # Success
-                    Information.set_kvalue("nicknames", "done")
-
-            # Check if signature adaptation is needed
-            bref_done = Information.get_kvalue("biblerefs")
-            if bref_done == None or bref_done != "done":
-                # Remove any previous BibRange objects
-                BibRange.objects.all().delete()
-                # Perform adaptations
-                for sermon in SermonDescr.objects.exclude(bibleref__isnull=True).exclude(bibleref__exact=''):
-                    sermon.do_ranges(force=True)
-                # Success
-                Information.set_kvalue("biblerefs", "done")
-                SermonDescr.objects.all()
+            # ======== One-time adaptations ==============
+            listview_adaptations("sermon_list")
 
             # Check if there are any sermons not connected to a manuscript: remove these
             delete_id = SermonDescr.objects.filter(Q(msitem__isnull=True)|Q(msitem__manu__isnull=True)).values('id')
@@ -5545,69 +5535,10 @@ class ProvenanceListView(BasicList):
 
         oErr = ErrHandle()
         try:
-            # OUTDATED: Check if otype has already been taken over
-            #manuprov_m2o = Information.get_kvalue("manuprov_m2o")
-            #if manuprov_m2o == None or manuprov_m2o != "done":
-            #    prov_changes = 0
-            #    prov_added = 0
-            #    # Get all the manuscripts
-            #    for manu in Manuscript.objects.all():
-            #        # Treat the provenances for this manuscript
-            #        for provenance in manu.provenances.all():
-            #            # Check if this can be used
-            #            if provenance.manu_id == None or provenance.manu_id == 0 or provenance.manu == None or provenance.manu.id == 0:
-            #                # We can use this one
-            #                provenance.manu = manu
-            #                prov_changes += 1
-            #            else:
-            #                # Need to create a new provenance
-            #                provenance = Provenance.objects.create(
-            #                    manu=manu, name=provenance.name, location=provenance.location, 
-            #                    note=provenance.note)
-            #                prov_added += 1
-            #            # Make sure to save the result
-            #            provenance.save() 
-            #    # Success
-            #    oErr.Status("manuprov_m2o: {} changes, {} additions".format(prov_changes, prov_added))
-            #    Information.set_kvalue("manuprov_m2o", "done")
 
-            # Issue #289: back to m2m connection
-            manuprov_m2m = Information.get_kvalue("manuprov_m2m")
-            if manuprov_m2m == None or manuprov_m2m != "done":
-                prov_changes = 0
-                prov_added = 0
-                # Keep a list of provenance id's that may be kept
-                keep_id = []
+            # ======== One-time adaptations ==============
+            listview_adaptations("provenance_list")
 
-                # Remove all previous ProvenanceMan connections
-                ProvenanceMan.objects.all().delete()
-                # Get all the manuscripts
-                for manu in Manuscript.objects.all():
-                    # Treat all the M2O provenances for this manuscript
-                    for prov in manu.manuprovenances.all():
-                        # Get the *name* and the *loc* for this prov
-                        name = prov.name
-                        loc = prov.location
-                        note = prov.note
-                        # Get the very *first* provenance with name/loc
-                        firstprov = Provenance.objects.filter(name__iexact=name, location=loc).first()
-                        if firstprov == None:
-                            # Create one
-                            firstprov = Provenance.objects.create(name=name, location=loc)
-                        keep_id.append(firstprov.id)
-                        # Add the link
-                        link = ProvenanceMan.objects.create(manuscript=manu, provenance=firstprov, note=note)
-                # Walk all provenances to remove the unused ones
-                delete_id = []
-                for prov in Provenance.objects.all().values('id'):
-                    if not prov['id'] in keep_id:
-                        delete_id.append(prov['id'])
-                oErr.Status("Deleting provenances: {}".format(len(delete_id)))
-                Provenance.objects.filter(id__in=delete_id).delete()
-
-                # Success
-                oErr.Status("manuprov_m2m: {} changes, {} additions".format(prov_changes, prov_added))
-                Information.set_kvalue("manuprov_m2m", "done")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProvenanceListView/initializations")
@@ -7876,9 +7807,11 @@ class CommentSend(BasicPart):
     def add_to_context(self, context):
 
         url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
-                     "gold": "sermongold_details", "super": "equalgold_details"}
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details"}
         obj_names = {"manu": "Manuscript", "sermo": "Sermon",
-                     "gold": "Sermon Gold", "super": "Super Sermon Gold"}
+                     "gold": "Sermon Gold", "super": "Super Sermon Gold",
+                     "codi": "Codicological unit"}
         def get_object(otype, objid):
             obj = None
             if otype == "manu":
@@ -7889,6 +7822,8 @@ class CommentSend(BasicPart):
                 obj = SermonGold.objects.filter(id=objid).first()
             elif otype == "super":
                 obj = EqualGold.objects.filter(id=objid).first()
+            elif otype == "codi":
+                obj = Codico.objects.filter(id=objid).first()
             return obj
 
         if self.add:
@@ -8039,6 +7974,8 @@ class CommentListView(BasicList):
                         obj.otype = "gold"
                     elif obj.comments_super.count() > 0:
                         obj.otype = "super"
+                    elif obj.comments_codi.count() > 0:
+                        obj.otype = "codi"
                     obj.save()
             # Success
             Information.set_kvalue("comment_otype", "done")
@@ -8087,6 +8024,13 @@ class CommentListView(BasicList):
                     else:
                         url = reverse("equalgold_details", kwargs={'pk': obj.id})
                         label = "super_{}".format(obj.id)
+                elif instance.otype == "codi":
+                    obj = instance.comments_codi.first()
+                    if obj is None:
+                        iStop = 1
+                    else:
+                        url = reverse("codico_details", kwargs={'pk': obj.id})
+                        label = "codi_{}".format(obj.id)
                 if url != "":
                     sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, label)
         except:
@@ -8101,7 +8045,7 @@ class ManuscriptEdit(BasicDetails):
     model = Manuscript  
     mForm = ManuscriptForm
     prefix = 'manu'
-    title = "Manuscript"
+    titlesg = "Manuscript identifier"
     rtype = "json"
     new_button = True
     mainitems = []
@@ -8133,6 +8077,7 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
+    form_objects = [{'form': ManuReconForm, 'prefix': 'mrec', 'readonly': False}]
 
     stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
                         'hierarchy',
@@ -8142,7 +8087,13 @@ class ManuscriptEdit(BasicDetails):
                         'LitrefMan', 'litlist',
                         'ProvenanceMan', 'mprovlist'
                         'ManuscriptExt', 'extlist']
-    
+
+    def custom_init(self, instance):
+        if instance != None and instance.mtype == "rec":
+            # Also adapt the title
+            self.titlesg = "Reconstructed manuscript"
+        return None
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -8151,7 +8102,23 @@ class ManuscriptEdit(BasicDetails):
             # Need to know who this user (profile) is
             profile = Profile.get_user_profile(self.request.user.username)
 
+            # Check if this is creating a reconstructed manuscript
+            if instance != None and "manu-codicostart" in self.qd:
+                # Get the codicostart
+                codicostart = self.qd.get("manu-codicostart")
+                codico = Codico.objects.filter(id=codicostart).first()
+                if codico != None:
+                    # Set the mtype to Reconstruction
+                    instance.mtype = "rec"
+                    instance.save()
+                    # Create a Reconstruction object
+                    obj = Reconstruction.objects.filter(codico=codico, manuscript=instance).first()
+                    if obj == None:
+                        obj = Reconstruction.objects.create(codico=codico, manuscript=instance, order=1)
+
             istemplate = (instance.mtype == "tem")
+            # Make sure we mark reconstructed in the context
+            context['reconstructed'] = (instance.mtype == "rec")
 
             # Define the main items to show and edit
             context['mainitems'] = []
@@ -8203,7 +8170,7 @@ class ManuscriptEdit(BasicDetails):
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
                         'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
                 context['mainitems'].append(
-                    {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance)}
+                    {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
 
             # Signal that we have select2
@@ -8227,14 +8194,15 @@ class ManuscriptEdit(BasicDetails):
                     lbuttons.append(dict(title="Download manuscript as Excel file", 
                                          click="manuscript_download", label="Download"))
 
-                    # Add a button so that the user can import sermons + hierarchy from an existing template
-                    if not has_sermons:
-                        lbuttons.append(dict(title="Import sermon manifestations from a template", 
-                                    id=template_import_button, open="import_from_template", label="Import from template..."))
+                    if instance.mtype != "rec":
+                        # Add a button so that the user can import sermons + hierarchy from an existing template
+                        if not has_sermons:
+                            lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                                        id=template_import_button, open="import_from_template", label="Import from template..."))
 
-                    # Add a button so that the user can turn this manuscript into a `Template`
-                    lbuttons.append(dict(title="Create template from this manuscript", 
-                                 submit="create_new_template", label="Create template..."))
+                        # Add a button so that the user can turn this manuscript into a `Template`
+                        lbuttons.append(dict(title="Create template from this manuscript", 
+                                     submit="create_new_template", label="Create template..."))
                 # Some buttons are needed anyway...
                 lbuttons.append(dict(title="Open a list of origins", href=reverse('origin_list'), label="Origins..."))
                 lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
@@ -8271,15 +8239,22 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
-            # Add Codico items
-            codicos = instance.manuscriptcodicounits.all().order_by('order')
+            # Add Codico items - depending on reconstructed or not
+            if instance.mtype == "rec":
+                # Note: we need to go through Reconstruction, 
+                #       since that table has the correct 'order' values for the reconstruction
+                codicos = [x.codico for x in instance.manuscriptreconstructions.all().order_by('order')]
+            else:
+                # Note: we need to go directly to Codico, since the order values are there
+                codicos = instance.manuscriptcodicounits.all().order_by('order')
             codico_list = []
             for codico in codicos:
                 # Get the codico details URL
                 url = reverse("codico_details", kwargs={'pk': codico.id})
+                url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
                 # Add the information to the codico list
-                codico_list.append( dict(url=url, kvlist=self.get_kvlist(codico), codico_id=codico.id) )
-            context['codico_list'] = codico_list
+                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
+                context['codico_list'] = codico_list
             lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
 
             # Add comment modal stuff
@@ -8299,20 +8274,21 @@ class ManuscriptEdit(BasicDetails):
         # Return the context we have made
         return context
 
-    def get_codico_buttons(self, instance):
+    def get_codico_buttons(self, instance, context):
         sBack = ""
-        context = dict(codico_count=instance.manuscriptcodicounits.count())
+        # context = dict(codico_count=instance.manuscriptcodicounits.count())
+        context['codico_count'] = instance.manuscriptcodicounits.count()
         lhtml = []
         lhtml.append(render_to_string("seeker/codico_buttons.html", context, self.request))
         sBack = "\n".join(lhtml)
         return sBack
 
-    def get_kvlist(self, instance):
+    def get_kvlist(self, codico, manu):
         """Get a list of fields and values"""
 
         # Get a list of sermon information for this codico
         sermon_list = []
-        for msitem in instance.codicoitems.all().order_by('order'):
+        for msitem in codico.codicoitems.all().order_by('order'):
             for sermon in msitem.itemsermons.all():
                 # Add information of this sermon to the list
                 sermon_url = reverse('sermon_details', kwargs={'pk': sermon.id})
@@ -8328,23 +8304,31 @@ class ManuscriptEdit(BasicDetails):
         # OLD:
         # sermons = ", ".join(sermon_list)
         lkv = []
-        lkv.append(dict(label="Order", value=instance.order))
+        if codico.manuscript.id == manu.id:
+            lkv.append(dict(label="Order", value=codico.order))
+        else:
+            # Get the 'reconstruction' element
+            reconstruction = Reconstruction.objects.filter(manuscript=manu, codico=codico).first()
+            if reconstruction != None:
+                # sOrder = "{} (in identifier: {})".format(reconstruction.order, codico.order)
+                sOrder = "{}".format(reconstruction.order)
+                lkv.append(dict(label="Order", value=sOrder))
         lkv.append(dict(label="Sermons", value=sermons))
-        lkv.append(dict(label="Title", value=instance.name))
-        lkv.append(dict(label="Date", value=instance.get_date_markdown()))
-        lkv.append(dict(label="Support", value=instance.support))
-        lkv.append(dict(label="Extent", value=instance.extent))
-        lkv.append(dict(label="Format", value=instance.format))
-        lkv.append(dict(label="Keywords", value=instance.get_keywords_markdown()))
-        lkv.append(dict(label="Origin", value=instance.get_origin_markdown()))
-        lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(instance)))
-        lkv.append(dict(label="Notes", value=instance.notes))
+        lkv.append(dict(label="Title", value=codico.name))
+        lkv.append(dict(label="Date", value=codico.get_date_markdown()))
+        lkv.append(dict(label="Support", value=codico.support))
+        lkv.append(dict(label="Extent", value=codico.extent))
+        lkv.append(dict(label="Format", value=codico.format))
+        lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
+        lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
+        lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
+        lkv.append(dict(label="Notes", value=codico.notes))
         return lkv
 
-    def get_codiprovenance_markdown(self, instance):
+    def get_codiprovenance_markdown(self, codico):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
 
-        context = dict(codi=instance)
+        context = dict(codi=codico)
         sBack = render_to_string("seeker/codi_provs.html", context, self.request)
         return sBack
 
@@ -8635,18 +8619,20 @@ class ManuscriptDetails(ManuscriptEdit):
                     oSermon['cols'] = maxdepth - oSermon['level'] + 1
                     if oSermon['group']: oSermon['cols'] -= 1
 
-            # Add instances to the list, noting their childof and order
-            context['sermon_list'] = sermon_list
-            context['sermon_count'] = len(sermon_list)
-            # List of codicological units that are not yet linked to data
-            codi_empty_list = []
-            for codi in instance.manuscriptcodicounits.all().order_by('order'):
-                if codi.codicoitems.count() == 0:
-                    codi_empty_list.append(codi)
-            context['codi_empty_list'] = codi_empty_list
+            # The following only goes for the correct mtype
+            if instance.mtype != "rec":
+                # Add instances to the list, noting their childof and order
+                context['sermon_list'] = sermon_list
+                context['sermon_count'] = len(sermon_list)
+                # List of codicological units that are not yet linked to data
+                codi_empty_list = []
+                for codi in instance.manuscriptcodicounits.all().order_by('order'):
+                    if codi.codicoitems.count() == 0:
+                        codi_empty_list.append(codi)
+                context['codi_empty_list'] = codi_empty_list
 
-            # Add the list of sermons and the comment button
-            context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
+                # Add the list of sermons and the comment button
+                context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDetails/add_to_context")
@@ -8818,36 +8804,98 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
                 passim_action_add(self, instance, details, "save")
 
-
-                # Old method - to be deleted
-                #else:
-
-                #    with transaction.atomic():
-                #        for item in hlist:
-                #            bNeedSaving = False
-                #            # Get the sermon of this item
-                #            sermon = SermonDescr.objects.filter(id=item['id']).first()
-                #            order = int(item['nodeid']) -1
-                #            parent_order = int(item['childof']) - 1
-                #            parent = None if parent_order == 0 else SermonDescr.objects.filter(manu=instance, order=parent_order).first()
-                #            # Check if anytyhing changed
-                #            if sermon.order != order:
-                #                sermon.order = order
-                #                bNeedSaving =True
-                #            if sermon.parent is not parent:
-                #                sermon.parent = parent
-                #                # Sanity check...
-                #                if sermon.parent.id == parent.id:
-                #                    sermon.parent = None
-                #                bNeedSaving = True
-                #            # Do we need to save this one?
-                #            if bNeedSaving:
-                #                sermon.save()
-
             return True
         except:
             msg = errHandle.get_error_message()
             errHandle.DoError("ManuscriptHierarchy")
+            return False
+
+
+class ManuscriptCodico(ManuscriptDetails):
+    """Link a codico to a manuscript"""
+    
+    initRedirect = True
+
+    def custom_init(self, instance):
+        errHandle = ErrHandle()
+
+        try:
+            # Check if the right parameters have been passed on
+            if "mrec-rmanu" in self.qd and "mrec-codicostart" in self.qd:
+                manu_id = self.qd.get("mrec-rmanu")
+                codico_id = self.qd.get("mrec-codicostart")
+                if manu_id == None or codico_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                else:
+
+                    # Check if this thing is already existing
+                    obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
+                    if obj == None:
+                        # Doesn't exist (yet), so create it
+                        order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
+                        obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
+
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    # Make sure we set the object to the reconstruction manuscript
+                    self.object = obj.manuscript
+            elif "mrec-rcodico" in self.qd and "mrec-manuscript" in self.qd:
+                manu_id = self.qd.get("mrec-manuscript")
+                codico_id = self.qd.get("mrec-rcodico")
+                if manu_id == None or codico_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                else:
+                    # Check if this thing is already existing
+                    obj = Reconstruction.objects.filter(manuscript=manu_id, codico=codico_id).first()
+                    if obj == None:
+                        # Doesn't exist (yet), so create it
+                        order = Reconstruction.objects.filter(manuscript=manu_id).count() + 1
+                        obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=codico_id, order=order)
+
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    # Make sure we set the object to the reconstruction manuscript
+                    self.object = obj.manuscript
+            elif "mrec-codicolist" in self.qd and "mrec-manuscript" in self.qd:
+                manu_id = self.qd.get("mrec-manuscript")
+                codico_str = self.qd.get("mrec-codicolist")
+                if manu_id == None:
+                    # Open another place
+                    self.redirectpage = reverse("manuscript_list")
+                elif codico_str == None or codico_str == "[]":
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                else:
+                    delete_lst = []
+                    current_lst = Reconstruction.objects.filter(manuscript=manu_id).order_by("order")
+                    codico_lst = json.loads(codico_str)
+                    for obj in current_lst:
+                        if obj.codico.id not in codico_lst:
+                            delete_lst.append(obj.id)
+                    # Remove those that need deletion
+                    if len(delete_lst) > 0:
+                        Reconstruction.objects.filter(id__in=delete_lst).delete()
+                    # Add and re-order
+                    order = 1
+                    with transaction.atomic():
+                        for id in codico_lst:
+                            # Check if this one is there
+                            obj = Reconstruction.objects.filter(manuscript=manu_id, codico=id).first()
+                            if obj == None:
+                                # Add it
+                                obj = Reconstruction.objects.create(manuscript=manu_id, codico=id)
+                            obj.order = order
+                            obj.save()
+                            order += 1
+                    # Make sure to set the correct redirect page
+                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+            # Return positively
+            return True
+        except:
+            msg = errHandle.get_error_message()
+            errHandle.DoError("ManuscriptCodico")
             return False
 
 
@@ -9125,7 +9173,10 @@ class ManuscriptListView(BasicList):
             fields['bibrefbk'] = Q(id__in=manulist)
 
         # Make sure we only show manifestations
-        fields['mtype'] = 'man'
+        #fields['mtype'] = 'man'
+        # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
+        lstExclude = [ Q(mtype='tem') ] 
+
         return fields, lstExclude, qAlternative
 
     def view_queryset(self, qs):
@@ -9425,6 +9476,13 @@ class CodicoEdit(BasicDetails):
                     lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
                     lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
                 lhtml.append("</div></div>")
+
+            # Add comment modal stuff
+            initial = dict(otype="codi", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
+
+            context['comment_list'] = get_usercomments('codi', instance, profile)
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
@@ -9808,13 +9866,8 @@ class SermonGoldListView(BasicList):
         return sBack, sTitle
 
     def initializations(self):
-        # Check if signature adaptation is needed
-        gsig_done = Information.get_kvalue("sermon_gsig")
-        if gsig_done == None or gsig_done == "":
-            # Perform adaptations
-            if SermonSignature.adapt_gsig():
-                # Success
-                Information.set_kvalue("sermon_gsig", "done")
+        # ======== One-time adaptations ==============
+        listview_adaptations("sermongold_list")
 
         return None
 
@@ -10803,165 +10856,8 @@ class EqualGoldListView(BasicList):
 
     def initializations(self):
 
-        re_pattern = r'^\s*(?:\b[A-Z][a-zA-Z]+\b\s*)+(?=[_])'
-        re_name = r'^[A-Z][a-zA-Z]+\s*'
-        oErr = ErrHandle()
-
-        def add_names(main_list, fragment):
-            oErr = ErrHandle()
-            try:
-                for sentence in fragment.replace("_", "").split("."):
-                    # WOrk through non-initial words
-                    words = re.split(r'\s+', sentence)
-                    for word in words[1:]:
-                        if re.match(re_name, word):
-                            if not word in main_list:
-                                main_list.append(word)
-            except:
-                msg = oErr.get_error_message()
-                oErr.DoError("add_names")
-
-        if Information.get_kvalue("author_anonymus") != "done":
-            # Get all SSGs with anyonymus
-            with transaction.atomic():
-                ano = "anonymus"
-                qs = EqualGold.objects.filter(Q(author__name__iexact=ano))
-                for ssg in qs:
-                    ssg.save()
-            Information.set_kvalue("author_anonymus", "done")
-
-        if Information.get_kvalue("latin_names") != "done":
-            # Start list of common names
-            common_names = []
-            # Walk all SSGs that are not templates
-            with transaction.atomic():
-                incexpl_list = EqualGold.objects.values('incipit', 'explicit')
-                for incexpl in incexpl_list:
-                    # Treat incipit and explicit
-                    inc = incexpl['incipit']
-                    if inc != None: add_names(common_names, inc)
-                    expl = incexpl['explicit']
-                    if expl != None:  add_names(common_names, expl)
-                # TRansform word list
-                names_list = sorted(common_names)
-                oErr.Status("Latin common names: {}".format(json.dumps(names_list)))
-            Information.set_kvalue("latin_names", "done")
-
-        if Information.get_kvalue("ssg_bidirectional") != "done":
-            # Put all links in a list
-            lst_link = []
-            lst_remove = []
-            lst_reverse = []
-            for obj in EqualGoldLink.objects.filter(linktype__in=LINK_BIDIR):
-                # Check for any other eqg-links with the same source
-                lst_src = EqualGoldLink.objects.filter(src=obj.src, dst=obj.dst).exclude(id=obj.id)
-                if lst_src.count() > 0:
-                    # Add them to the removal
-                    for item in lst_src:
-                        lst_remove.append(item)
-                else:
-                    # Add the obj to the list
-                    lst_link.append(obj)
-            for obj in lst_link:
-                # Find the reverse link
-                reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src)
-                if reverse.count() == 0:
-                    # Create the reversal
-                    reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
-
-            Information.set_kvalue("ssg_bidirectional", "done")
-
-        if Information.get_kvalue("s_to_ssg_link") != "done":
-            qs = SermonDescrEqual.objects.all()
-            with transaction.atomic():
-                for obj in qs:
-                    obj.linktype = LINK_UNSPECIFIED
-                    obj.save()
-            Information.set_kvalue("s_to_ssg_link", "done")
-
-        if Information.get_kvalue("hccount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    hccount = ssg.collections.filter(settype="hc").count()
-                    if hccount != ssg.hccount:
-                        ssg.hccount = hccount
-                        ssg.save()
-            Information.set_kvalue("hccount", "done")
-
-        if Information.get_kvalue("scount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    scount = ssg.equalgold_sermons.count()
-                    if scount != ssg.scount:
-                        ssg.scount = scount
-                        ssg.save()
-            Information.set_kvalue("scount", "done")
-
-        if Information.get_kvalue("ssgcount") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                for ssg in EqualGold.objects.all():
-                    ssgcount = ssg.relations.count()
-                    if ssgcount != ssg.ssgcount:
-                        ssg.ssgcount = ssgcount
-                        ssg.save()
-            Information.set_kvalue("ssgcount", "done")
-
-        if Information.get_kvalue("ssgselflink") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                must_delete = []
-                # Walk all SSG links
-                for ssglink in EqualGoldLink.objects.all():
-                    # Is this a self-link?
-                    if ssglink.src == ssglink.dst:
-                        # Add it to must_delete
-                        must_delete.append(ssglink.id)
-                # Remove all self-links
-                EqualGoldLink.objects.filter(id__in=must_delete).delete()
-            Information.set_kvalue("ssgselflink", "done")
-
-        if Information.get_kvalue("add_manu") != "done":
-            # Walk all SSGs
-            with transaction.atomic():
-                # Walk all SSG links
-                for link in SermonDescrEqual.objects.all():
-                    # Get the manuscript for this sermon
-                    manu = link.sermon.msitem.manu
-                    # Add it
-                    link.manu = manu
-                    link.save()
-            Information.set_kvalue("add_manu", "done")
-
-        if Information.get_kvalue("passim_code") != "done":
-            # Walk all SSGs
-            need_correction = {}
-            for obj in EqualGold.objects.all():
-                code = obj.code
-                if code != None and code != "ZZZ_DETERMINE":
-                    count = EqualGold.objects.filter(code=code).count()
-                    if count > 1:
-                        oErr.Status("Duplicate code={} id={}".format(code, obj.id))
-                        if code in need_correction:
-                            need_correction[code].append(obj.id)
-                        else:                            
-                            need_correction[code] = [obj.id]
-            oErr.Status(json.dumps(need_correction))
-            for k,v in need_correction.items():
-                code = k
-                ssg_list = v
-                for ssg_id in ssg_list[:-1]:
-                    oErr.Status("Changing CODE for id {}".format(ssg_id))
-                    obj = EqualGold.objects.filter(id=ssg_id).first()
-                    if obj != None:
-                        obj.code = None
-                        obj.number = None
-                        obj.save()
-                        oErr.Status("Re-saved id {}, code is now: {}".format(obj.id, obj.code))
-
-            Information.set_kvalue("passim_code", "done")
+        # ======== One-time adaptations ==============
+        listview_adaptations("equalgold_list")
 
         return None
     

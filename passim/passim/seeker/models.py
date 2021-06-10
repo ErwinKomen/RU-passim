@@ -3019,7 +3019,8 @@ class Comment(models.Model):
         return True
 
     def get_otype(self):
-        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", super="Super Sermon Gold")
+        otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
+                      super="Super Sermon Gold", codi="Codicological Unit")
         return otypes[self.otype]
 
 
@@ -3072,6 +3073,8 @@ class Manuscript(models.Model):
     saved = models.DateTimeField(null=True, blank=True)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
+    #     The third alternative is: a reconstruction
+    #     So the options: 'man', 'tem', 'rec'
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
     # [0-1] Bibliography used for the manuscript
@@ -4701,6 +4704,36 @@ class Codico(models.Model):
             sBack = manu.get_full_name()
         return sBack
 
+    def get_identification(self):
+        """Get a unique identification of myself
+        
+        Target output:
+             manuscriptCity+Library+Identifier ‘_’ codico volgnummer ‘_’ beginpagina-eindpagina
+        """
+
+        sBack = ""
+        combi = []
+        # Look for the city+library+identifier
+        combi.append(self.manuscript.get_full_name())
+        # Possibly add codico order number
+        if self.order:
+            combi.append(str(self.order))
+
+        # do *NOT* use the name (=title) of the codico
+        #if self.name:
+        #    combi.append(self.name)
+
+        # Add the page-range
+        if self.pagefirst > 0:
+            if self.pagelast > 0 and self.pagelast > self.pagefirst:
+                combi.append("{}-{}".format(self.pagefirst, self.pagelast))
+            else:
+                combi.append("p{}".format(self.pagefirst))
+
+        # Combine it all
+        sBack = "_".join(combi)
+        return sBack
+
     def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
@@ -4814,6 +4847,21 @@ class Codico(models.Model):
             pass
         sBack = get_stype_light(self.stype, usercomment, count)
         return sBack
+
+
+class Reconstruction(models.Model):
+    """Combines a Codico with a reconstructed manuscript"""
+
+    # [1] Link to the reconstruction manuscript 
+    manuscript = models.ForeignKey(Manuscript, on_delete = models.CASCADE, related_name="manuscriptreconstructions")
+    # [1] Link to the codico
+    codico = models.ForeignKey(Codico, on_delete = models.CASCADE, related_name = "codicoreconstructions")
+    # [1] The order of this link within the reconstructed manuscript
+    order = models.IntegerField("Order", default=0)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
 
 
 class Daterange(models.Model):
