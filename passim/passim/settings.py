@@ -36,27 +36,34 @@ MEDIA_DIR = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
 
 APP_PREFIX = ""
 USE_REDIS = False
+ADMIN_SITE_URL = ""
 if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or "c:" in WRITABLE_DIR or "C:" in WRITABLE_DIR or bUseTunnel:
     APP_PREFIX = ""
-    admin.site.site_url = '/'
+    # admin.site.site_url = '/'
+    ADMIN_SITE_URL = "/"
     # Specific differentiation
     if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR:
         USE_REDIS = True
 elif "131.174" in hst:
     # Configuration within the Radboud University environment (AppleJack)
     APP_PREFIX = ""             # Was: "passim/"
-    admin.site.site_url = '/'   # Was: '/passim'
+    #admin.site.site_url = '/'   # Was: '/passim'
+    ADMIN_SITE_URL = "/"
     USE_REDIS = True
 elif "/var/www" in WRITABLE_DIR:
     # New configuration of http://corpus-studio-web.cttnww-meertens.surf-hosted.nl/passim
     APP_PREFIX = "passim/"
-    admin.site.site_url = '/passim'
+    #admin.site.site_url = '/passim'
+    ADMIN_SITE_URL = "/passim"
     USE_REDIS = True
 else:
     APP_PREFIX = "dd/"
-    admin.site.site_url = '/dd'
+    #admin.site.site_url = '/dd'
+    ADMIN_SITE_URL = "/dd"
 
-FORCE_SCRIPT_NAME = admin.site.site_url
+# NOTE: change admin.site.site_url in admin.py if needed
+
+# FORCE_SCRIPT_NAME = admin.site.site_url
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 
@@ -109,14 +116,15 @@ INSTALLED_APPS = [
     'passim.enrich'
 ]
 
-MIDDLEWARE_CLASSES = [
+# MIDDLEWARE_CLASSES = [
+MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
+    # 'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

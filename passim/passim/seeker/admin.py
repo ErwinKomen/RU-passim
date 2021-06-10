@@ -2,10 +2,11 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry, DELETION
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from passim.seeker.models import *
 from passim.seeker.forms import *
+from passim.settings import ADMIN_SITE_URL
 
 class LogEntryAdmin(admin.ModelAdmin):
 
@@ -260,3 +261,5 @@ UserAdmin.list_display = ['username', 'email', 'first_name', 'last_name', 'is_st
 # Turn it on again
 admin.site.register(User, UserAdmin)
 
+# Register link
+admin.site.site_url = ADMIN_SITE_URL

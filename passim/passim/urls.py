@@ -4,13 +4,18 @@ Definition of urls for passim.
 
 from datetime import datetime
 from django.contrib.auth.decorators import login_required, permission_required
-from django.conf.urls import include, url
+from django.conf.urls import include, url # , handler404, handler400, handler403, handler500
 from django.contrib import admin
+from django.contrib.auth.views import LoginView, LogoutView
+from django.http import HttpResponseNotFound
+from django.urls import path
 import django.contrib.auth.views
+import django
 
 import passim.seeker.forms
 import passim.seeker.views
 import passim.reader.views
+from passim import views
 from passim.seeker.views import *
 from passim.seeker.visualizations import *
 from passim.reader.views import *
@@ -21,9 +26,9 @@ from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson
 from passim.settings import APP_PREFIX
 
 # Other Django stuff
-from django.core import urlresolvers
+# from django.core import urlresolvers
 from django.shortcuts import redirect
-from django.core.urlresolvers import reverse, reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import RedirectView
 
@@ -37,9 +42,15 @@ admin.site.site_title = "passim Admin"
 pfx = APP_PREFIX
 use_testapp = False
 
+# ================ Custom error handling when debugging =============
+def custom_page_not_found(request):
+    return passim.seeker.views.view_404(request)
+
 urlpatterns = [
     # Examples:
     url(r'^$', passim.seeker.views.home, name='home'),
+    # url(r'^404/$', passim.seeker.views.view_404, name='view_404'),
+    path("404/", custom_page_not_found),
     url(r'^favicon\.ico$',RedirectView.as_view(url='/static/seeker/content/favicon.ico')),
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
@@ -303,28 +314,16 @@ urlpatterns = [
 
     url(r'^login/user/(?P<user_id>\w[\w\d_]+)$', passim.seeker.views.login_as_user, name='login_as'),
 
-    url(r'^login/$',
-        django.contrib.auth.views.login,
-        {
-            'template_name': 'login.html',
-            'authentication_form': passim.seeker.forms.BootstrapAuthenticationForm,
-            'extra_context':
-            {
-                'title': 'Log in',
-                'year': datetime.now().year,
-            }
-        },
+    url(r'^login/$', LoginView.as_view
+        (
+            template_name= 'login.html',
+            authentication_form= passim.seeker.forms.BootstrapAuthenticationForm,
+            extra_context= {'title': 'Log in','year': datetime.now().year,}
+        ),
         name='login'),
-    url(r'^logout$',
-        django.contrib.auth.views.logout,
-        {
-            'next_page':  reverse_lazy('home'),
-        },
-        name='logout'),
-
-    # Uncomment the admin/doc line below to enable admin documentation:
-    url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
+    url(r'^logout$',  LogoutView.as_view(next_page=reverse_lazy('home')), name='logout'),
 
     # Uncomment the next line to enable the admin:
-    url(r'^admin/', include(admin.site.urls), name='admin_base'),
+    url(r'^admin/', admin.site.urls, name='admin_base'),
 ]
+

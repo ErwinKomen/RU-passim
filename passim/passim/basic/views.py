@@ -4,7 +4,7 @@ Definition of views for the BASIC app.
 
 from django.apps import apps
 from django.contrib.auth.models import User, Group
-# from django.core.urlresolvers import reverse
+# from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F

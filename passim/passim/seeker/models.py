@@ -1192,7 +1192,7 @@ class Action(models.Model):
     """Track actions made by users"""
 
     # [1] The user
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_actions")
     # [1] The item (e.g: Manuscript, SermonDescr, SermonGold = M/S/SG/SSG)
     itemtype = models.CharField("Item type", max_length=MAX_TEXT_LEN)
     # [1] The ID value of the item (M/S/SG/SSG)
@@ -1275,7 +1275,7 @@ class Report(models.Model):
     """Report of an upload action or something like that"""
 
     # [1] Every report must be connected to a user and a date (when a user is deleted, the Report is deleted too)
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_reports")
     # [1] And a date: the date of saving this report
     created = models.DateTimeField(default=get_current_datetime)
     # [1] A report should have a type to know what we are reporting about
@@ -1348,7 +1348,7 @@ class Profile(models.Model):
     """Information about the user"""
 
     # [1] Every profile is linked to a user
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_profiles")
     # [1] Every user has a profile-status
     ptype = models.CharField("Profile status", choices=build_abbr_list(PROFILE_TYPE), max_length=5, default="unk")
     # [1] Every user has a stack: a list of visit objects
@@ -1573,7 +1573,7 @@ class Visit(models.Model):
     """One visit to part of the application"""
 
     # [1] Every visit is made by a user
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_visits")
     # [1] Every visit is done at a certain moment
     when = models.DateTimeField(default=get_current_datetime)
     # [1] Every visit is to a 'named' point
@@ -1674,9 +1674,9 @@ class Location(models.Model):
 
     # We need to know whether a location is part of a particular city or country for 'dependent_fields'
     # [0-1] City according to the 'Location' specification
-    lcity = models.ForeignKey("self", null=True, related_name="lcity_locations")
+    lcity = models.ForeignKey("self", null=True, related_name="lcity_locations", on_delete=models.SET_NULL)
     # [0-1] Library according to the 'Location' specification
-    lcountry = models.ForeignKey("self", null=True, related_name="lcountry_locations")
+    lcountry = models.ForeignKey("self", null=True, related_name="lcountry_locations", on_delete=models.SET_NULL)
 
     # Many-to-many field that identifies relations between locations
     relations = models.ManyToManyField("self", through="LocationRelation", symmetrical=False, related_name="relations_location")
@@ -1808,7 +1808,7 @@ class LocationName(models.Model):
     # [1] the language in which this name is given - ISO 3 letter code
     language = models.CharField("Language", max_length=STANDARD_LENGTH, default="eng")
     # [1] the Location to which this (vernacular) name belongs
-    location = models.ForeignKey(Location, related_name="location_names")
+    location = models.ForeignKey(Location, related_name="location_names", on_delete=models.CASCADE)
 
     def __str__(self):
         return "{} ({})".format(self.name, self.language)
@@ -1822,7 +1822,7 @@ class LocationIdentifier(models.Model):
     # [0-1]        ... and an identifier value
     idvalue = models.IntegerField("Identifier value", null=True, blank=True)
     # [1] the Location to which this (vernacular) name belongs
-    location = models.ForeignKey(Location, related_name="location_identifiers")
+    location = models.ForeignKey(Location, related_name="location_identifiers", on_delete=models.CASCADE)
 
     def __str__(self):
         return "{} ({})".format(self.name, self.language)
@@ -1832,9 +1832,9 @@ class LocationRelation(models.Model):
     """Container-contained relation between two locations"""
 
     # [1] Obligatory container
-    container = models.ForeignKey(Location, related_name="container_locrelations")
+    container = models.ForeignKey(Location, related_name="container_locrelations", on_delete=models.CASCADE)
     # [1] Obligatory contained
-    contained = models.ForeignKey(Location, related_name="contained_locrelations")
+    contained = models.ForeignKey(Location, related_name="contained_locrelations", on_delete=models.CASCADE)
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # First do the regular saving
@@ -1881,7 +1881,7 @@ class City(models.Model):
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [0-1] Name of the country this is in
     #       Note: when a country is deleted, its cities are automatically deleted too
-    country = models.ForeignKey(Country, null=True, blank=True, related_name="country_cities")
+    country = models.ForeignKey(Country, null=True, blank=True, related_name="country_cities", on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.name
@@ -1937,9 +1937,9 @@ class Library(models.Model):
     # ============= These fields should be removed sooner or later ===================
     # [1] Name of the city this is in
     #     Note: when a city is deleted, its libraries are deleted automatically
-    city = models.ForeignKey(City, null=True, related_name="city_libraries")
+    city = models.ForeignKey(City, null=True, related_name="city_libraries", on_delete=models.SET_NULL)
     # [1] Name of the country this is in
-    country = models.ForeignKey(Country, null=True, related_name="country_libraries")
+    country = models.ForeignKey(Country, null=True, related_name="country_libraries", on_delete=models.SET_NULL)
     # ================================================================================
 
     # [1] Every Library has a status to keep track of who edited it
@@ -1951,11 +1951,11 @@ class Library(models.Model):
     mcount = models.IntegerField("Manuscripts for this library", default=0)
 
     # [0-1] Location, as specific as possible, but optional in the end
-    location = models.ForeignKey(Location, null=True, related_name="location_libraries")
+    location = models.ForeignKey(Location, null=True, related_name="location_libraries", on_delete=models.SET_NULL)
     # [0-1] City according to the 'Location' specification
-    lcity = models.ForeignKey(Location, null=True, related_name="lcity_libraries")
+    lcity = models.ForeignKey(Location, null=True, related_name="lcity_libraries", on_delete=models.SET_NULL)
     # [0-1] Library according to the 'Location' specification
-    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_libraries")
+    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_libraries", on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.name
@@ -2153,7 +2153,7 @@ class Origin(models.Model):
     name = models.CharField("Original location", max_length=LONG_STRING)
 
     # [0-1] Optional: LOCATION element this refers to
-    location = models.ForeignKey(Location, null=True, related_name="location_origins")
+    location = models.ForeignKey(Location, null=True, related_name="location_origins", on_delete=models.SET_NULL)
 
     # [0-1] Further details are perhaps required too
     note = models.TextField("Notes on this origin", blank=True, null=True)
@@ -2202,7 +2202,7 @@ class SourceInfo(models.Model):
     url = models.URLField("URL", null=True, blank=True)
     # [1] The person who was in charge of extracting the information
     collector = models.CharField("Collected by", max_length=LONG_STRING)
-    profile = models.ForeignKey(Profile, on_delete=models.SET_NULL, blank=True, null=True)
+    profile = models.ForeignKey(Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name="profile_sourceinfos")
 
     def init_profile():
         coll_set = {}
@@ -3052,9 +3052,9 @@ class Manuscript(models.Model):
 
     # Temporary support for the LIBRARY, when that field is not completely known:
     # [0-1] City - ideally determined by field [library]
-    lcity = models.ForeignKey(Location, null=True, related_name="lcity_manuscripts")
+    lcity = models.ForeignKey(Location, null=True, related_name="lcity_manuscripts", on_delete=models.SET_NULL)
     # [0-1] Library - ideally determined by field [library]
-    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_manuscripts")
+    lcountry = models.ForeignKey(Location, null=True, related_name="lcountry_manuscripts", on_delete=models.SET_NULL)
 
     # PHYSICAL features of the manuscript (OPTIONAL)
     # [0-1] Support: the general type of manuscript
@@ -3820,6 +3820,96 @@ class Manuscript(models.Model):
         else:
             count = self.manusermons.all().count()
         return count
+
+    def get_sermon_list(self, username, team_group):
+        """Create a list of sermons with hierarchical information"""
+
+        oErr = ErrHandle()
+        sermon_list = []
+        maxdepth = 0
+        msitem_dict = {}
+
+        method = "sermondescr"  # OLD: each manuscript had a number of SermonDescr directly
+
+        if self.mtype == "rec":
+            method = "codicos"      # NEW: Take codicological units as a starting point
+        else:
+            method = "msitem"       # CURRENT: there is a level of [MsItem] between Manuscript and SermonDescr/SermonHead
+
+        try:
+            # Create a well sorted list of sermons
+            if method == "msitem":
+                qs = self.manuitems.filter(order__gte=0).order_by('order')
+            elif method == "codicos":
+                # Look for the Reconstruction codico's
+                codico_lst = [x['codico__id'] for x in self.manuscriptreconstructions.order_by('order').values('codico__id')]
+                # Create a list of MsItem objects that belong to this reconstruction manuscript
+                qs = []
+                for codico_id in codico_lst:
+                    codico = Codico.objects.filter(id=codico_id).first()
+                    for obj in MsItem.objects.filter(codico__id=codico_id, order__gte=0).order_by('order'):
+                        qs.append(obj)
+                        # Make sure to put this MsItem in the dictionary with the right Codico target
+                        msitem_dict[obj.id] = codico
+            prev_level = 0
+            for idx, sermon in enumerate(qs):
+                # Need this first, because it also REPAIRS possible parent errors
+                level = sermon.getdepth()
+
+                parent = sermon.parent
+                firstchild = False
+                if parent:
+                    if method == "msitem":
+                        qs_siblings = self.manuitems.filter(parent=parent).order_by('order')
+                    elif method == "codicos":
+                        # N.B: note that 'sermon' is not really a sermon but the MsItem
+                        qs_siblings = msitem_dict[sermon.id].codicoitems.filter(parent=parent).order_by('order')
+                    if sermon.id == qs_siblings.first().id:
+                        firstchild = True
+
+                # Only then continue!
+                oSermon = {}
+                if method == "msitem" or method == "codicos":
+                    # The 'obj' always is the MsItem itself
+                    oSermon['obj'] = sermon
+                    # Now we need to add a reference to the actual SermonDescr object
+                    oSermon['sermon'] = sermon.itemsermons.first()
+                    # And we add a reference to the SermonHead object
+                    oSermon['shead'] = sermon.itemheads.first()
+                oSermon['nodeid'] = sermon.order + 1
+                oSermon['number'] = idx + 1
+                oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
+                oSermon['level'] = level
+                oSermon['pre'] = (level-1) * 20
+                # If this is a new level, indicate it
+                oSermon['group'] = firstchild   # (sermon.firstchild != None)
+                # Is this one a parent of others?
+                if method == "msitem" or method == "codicos":
+                    if method == "msitem":
+                        oSermon['isparent'] = self.manuitems.filter(parent=sermon).exists()
+                    elif method == "codicos":
+                        oSermon['isparent'] = msitem_dict[sermon.id].codicoitems.filter(parent=sermon).exists()
+                    codi = sermon.get_codistart()
+                    oSermon['codistart'] = "" if codi == None else codi.id
+                    oSermon['codiorder'] = -1 if codi == None else codi.order
+
+                # Add the user-dependent list of associated collections to this sermon descriptor
+                oSermon['hclist'] = [] if oSermon['sermon'] == None else oSermon['sermon'].get_hcs_plain(username, team_group)
+
+                sermon_list.append(oSermon)
+                # Bookkeeping
+                if level > maxdepth: maxdepth = level
+                prev_level = level
+            # Review them all and fill in the colspan
+            for oSermon in sermon_list:
+                oSermon['cols'] = maxdepth - oSermon['level'] + 1
+                if oSermon['group']: oSermon['cols'] -= 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_sermon_list")
+        
+            # Return the result
+        return sermon_list
 
     def get_stype_light(self, usercomment=False):
         count = 0
@@ -5206,7 +5296,7 @@ class Provenance(models.Model):
     # [1] Name of the location (can be cloister or anything)
     name = models.CharField("Provenance location", max_length=LONG_STRING)
     # [0-1] Optional: LOCATION element this refers to
-    location = models.ForeignKey(Location, null=True, related_name="location_provenances")
+    location = models.ForeignKey(Location, null=True, related_name="location_provenances", on_delete=models.SET_NULL)
     ## [0-1] Further details are perhaps required too
     #note = models.TextField("Notes on this provenance", blank=True, null=True)
 
@@ -6556,9 +6646,9 @@ class EqualGoldLink(models.Model):
 
     # [1] Starting from equalgold group [src]
     #     Note: when a EqualGold is deleted, then the EqualGoldLink instance that refers to it is removed too
-    src = models.ForeignKey(EqualGold, related_name="equalgold_src")
+    src = models.ForeignKey(EqualGold, related_name="equalgold_src", on_delete=models.CASCADE)
     # [1] It equals equalgoldgroup [dst]
-    dst = models.ForeignKey(EqualGold, related_name="equalgold_dst")
+    dst = models.ForeignKey(EqualGold, related_name="equalgold_dst", on_delete=models.CASCADE)
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_EQUAL)
     # [0-1] Specification of directionality and source
@@ -6601,9 +6691,9 @@ class EqualGoldKeyword(models.Model):
     """Relation between an EqualGold and a Keyword"""
 
     # [1] The link is between a SermonGold instance ...
-    equal = models.ForeignKey(EqualGold, related_name="equal_kw")
+    equal = models.ForeignKey(EqualGold, related_name="equal_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="equal_kw")
+    keyword = models.ForeignKey(Keyword, related_name="equal_kw", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -6613,9 +6703,9 @@ class SermonGoldSame(models.Model):
 
     # [1] Starting from sermon [src]
     #     Note: when a SermonGold is deleted, then the SermonGoldSame instance that refers to it is removed too
-    src = models.ForeignKey(SermonGold, related_name="sermongold_src")
+    src = models.ForeignKey(SermonGold, related_name="sermongold_src", on_delete=models.CASCADE)
     # [1] It equals sermon [dst]
-    dst = models.ForeignKey(SermonGold, related_name="sermongold_dst")
+    dst = models.ForeignKey(SermonGold, related_name="sermongold_dst", on_delete=models.CASCADE)
     # [1] Each gold-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
                             max_length=5, default=LINK_EQUAL)
@@ -6629,9 +6719,9 @@ class SermonGoldKeyword(models.Model):
     """Relation between a SermonGold and a Keyword"""
 
     # [1] The link is between a SermonGold instance ...
-    gold = models.ForeignKey(SermonGold, related_name="gold_sermongold_kw")
+    gold = models.ForeignKey(SermonGold, related_name="gold_sermongold_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="keyword_sermongold_kw")
+    keyword = models.ForeignKey(Keyword, related_name="keyword_sermongold_kw", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -6650,7 +6740,7 @@ class Ftextlink(models.Model):
     url = models.URLField("Full text URL", max_length=LONG_STRING)
     # [1] Every edition belongs to exactly one gold-sermon
     #     Note: when a SermonGold is removed, this FtextLink also gets removed
-    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldftxtlinks")
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldftxtlinks", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.url
@@ -6665,7 +6755,7 @@ class ManuscriptExt(models.Model):
     # [1] The URL itself
     url = models.URLField("External URL", max_length=LONG_STRING)
     # [1] Every external URL belongs to exactly one Manuscript
-    manuscript = models.ForeignKey(Manuscript, null=False, blank=False, related_name="manuscriptexternals")
+    manuscript = models.ForeignKey(Manuscript, null=False, blank=False, related_name="manuscriptexternals", on_delete=models.CASCADE)
 
     def __str__(self):
         return self.url
@@ -6680,7 +6770,7 @@ class Collection(models.Model):
     # [1] Each collection has only 1 name 
     name = models.CharField("Name", null=True, blank=True, max_length=LONG_STRING)
     # [1] Each collection has only 1 owner
-    owner = models.ForeignKey(Profile, null=True)    
+    owner = models.ForeignKey(Profile, null=True, related_name="owner_collections", on_delete=models.SET_NULL)    
     # [0-1] Each collection can be marked a "read only" by Passim-team  ERUIT
     readonly = models.BooleanField(default=False)
     # [1] Each "Collection" has only 1 type    
@@ -8350,7 +8440,7 @@ class Range(models.Model):
     # [1] The end of the range also in bk/ch/vs
     einde = models.CharField("Einde", default = "",  max_length=BKCHVS_LENGTH)
     # [1] Each range is linked to a Sermon
-    sermon = models.ForeignKey(SermonDescr, related_name="sermonranges")
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonranges", on_delete=models.CASCADE)
 
     # [0-1] Optional introducer
     intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
@@ -8754,9 +8844,9 @@ class SermonDescrKeyword(models.Model):
     """Relation between a SermonDescr and a Keyword"""
 
     # [1] The link is between a SermonGold instance ...
-    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw")
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw")
+    keyword = models.ForeignKey(Keyword, related_name="sermondescr_kw", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -8765,9 +8855,9 @@ class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
     # [1] The link is between a Manuscript instance ...
-    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kw")
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="manuscript_kw")
+    keyword = models.ForeignKey(Keyword, related_name="manuscript_kw", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -8776,9 +8866,9 @@ class CodicoKeyword(models.Model):
     """Relation between a Codico and a Keyword"""
 
     # [1] The link is between a Manuscript instance ...
-    codico = models.ForeignKey(Codico, related_name="codico_kw")
+    codico = models.ForeignKey(Codico, related_name="codico_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="codico_kw")
+    keyword = models.ForeignKey(Keyword, related_name="codico_kw", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -8852,9 +8942,9 @@ class UserKeyword(models.Model):
     """Relation between a M/S/SG/SSG and a Keyword - restricted to user"""
 
     # [1] ...and a keyword instance
-    keyword = models.ForeignKey(Keyword, related_name="kw_userkeywords")
+    keyword = models.ForeignKey(Keyword, related_name="kw_userkeywords", on_delete=models.CASCADE)
     # [1] It is part of a user profile
-    profile = models.ForeignKey(Profile, related_name="profile_userkeywords")
+    profile = models.ForeignKey(Profile, related_name="profile_userkeywords", on_delete=models.CASCADE)
     # [1] Each "UserKeyword" has only 1 type, one of M/S/SG/SSG
     type = models.CharField("Type of user keyword", choices=build_abbr_list(COLLECTION_TYPE), max_length=5)
     # [1] And a date: the date of saving this relation
@@ -8862,13 +8952,13 @@ class UserKeyword(models.Model):
 
     # ==== Depending on the type, only one of these will be filled
     # [0-1] The link is with a Manuscript instance ...
-    manu = models.ForeignKey(Manuscript, blank=True, null=True, related_name="manu_userkeywords")
+    manu = models.ForeignKey(Manuscript, blank=True, null=True, related_name="manu_userkeywords", on_delete=models.SET_NULL)
     # [0-1] The link is with a SermonDescr instance ...
-    sermo = models.ForeignKey(SermonDescr, blank=True, null=True, related_name="sermo_userkeywords")
+    sermo = models.ForeignKey(SermonDescr, blank=True, null=True, related_name="sermo_userkeywords", on_delete=models.SET_NULL)
     # [0-1] The link is with a SermonGold instance ...
-    gold = models.ForeignKey(SermonGold, blank=True, null=True, related_name="gold_userkeywords")
+    gold = models.ForeignKey(SermonGold, blank=True, null=True, related_name="gold_userkeywords", on_delete=models.SET_NULL)
     # [0-1] The link is with a EqualGold instance ...
-    super = models.ForeignKey(EqualGold, blank=True, null=True, related_name="super_userkeywords")
+    super = models.ForeignKey(EqualGold, blank=True, null=True, related_name="super_userkeywords", on_delete=models.SET_NULL)
 
     def __str__(self):
         sBack = self.keyword.name
@@ -8935,11 +9025,11 @@ class SermonDescrEqual(models.Model):
     """Link from sermon description (S) to super sermon gold (SSG)"""
 
     # [1] The sermondescr
-    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_super")
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_super", on_delete=models.CASCADE)
     # [0-1] The manuscript in which the sermondescr resides
-    manu = models.ForeignKey(Manuscript, related_name="sermondescr_super", blank=True, null=True)
+    manu = models.ForeignKey(Manuscript, related_name="sermondescr_super", blank=True, null=True, on_delete=models.SET_NULL)
     # [1] The gold sermon
-    super = models.ForeignKey(EqualGold, related_name="sermondescr_super")
+    super = models.ForeignKey(EqualGold, related_name="sermondescr_super", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="uns")
 
@@ -9007,9 +9097,9 @@ class SermonEqualDist(models.Model):
     """Keep track of the 'distance' between sermons and SSGs"""
 
     # [1] The sermondescr
-    sermon = models.ForeignKey(SermonDescr, related_name="sermonsuperdist")
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonsuperdist", on_delete=models.CASCADE)
     # [1] The equal gold sermon (=SSG)
-    super = models.ForeignKey(EqualGold, related_name="sermonsuperdist")
+    super = models.ForeignKey(EqualGold, related_name="sermonsuperdist", on_delete=models.CASCADE)
     # [1] Each sermon-to-equal keeps track of a distance
     distance = models.FloatField("Distance", default=100.0)
 
@@ -9021,9 +9111,9 @@ class SermonDescrGold(models.Model):
     """Link from sermon description to gold standard"""
 
     # [1] The sermondescr
-    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold")
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_gold", on_delete=models.CASCADE)
     # [1] The gold sermon
-    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold")
+    gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
     linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
                             max_length=5, default="eq")
@@ -9068,7 +9158,7 @@ class Signature(models.Model):
                             max_length=5, default="gr")
     # [1] Every signature belongs to exactly one gold-sermon
     #     Note: when a SermonGold is removed, then its associated Signature gets removed too
-    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures")
+    gold = models.ForeignKey(SermonGold, null=False, blank=False, related_name="goldsignatures", on_delete=models.CASCADE)
 
     def __str__(self):
         return "{}: {}".format(self.editype, self.code)
@@ -9109,10 +9199,10 @@ class SermonSignature(models.Model):
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
     # [0-1] Optional link to the (gold) Signature from which this derives
-    gsig = models.ForeignKey(Signature, blank=True, null=True, related_name="sermongoldsignatures")
+    gsig = models.ForeignKey(Signature, blank=True, null=True, related_name="sermongoldsignatures", on_delete=models.SET_NULL)
     # [1] Every signature belongs to exactly one gold-sermon
     #     Note: when a SermonDescr gets removed, then its associated SermonSignature gets removed too
-    sermon = models.ForeignKey(SermonDescr, null=False, blank=False, related_name="sermonsignatures")
+    sermon = models.ForeignKey(SermonDescr, null=False, blank=False, related_name="sermonsignatures", on_delete=models.CASCADE)
 
     def __str__(self):
         return "{}: {}".format(self.editype, self.code)
@@ -9202,9 +9292,9 @@ class Basket(models.Model):
     """The basket is the user's vault of search results (of sermondescr items)"""
 
     # [1] The sermondescr
-    sermon = models.ForeignKey(SermonDescr, related_name="basket_contents")
+    sermon = models.ForeignKey(SermonDescr, related_name="basket_contents", on_delete=models.CASCADE)
     # [1] The user
-    profile = models.ForeignKey(Profile, related_name="basket_contents")
+    profile = models.ForeignKey(Profile, related_name="basket_contents", on_delete=models.CASCADE)
 
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
@@ -9215,9 +9305,9 @@ class BasketMan(models.Model):
     """The basket is the user's vault of search results (of manuscript items)"""
     
     # [1] The manuscript
-    manu = models.ForeignKey(Manuscript, related_name="basket_contents_manu")
+    manu = models.ForeignKey(Manuscript, related_name="basket_contents_manu", on_delete=models.CASCADE)
     # [1] The user
-    profile = models.ForeignKey(Profile, related_name="basket_contents_manu")
+    profile = models.ForeignKey(Profile, related_name="basket_contents_manu", on_delete=models.CASCADE)
 
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
@@ -9228,9 +9318,9 @@ class BasketGold(models.Model):
     """The basket is the user's vault of search results (of sermon gold items)"""
     
     # [1] The sermon gold
-    gold = models.ForeignKey(SermonGold, related_name="basket_contents_gold")
+    gold = models.ForeignKey(SermonGold, related_name="basket_contents_gold", on_delete=models.CASCADE)
     # [1] The user
-    profile = models.ForeignKey(Profile, related_name="basket_contents_gold")
+    profile = models.ForeignKey(Profile, related_name="basket_contents_gold", on_delete=models.CASCADE)
 
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
@@ -9241,9 +9331,9 @@ class BasketSuper(models.Model):
     """The basket is the user's vault of search results (of super sermon gold items)"""
     
     # [1] The super sermon gold
-    super = models.ForeignKey(EqualGold, related_name="basket_contents_super")
+    super = models.ForeignKey(EqualGold, related_name="basket_contents_super", on_delete=models.CASCADE)
     # [1] The user
-    profile = models.ForeignKey(Profile, related_name="basket_contents_super")
+    profile = models.ForeignKey(Profile, related_name="basket_contents_super", on_delete=models.CASCADE)
 
     def __str__(self):
         combi = "{}_s{}".format(self.profile.user.username, self.sermon.id)
@@ -9254,9 +9344,9 @@ class ProvenanceMan(models.Model):
     """Link between Provenance and Codico"""
 
     # [1] The provenance
-    provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances")
+    provenance = models.ForeignKey(Provenance, related_name = "manuscripts_provenances", on_delete=models.CASCADE)
     # [1] The manuscript this provenance is written on 
-    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances")
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscripts_provenances", on_delete=models.CASCADE)
     # [0-1] Further details are perhaps required too
     note = models.TextField("Manuscript-specific provenance note", blank=True, null=True)
 
@@ -9276,9 +9366,9 @@ class ProvenanceCod(models.Model):
     """Link between Provenance and Codico"""
 
     # [1] The provenance
-    provenance = models.ForeignKey(Provenance, related_name = "codico_provenances")
+    provenance = models.ForeignKey(Provenance, related_name = "codico_provenances", on_delete=models.CASCADE)
     # [1] The codico this provenance is written on 
-    codico = models.ForeignKey(Codico, related_name = "codico_provenances")
+    codico = models.ForeignKey(Codico, related_name = "codico_provenances", on_delete=models.CASCADE)
     # [0-1] Further details are perhaps required too
     note = models.TextField("Codico-specific provenance note", blank=True, null=True)
 
@@ -9298,9 +9388,9 @@ class LitrefMan(models.Model):
     """The link between a literature item and a manuscript"""
 
     # [1] The literature item
-    reference = models.ForeignKey(Litref, related_name="reference_litrefs")
+    reference = models.ForeignKey(Litref, related_name="reference_litrefs", on_delete=models.CASCADE)
     # [1] The manuscript to which the literature item refers
-    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs")
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_litrefs", on_delete=models.CASCADE)
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
@@ -9321,9 +9411,9 @@ class LitrefSG(models.Model):
     """The link between a literature item and a SermonGold"""
     
     # [1] The literature item
-    reference = models.ForeignKey(Litref, related_name="reference_litrefs_2")
+    reference = models.ForeignKey(Litref, related_name="reference_litrefs_2", on_delete=models.CASCADE)
     # [1] The SermonGold to which the literature item refers
-    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_litrefs")
+    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_litrefs", on_delete=models.CASCADE)
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
@@ -9353,9 +9443,9 @@ class LitrefCol(models.Model):
     """The link between a literature item and a Collection (usually a HC)"""
     
     # [1] The literature item
-    reference = models.ForeignKey(Litref, related_name="reference_litrefcols")
+    reference = models.ForeignKey(Litref, related_name="reference_litrefcols", on_delete=models.CASCADE)
     # [1] The SermonGold to which the literature item refers
-    collection = models.ForeignKey(Collection, related_name = "collection_litrefcols")
+    collection = models.ForeignKey(Collection, related_name = "collection_litrefcols", on_delete=models.CASCADE)
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
@@ -9385,9 +9475,9 @@ class EdirefSG(models.Model):
     """The link between an edition item and a SermonGold"""
 
     # [1] The edition item
-    reference = models.ForeignKey(Litref, related_name = "reference_edition")
+    reference = models.ForeignKey(Litref, related_name = "reference_edition", on_delete=models.CASCADE)
     # [1] The SermonGold to which the literature item refers
-    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_editions")
+    sermon_gold = models.ForeignKey(SermonGold, related_name = "sermon_gold_editions", on_delete=models.CASCADE)
     # [0-1] The first and last page of the reference
     pages = models.CharField("Pages", blank = True, null = True,  max_length=MAX_TEXT_LEN)
 
@@ -9459,9 +9549,9 @@ class CollectionSerm(models.Model):
     """The link between a collection item and a S (sermon)"""
 
     # [1] The sermon to which the collection item refers
-    sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col")
+    sermon = models.ForeignKey(SermonDescr, related_name = "sermondescr_col", on_delete=models.CASCADE)
     # [1] The collection to which the context item refers to
-    collection = models.ForeignKey(Collection, related_name= "sermondescr_col")
+    collection = models.ForeignKey(Collection, related_name= "sermondescr_col", on_delete=models.CASCADE)
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
@@ -9470,9 +9560,9 @@ class CollectionMan(models.Model):
     """The link between a collection item and a M (manuscript)"""
 
     # [1] The manuscript to which the collection item refers
-    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_col")
+    manuscript = models.ForeignKey(Manuscript, related_name = "manuscript_col", on_delete=models.CASCADE)
     # [1] The collection to which the context item refers to
-    collection = models.ForeignKey(Collection, related_name= "manuscript_col")
+    collection = models.ForeignKey(Collection, related_name= "manuscript_col", on_delete=models.CASCADE)
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
@@ -9481,9 +9571,9 @@ class CollectionGold(models.Model):
     """The link between a collection item and a SG (gold sermon)"""
 
     # [1] The gold sermon to which the collection item refers
-    gold = models.ForeignKey(SermonGold, related_name = "gold_col")
+    gold = models.ForeignKey(SermonGold, related_name = "gold_col", on_delete=models.CASCADE)
     # [1] The collection to which the context item refers to
-    collection = models.ForeignKey(Collection, related_name= "gold_col")
+    collection = models.ForeignKey(Collection, related_name= "gold_col", on_delete=models.CASCADE)
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
@@ -9493,9 +9583,9 @@ class CollectionSuper(models.Model):
 
     # [1] The gold sermon to which the coll
     # ection item refers
-    super = models.ForeignKey(EqualGold, related_name = "super_col")
+    super = models.ForeignKey(EqualGold, related_name = "super_col", on_delete=models.CASCADE)
     # [1] The collection to which the context item refers to
-    collection = models.ForeignKey(Collection, related_name= "super_col")
+    collection = models.ForeignKey(Collection, related_name= "super_col", on_delete=models.CASCADE)
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 

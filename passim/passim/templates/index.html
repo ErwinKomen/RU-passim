@@ -21,6 +21,12 @@
       </p>
   </div>
 
+  {% if is_404 %}
+    <div class="sent-error">
+      Sorry, but the path that you attempted to use is not available for the Passim application.
+    </div>
+  {% endif %}
+
   <div class="row">
       <div class="col-md-6 bgimg">
         <h2>Summary</h2>

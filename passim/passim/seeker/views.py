@@ -6,7 +6,7 @@ from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
@@ -300,7 +300,7 @@ def user_is_authenticated(request):
     # Is this user authenticated?
     username = request.user.username
     user = User.objects.filter(username=username).first()
-    response = False if user == None else user.is_authenticated()
+    response = False if user == None else user.is_authenticated
     return response
 
 def user_is_ingroup(request, sGroup):
@@ -536,7 +536,7 @@ def adapt_regex_incexp(value):
 
 # ================= STANDARD views =====================================
 
-def home(request):
+def home(request, errortype=None):
     """Renders the home page."""
 
     assert isinstance(request, HttpRequest)
@@ -554,6 +554,11 @@ def home(request):
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
+
+    # See if this is the result of a particular error
+    if errortype != None:
+        if errortype == "404":
+            context['is_404'] = True
 
     # Check the newsitems for validity
     NewsItem.check_until()
@@ -573,6 +578,9 @@ def home(request):
 
     # Render and return the page
     return render(request, template_name, context)
+
+def view_404(request, *args, **kwargs):
+    return home(request, "404")
 
 def contact(request):
     """Renders the contact page."""
@@ -1017,7 +1025,7 @@ def search_collection(request):
 
     # Other initialisations
     currentuser = request.user
-    authenticated = currentuser.is_authenticated()
+    authenticated = currentuser.is_authenticated
 
     # Create context and add to it
     context = dict(title="Search collection",
@@ -8276,8 +8284,11 @@ class ManuscriptEdit(BasicDetails):
 
     def get_codico_buttons(self, instance, context):
         sBack = ""
-        # context = dict(codico_count=instance.manuscriptcodicounits.count())
-        context['codico_count'] = instance.manuscriptcodicounits.count()
+        # The number of codico's depends on the mtype of the manuscript
+        if instance.mtype == "rec":
+            context['codico_count'] = instance.manuscriptreconstructions.count()
+        else:
+            context['codico_count'] = instance.manuscriptcodicounits.count()
         lhtml = []
         lhtml.append(render_to_string("seeker/codico_buttons.html", context, self.request))
         sBack = "\n".join(lhtml)
@@ -8547,80 +8558,15 @@ class ManuscriptDetails(ManuscriptEdit):
             # Lists of related objects
             context['related_objects'] = []
 
-            # Construct the hierarchical list
-            sermon_list = []
-            maxdepth = 0
-            #build_htable = False
-
-            method = "msitem"   # "sermondescr"
-
             # Need to know who this user (profile) is
             username = self.request.user.username
             team_group = app_editor
 
-            if instance != None:
-                # Create a well sorted list of sermons
-                if method == "msitem":
-                    qs = instance.manuitems.filter(order__gte=0).order_by('order')
-                #else:
-                #    qs = instance.manusermons.filter(order__gte=0).order_by('order')
-                prev_level = 0
-                for idx, sermon in enumerate(qs):
-                    # Need this first, because it also REPAIRS possible parent errors
-                    level = sermon.getdepth()
-
-                    parent = sermon.parent
-                    firstchild = False
-                    if parent:
-                        if method == "msitem":
-                            qs_siblings = instance.manuitems.filter(parent=parent).order_by('order')
-                        #else:
-                        #    qs_siblings = instance.manusermons.filter(parent=parent).order_by('order')
-                        if sermon.id == qs_siblings.first().id:
-                            firstchild = True
-
-                    # Only then continue!
-                    oSermon = {}
-                    if method == "msitem":
-                        # The 'obj' always is the MsItem itself
-                        oSermon['obj'] = sermon
-                        # Now we need to add a reference to the actual SermonDescr object
-                        oSermon['sermon'] = sermon.itemsermons.first()
-                        # And we add a reference to the SermonHead object
-                        oSermon['shead'] = sermon.itemheads.first()
-                    #else:
-                    #    # 'sermon' is the SermonDescr instance
-                    #    oSermon['obj'] = sermon
-                    oSermon['nodeid'] = sermon.order + 1
-                    oSermon['number'] = idx + 1
-                    oSermon['childof'] = 1 if sermon.parent == None else sermon.parent.order + 1
-                    oSermon['level'] = level
-                    oSermon['pre'] = (level-1) * 20
-                    # If this is a new level, indicate it
-                    oSermon['group'] = firstchild   # (sermon.firstchild != None)
-                    # Is this one a parent of others?
-                    if method == "msitem":
-                        oSermon['isparent'] = instance.manuitems.filter(parent=sermon).exists()
-                        codi = sermon.get_codistart()
-                        oSermon['codistart'] = "" if codi == None else codi.id
-                        oSermon['codiorder'] = -1 if codi == None else codi.order
-                    #else:
-                    #    oSermon['isparent'] = instance.manusermons.filter(parent=sermon).exists()
-
-                    # Add the user-dependent list of associated collections to this sermon descriptor
-                    oSermon['hclist'] = [] if oSermon['sermon'] == None else oSermon['sermon'].get_hcs_plain(username, team_group)
-
-                    sermon_list.append(oSermon)
-                    # Bookkeeping
-                    if level > maxdepth: maxdepth = level
-                    prev_level = level
-                # Review them all and fill in the colspan
-                for oSermon in sermon_list:
-                    oSermon['cols'] = maxdepth - oSermon['level'] + 1
-                    if oSermon['group']: oSermon['cols'] -= 1
-
+            # Construct the hierarchical list
+            sermon_list = instance.get_sermon_list(username, team_group)
+ 
             # The following only goes for the correct mtype
-            if instance.mtype != "rec":
+            if instance.mtype == "man":
                 # Add instances to the list, noting their childof and order
                 context['sermon_list'] = sermon_list
                 context['sermon_count'] = len(sermon_list)
@@ -8633,6 +8579,19 @@ class ManuscriptDetails(ManuscriptEdit):
 
                 # Add the list of sermons and the comment button
                 context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context, self.request)
+            elif instance.mtype == "rec":
+                # THis is a reconstruction: show hierarchy view-only
+                context['sermon_list'] = sermon_list
+                context['sermon_count'] = len(sermon_list)
+
+                # Note: do *NOT* give this list for reconstructions!!
+                context['codi_empty_list'] = []
+
+                # Add the list of sermons and the comment button
+                context_special = copy.copy(context)
+                context_special['is_app_editor'] = False
+                context['add_to_details'] = render_to_string("seeker/manuscript_sermons.html", context_special, self.request)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDetails/add_to_context")

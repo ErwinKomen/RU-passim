@@ -35,7 +35,7 @@
       </form>
     </div>
 
-    {% if object.manuitems.count == 0 %}
+    {% if sermon_list|length == 0 %}  <!-- object.manuitems.count -->
       <p><i>This manuscript does not contain a definition of its contents</i></p>
     {% else %}
 

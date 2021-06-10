@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry, DELETION
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.forms.widgets import *
 
 from passim.basic.models import *
