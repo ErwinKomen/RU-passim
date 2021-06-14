@@ -8087,13 +8087,13 @@ class ManuscriptEdit(BasicDetails):
                        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}]
     form_objects = [{'form': ManuReconForm, 'prefix': 'mrec', 'readonly': False}]
 
-    stype_edi_fields = ['name', 'library', 'lcountry', 'lcity', 'idno', 'origin', 'support', 'extent', 'format', 'source', 'project',
+    stype_edi_fields = [# 'name', 'support', 'extent', 'format', 
+                        # 'CollectionMan', 'collist',
+                        # 'ProvenanceMan', 'mprovlist'
+                        # 'Daterange', 'datelist',
+                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', 'project',
                         'hierarchy',
-                        'Daterange', 'datelist',
-                        #'kwlist',
-                        #'CollectionMan', 'collist',
                         'LitrefMan', 'litlist',
-                        'ProvenanceMan', 'mprovlist'
                         'ManuscriptExt', 'extlist']
 
     def custom_init(self, instance):
@@ -8890,6 +8890,7 @@ class ManuscriptListView(BasicList):
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
+        {"name": "Manuscript",      "id": "filter_manutype",         "enabled": False},
         {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
@@ -8918,6 +8919,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'daterange',     'dbfield': 'manuscript_dateranges__yearfinish__lte',        'keyS': 'date_until'},
             {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super',    'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -9114,6 +9116,10 @@ class ManuscriptListView(BasicList):
                             for coll in coll_list:
                                 for manu in manu_list:
                                     ptc = CollOverlap.get_overlap(profile, coll, manu)
+
+        # Adapt the manutype filter
+        #if 'manutype' in fields and fields['manutype'] != None:
+        #    fields['manutype'] = fields['manutype'].abbr
 
         # Adapt the bible reference list
         bibrefbk = fields.get("bibrefbk", "")

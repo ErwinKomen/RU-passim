@@ -347,6 +347,11 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 s_q = ""
                             else:
                                 s_q = Q(**{"{}__exact".format(dbfield): ""})
+                    elif keyType == "fieldchoice" and has_obj_value(keyS, oFields):
+                        if infield == None: infield = "abbr"
+                        val = getattr(oFields[keyS], infield)
+                        s_q = Q(**{"{}".format(dbfield): val})
+                        enable_filter(filter_type, head_id)
                     # Check for keyS
                     elif has_string_value(keyS, oFields):
                         # Check for ID field
