@@ -4784,6 +4784,7 @@ class SermonListView(BasicList):
                 {"name": "Provenance",       "id": "filter_provenance",     "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Date from",        "id": "filter_datestart",      "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Manuscript type",  "id": "filter_manutype",       "enabled": False, "head_id": "filter_manuscript"},
                 ]
     
     searches = [
@@ -4818,13 +4819,16 @@ class SermonListView(BasicList):
             ]},
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'country',       'fkfield': 'manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',       'fkfield': 'manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'origin',        'fkfield': 'manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'provenance',    'fkfield': 'manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'country',       'fkfield': 'msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
+            #{'filter': 'datestart',     'dbfield': 'manu__manuscript_dateranges__yearstart__gte',     'keyS': 'date_from'},
+            #{'filter': 'datefinish',    'dbfield': 'manu__manuscript_dateranges__yearfinish__lte',    'keyS': 'date_until'},
+            {'filter': 'datestart',     'dbfield': 'msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
+            {'filter': 'manutype',      'dbfield': 'msitem__manu__mtype',     'keyS': 'manutype',     'keyType': 'fieldchoice', 'infield': 'abbr'},
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'},
@@ -4927,13 +4931,22 @@ class SermonListView(BasicList):
 
     def adapt_search(self, fields):
         # Adapt the search to the keywords that *may* be shown
-        lstExclude=None
+        lstExclude=[]
         qAlternative = None
         oErr = ErrHandle()
 
         try:
-            # Make sure to only show mtype manifestations
-            fields['mtype'] = "man"
+            # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
+            lstExclude.append(Q(mtype='tem') )
+            ## Make sure to only show mtype manifestations
+            #fields['mtype'] = "man"
+
+            manutype = fields.get('manutype')
+            if manutype != None and manutype != "":
+                if manutype.abbr == "rec":
+                    # Restrict to sermons that are part of a codico that is in table Reconstruction
+                    codicolist = [x.codico.id for x in Reconstruction.objects.all()]
+                    fields['manutype'] = Q(msitem__codico__id__in=codicolist)
 
             # Check if a list of keywords is given
             if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
@@ -4968,10 +4981,10 @@ class SermonListView(BasicList):
             if 'authortype' in fields:
                 authortype = fields['authortype']
                 if authortype == "non":
-                    lstExclude = []
+                    # lstExclude = []
                     lstExclude.append(Q(author__isnull=False))
                 elif authortype == "spe":
-                    lstExclude = []
+                    # lstExclude = []
                     lstExclude.append(Q(author__isnull=True))
                 else:
                     # Reset the authortype
@@ -5014,12 +5027,15 @@ class SermonListView(BasicList):
                 if s_q_i_lst != "":
                     qAlternative = s_q_i_lst
                 if s_q_e_lst != "":
-                    lstExclude = [ s_q_e_lst ]
+                    lstExclude.append( s_q_e_lst )
 
                 # CLear the fields
                 fields['free_term'] = "yes"
                 fields['free_include'] = ""
                 fields['free_exclude'] = ""
+            # Double check the length of the exclude list
+            if len(lstExclude) == 0:
+                lstExclude = None
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListView/adapt_search")

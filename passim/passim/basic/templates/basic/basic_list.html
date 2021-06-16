@@ -409,7 +409,8 @@
                       <tr>
                         <th class="hidden">id</th>
                         {% for hd in order_heads %}
-                          <th class="sortable tdnowrap {% if hd.colwrap or hd.autohide == "on" %}hidden{% endif %}" scope="col" {% if hd.title %}title="{{hd.title}}"{% endif %}>
+                          <th class="sortable tdnowrap {% if hd.colwrap or hd.autohide == "on" %}hidden{% endif %}" 
+                              scope="col" {% if hd.title %}title="{{hd.title}}"{% endif %}>
                             <div class="text">
                               {% if hd.order == "" %}{{hd.name}}
                               {% else %}
@@ -448,7 +449,9 @@
 
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
-                          <td class="{{field.classes}}  {% if field.colwrap or field.autohide == "on" %}hidden{% endif %}" style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} {% if field.align %}align="{{field.align}}"{% endif %}>
+                          <td class="{{field.classes}}  {% if field.colwrap or field.autohide == "on" %}hidden{% endif %}" 
+                              style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} 
+                              {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
                               <a href="{% url basic_details result.id %}{% if params %}?params={{params}}{% endif %}" 
                                  class="nostyle" title="Show details of this {{titlesg}}">
