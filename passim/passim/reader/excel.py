@@ -32,7 +32,7 @@ from io import StringIO
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 
-from passim.seeker.models import Manuscript, SermonDescr, Profile, Report
+from passim.seeker.models import Manuscript, SermonDescr, Profile, Report, Codico
 from passim.seeker.views import app_editor
 from passim.reader.views import ReaderImport
 from passim.reader.forms import UploadFileForm
@@ -121,6 +121,12 @@ class ManuscriptUploadExcel(ReaderImport):
                                         oManu[k] = v
                                 # We have an object with key/value pairs: process it
                                 manu = Manuscript.custom_add(oManu, **kwargs)
+
+                                # Now get the codicological unit that has been automatically created and adapt it
+                                codico = manu.manuscriptcodicounits.first()
+                                if codico != None:
+                                    oManu['manuscript'] = manu
+                                    codico = Codico.custom_add(oManu, **kwargs)
 
                                 oResult['count'] += 1
                                 oResult['obj'] = manu

@@ -6538,6 +6538,13 @@ class CollAnyEdit(BasicDetails):
                 {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
                  'title': 'Open a listview that is filtered on this dataset'}
                 )
+        # For HC: buttons to switch between related listviews
+        if instance.settype == "hc" and context['is_app_editor']:
+            context['mainitems'].append(
+                    {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
+                     'title': 'Opionally show and edit the SSGs in this collection'}
+                    )
+
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -6571,6 +6578,28 @@ class CollAnyEdit(BasicDetails):
           
         # Return the context we have made
         return context    
+
+    def get_hc_buttons(self, instance):
+        """Get buttons to show/hide the two HC listviews (SSGs and Manuscripts)"""
+
+        sBack = ""
+        lHtml = []
+        abbr = None
+        button_list = [
+            {'label': 'Super sermons gold', 'id': 'basic_super_set', 'show': False},
+            {'label': 'Manuscripts',        'id': 'basic_manu_set',  'show': True},
+            ]
+        oErr = ErrHandle()
+        try:
+            for oButton in button_list:
+                lHtml.append("<a role='button' class='btn btn-xs jumbo-1' data-toggle='collapse' data-target='#{}' >{}</a>".format(
+                    oButton['id'], oButton['label']))
+            sBack = "<span>&nbsp;</span>".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/get_hc_buttons")
+
+        return sBack
 
     def get_listview_buttons(self, instance):
         """Create an HTML list of buttons for M/S/SG/SSG listviews filtered on this collection"""
@@ -7079,7 +7108,7 @@ class CollPrivDetails(CollAnyEdit):
         buttons = ['remove']    # This contains all the button names that need to be added
 
         # Start the whole spane
-        html.append("<span class='blinded'>")
+        html.append("<div class='blinded'>")
         
         # Add components
         if 'up' in buttons: 
@@ -7172,195 +7201,323 @@ class CollHistDetails(CollHistEdit):
         # Start by executing the standard handling
         super(CollHistDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+            oAdd = dict(value=value)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
+            rel_item.append(oAdd)
+            return True
 
-        username = self.request.user.username
-        team_group = app_editor
+        def check_order(qs):
+            with transaction.atomic():
+                for idx, obj in enumerate(qs):
+                    if obj.order < 0:
+                        obj.order = idx + 1
+                        obj.save()
 
-        # Lists of related objects
-        related_objects = []
-        resizable = True
+        oErr = ErrHandle()
+        try:
 
-        # In all cases: Get all the SSGs that are part of this historical collection:
-        qs_ssg = instance.collections_super.all().values("id")
+            context['sections'] = []
 
-        # Check what kind of comparison we need to make
-        if self.manu == None:
-            # This is the plain historical collection details view
-            # List of Manuscripts contained in this collection
-            sTitle = "Manuscripts with sermons connected to this collection"
-            if resizable:
-                manuscripts = dict(title=sTitle, prefix="manu", gridclass="resizable")
-            else:
-                manuscripts = dict(title=sTitle, prefix="manu")
+            username = self.request.user.username
+            team_group = app_editor
 
-            # Get the manuscripts linked to these SSGs
+            # Authorization: only app-editors may edit!
+            bMayEdit = user_is_ingroup(self.request, team_group)
+            
+            # Lists of related objects
+            related_objects = []
+            resizable = True
             lstQ = []
-            # lstQ.append(Q(manuitems__itemsermons__sermondescr_super__super__id__in=qs_ssg))
-            lstQ.append(Q(manuitems__itemsermons__equalgolds__collections=instance))
-            lstQ.append(Q(mtype="man"))
-            qs_manu = Manuscript.objects.filter(*lstQ).order_by(
-                'id').distinct().order_by('lcity__name', 'library__name', 'idno')
-
             rel_list =[]
-            for item in qs_manu:
-                rel_item = []
-                # Shelfmark = IDNO
-                manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
-                manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
-                # Name as CITY - LIBRARY - IDNO + Name
-                manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
-                rel_item.append({'value': manu_name, 'title': item.idno, 'main': True,
-                                    'link': reverse('manuscript_details', kwargs={'pk': item.id})})
-
-                # Origin
-                or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown())
-                if resizable:
-                    rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)", 'initial': 'small'})
-                else:
-                    rel_item.append({'value': or_prov, 'title': "Origin (if known), followed by provenances (between brackets)"})
-
-                # date range
-                daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                if resizable:
-                    rel_item.append({'value': daterange, 'align': "right", 'initial': 'small'})
-                else:
-                    rel_item.append({'value': daterange, 'align': "right"})
-
-                # Number of sermons in this manuscript
-                sermo_number = item.get_sermon_count()
-                if resizable:
-                    rel_item.append({'value': sermo_number, 'align': "right", 'initial': 'small'})
-                else:
-                    rel_item.append({'value': sermo_number, 'align': "right"})
-
-                # Linked SSG(s)
-                ssg_info = item.get_ssg_count(compare_link=True, collection=instance)
-                if resizable:
-                    rel_item.append({'value': ssg_info, 'align': "right", 'initial': 'small'})
-                else:
-                    rel_item.append({'value': ssg_info, 'align': "right"})
-
-                # Add this Manu line to the list
-                rel_list.append(dict(id=item.id, cols=rel_item))
-
-            manuscripts['rel_list'] = rel_list
-
-            manuscripts['columns'] = [
-                'Shelfmark', 
-                '<span title="Origin/Provenance">or./prov.</span>', 
-                '<span title="Date range">date</span>', 
-                '<span title="Sermons in this manuscript">sermons</span>',
-                '<span title="Super sermon gold links">ssgs.</span>', 
-                ]
-            related_objects.append(manuscripts)
-        else:
-            # This is a comparison between the SSGs in the historical collection and the sermons in the manuscript
-            # (1) Start making a comparison table
-            title = "Comparison with manuscript [{}]".format(self.manu.get_full_name())
-            sermons = dict(title=title, prefix="sermo", gridclass="resizable")
-            # (2) Get a list of sermons
-            qs_s = SermonDescr.objects.filter(msitem__manu=self.manu).order_by('msitem__order')
-
-            # Build the related list
-            rel_list =[]
-            equal_list = []
             index = 1
-            for item in qs_s:
-                rel_item = []
-                # Determine the matching SSG from the Historical Collection
-                equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
-                # List of SSGs that have been dealt with already
-                if equal != None: equal_list.append(equal.id)
+            sort_start = ""
+            sort_start_int = ""
+            sort_end = ""
+            if bMayEdit:
+                sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_end = '</span>'
 
-                # S: Order in Manuscript
-                rel_item.append({'value': index, 'initial': 'small'})
-                index += 1
+            # In all cases: Get all the SSGs that are part of this historical collection:
+            qs_ssg = instance.collections_super.all().values("id")
 
-                # S: Locus
-                rel_item.append({'value': item.get_locus()})
+            # Check what kind of comparison we need to make
+            if self.manu == None:
+                # This is the plain historical collection details view
 
-                # S: TItle
-                rel_item.append({'value': item.title, 'initial': 'small'})
+                # Get all SSGs that are part of this PD
+                supers = dict(title="Super sermons gold within this historical collection", prefix="super")   #prefix="sermo")
+                if resizable: supers['gridclass'] = "resizable dragdrop"
+                supers['savebuttons'] = True
+                supers['classes'] = 'collapse'
 
-                # SSG: passim code
-                if equal:
+                qs_sermo = instance.super_col.all().order_by(
+                        'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
+                check_order(qs_sermo)
+
+                # Walk these collection sermons
+                for obj in qs_sermo:
+                    rel_item = []
+                    item = obj.super
+
+                    # SSG: Order in Manuscript
+                    #add_one_item(rel_item, index, False, align="right")
+                    #index += 1
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                    # SSG: Author
+                    add_one_item(rel_item, self.get_field_value("super", item, "author"), resizable)
+
+                    # SSG: Passim code
+                    add_one_item(rel_item, self.get_field_value("super", item, "code"), False)
+
+                    # SSG: Gryson/Clavis = signature
+                    add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
+
+                    # SSG: Inc/Expl
+                    add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), False, main=True)
+
+                    # SSG: Size (number of SG in equality set)
+                    add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
+
+                    # Actions that can be performed on this item
+                    if bMayEdit:
+                        add_one_item(rel_item, self.get_actions())
+
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
+            
+                supers['rel_list'] = rel_list
+                supers['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start_int, sort_end), 
+                    ''
+                    ]
+                related_objects.append(supers)
+
+                # List of Manuscripts contained in this collection
+                sTitle = "Manuscripts with sermons connected to this collection"
+                manuscripts = dict(title=sTitle, prefix="manu")
+                if resizable:
+                    manuscripts['gridclass'] = "resizable"
+                manuscripts['classes'] = 'collapse in'
+
+                # Get the manuscripts linked to these SSGs (in this historical collection)
+                lstQ = []
+                lstQ.append(Q(manuitems__itemsermons__equalgolds__collections=instance))
+                lstQ.append(Q(mtype="man"))
+                qs_manu = Manuscript.objects.filter(*lstQ).order_by(
+                    'id').distinct().order_by('lcity__name', 'library__name', 'idno')
+
+                rel_list =[]
+                for item in qs_manu:
+                    rel_item = []
+
+                    # Get the codico's for this manuscript
+                    codico_lst = item.manuscriptcodicounits.all().order_by('order')
+
+                    # Shelfmark = IDNO
+                    add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
+                                 link=reverse('manuscript_details', kwargs={'pk': item.id}))
+
+                    # Origin
+                    add_one_item(rel_item, self.get_field_value("codicos", codico_lst, "origprov"), resizable, 
+                                 title="Origin (if known), followed by provenances (between brackets)")
+
+                    # date range
+                    add_one_item(rel_item, self.get_field_value("codicos", codico_lst, "daterange"), resizable, align="right")
+
+                    # Number of sermons in this manuscript
+                    add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), resizable, align="right")
+
+                    # Linked SSG(s)
+                    ssg_info = item.get_ssg_count(compare_link=True, collection=instance)
+                    add_one_item(rel_item, ssg_info, resizable, align="right")
+
+                    # Add this Manu line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
+
+                manuscripts['rel_list'] = rel_list
+
+                manuscripts['columns'] = [
+                    'Shelfmark', 
+                    '<span title="Origin/Provenance">or./prov.</span>', 
+                    '<span title="Date range">date</span>', 
+                    '<span title="Sermons in this manuscript">sermons</span>',
+                    '<span title="Super sermon gold links">ssgs.</span>', 
+                    ]
+                related_objects.append(manuscripts)
+            else:
+                # This is a comparison between the SSGs in the historical collection and the sermons in the manuscript
+                # (1) Start making a comparison table
+                title = "Comparison with manuscript [{}]".format(self.manu.get_full_name())
+                sermons = dict(title=title, prefix="sermo", gridclass="resizable")
+                # (2) Get a list of sermons
+                qs_s = SermonDescr.objects.filter(msitem__manu=self.manu).order_by('msitem__order')
+
+                # Build the related list
+                rel_list =[]
+                equal_list = []
+                index = 1
+                for item in qs_s:
+                    rel_item = []
+                    # Determine the matching SSG from the Historical Collection
+                    equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
+                    # List of SSGs that have been dealt with already
+                    if equal != None: equal_list.append(equal.id)
+
+                    # S: Order in Manuscript
+                    rel_item.append({'value': index, 'initial': 'small'})
+                    index += 1
+
+                    # S: Locus
+                    rel_item.append({'value': item.get_locus()})
+
+                    # S: TItle
+                    rel_item.append({'value': item.title, 'initial': 'small'})
+
+                    # SSG: passim code
+                    if equal:
+                        rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
+                    else:
+                        rel_item.append({'value': "(none)", 'initial': 'small'})
+
+                    ratio = 0.0
+                    if equal:
+                        # S: incipit + explicit compared
+                        s_equal, ratio_equal = equal.get_incexp_match()
+                        comparison, ratio = item.get_incexp_match(s_equal)
+                        rel_item.append({'value': comparison, 'initial': 'small'})
+
+                        # SSG: incipit + explicit compared
+                        s_sermon, ratio_sermon = item.get_incexp_match()
+                        comparison, ratio2 = equal.get_incexp_match(s_sermon)
+                        rel_item.append({'value': comparison, 'initial': 'small'})
+                    else:
+                        # S: incipit + explicit compared
+                        s_sermon, ratio_sermon = item.get_incexp_match()
+                        rel_item.append({'value': s_sermon, 'initial': 'small'})
+
+                        # SSG: incipit + explicit compared
+                        rel_item.append({'value': "", 'initial': 'small'})
+
+                    # Ratio of equalness
+                    rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
+
+                    rel_list.append(rel_item)
+
+                # Check if there are any SSGs in the collection that have not been dealt with yet
+                qs_ssg = instance.collections_super.exclude(id__in=equal_list)
+                for item in qs_ssg:
+                    rel_item = []
+                    equal = item
+                    # S: Order in Manuscript
+                    rel_item.append({'value': "-", 'initial': 'small'})
+
+                    # S: Locus
+                    rel_item.append({'value': "-"})
+
+                    # S: TItle
+                    rel_item.append({'value': "-", 'initial': 'small'})
+
+                    # SSG: passim code
                     rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
-                else:
-                    rel_item.append({'value': "(none)", 'initial': 'small'})
 
-                ratio = 0.0
-                if equal:
                     # S: incipit + explicit compared
-                    s_equal, ratio_equal = equal.get_incexp_match()
-                    comparison, ratio = item.get_incexp_match(s_equal)
-                    rel_item.append({'value': comparison, 'initial': 'small'})
-
-                    # SSG: incipit + explicit compared
-                    s_sermon, ratio_sermon = item.get_incexp_match()
-                    comparison, ratio2 = equal.get_incexp_match(s_sermon)
-                    rel_item.append({'value': comparison, 'initial': 'small'})
-                else:
-                    # S: incipit + explicit compared
-                    s_sermon, ratio_sermon = item.get_incexp_match()
-                    rel_item.append({'value': s_sermon, 'initial': 'small'})
-
-                    # SSG: incipit + explicit compared
+                    ratio = 0.0
                     rel_item.append({'value': "", 'initial': 'small'})
 
-                # Ratio of equalness
-                rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
+                    # SSG: incipit + explicit compared
+                    s_equal, ratio_equal = equal.get_incexp_match()
+                    rel_item.append({'value': s_equal, 'initial': 'small'})
 
-                rel_list.append(rel_item)
+                    # Ratio of equalness
+                    rel_item.append({'value': ratio, 'initial': 'small'})
 
-            # Check if there are any SSGs in the collection that have not been dealt with yet
-            qs_ssg = instance.collections_super.exclude(id__in=equal_list)
-            for item in qs_ssg:
-                rel_item = []
-                equal = item
-                # S: Order in Manuscript
-                rel_item.append({'value': "-", 'initial': 'small'})
-
-                # S: Locus
-                rel_item.append({'value': "-"})
-
-                # S: TItle
-                rel_item.append({'value': "-", 'initial': 'small'})
-
-                # SSG: passim code
-                rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
-
-                # S: incipit + explicit compared
-                ratio = 0.0
-                rel_item.append({'value': "", 'initial': 'small'})
-
-                # SSG: incipit + explicit compared
-                s_equal, ratio_equal = equal.get_incexp_match()
-                rel_item.append({'value': s_equal, 'initial': 'small'})
-
-                # Ratio of equalness
-                rel_item.append({'value': ratio, 'initial': 'small'})
-
-                rel_list.append(dict(id=item.id, cols=rel_item))
+                    rel_list.append(dict(id=item.id, cols=rel_item))
 
 
-            # Add the related list
-            sermons['rel_list'] = rel_list
+                # Add the related list
+                sermons['rel_list'] = rel_list
 
-            # Set the columns
-            sermons['columns'] = ['Order', 'Locus', 'Title', 
-                                  '<span title="Super sermon gold">ssg</span>',
-                                  '<span title="Incipit + explicit of sermon manifestation">inc/exp. s</span>', 
-                                  '<span title="Incipit + explicit of super sermon gold (SSG)">inc/exp. ssg</span>',
-                                  '<span title="Comparison ratio between inc/exp of S and SSG">ratio</span>']
-            # Add to related objects
-            related_objects.append(sermons)
+                # Set the columns
+                sermons['columns'] = ['Order', 'Locus', 'Title', 
+                                      '<span title="Super sermon gold">ssg</span>',
+                                      '<span title="Incipit + explicit of sermon manifestation">inc/exp. s</span>', 
+                                      '<span title="Incipit + explicit of super sermon gold (SSG)">inc/exp. ssg</span>',
+                                      '<span title="Comparison ratio between inc/exp of S and SSG">ratio</span>']
+                # Add to related objects
+                related_objects.append(sermons)
 
-        context['related_objects'] = related_objects
-        context['histogram_data'] = self.get_histogram_data(instance, instance.collections_super.all(), 'collist_hist', 'd3')
+            context['related_objects'] = related_objects
+            context['histogram_data'] = self.get_histogram_data(instance, instance.collections_super.all(), 'collist_hist', 'd3')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollHistDetails/add_to_context")
 
         # Return the context we have made
         return context
+
+    def get_actions(self):
+        html = []
+        buttons = ['remove']    # This contains all the button names that need to be added
+
+        # Start the whole spane
+        html.append("<div class='blinded'>")
+        
+        # Add components
+        if 'up' in buttons: 
+            html.append("<a class='related-up' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
+        if 'down' in buttons: 
+            html.append("<a class='related-down'><span class='glyphicon glyphicon-arrow-down'></span></a>")
+        if 'remove' in buttons: 
+            html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
+
+        # Finish up the span
+        html.append("&nbsp;</span>")
+
+        # COmbine the list into a string
+        sHtml = "\n".join(html)
+        # Return out HTML string
+        return sHtml
+
+    def get_field_value(self, type, instance, custom):
+        sBack = ""
+        if type == "manu":
+            if custom == "shelfmark":
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+            elif custom == "name":
+                sBack = instance.name
+            #elif custom == "origprov":
+            #    sBack = "origin: {} (provenance[s]: {})".format(instance.get_origin(), instance.get_provenance_markdown(table=False))
+            #elif custom == "daterange":
+            #    sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
+            elif custom == "sermons":
+                sBack = instance.get_sermon_count()
+        elif type == "codicos":
+            lCombi = []
+            if custom == "origprov":
+                for obj in instance:
+                    lCombi.append( "origin: {} (provenance[s]: {})".format(obj.get_origin(), obj.get_provenance_markdown(table=False)))
+                sBack = "; ".join(lCombi)
+            elif custom == "daterange":
+                for obj in instance:
+                    lCombi.append( "{}-{}".format(obj.yearstart, obj.yearfinish))
+                sBack = "; ".join(lCombi)
+
+        elif type == "super":
+            sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
+        return sBack
 
 
 class CollHistCompare(CollHistDetails):
