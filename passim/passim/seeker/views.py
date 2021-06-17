@@ -7188,10 +7188,11 @@ class CollHistDetails(CollHistEdit):
         if self.manu == None:
             # This is the plain historical collection details view
             # List of Manuscripts contained in this collection
+            sTitle = "Manuscripts with sermons connected to this collection"
             if resizable:
-                manuscripts = dict(title="Manuscripts with sermons connected to this collection", prefix="manu", gridclass="resizable")
+                manuscripts = dict(title=sTitle, prefix="manu", gridclass="resizable")
             else:
-                manuscripts = dict(title="Manuscripts with sermons connected to this collection", prefix="manu")
+                manuscripts = dict(title=sTitle, prefix="manu")
 
             # Get the manuscripts linked to these SSGs
             lstQ = []
