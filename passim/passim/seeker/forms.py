@@ -1320,23 +1320,26 @@ class SearchManuForm(PassimModelForm):
     #                                      'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
-    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
+    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
+                  "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
+        # OLD (issue #372) 
+        # fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
+        fields = ['name', 'library', 'idno', 'url', 'stype'] 
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
+                 'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
                  #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
-                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
-                 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # (#372) 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 # (#372) 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 # (#372) 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # (#372) 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -1409,9 +1412,10 @@ class SearchManuForm(PassimModelForm):
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
-                # Look after origin
-                origin = instance.origin
-                self.fields['origname_ta'].initial = "" if origin == None else origin.name
+
+                ## Look after origin
+                #origin = instance.origin
+                #self.fields['origname_ta'].initial = "" if origin == None else origin.name
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SearchManuForm-init")
