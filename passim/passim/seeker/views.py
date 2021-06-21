@@ -6540,7 +6540,7 @@ class CollAnyEdit(BasicDetails):
                  'title': 'Open a listview that is filtered on this dataset'}
                 )
         # For HC: buttons to switch between related listviews
-        if instance.settype == "hc" and context['is_app_editor']:
+        if instance.settype == "hc" and context['is_app_editor'] and self.manu == None and self.codico == None:
             context['mainitems'].append(
                     {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
                      'title': 'Opionally show and edit the SSGs in this collection'}
