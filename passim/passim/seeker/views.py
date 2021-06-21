@@ -7470,7 +7470,7 @@ class CollHistDetails(CollHistEdit):
                     # Ratio of equalness
                     rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
 
-                    rel_list.append(rel_item)
+                    rel_list.append(dict(id=item.id, cols=rel_item))
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
@@ -7572,7 +7572,7 @@ class CollHistDetails(CollHistEdit):
                     # Ratio of equalness
                     rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
 
-                    rel_list.append(rel_item)
+                    rel_list.append(dict(id=item.id, cols=rel_item))
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
