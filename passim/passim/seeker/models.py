@@ -3640,6 +3640,10 @@ class Manuscript(models.Model):
         if self.idno != None:
             lhtml.append(self.idno)
 
+        # What if we don't have anything?
+        if len(lhtml) == 0:
+            lhtml.append("Unnamed [id={}]".format(self.id))
+
         return ", ".join(lhtml)
 
     def get_keywords_markdown(self, plain=False):
@@ -4961,7 +4965,7 @@ class Codico(models.Model):
         sBack = "-"
         manu = self.manuscript
         if manu != None:
-            sBack = manu.get_full_name()
+            sBack = "{}: {}".format( manu.get_full_name(), self.order)
         return sBack
 
     def get_identification(self):
@@ -5097,6 +5101,21 @@ class Codico(models.Model):
         else:
             # sBack = ", ".join(lHtml)
             sBack = "".join(lHtml)
+        return sBack
+
+    def get_sermon_count(self):
+        count = SermonDescr.objects.filter(msitem__codico=self).count()
+        return count
+
+    def get_ssg_count(self, compare_link=False, collection = None):
+        # Get a list of all SSGs related to [self]
+        ssg_list_num = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico=self).order_by('id').distinct().count()
+        if compare_link:
+            url = "{}?codico={}".format(reverse("collhist_compare", kwargs={'pk': collection.id}), self.id)
+            sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, ssg_list_num)
+        else:
+            sBack = "<span>{}</span>".format(ssg_list_num)
+        # Return the combined information
         return sBack
 
     def get_stype_light(self, usercomment=False):
@@ -7212,6 +7231,8 @@ class Collection(models.Model):
 
         # Create an empty Manuscript
         manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
+        # Figure out  what the automatically created codico is
+        codico = Codico.objects.filter(manuscript=manu).first()
         
         # Create all the sermons based on the SSGs
         msitems = []
@@ -7219,7 +7240,7 @@ class Collection(models.Model):
             order = 1
             for ssg in self.collections_super.all():
                 # Create a MsItem
-                msitem = MsItem.objects.create(manu=manu, order=order)
+                msitem = MsItem.objects.create(manu=manu, codico=codico, order=order)
                 order += 1
                 # Add it to the list
                 msitems.append(msitem)

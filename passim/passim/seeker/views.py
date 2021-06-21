@@ -6364,6 +6364,7 @@ class CollAnyEdit(BasicDetails):
     title = "Any collection"
     history_button = True
     manu = None
+    codico = None
     datasettype = ""
     mainitems = []
     hlistitems = [
@@ -6580,14 +6581,14 @@ class CollAnyEdit(BasicDetails):
         return context    
 
     def get_hc_buttons(self, instance):
-        """Get buttons to show/hide the two HC listviews (SSGs and Manuscripts)"""
+        """Get buttons to show/hide the two HC listviews (SSGs and Codicological units)"""
 
         sBack = ""
         lHtml = []
         abbr = None
         button_list = [
             {'label': 'Super sermons gold', 'id': 'basic_super_set', 'show': False},
-            {'label': 'Manuscripts',        'id': 'basic_manu_set',  'show': True},
+            {'label': 'Codicological units','id': 'basic_codi_set',  'show': True},
             ]
         oErr = ErrHandle()
         try:
@@ -7230,7 +7231,7 @@ class CollHistDetails(CollHistEdit):
             # Authorization: only app-editors may edit!
             bMayEdit = user_is_ingroup(self.request, team_group)
             
-            # Lists of related objects
+            # Lists of related objects and other initializations
             related_objects = []
             resizable = True
             lstQ = []
@@ -7239,6 +7240,9 @@ class CollHistDetails(CollHistEdit):
             sort_start = ""
             sort_start_int = ""
             sort_end = ""
+            show_codico = True  # See issue #363
+            show_manu = False   # See issue #363
+
             if bMayEdit:
                 sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
                 sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
@@ -7248,7 +7252,7 @@ class CollHistDetails(CollHistEdit):
             qs_ssg = instance.collections_super.all().values("id")
 
             # Check what kind of comparison we need to make
-            if self.manu == None:
+            if self.manu == None and self.codico == None:
                 # This is the plain historical collection details view
 
                 # Get all SSGs that are part of this PD
@@ -7305,65 +7309,219 @@ class CollHistDetails(CollHistEdit):
                     ]
                 related_objects.append(supers)
 
-                # List of Manuscripts contained in this collection
-                sTitle = "Manuscripts with sermons connected to this collection"
-                manuscripts = dict(title=sTitle, prefix="manu")
-                if resizable:
-                    manuscripts['gridclass'] = "resizable"
-                manuscripts['classes'] = 'collapse in'
+                if show_codico:
+                    # NEW (see issue #363): List of codicological units contained in this collection
+                    sTitle = "Codicological units with sermons connected to this collection"
+                    codicos = dict(title=sTitle, prefix="codi")
+                    if resizable:
+                        codicos['gridclass'] = "resizable"
+                    codicos['classes'] = 'collapse in'
 
-                # Get the manuscripts linked to these SSGs (in this historical collection)
-                lstQ = []
-                lstQ.append(Q(manuitems__itemsermons__equalgolds__collections=instance))
-                lstQ.append(Q(mtype="man"))
-                qs_manu = Manuscript.objects.filter(*lstQ).order_by(
-                    'id').distinct().order_by('lcity__name', 'library__name', 'idno')
+                    # Get the codicos linked to these SSGs (in this historical collection)
+                    lstQ = []
+                    lstQ.append(Q(codicoitems__itemsermons__equalgolds__collections=instance))
+                    lstQ.append(Q(manuscript__mtype="man"))
+                    qs_codi = Codico.objects.filter(*lstQ).order_by(
+                        'id').distinct().order_by('manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
 
-                rel_list =[]
-                for item in qs_manu:
-                    rel_item = []
+                    rel_list =[]
+                    for item in qs_codi:
+                        rel_item = []
 
-                    # Get the codico's for this manuscript
-                    codico_lst = item.manuscriptcodicounits.all().order_by('order')
+                        # Shelfmark = IDNO
+                        add_one_item(rel_item,  self.get_field_value("codicos", item, "manuscript"), False, title=item.manuscript.idno, main=True, 
+                                     link=reverse('manuscript_details', kwargs={'pk': item.manuscript.id}))
 
-                    # Shelfmark = IDNO
-                    add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
-                                 link=reverse('manuscript_details', kwargs={'pk': item.id}))
+                        # Origin
+                        add_one_item(rel_item, self.get_field_value("codicos", item, "origprov"), resizable, 
+                                     title="Origin (if known), followed by provenances (between brackets)")
 
-                    # Origin
-                    add_one_item(rel_item, self.get_field_value("codicos", codico_lst, "origprov"), resizable, 
-                                 title="Origin (if known), followed by provenances (between brackets)")
+                        # date range
+                        add_one_item(rel_item, self.get_field_value("codicos", item, "daterange"), resizable, align="right")
 
-                    # date range
-                    add_one_item(rel_item, self.get_field_value("codicos", codico_lst, "daterange"), resizable, align="right")
+                        # Number of sermons in this codicological unit
+                        add_one_item(rel_item, self.get_field_value("codicos", item, "sermons"), resizable, align="right")
 
-                    # Number of sermons in this manuscript
-                    add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), resizable, align="right")
+                        # Linked SSG(s)
+                        ssg_info = item.get_ssg_count(compare_link=True, collection=instance)
+                        add_one_item(rel_item, ssg_info, resizable, align="right")
 
-                    # Linked SSG(s)
-                    ssg_info = item.get_ssg_count(compare_link=True, collection=instance)
-                    add_one_item(rel_item, ssg_info, resizable, align="right")
+                        # Add this Manu line to the list
+                        rel_list.append(dict(id=item.id, cols=rel_item))
 
-                    # Add this Manu line to the list
-                    rel_list.append(dict(id=item.id, cols=rel_item))
+                    codicos['rel_list'] = rel_list
 
-                manuscripts['rel_list'] = rel_list
+                    codicos['columns'] = [
+                        'Manuscript', 
+                        '<span title="Origin/Provenance">or./prov.</span>', 
+                        '<span title="Date range">date</span>', 
+                        '<span title="Sermons in this codicological unit">sermons</span>',
+                        '<span title="Super sermon gold links">ssgs.</span>', 
+                        ]
+                    related_objects.append(codicos)
 
-                manuscripts['columns'] = [
-                    'Shelfmark', 
-                    '<span title="Origin/Provenance">or./prov.</span>', 
-                    '<span title="Date range">date</span>', 
-                    '<span title="Sermons in this manuscript">sermons</span>',
-                    '<span title="Super sermon gold links">ssgs.</span>', 
-                    ]
-                related_objects.append(manuscripts)
-            else:
+                if show_manu:
+                    # OLD (see issue #363): List of Manuscripts contained in this collection
+                    sTitle = "Manuscripts with sermons connected to this collection"
+                    manuscripts = dict(title=sTitle, prefix="manu")
+                    if resizable:
+                        manuscripts['gridclass'] = "resizable"
+                    manuscripts['classes'] = 'collapse in'
+
+                    # Get the manuscripts linked to these SSGs (in this historical collection)
+                    lstQ = []
+                    lstQ.append(Q(manuitems__itemsermons__equalgolds__collections=instance))
+                    lstQ.append(Q(mtype="man"))
+                    qs_manu = Manuscript.objects.filter(*lstQ).order_by(
+                        'id').distinct().order_by('lcity__name', 'library__name', 'idno')
+
+                    rel_list =[]
+                    for item in qs_manu:
+                        rel_item = []
+
+                        # Get the codico's for this manuscript
+                        codico_lst = item.manuscriptcodicounits.all().order_by('order')
+
+                        # Shelfmark = IDNO
+                        add_one_item(rel_item,  self.get_field_value("manu", item, "shelfmark"), False, title=item.idno, main=True, 
+                                     link=reverse('manuscript_details', kwargs={'pk': item.id}))
+
+                        # Origin
+                        add_one_item(rel_item, self.get_field_value("manucodicos", codico_lst, "origprov"), resizable, 
+                                     title="Origin (if known), followed by provenances (between brackets)")
+
+                        # date range
+                        add_one_item(rel_item, self.get_field_value("manucodicos", codico_lst, "daterange"), resizable, align="right")
+
+                        # Number of sermons in this manuscript
+                        add_one_item(rel_item, self.get_field_value("manu", item, "sermons"), resizable, align="right")
+
+                        # Linked SSG(s)
+                        ssg_info = item.get_ssg_count(compare_link=True, collection=instance)
+                        add_one_item(rel_item, ssg_info, resizable, align="right")
+
+                        # Add this Manu line to the list
+                        rel_list.append(dict(id=item.id, cols=rel_item))
+
+                    manuscripts['rel_list'] = rel_list
+
+                    manuscripts['columns'] = [
+                        'Shelfmark', 
+                        '<span title="Origin/Provenance">or./prov.</span>', 
+                        '<span title="Date range">date</span>', 
+                        '<span title="Sermons in this manuscript">sermons</span>',
+                        '<span title="Super sermon gold links">ssgs.</span>', 
+                        ]
+                    related_objects.append(manuscripts)
+            elif self.manu != None:
                 # This is a comparison between the SSGs in the historical collection and the sermons in the manuscript
                 # (1) Start making a comparison table
                 title = "Comparison with manuscript [{}]".format(self.manu.get_full_name())
                 sermons = dict(title=title, prefix="sermo", gridclass="resizable")
                 # (2) Get a list of sermons
                 qs_s = SermonDescr.objects.filter(msitem__manu=self.manu).order_by('msitem__order')
+
+                # Build the related list
+                rel_list =[]
+                equal_list = []
+                index = 1
+                for item in qs_s:
+                    rel_item = []
+                    # Determine the matching SSG from the Historical Collection
+                    equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
+                    # List of SSGs that have been dealt with already
+                    if equal != None: equal_list.append(equal.id)
+
+                    # S: Order in Manuscript
+                    rel_item.append({'value': index, 'initial': 'small'})
+                    index += 1
+
+                    # S: Locus
+                    rel_item.append({'value': item.get_locus()})
+
+                    # S: TItle
+                    rel_item.append({'value': item.title, 'initial': 'small'})
+
+                    # SSG: passim code
+                    if equal:
+                        rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
+                    else:
+                        rel_item.append({'value': "(none)", 'initial': 'small'})
+
+                    ratio = 0.0
+                    if equal:
+                        # S: incipit + explicit compared
+                        s_equal, ratio_equal = equal.get_incexp_match()
+                        comparison, ratio = item.get_incexp_match(s_equal)
+                        rel_item.append({'value': comparison, 'initial': 'small'})
+
+                        # SSG: incipit + explicit compared
+                        s_sermon, ratio_sermon = item.get_incexp_match()
+                        comparison, ratio2 = equal.get_incexp_match(s_sermon)
+                        rel_item.append({'value': comparison, 'initial': 'small'})
+                    else:
+                        # S: incipit + explicit compared
+                        s_sermon, ratio_sermon = item.get_incexp_match()
+                        rel_item.append({'value': s_sermon, 'initial': 'small'})
+
+                        # SSG: incipit + explicit compared
+                        rel_item.append({'value': "", 'initial': 'small'})
+
+                    # Ratio of equalness
+                    rel_item.append({'value': "{:.1%}".format(ratio), 'initial': 'small'})
+
+                    rel_list.append(rel_item)
+
+                # Check if there are any SSGs in the collection that have not been dealt with yet
+                qs_ssg = instance.collections_super.exclude(id__in=equal_list)
+                for item in qs_ssg:
+                    rel_item = []
+                    equal = item
+                    # S: Order in Manuscript
+                    rel_item.append({'value': "-", 'initial': 'small'})
+
+                    # S: Locus
+                    rel_item.append({'value': "-"})
+
+                    # S: TItle
+                    rel_item.append({'value': "-", 'initial': 'small'})
+
+                    # SSG: passim code
+                    rel_item.append({'value': equal.get_passimcode_markdown(), 'initial': 'small'})
+
+                    # S: incipit + explicit compared
+                    ratio = 0.0
+                    rel_item.append({'value': "", 'initial': 'small'})
+
+                    # SSG: incipit + explicit compared
+                    s_equal, ratio_equal = equal.get_incexp_match()
+                    rel_item.append({'value': s_equal, 'initial': 'small'})
+
+                    # Ratio of equalness
+                    rel_item.append({'value': ratio, 'initial': 'small'})
+
+                    rel_list.append(dict(id=item.id, cols=rel_item))
+
+
+                # Add the related list
+                sermons['rel_list'] = rel_list
+
+                # Set the columns
+                sermons['columns'] = ['Order', 'Locus', 'Title', 
+                                      '<span title="Super sermon gold">ssg</span>',
+                                      '<span title="Incipit + explicit of sermon manifestation">inc/exp. s</span>', 
+                                      '<span title="Incipit + explicit of super sermon gold (SSG)">inc/exp. ssg</span>',
+                                      '<span title="Comparison ratio between inc/exp of S and SSG">ratio</span>']
+                # Add to related objects
+                related_objects.append(sermons)
+
+            elif self.codico != None:
+                # This is a comparison between the SSGs in the historical collection and the sermons in a codicological  unit
+                # (1) Start making a comparison table
+                title = "Comparison with codicological unit [{}]".format(self.codico.get_full_name())
+                sermons = dict(title=title, prefix="sermo", gridclass="resizable")
+                # (2) Get a list of sermons
+                qs_s = SermonDescr.objects.filter(msitem__codico=self.codico).order_by('msitem__order')
 
                 # Build the related list
                 rel_list =[]
@@ -7504,7 +7662,7 @@ class CollHistDetails(CollHistEdit):
             #    sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
             elif custom == "sermons":
                 sBack = instance.get_sermon_count()
-        elif type == "codicos":
+        elif type == "manucodicos":
             lCombi = []
             if custom == "origprov":
                 for obj in instance:
@@ -7514,6 +7672,16 @@ class CollHistDetails(CollHistEdit):
                 for obj in instance:
                     lCombi.append( "{}-{}".format(obj.yearstart, obj.yearfinish))
                 sBack = "; ".join(lCombi)
+        elif type == "codicos":
+            lCombi = []
+            if custom == "origprov":
+                sBack = "origin: {} (provenance[s]: {})".format(instance.get_origin(), instance.get_provenance_markdown(table=False))
+            elif custom == "daterange":
+                sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
+            elif custom == "manuscript":
+                sBack = "<span class='signature'>{}</span>".format(instance.manuscript.get_full_name())
+            elif custom == "sermons":
+                sBack = instance.get_sermon_count()
 
         elif type == "super":
             sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
@@ -7530,11 +7698,19 @@ class CollHistCompare(CollHistDetails):
         # Make sure to get the Manuscript for comparison
         if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
             manu_id = self.qd.get('manu')
+            codico_id = self.qd.get('codico')
             if manu_id != None:
                 manu = Manuscript.objects.filter(id=manu_id).first()
                 if manu != None:
                     # We have the manuscript: the comparison can continue
                     self.manu = manu
+                    self.codico = None
+            elif codico_id != None:
+                codico = Codico.objects.filter(id=codico_id).first()
+                if codico != None:
+                    # We have the codico: the comparison can continue
+                    self.codico = codico
+                    self.manu = None
         return None
 
 
