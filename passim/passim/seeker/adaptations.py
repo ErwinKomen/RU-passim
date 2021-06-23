@@ -162,7 +162,7 @@ def adapt_codicocopy(oStatus=None):
 
         # Walk through all manuscripts (that are not templates)
         manu_lst = []
-        for manu in Manuscript.objects.filter(mtype="man"):
+        for manu in Manuscript.objects.filter(mtype__iregex="man|tem"):
             # Check if this manuscript already has Codico's
             if manu.manuscriptcodicounits.count() == 0:
                 # Note that Codico's must be made for this manuscript

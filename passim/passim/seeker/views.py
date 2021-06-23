@@ -8596,23 +8596,24 @@ class ManuscriptEdit(BasicDetails):
                     local_context['import_button'] = template_import_button
                     lhtml.append(render_to_string('seeker/template_import.html', local_context, self.request))
 
-            # Add Codico items - depending on reconstructed or not
-            if instance.mtype == "rec":
-                # Note: we need to go through Reconstruction, 
-                #       since that table has the correct 'order' values for the reconstruction
-                codicos = [x.codico for x in instance.manuscriptreconstructions.all().order_by('order')]
-            else:
-                # Note: we need to go directly to Codico, since the order values are there
-                codicos = instance.manuscriptcodicounits.all().order_by('order')
-            codico_list = []
-            for codico in codicos:
-                # Get the codico details URL
-                url = reverse("codico_details", kwargs={'pk': codico.id})
-                url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
-                # Add the information to the codico list
-                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
-                context['codico_list'] = codico_list
-            lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
+            if instance.mtype in ["rec", "man"]:
+                # Add Codico items - depending on reconstructed or not
+                if instance.mtype == "rec":
+                    # Note: we need to go through Reconstruction, 
+                    #       since that table has the correct 'order' values for the reconstruction
+                    codicos = [x.codico for x in instance.manuscriptreconstructions.all().order_by('order')]
+                else:
+                    # Note: we need to go directly to Codico, since the order values are there
+                    codicos = instance.manuscriptcodicounits.all().order_by('order')
+                codico_list = []
+                for codico in codicos:
+                    # Get the codico details URL
+                    url = reverse("codico_details", kwargs={'pk': codico.id})
+                    url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
+                    # Add the information to the codico list
+                    codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
+                    context['codico_list'] = codico_list
+                lhtml.append(render_to_string("seeker/codico_list.html", context, self.request))
 
             # Add comment modal stuff
             initial = dict(otype="manu", objid=instance.id, profile=profile)
@@ -8915,7 +8916,7 @@ class ManuscriptDetails(ManuscriptEdit):
             sermon_list = instance.get_sermon_list(username, team_group)
  
             # The following only goes for the correct mtype
-            if instance.mtype == "man":
+            if instance.mtype in ["man", "tem"]:
                 # Add instances to the list, noting their childof and order
                 context['sermon_list'] = sermon_list
                 context['sermon_count'] = len(sermon_list)
