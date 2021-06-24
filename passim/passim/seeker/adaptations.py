@@ -185,6 +185,22 @@ def adapt_codicocopy(oStatus=None):
                 if manu != None:
                     bResult, msg = add_codico_to_manuscript(manu)
 
+        # Adapt codico's for templates
+        codico_name = "(No codicological definition for a template)" 
+        with transaction.atomic():
+            for codico in Codico.objects.filter(manuscript__mtype="tem"):
+                # Make sure the essential parts are empty!!
+                bNeedSaving = False
+                if codico.name != codico_name : 
+                    codico.name = codico_name
+                    bNeedSaving = True
+                if codico.notes != None: codico.notes = None ; bNeedSaving = True
+                if codico.support != None: codico.support = None ; bNeedSaving = True
+                if codico.extent != None: codico.extent = None ; bNeedSaving = True
+                if codico.format != None: codico.format = None ; bNeedSaving = True
+                if bNeedSaving:
+                    codico.save()
+
         if oStatus != None: oStatus.set("finished", oBack)
 
         # Note that we are indeed ready
