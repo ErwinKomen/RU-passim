@@ -9727,11 +9727,17 @@ class NewsItem(models.Model):
 
         # Get current time
         now = timezone.now()
-        for obj in NewsItem.objects.all():
-            if obj.until and obj.until < now:
-                # This should be set invalid
-                obj.status = "ext"
-                obj.save()
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in NewsItem.objects.all():
+                    if obj.until and obj.until < now:
+                        # This should be set invalid
+                        obj.status = "ext"
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Newsitem/check_until")
         # Return valid
         return True
 
