@@ -3077,6 +3077,8 @@ class Manuscript(models.Model):
     #     The third alternative is: a reconstruction
     #     So the options: 'man', 'tem', 'rec'
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
+    # [1] Imported manuscripts need to have a codico check
+    itype = models.CharField("Import codico status", max_length=MAX_TEXT_LEN, default="no")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
