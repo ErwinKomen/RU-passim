@@ -1599,11 +1599,21 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         drange = Daterange.objects.create(manuscript=manu_obj, yearstart = unit_yearstart, yearfinish = unit_yearfinish)
                         print(drange)
                     
-                    # Add id's of project, library, city and country to the Manuscript table.                                            
+                    
+                    # Add id's of project, source, library, city and country to the Manuscript table.                                            
                     project = Project.get_default(username) 
                     
                     # Add project id to the manuscript                               
                     manu_obj.project = project
+                    
+                    #profile = Profile.get_user_profile(username) 
+                    #print(sourceinfo_url)
+                    # Create a SourceInfo object for this extraction TH werkt nog niet
+                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username)
+                    #print(source)
+                    # Add source id to the manuscript                               
+                    manu_obj.source = source
+
                     
                     # This is probably not the best way to do this...
                     unitlibrary_id = 1160 # Bibliothèque nationale de France, Manuscrits
