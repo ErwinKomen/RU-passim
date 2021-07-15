@@ -192,13 +192,15 @@ def isempty(value):
             response = (len(value) == 0)
     return response
 
-def has_obj_value(field, obj):
+def has_obj_value(field, obj, model_name=None):
     if field == None:
         response = False
     elif field in obj and isinstance(obj[field], str):
         response = (obj[field] != "")
     else:
         response = (field != None and field in obj and obj[field] != None )
+    if response and model_name != None:
+        response = (obj[field].__class__.__name__ == model_name)
     return response
 
 def adapt_search(val, regex_function=None):
@@ -347,6 +349,12 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 s_q = ""
                             else:
                                 s_q = Q(**{"{}__exact".format(dbfield): ""})
+                    elif keyType == "fieldchoice" and has_obj_value(keyS, oFields, "FieldChoice"):
+                        if infield == None: infield = "abbr"
+                        
+                        val = getattr(oFields[keyS], infield)
+                        s_q = Q(**{"{}".format(dbfield): val})
+                        enable_filter(filter_type, head_id)
                     # Check for keyS
                     elif has_string_value(keyS, oFields):
                         # Check for ID field
@@ -424,6 +432,7 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         colnum = ""
         # reset 'used' feature for all heads
         for item in order_heads: item['used'] = None
+
         # Set the default sort order numbers
         for item in order_heads:
             sorting = ""
@@ -433,6 +442,7 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
             item['sorting'] = sorting
             item['direction'] = ""
             item['priority'] = ""
+
         # Check out the 'o' parameter...
         if 'o' in qd and qd['o'] != "":
             # Initializations

@@ -8,6 +8,7 @@
 
 .blinded {
     opacity: 0.0;
+    min-width: 25px;
 }
 
 .hidehover:hover .blinded {

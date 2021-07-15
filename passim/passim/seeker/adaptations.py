@@ -154,6 +154,9 @@ def adapt_codicocopy(oStatus=None):
     oErr = ErrHandle()
     bResult = True
     msg = ""
+    count_add = 0       # Codico layers added
+    count_copy = 0      # Codico layers copied
+    count_tem = 0       # Template codico changed
     oBack = dict(status="ok", msg="")
 
     try:
@@ -162,13 +165,13 @@ def adapt_codicocopy(oStatus=None):
 
         # Walk through all manuscripts (that are not templates)
         manu_lst = []
-        for manu in Manuscript.objects.filter(mtype="man"):
+        for manu in Manuscript.objects.filter(mtype__iregex="man|tem"):
             # Check if this manuscript already has Codico's
             if manu.manuscriptcodicounits.count() == 0:
                 # Note that Codico's must be made for this manuscript
                 manu_lst.append(manu.id)
         # Status message
-        oBack['total'] = "Got a list of manuscripts: {}".format(len(manu_lst))
+        oBack['total'] = "Manuscripts without codico: {}".format(len(manu_lst))
         if oStatus != None: oStatus.set("ok", oBack)
         # Create the codico's for the manuscripts
         with transaction.atomic():
@@ -184,6 +187,43 @@ def adapt_codicocopy(oStatus=None):
                 manu = Manuscript.objects.filter(id=manu_id).first()
                 if manu != None:
                     bResult, msg = add_codico_to_manuscript(manu)
+                    count_add += 1
+        oBack['codico_added'] = count_add
+
+        # Checking up on manuscripts that are imported (stype='imp') but whose Codico has not been 'fixed' yet
+        manu_lst = Manuscript.objects.filter(stype="imp").exclude(itype="codico_copied")
+        # Status message
+        oBack['total'] = "Imported manuscripts whose codico needs checking: {}".format(len(manu_lst))
+        if oStatus != None: oStatus.set("ok", oBack)
+        with transaction.atomic():
+            for idx, manu in enumerate(manu_lst):
+                # Show what we are doing
+                oErr.Status("Checking manuscript {} of {}".format(idx+1, len(manu_lst)))
+                # Actually do it
+                bResult, msg = add_codico_to_manuscript(manu)
+                if bResult:
+                    manu.itype = "codico_copied"
+                    manu.save()
+                    count_copy += 1
+        oBack['codico_copied'] = count_copy
+
+        # Adapt codico's for templates
+        codico_name = "(No codicological definition for a template)" 
+        with transaction.atomic():
+            for codico in Codico.objects.filter(manuscript__mtype="tem"):
+                # Make sure the essential parts are empty!!
+                bNeedSaving = False
+                if codico.name != codico_name : 
+                    codico.name = codico_name
+                    bNeedSaving = True
+                if codico.notes != None: codico.notes = None ; bNeedSaving = True
+                if codico.support != None: codico.support = None ; bNeedSaving = True
+                if codico.extent != None: codico.extent = None ; bNeedSaving = True
+                if codico.format != None: codico.format = None ; bNeedSaving = True
+                if bNeedSaving:
+                    codico.save()
+                    count_tem += 1
+        oBack['codico_template'] = count_tem
 
         if oStatus != None: oStatus.set("finished", oBack)
 

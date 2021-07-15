@@ -56,6 +56,7 @@ SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
 MANIFESTATION_TYPE = "seeker.mtype"
+MANUSCRIPT_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
@@ -3076,6 +3077,8 @@ class Manuscript(models.Model):
     #     The third alternative is: a reconstruction
     #     So the options: 'man', 'tem', 'rec'
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
+    # [1] Imported manuscripts need to have a codico check
+    itype = models.CharField("Import codico status", max_length=MAX_TEXT_LEN, default="no")
 
     # [0-1] Bibliography used for the manuscript
     literature = models.TextField("Literature", null=True, blank=True)
@@ -3107,17 +3110,17 @@ class Manuscript(models.Model):
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
-        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        {'name': 'Support',             'type': 'field', 'path': 'support'},
-        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
-        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        #{'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        #{'name': 'Support',             'type': 'field', 'path': 'support'},
+        #{'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        #{'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
-        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        # {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        # {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
         {'name': 'Notes',               'type': 'field', 'path': 'notes'},
         {'name': 'External links',      'type': 'func',  'path': 'external'},
         ]
@@ -3258,7 +3261,7 @@ class Manuscript(models.Model):
                             # Set the KV in a special way
                             obj.custom_set(path, value, **kwargs)
 
-                # Make sure the updae the object
+                # Make sure the update the object
                 obj.save()
         except:
             msg = oErr.get_error_message()
@@ -3272,13 +3275,13 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
-            if path == "dateranges":
-                qs = self.manuscript_dateranges.all().order_by('yearstart')
-                dates = []
-                for obj in qs:
-                    dates.append(obj.__str__())
-                sBack = json.dumps(dates)
-            elif path == "keywords":
+            #if path == "dateranges":
+            #    qs = self.manuscript_dateranges.all().order_by('yearstart')
+            #    dates = []
+            #    for obj in qs:
+            #        dates.append(obj.__str__())
+            #    sBack = json.dumps(dates)
+            if path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
                 sBack =  self.get_keywords_user_markdown(profile, plain=True)
@@ -3286,10 +3289,10 @@ class Manuscript(models.Model):
                 sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
             elif path == "literature":
                 sBack = self.get_litrefs_markdown(plain=True)
-            elif path == "origin":
-                sBack = self.get_origin()
-            elif path == "provenances":
-                sBack = self.get_provenance_markdown(plain=True)
+            #elif path == "origin":
+            #    sBack = self.get_origin()
+            #elif path == "provenances":
+            #    sBack = self.get_provenance_markdown(plain=True)
             elif path == "external":
                 sBack = self.get_external_markdown(plain=True)
             elif path == "brefs":
@@ -3343,20 +3346,20 @@ class Manuscript(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
-            if path == "dateranges":
-                # TRanslate the string into a list
-                dates = value_lst # json.loads(value)
-                # Possibly add each item from the list, if it doesn't yet exist
-                for date_item in dates:
-                    years = date_item.split("-")
-                    yearstart = years[0]
-                    yearfinish = yearstart
-                    if len(years) > 0: yearfinish = years[1]
-                    obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
-                    if obj == None:
-                        # Doesn't exist, so create it
-                        obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
-            elif path == "keywordsU":
+            #if path == "dateranges":
+            #    # TRanslate the string into a list
+            #    dates = value_lst # json.loads(value)
+            #    # Possibly add each item from the list, if it doesn't yet exist
+            #    for date_item in dates:
+            #        years = date_item.split("-")
+            #        yearstart = years[0]
+            #        yearfinish = yearstart
+            #        if len(years) > 0: yearfinish = years[1]
+            #        obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
+            #        if obj == None:
+            #            # Doesn't exist, so create it
+            #            obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
+            if path == "keywordsU":
                 # Get the list of keywords
                 user_keywords = value_lst #  json.loads(value)
                 for kw in user_keywords:
@@ -3365,6 +3368,7 @@ class Manuscript(models.Model):
                     if keyword != None:
                         # Add this keyword to the manuscript for this user
                         UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
+                # Ready
             elif path == "datasets":
                 # Walk the personal datasets
                 datasets = value_lst #  json.loads(value)
@@ -3382,6 +3386,7 @@ class Manuscript(models.Model):
                     else:
                         order = 1
                     CollectionMan.objects.create(collection=collection, manuscript=self, order=order)
+                # Ready
             elif path == "literature":
                 # Go through the items to be added
                 litrefs_full = value_lst #  json.loads(value)
@@ -3396,44 +3401,45 @@ class Manuscript(models.Model):
                     if litref != None:
                         # Create an appropriate LitrefMan object
                         obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
-            elif path == "origin":
-                if value != "" and value != "-":
-                    # THere is an origin specified
-                    origin = Origin.objects.filter(name__iexact=value).first()
-                    if origin == None:
-                        # Try find it through location
-                        origin = Origin.objects.filter(location__name__iexact=value).first()
-                    if origin == None:
-                        # Indicate that we didn't find it in the notes
-                        intro = ""
-                        if self.notes != "": intro = "{}. ".format(self.notes)
-                        self.notes = "{}Please set manually origin [{}]".format(intro, value)
-                        self.save()
-                    else:
-                        # The origin can be tied to me
-                        self.origin = origin
-                        self.save()
-                sBack = self.get_origin()
-            elif path == "provenances":
-                provenance_names = value_lst #  json.loads(value)
-                for pname in provenance_names:
-                    pname = pname.strip()
-                    # Try find this provenance
-                    prov_found = Provenance.objects.filter(name__iexact=pname).first()
-                    if prov_found == None:
-                        prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
-                    if prov_found == None:
-                        # Indicate that we didn't find it in the notes
-                        intro = ""
-                        if self.notes != "": intro = "{}. ".format(self.notes)
-                        self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
-                        self.save()
-                    else:
-                        # Make a copy of prov_found
-                        provenance = Provenance.objects.create(
-                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
-                        # Make link between provenance and manuscript
-                        ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
+                # Ready
+            #elif path == "origin":
+            #    if value != "" and value != "-":
+            #        # THere is an origin specified
+            #        origin = Origin.objects.filter(name__iexact=value).first()
+            #        if origin == None:
+            #            # Try find it through location
+            #            origin = Origin.objects.filter(location__name__iexact=value).first()
+            #        if origin == None:
+            #            # Indicate that we didn't find it in the notes
+            #            intro = ""
+            #            if self.notes != "": intro = "{}. ".format(self.notes)
+            #            self.notes = "{}Please set manually origin [{}]".format(intro, value)
+            #            self.save()
+            #        else:
+            #            # The origin can be tied to me
+            #            self.origin = origin
+            #            self.save()
+            #    sBack = self.get_origin()
+            #elif path == "provenances":
+            #    provenance_names = value_lst #  json.loads(value)
+            #    for pname in provenance_names:
+            #        pname = pname.strip()
+            #        # Try find this provenance
+            #        prov_found = Provenance.objects.filter(name__iexact=pname).first()
+            #        if prov_found == None:
+            #            prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
+            #        if prov_found == None:
+            #            # Indicate that we didn't find it in the notes
+            #            intro = ""
+            #            if self.notes != "": intro = "{}. ".format(self.notes)
+            #            self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
+            #            self.save()
+            #        else:
+            #            # Make a copy of prov_found
+            #            provenance = Provenance.objects.create(
+            #                name=prov_found.name, location=prov_found.location, note=prov_found.note)
+            #            # Make link between provenance and manuscript
+            #            ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
                 # Ready
             elif path == "external":
                 link_names = value_lst #  json.loads(value)
@@ -3636,6 +3642,10 @@ class Manuscript(models.Model):
         if self.idno != None:
             lhtml.append(self.idno)
 
+        # What if we don't have anything?
+        if len(lhtml) == 0:
+            lhtml.append("Unnamed [id={}]".format(self.id))
+
         return ", ".join(lhtml)
 
     def get_keywords_markdown(self, plain=False):
@@ -3782,27 +3792,6 @@ class Manuscript(models.Model):
                     sMprov = sProvLink
 
             lHtml.append(sMprov)
-
-            #if prov.location == None:
-            #    if plain:
-            #        mprov_html.append("<span title='{}'>{}</span>".format(sTitle, prov.name))
-            #    else:
-            #        # Create a display for this item
-            #        mprov_html.append("<a href='{}' title='{}'>{}</a>".format(
-            #            url, sTitle, prov.name))
-            #else:
-            #    if plain:
-            #        mprov_html.append("<span title='{}'>{}: {}</span>".format(
-            #            sTitle, prov.name, prov.location.name))
-            #    else:
-            #        # Create a display for this item
-            #        mprov_html.append("<a href='{}' title='{}'>{}: {}</a>".format(
-            #            url, sTitle, prov.name, prov.location.name))
-            #mprov_html.append("</span>")
-            ## COmbine...
-            #lHtml.append("".join(mprov_html))
-
-            # if not plain: lHtml.append("</tr>")
 
         if not plain: 
             if table: lHtml.append("</tbody></table>")
@@ -4731,6 +4720,18 @@ class Codico(models.Model):
     # [m] Many-to-many: one codico can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_codi")
 
+    # Scheme for downloading and uploading
+    specification = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
+        {'name': 'Title',               'type': 'field', 'path': 'name'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Support',             'type': 'field', 'path': 'support'},
+        {'name': 'Extent',              'type': 'field', 'path': 'extent'},
+        {'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        ]
+
     class Meta:
         verbose_name = "Codicological unit"
         verbose_name_plural = "Codicological units"
@@ -4763,6 +4764,181 @@ class Codico(models.Model):
         # Return the correct response
         return response
 
+    def custom_add(oCodico, **kwargs):
+        """Add a codico according to the specifications provided"""
+
+        oErr = ErrHandle()
+        manu = None
+        lst_msg = []
+
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            # First get the shelf mark
+            manu = oCodico.get('manuscript')
+            if manu == None:
+                oErr.DoError("Codico/add_one: no [manuscript] provided")
+            else:
+                # Retrieve or create a new codico with default values
+                obj = Codico.objects.filter(manuscript=manu).first()
+                if obj == None:
+                    # Doesn't exist: create it
+                    obj = Codico.objects.create(manuscript=manu, stype="imp")
+                        
+                # Process all fields in the Specification
+                for oField in Codico.specification:
+                    field = oField.get("name").lower()
+                    value = oCodico.get(field)
+                    readonly = oField.get('readonly', False)
+                    if value != None and value != "" and not readonly:
+                        path = oField.get("path")
+                        type = oField.get("type")
+                        if type == "field":
+                            # Set the correct field's value
+                            setattr(obj, path, value)
+                        elif type == "fk":
+                            fkfield = oField.get("fkfield")
+                            model = oField.get("model")
+                            if fkfield != None and model != None:
+                                # Find an item with the name for the particular model
+                                cls = apps.app_configs['seeker'].get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                if instance != None:
+                                    setattr(obj, path, instance)
+                        elif type == "func":
+                            # Set the KV in a special way
+                            obj.custom_set(path, value, **kwargs)
+
+                # Make sure the update the object
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Codico/add_one")
+        return obj
+
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            if path == "dateranges":
+                qs = self.codico_dateranges.all().order_by('yearstart')
+                dates = []
+                for obj in qs:
+                    dates.append(obj.__str__())
+                sBack = json.dumps(dates)
+            elif path == "origin":
+                sBack = self.get_origin()
+            elif path == "provenances":
+                sBack = self.get_provenance_markdown(plain=True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Codico/custom_get")
+        return sBack
+
+    def custom_getkv(self, item, **kwargs):
+        """Get key and value from the manuitem entry"""
+
+        oErr = ErrHandle()
+        key = ""
+        value = ""
+        try:
+            key = item['name']
+            if self != None:
+                if item['type'] == 'field':
+                    value = getattr(self, item['path'])
+                elif item['type'] == "fk":
+                    fk_obj = getattr(self, item['path'])
+                    if fk_obj != None:
+                        value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == 'func':
+                    value = self.custom_get(item['path'], kwargs=kwargs)
+                    # Adaptation for empty lists
+                    if value == "[]": value = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Codico/custom_getkv")
+        return key, value
+
+    def custom_set(self, path, value, **kwargs):
+        """Set related items"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+            value_lst = []
+            if isinstance(value, str) and value[0] != '[':
+                value_lst = value.split(",")
+                for idx, item in enumerate(value_lst):
+                    value_lst[idx] = value_lst[idx].strip()
+            if path == "dateranges":
+                # TRanslate the string into a list
+                dates = value_lst # json.loads(value)
+                # Possibly add each item from the list, if it doesn't yet exist
+                for date_item in dates:
+                    years = date_item.split("-")
+                    yearstart = years[0]
+                    yearfinish = yearstart
+                    if len(years) > 0: yearfinish = years[1]
+                    obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
+                    if obj == None:
+                        # Doesn't exist, so create it
+                        obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
+                # Ready
+            elif path == "origin":
+                if value != "" and value != "-":
+                    # THere is an origin specified
+                    origin = Origin.objects.filter(name__iexact=value).first()
+                    if origin == None:
+                        # Try find it through location
+                        origin = Origin.objects.filter(location__name__iexact=value).first()
+                    if origin == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually origin [{}]".format(intro, value)
+                        self.save()
+                    else:
+                        # The origin can be tied to me
+                        self.origin = origin
+                        self.save()
+                sBack = self.get_origin()
+            elif path == "provenances":
+                provenance_names = value_lst #  json.loads(value)
+                for pname in provenance_names:
+                    pname = pname.strip()
+                    # Try find this provenance
+                    prov_found = Provenance.objects.filter(name__iexact=pname).first()
+                    if prov_found == None:
+                        prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
+                    if prov_found == None:
+                        # Indicate that we didn't find it in the notes
+                        intro = ""
+                        if self.notes != "": intro = "{}. ".format(self.notes)
+                        self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
+                        self.save()
+                    else:
+                        # Make a copy of prov_found
+                        provenance = Provenance.objects.create(
+                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
+                        # Make link between provenance and codico
+                        ProvenanceCod.objects.create(codico=self, provenance=provenance)
+                # Ready
+            else:
+                # Figure out what to do in this case
+                pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Codico/custom_set")
+            bResult = False
+        return bResult
+
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
 
@@ -4791,7 +4967,7 @@ class Codico(models.Model):
         sBack = "-"
         manu = self.manuscript
         if manu != None:
-            sBack = manu.get_full_name()
+            sBack = "{}: {}".format( manu.get_full_name(), self.order)
         return sBack
 
     def get_identification(self):
@@ -4927,6 +5103,21 @@ class Codico(models.Model):
         else:
             # sBack = ", ".join(lHtml)
             sBack = "".join(lHtml)
+        return sBack
+
+    def get_sermon_count(self):
+        count = SermonDescr.objects.filter(msitem__codico=self).count()
+        return count
+
+    def get_ssg_count(self, compare_link=False, collection = None):
+        # Get a list of all SSGs related to [self]
+        ssg_list_num = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico=self).order_by('id').distinct().count()
+        if compare_link:
+            url = "{}?codico={}".format(reverse("collhist_compare", kwargs={'pk': collection.id}), self.id)
+            sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, ssg_list_num)
+        else:
+            sBack = "<span>{}</span>".format(ssg_list_num)
+        # Return the combined information
         return sBack
 
     def get_stype_light(self, usercomment=False):
@@ -7042,6 +7233,8 @@ class Collection(models.Model):
 
         # Create an empty Manuscript
         manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
+        # Figure out  what the automatically created codico is
+        codico = Codico.objects.filter(manuscript=manu).first()
         
         # Create all the sermons based on the SSGs
         msitems = []
@@ -7049,7 +7242,7 @@ class Collection(models.Model):
             order = 1
             for ssg in self.collections_super.all():
                 # Create a MsItem
-                msitem = MsItem.objects.create(manu=manu, order=order)
+                msitem = MsItem.objects.create(manu=manu, codico=codico, order=order)
                 order += 1
                 # Add it to the list
                 msitems.append(msitem)
@@ -9536,11 +9729,17 @@ class NewsItem(models.Model):
 
         # Get current time
         now = timezone.now()
-        for obj in NewsItem.objects.all():
-            if obj.until and obj.until < now:
-                # This should be set invalid
-                obj.status = "ext"
-                obj.save()
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in NewsItem.objects.all():
+                    if obj.until and obj.until < now:
+                        # This should be set invalid
+                        obj.status = "ext"
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Newsitem/check_until")
         # Return valid
         return True
 

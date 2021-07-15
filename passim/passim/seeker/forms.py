@@ -65,15 +65,15 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
-class AutypeWidget(ModelSelect2Widget):
-    model = FieldChoice
-    search_fields = [ 'english_name__icontains']
+#class AutypeWidget(ModelSelect2Widget):
+#    model = FieldChoice
+#    search_fields = [ 'english_name__icontains']
 
-    def label_from_instance(self, obj):
-        return obj.english_name
+#    def label_from_instance(self, obj):
+#        return obj.english_name
 
-    def get_queryset(self):
-        return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
+#    def get_queryset(self):
+#        return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
 
 
 class BibrefWidget(ModelSelect2MultipleWidget):
@@ -500,15 +500,15 @@ class KeywordOneWidget(ModelSelect2Widget):
         return qs
 
 
-class LibtypeWidget(ModelSelect2Widget):
-    model = FieldChoice
-    search_fields = [ 'english_name__icontains']
+#class LibtypeWidget(ModelSelect2Widget):
+#    model = FieldChoice
+#    search_fields = [ 'english_name__icontains']
 
-    def label_from_instance(self, obj):
-        return obj.english_name
+#    def label_from_instance(self, obj):
+#        return obj.english_name
 
-    def get_queryset(self):
-        return FieldChoice.objects.filter(field=LIBRARY_TYPE).order_by("english_name")
+#    def get_queryset(self):
+#        return FieldChoice.objects.filter(field=LIBRARY_TYPE).order_by("english_name")
 
 
 class LitrefWidget(ModelSelect2Widget):
@@ -1017,6 +1017,17 @@ class SignatureOtherWidget(SignatureOneWidget):
     editype = "ot"
 
 
+class ManutypeWidget(ModelSelect2Widget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
+
+
 class StypeWidget(ModelSelect2MultipleWidget):
     model = FieldChoice
     search_fields = [ 'english_name__icontains']
@@ -1278,6 +1289,8 @@ class SearchManuForm(PassimModelForm):
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
+    manutype    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
@@ -1307,23 +1320,26 @@ class SearchManuForm(PassimModelForm):
     #                                      'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
-    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", "manuidnos", "gldsiggrysons", "gldsigclavises"]
+    typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
+                  "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
+        # OLD (issue #372) 
+        # fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
+        fields = ['name', 'library', 'idno', 'url', 'stype'] 
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
+                 'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
                  #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
-                 'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
-                 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # (#372) 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 # (#372) 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 # (#372) 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # (#372) 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -1337,8 +1353,7 @@ class SearchManuForm(PassimModelForm):
             # NONE of the fields are required in the SEARCH form!
             self.fields['stype'].required = False
             self.fields['name'].required = False
-            #self.fields['yearstart'].required = False
-            #self.fields['yearfinish'].required = False
+
             self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -1347,6 +1362,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+            self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
@@ -1396,9 +1412,10 @@ class SearchManuForm(PassimModelForm):
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
-                # Look after origin
-                origin = instance.origin
-                self.fields['origname_ta'].initial = "" if origin == None else origin.name
+
+                ## Look after origin
+                #origin = instance.origin
+                #self.fields['origname_ta'].initial = "" if origin == None else origin.name
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SearchManuForm-init")
@@ -1419,6 +1436,8 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    manutype    = forms.ModelChoiceField(queryset=None, required=False, 
+                widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
@@ -1578,6 +1597,8 @@ class SermonForm(PassimModelForm):
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+
+            self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
             self.fields['free_include'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
             self.fields['free_exclude'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
