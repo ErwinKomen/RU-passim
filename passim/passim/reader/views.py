@@ -1013,7 +1013,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 if manu_obj == None:
                     # Now we can create a completely fresh manuscript
                     manu_obj = Manuscript.objects.create() 
+                    
                     manu_obj.idno = manuidno
+                    manu_obj.source = source
                 else:
                     # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)                     
                     # Retrieve the id's of the Comments linked to the manuscript
@@ -1605,16 +1607,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     
                     # Add project id to the manuscript                               
                     manu_obj.project = project
-                    
-                    #profile = Profile.get_user_profile(username) 
-                    #print(sourceinfo_url)
-                    # Create a SourceInfo object for this extraction TH werkt nog niet
-                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username)
-                    #print(source)
-                    # Add source id to the manuscript                               
-                    manu_obj.source = source
 
-                    
                     # This is probably not the best way to do this...
                     unitlibrary_id = 1160 # Bibliothèque nationale de France, Manuscrits
                     unitcity_id = 616 # Paris
