@@ -9180,29 +9180,61 @@ class ManuscriptCodico(ManuscriptDetails):
                     # Make sure to set the correct redirect page
                     self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
                 else:
-                    delete_lst = []
-                    current_lst = Reconstruction.objects.filter(manuscript=manu_id).order_by("order")
+                    # Get the actual manuscript
+                    manu = Manuscript.objects.filter(id=manu_id).first()
+                    # Get the list of codico id's (in their proper order)
                     codico_lst = json.loads(codico_str)
-                    for obj in current_lst:
-                        if obj.codico.id not in codico_lst:
-                            delete_lst.append(obj.id)
-                    # Remove those that need deletion
-                    if len(delete_lst) > 0:
-                        Reconstruction.objects.filter(id__in=delete_lst).delete()
-                    # Add and re-order
-                    order = 1
-                    with transaction.atomic():
-                        for id in codico_lst:
-                            # Check if this one is there
-                            obj = Reconstruction.objects.filter(manuscript=manu_id, codico=id).first()
-                            if obj == None:
-                                # Add it
-                                obj = Reconstruction.objects.create(manuscript=manu_id, codico=id)
-                            obj.order = order
-                            obj.save()
-                            order += 1
-                    # Make sure to set the correct redirect page
-                    self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    # Action depends on the manuscript type
+                    if manu.mtype == "rec":
+                        # This is a reconstructed manuscript
+                        delete_lst = []
+                        current_lst = Reconstruction.objects.filter(manuscript=manu_id).order_by("order")
+                        for obj in current_lst:
+                            if obj.codico.id not in codico_lst:
+                                delete_lst.append(obj.id)
+                        # Remove those that need deletion
+                        if len(delete_lst) > 0:
+                            Reconstruction.objects.filter(id__in=delete_lst).delete()
+                        # Add and re-order
+                        order = 1
+                        with transaction.atomic():
+                            for id in codico_lst:
+                                # Check if this one is there
+                                obj = Reconstruction.objects.filter(manuscript=manu_id, codico=id).first()
+                                if obj == None:
+                                    # Add it
+                                    obj = Reconstruction.objects.create(manuscript_id=manu_id, codico_id=id)
+                                obj.order = order
+                                obj.save()
+                                order += 1
+                        # Make sure to set the correct redirect page
+                        self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    else:
+                        # This is a common manuscript (or a template, but I'm not sure that should be allowed)
+                        order = 1
+                        # (1) Put the codicological units in the correct order
+                        with transaction.atomic():
+                            for id in codico_lst:
+                                # Get the codico
+                                codi = Codico.objects.filter(id=id).first()
+                                # Set the correct order
+                                codi.order = order
+                                codi.save()
+                                # Go to the next order count
+                                order += 1
+                        order = 1
+                        # (2) Put the MsItem-s in the correct order
+                        with transaction.atomic():
+                            for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
+                                msitem.order = order
+                                msitem.save()
+                                order += 1
+
+                        # Make sure to set the correct redirect page
+                        self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
+                    
+                    # FOr debugging purposes
+                    x = manu.manuscriptcodicounits.all()
             # Return positively
             return True
         except:
