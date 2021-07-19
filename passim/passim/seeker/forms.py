@@ -1491,6 +1491,7 @@ class SermonForm(PassimModelForm):
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_hc =  ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_s = forms.CharField(label=_("Collection s"), required=False,
@@ -1619,6 +1620,8 @@ class SermonForm(PassimModelForm):
                         'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple super sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_hc'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSermoWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
@@ -1627,6 +1630,7 @@ class SermonForm(PassimModelForm):
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            self.fields['collist_hc'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='hc')
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "sermo"

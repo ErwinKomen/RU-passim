@@ -4776,6 +4776,7 @@ class SermonListView(BasicList):
                 {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
@@ -4815,7 +4816,9 @@ class SermonListView(BasicList):
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'id' }, 
             {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
-            {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
+            {'filter': 'collsuper',     'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }, 
+            {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hc', 'infield': 'id' }
+            # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
@@ -6630,7 +6633,10 @@ class CollAnyEdit(BasicDetails):
                 context['url_manu'] = "{}?manu-collist_{}={}".format(url_m, abbr, instance.id)
                 context['url_sermo'] = "{}?sermo-collist_{}={}".format(url_s, abbr, instance.id)
                 context['url_gold'] = "{}?gold-collist_{}={}".format(url_sg, abbr, instance.id)
-                context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+                if self.settype == "hc":
+                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+                else:
+                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, "hc", instance.id)
 
                 sBack = render_to_string('seeker/coll_buttons.html', context, self.request)
 
