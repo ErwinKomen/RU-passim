@@ -2073,7 +2073,7 @@ def import_ead(request):
             print('import_ead: valid form') 
 
             # Create a SourceInfo object for this extraction
-            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username) 
+            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username, profile = profile) 
             source.save()
             file_list = []
 
@@ -2385,8 +2385,11 @@ class ReaderImport(View):
                     # The list of headers to be shown
                     lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
+                    # Get profile 
+                    profile = Profile.get_user_profile(username) 
+                    
                     # Create a SourceInfo object for this extraction
-                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username)
+                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
 
                     # Process the request
                     bOkay, code = self.process_files(request, source, lResults, lHeader)
@@ -2394,6 +2397,7 @@ class ReaderImport(View):
                     if bOkay:
                         # Adapt the 'source' to tell what we did 
                         source.code = code
+                        print(code)
                         source.save()
                         # Indicate we are ready
                         oStatus.set("readyclose")
@@ -2733,7 +2737,7 @@ class ReaderEad(ReaderImport):
                         else:
                             lResults.append(oResult)
             code = "Imported using the [import_ead] function on these XML files: {}".format(", ".join(file_list))
-        except:
+        except: 
             bOkay = False
             code = oErr.get_error_message()
         return bOkay, code
