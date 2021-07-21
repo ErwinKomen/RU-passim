@@ -738,7 +738,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # Make set of the list, sm_shelfmark is to be used to compare 
             # each shelfmark of each manuscript in all available A+M XML's
             shelfmark_set = set(shelfmark_list)
-            print(shelfmark_set)
+            errHandle.Status(shelfmark_set)
             
             # Make a dictionary that can be used to find out if a shelfmark has
             # been digitized or not
@@ -1075,7 +1075,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 
                 # Set the default status type
                 manu_obj.stype = STYPE_IMPORTED
-                print(manu_obj.stype)
+                errHandle.Status(manu_obj.stype)
 
                 # Add shelfmark to list of processed manuscripts                
                 lst_manus.append(manuidno)
@@ -1315,8 +1315,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             
                             # Add to the custodhist_low string
                             custodhist_low += unit_custh_3 + " "
-                            print(custodhist_low) 
-
+                            errHandle.Status(custodhist_low) 
                         else: 
                             custodhist_low = ""                                 
                     
@@ -1599,7 +1598,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                     # Create new Daterange object, store yearstart and year finish, only if there is a unitdate available.                     
                     if unit_yearstart != "":
                         drange = Daterange.objects.create(manuscript=manu_obj, yearstart = unit_yearstart, yearfinish = unit_yearfinish)
-                        print(drange)
+                        errHandle.Status(drange)
                     
                     
                     # Add id's of project, source, library, city and country to the Manuscript table.                                            
@@ -1636,7 +1635,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         for unit_p in manu.findall("./scopecontent/p"):
                             if len(unit_p) > 0: 
                                 note = ElementTree.tostring(unit_p, encoding="unicode", method='text') # Laatste is heel handig!!
-                                print(note)
+                                errHandle.Status(note)
                                 # Maybe clean string from elements and stuff
                                 # Maybe change the sequence
                                 note_1 = re.sub("[\n\s]+"," ", note)
@@ -1695,7 +1694,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                                         
                             # Third strip string of spaces 
                             scopecontent_3 = scopecontent_2.strip()
-                            print(scopecontent_3) 
+                            errHandle.Status(scopecontent_3)
 
                             # Now the combined old shelfmarks can be stored in the database in the notes field
                             # If there is no section <scopecontent> then only the ancienne cotes should be stored. 
@@ -1833,7 +1832,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                             # only when 9999 is not in sermon_yearstart
                             if sermon_yearstart != "9999":
                                 drange = Daterange.objects.create(manuscript=manu_obj, yearstart = sermon_yearstart, yearfinish = sermon_yearfinish)
-                                print(drange)
+                                errHandle.Status(drange)
                             
                             # Third: find section TITLE
                             
@@ -1857,7 +1856,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 
                             # Get rid of the last comma at the end of the string
                             sermon_title_3_total = sermon_title_comb.rstrip(", ") 
-                            # print(sermon_title_3_total)
+                            errHandle.Status(sermon_title_3_total)
                                                        
                             # Now we have the folio/head and the title we can store them in SermHead
                                                                                    
@@ -1901,7 +1900,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                                     # Maybe clean string from elements and stuff
                                     # Maybe change the sequence
                                     title = re.sub("[\n\s]+"," ", title_test)
-                                    print(title)
+                                    errHandle.Status(title)
 
                                     # Split the serm_manif_title up...
                                     # title_split_1 = serm_manif_title.split(" ")                             
@@ -2397,7 +2396,7 @@ class ReaderImport(View):
                     if bOkay:
                         # Adapt the 'source' to tell what we did 
                         source.code = code
-                        print(code)
+                        errHandle.Status(code)
                         source.save()
                         # Indicate we are ready
                         oStatus.set("readyclose")
