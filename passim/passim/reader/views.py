@@ -688,7 +688,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     """
     mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'idno'}
     oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'url':'', 'list': []}
-    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username, 'lst_obj': []}
     errHandle = ErrHandle()
     iSermCount = 0
 
@@ -1036,6 +1036,9 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                 
                 # Print the shelfmark to keep track of process during import
                 print(manuidno)  
+
+                # Add the manuscript to the list of read objects
+                oBack['lst_obj'].append(manu_obj)
                 
                 # Check if the shelfmark is registered as "not digitized"
                 if shelf_digit[manuidno] == "not_digitized":
@@ -2667,12 +2670,14 @@ class ReaderEad(ReaderImport):
                                                 filename=oResult['filename'])
                             else:
                                 # Get the results from oResult
-                                obj = oResult['obj']
-                                # Process results
-                                self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                                                name=oResult['name'], yearstart=obj.yearstart,
-                                                yearfinish=obj.yearfinish,library=obj.library.name,
-                                                idno=obj.idno,filename=oResult['filename'])
+                                lst_obj = oResult.get('lst_obj')
+                                if lst_obj != None:
+                                    for obj in lst_obj:
+                                        # Process results
+                                        self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                        name=oResult['name'], yearstart=obj.yearstart,
+                                                        yearfinish=obj.yearfinish,library=obj.library.name,
+                                                        idno=obj.idno,filename=oResult['filename'])
 
                         elif extension == "txt":
                             # Set the status
