@@ -2399,7 +2399,7 @@ class ReaderImport(View):
                     if bOkay:
                         # Adapt the 'source' to tell what we did 
                         source.code = code
-                        errHandle.Status(code)
+                        oErr.Status(code)
                         source.save()
                         # Indicate we are ready
                         oStatus.set("readyclose")
@@ -2674,10 +2674,11 @@ class ReaderEad(ReaderImport):
                                 if lst_obj != None:
                                     for obj in lst_obj:
                                         # Process results
+                                        library_name = "" if obj.library == None else obj.library.name
                                         self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                                                        name=oResult['name'], yearstart=obj.yearstart,
-                                                        yearfinish=obj.yearfinish,library=obj.library.name,
-                                                        idno=obj.idno,filename=oResult['filename'])
+                                                        name=obj.name, yearstart=obj.yearstart,
+                                                        yearfinish=obj.yearfinish,library=library_name,
+                                                        idno=obj.idno,filename=filename)
 
                         elif extension == "txt":
                             # Set the status
