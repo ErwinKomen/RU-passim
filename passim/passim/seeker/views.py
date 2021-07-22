@@ -10949,7 +10949,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # And in all cases: make sure we redirect to the 'clean' GET page
                 self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
-            else:
+            elif instance != None and instance.id != None:
                 context['sections'] = []
 
                 # Lists of related objects
@@ -11100,6 +11100,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 lHtml = []
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])
+                if context['object'] == None:
+                    context['object'] = instance
                 lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
                 context['after_details'] = "\n".join(lHtml)
 
