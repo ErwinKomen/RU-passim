@@ -161,12 +161,13 @@ class EqualGoldOverlap(BasicPart):
                 ssg_link[src].append(dst)
 
             # Create the overlap network
-            node_list, link_list, max_value = self.do_overlap(ssg_link, networkslider)
+            node_list, link_list, max_value, max_group = self.do_overlap(ssg_link, networkslider)
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
                                    max_value=max_value,
+                                   max_group=max_group,
                                    networkslider=networkslider,
                                    legend="SSG overlap network")
             
@@ -198,6 +199,7 @@ class EqualGoldOverlap(BasicPart):
         node_set = {}
         link_set = {}
         max_value = 0
+        max_group = 1
         oErr = ErrHandle()
 
         try:
@@ -251,12 +253,15 @@ class EqualGoldOverlap(BasicPart):
             for oItem in link_list:
                 value = oItem['value']
                 if value > max_value: max_value = value
+            for oItem in node_list:
+                group = oItem['group']
+                if group > max_group: max_group = group
             
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldOverlap/do_overlap")
 
-        return node_list, link_list, max_value
+        return node_list, link_list, max_value, max_group
 
 
 class EqualGoldTrans(BasicPart):
@@ -340,6 +345,7 @@ class EqualGoldTrans(BasicPart):
         
         The @min_value is the minimum link-value the user wants to see
         """
+
         oErr = ErrHandle()
         author_dict = {}
         node_list = []
@@ -370,8 +376,6 @@ class EqualGoldTrans(BasicPart):
                     title = code.split(" ")[1]
                 # Get the Signature that is most appropriate
                 sig = get_ssg_sig(ssg_id)
-                #sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
-                #sig = "" if sig_obj == None else sig_obj.code
 
                 # Add author to dictionary
                 if not category in author_dict: author_dict[category] = 0

@@ -1787,6 +1787,7 @@ var ru = (function ($, ru) {
             color,    // D3 color scheme
             grayrange,  // D3 gray color
             widthrange, // D3 width range
+            colrange,   // D3 color range (attempt) for node coloring
             factor,
             width,
             height,
@@ -1796,6 +1797,7 @@ var ru = (function ($, ru) {
             count,
             max_width = 2,
             max_value = 1,
+            max_group = 1,
             bDoTransform = true,
             maxcount = 0,
             gravityvalue = 100,
@@ -1826,14 +1828,24 @@ var ru = (function ($, ru) {
           factor = options['factor'];
           degree = options['degree'];
           max_value = options['max_value'];
+          max_group = options['max_group'];
 
           // Create a grayscale color range
           grayrange = d3.scaleLinear()
             .domain([1, max_value])
             .range(["#999", "000"]);
+
           widthrange = d3.scaleLinear()
             .domain([1, max_value])
             .range([1, max_width]);
+
+          //colrange = d3.scaleQuantile()
+          //  .range(["#fe433c", "#f31d64", "#a224ad", "#6a38b3", "#3c50b1", "#0095ef"])
+          //  .domain([1, max_group]);
+
+          colrange = d3.scaleLinear()
+            .range(["red", "darkblue"])
+            .domain([1, max_group]);
 
           // Calculate the maxcount within the nodes 'scount' feature
           for (i = 0; i < options['nodes'].length; i++) {
@@ -2187,7 +2199,8 @@ var ru = (function ($, ru) {
 
           function network_color(d) {
             var col_result = "";
-            col_result = scale(d.group);
+            // col_result = scale(d.group);
+            col_result = colrange(d.group);
             return col_result;
           }
 
@@ -6120,6 +6133,7 @@ var ru = (function ($, ru) {
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
                   options['max_value'] = max_value;
+                  options['max_group'] = response.max_group;
 
                   loc_network_options = options;
 
