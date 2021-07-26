@@ -4817,7 +4817,7 @@ class SermonListView(BasicList):
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'id' }, 
             {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
             {'filter': 'collsuper',     'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }, 
-            {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hc', 'infield': 'id' }
+            {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'id' }
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
@@ -6629,14 +6629,16 @@ class CollAnyEdit(BasicDetails):
             elif instance.type == "super":
                 # collection of SSG
                 abbr = "ssg"
+                if self.settype == "hc": abbr = "hist"
             if url_m != None and url_s != None and url_sg != None and url_ssg != None and abbr != None:
                 context['url_manu'] = "{}?manu-collist_{}={}".format(url_m, abbr, instance.id)
                 context['url_sermo'] = "{}?sermo-collist_{}={}".format(url_s, abbr, instance.id)
                 context['url_gold'] = "{}?gold-collist_{}={}".format(url_sg, abbr, instance.id)
-                if self.settype == "hc":
-                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
-                else:
-                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, "hc", instance.id)
+                context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+                #if self.settype == "hc":
+                #    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, "hc", instance.id)
+                #else:
+                #    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
 
                 sBack = render_to_string('seeker/coll_buttons.html', context, self.request)
 
@@ -10132,6 +10134,7 @@ class SermonGoldListView(BasicList):
         {"name": "Sermon",          "id": "filter_collsermo",   "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon Gold",     "id": "filter_collgold",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Super sermon gold","id": "filter_collsuper",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Historical",      "id": "filter_collhist",    "enabled": False, "head_id": "filter_collection"},
         ]       
     searches = [
         {'section': '', 'filterlist': [
@@ -10151,7 +10154,9 @@ class SermonGoldListView(BasicList):
             {'filter': 'collmanu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
             {'filter': 'collsermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
             {'filter': 'collgold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' } 
+            {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
+            {'filter': 'collhist',  'fkfield': 'equal__collections',                            
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
             ]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
