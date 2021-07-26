@@ -1785,6 +1785,8 @@ var ru = (function ($, ru) {
         var svg,      // the SVG element within the DOM that is being used
             divSvg,   // The target svg div
             color,    // D3 color scheme
+            grayrange,  // D3 gray color
+            widthrange, // D3 width range
             factor,
             width,
             height,
@@ -1792,6 +1794,8 @@ var ru = (function ($, ru) {
             calcH,
             i,
             count,
+            max_width = 2,
+            max_value = 1,
             bDoTransform = true,
             maxcount = 0,
             gravityvalue = 100,
@@ -1821,6 +1825,15 @@ var ru = (function ($, ru) {
           height = options['height'];
           factor = options['factor'];
           degree = options['degree'];
+          max_value = options['max_value'];
+
+          // Create a grayscale color range
+          grayrange = d3.scaleLinear()
+            .domain([1, max_value])
+            .range(["#999", "000"]);
+          widthrange = d3.scaleLinear()
+            .domain([1, max_value])
+            .range([1, max_width]);
 
           // Calculate the maxcount within the nodes 'scount' feature
           for (i = 0; i < options['nodes'].length; i++) {
@@ -1866,10 +1879,6 @@ var ru = (function ($, ru) {
               .force("collide", d3.forceCollide(d => 65).radius(function (d) {
                 return get_height(d) + 1;
               }).iterations(3))
-              // .force("collision", rectCollide().size(function (d) {
-              //  return [get_width(d), get_height(d)];
-              //}))
-              //.nodes(options['nodes']);
               .on("tick", ticked);
           
           if (bDoTransform) {
@@ -1886,8 +1895,12 @@ var ru = (function ($, ru) {
                     .selectAll("line")
                     .data(options['links'])
                     .join("line")
+                    .attr("stroke", function (d) {
+                      return grayrange(d.value);
+                    })
                     .attr("stroke-width", function (d) {
-                      return Math.sqrt(2 * d.value);
+                      // return (max_width * d.value / max_value);
+                      return widthrange(d.value);
                     });
           node = g.append("g")
                     .attr("class", "nodes")
@@ -1953,7 +1966,12 @@ var ru = (function ($, ru) {
             g.attr("transform", event.transform);
 
             link.style("stroke-width", function (d) {
-              return Math.sqrt(2 * d.value);
+              // return (max_width * d.value / max_value);
+              return widthrange(d.value);
+            });
+
+            link.style("stroke", function (d) {
+              return grayrange(d.value);
             });
 
             // Make sure that the circle retain their size by dividing by the scale factor
@@ -1997,9 +2015,11 @@ var ru = (function ($, ru) {
 
             node.attr("transform", function (d) {
               var radius = 10, ix, iy;
-              if (d.scount !== undefined) { radius = get_radius(d); }
-              ix = Math.max(radius, Math.min(width - radius, d.x));
-              iy = Math.max(radius, Math.min(height - radius, d.y));
+              //if (d.scount !== undefined) { radius = get_radius(d); }
+              //ix = Math.max(radius, Math.min(width - radius, d.x));
+              //iy = Math.max(radius, Math.min(height - radius, d.y));
+              ix = d.x;
+              iy = d.y;
               return `translate(${ix},${iy})`
             });
 
@@ -6099,6 +6119,7 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['max_value'] = max_value;
 
                   loc_network_options = options;
 
