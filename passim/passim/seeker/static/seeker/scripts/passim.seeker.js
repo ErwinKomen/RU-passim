@@ -1901,6 +1901,23 @@ var ru = (function ($, ru) {
               .on("zoom", zoomed));
           }
 
+          // Define arrow heads
+          g.append("defs").selectAll("marker")
+            .data(["arrow_uses"])
+            .enter().append("marker")
+            .attr("id", function (d) {
+              return d;
+            })
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 18)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("fill", "black")
+            .attr("d", 'M0,-5L10,0L0,5');
+
           // Define a d3 function based on the information in 'nodes' and 'links'
           link = g.append("g")
                     .attr("class", "links")
@@ -1913,6 +1930,10 @@ var ru = (function ($, ru) {
                     .attr("stroke-width", function (d) {
                       // return (max_width * d.value / max_value);
                       return widthrange(d.value);
+                    })
+                    .attr("marker-end", function (d) {
+                      var m = ru.passim.seeker.overlap_marker_end(d);
+                      return m;
                     });
           node = g.append("g")
                     .attr("class", "nodes")
@@ -6072,6 +6093,40 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * network_overlap_option
+       *   Set or clear a network graph option
+       *
+       */
+      network_overlap_option: function (elStart, type) {
+        var status = elStart.checked;
+
+        try {
+          loc_network_options[type] = status;
+          // Redraw
+          ru.passim.seeker.network_overlap(elStart);
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_option", ex);
+        }
+      },
+
+      /**
+       * network_graph_option
+       *   Set or clear a network graph option
+       *
+       */
+      overlap_marker_end: function (d) {
+        try {
+          if (loc_network_options['overlap_direction'] === true) {
+            return "url(#arrow_uses)";
+          } else {
+            return "";
+          }
+        } catch (ex) {
+          private_methods.errMsg("overlap_marker_end", ex);
+        }
+      },
+
+      /**
        * network_overlap
        *   Create and show a SSG-overlap network
        *
@@ -6135,7 +6190,15 @@ var ru = (function ($, ru) {
                   options['max_value'] = max_value;
                   options['max_group'] = response.max_group;
 
-                  loc_network_options = options;
+                  // Copy from [options] to [loc]
+                  for (var key in options) {
+                    loc_network_options[key] = options[key];
+                  }
+                  // COpy from [loc] to [options]
+                  for (var key in loc_network_options) {
+                    options[key] = loc_network_options[key];
+                  }
+                  // loc_network_options = options;
 
                   // Use D3 to draw a force-directed network
                   private_methods.draw_network_overlap(options);
