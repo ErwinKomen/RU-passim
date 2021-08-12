@@ -20,7 +20,7 @@ from passim.seeker.views import *
 from passim.seeker.visualizations import *
 from passim.reader.views import *
 from passim.enrich.views import *
-from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -95,6 +95,7 @@ urlpatterns = [
     url(r'^manuscript/download(?:/(?P<pk>\d+))?/$', ManuscriptDownload.as_view(), name='manuscript_download'),
     url(r'^manuscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
+    url(r'^manuscript/import/galway/$', ManuscriptUploadGalway.as_view(), name='manuscript_upload_galway'),
     url(r'^manuscript/codico/$', ManuscriptCodico.as_view(), name='manuscript_codico'),
 
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),

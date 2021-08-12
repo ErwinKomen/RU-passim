@@ -3073,6 +3073,9 @@ class Manuscript(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
 
+    # [0-1] A manuscript may have an ID from the database from which it was read
+    external = models.IntegerField("ID in external DB", null=True)
+
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     #     The third alternative is: a reconstruction
     #     So the options: 'man', 'tem', 'rec'
@@ -3110,19 +3113,15 @@ class Manuscript(models.Model):
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
-        #{'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        #{'name': 'Support',             'type': 'field', 'path': 'support'},
-        #{'name': 'Extent',              'type': 'field', 'path': 'extent'},
-        #{'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        # {'name': 'Origin',              'type': 'func',  'path': 'origin'},
-        # {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
         {'name': 'Notes',               'type': 'field', 'path': 'notes'},
-        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        {'name': 'Url',                 'type': 'field', 'path': 'url'},
+        {'name': 'External id',         'type': 'field', 'path': 'external'},
+        {'name': 'External links',      'type': 'func',  'path': 'external_links'},
         ]
 
     def __str__(self):
@@ -3275,12 +3274,7 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
-            #if path == "dateranges":
-            #    qs = self.manuscript_dateranges.all().order_by('yearstart')
-            #    dates = []
-            #    for obj in qs:
-            #        dates.append(obj.__str__())
-            #    sBack = json.dumps(dates)
+
             if path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
@@ -3289,10 +3283,6 @@ class Manuscript(models.Model):
                 sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
             elif path == "literature":
                 sBack = self.get_litrefs_markdown(plain=True)
-            #elif path == "origin":
-            #    sBack = self.get_origin()
-            #elif path == "provenances":
-            #    sBack = self.get_provenance_markdown(plain=True)
             elif path == "external":
                 sBack = self.get_external_markdown(plain=True)
             elif path == "brefs":
@@ -3346,19 +3336,6 @@ class Manuscript(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
-            #if path == "dateranges":
-            #    # TRanslate the string into a list
-            #    dates = value_lst # json.loads(value)
-            #    # Possibly add each item from the list, if it doesn't yet exist
-            #    for date_item in dates:
-            #        years = date_item.split("-")
-            #        yearstart = years[0]
-            #        yearfinish = yearstart
-            #        if len(years) > 0: yearfinish = years[1]
-            #        obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
-            #        if obj == None:
-            #            # Doesn't exist, so create it
-            #            obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
             if path == "keywordsU":
                 # Get the list of keywords
                 user_keywords = value_lst #  json.loads(value)
@@ -3401,45 +3378,6 @@ class Manuscript(models.Model):
                     if litref != None:
                         # Create an appropriate LitrefMan object
                         obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
-                # Ready
-            #elif path == "origin":
-            #    if value != "" and value != "-":
-            #        # THere is an origin specified
-            #        origin = Origin.objects.filter(name__iexact=value).first()
-            #        if origin == None:
-            #            # Try find it through location
-            #            origin = Origin.objects.filter(location__name__iexact=value).first()
-            #        if origin == None:
-            #            # Indicate that we didn't find it in the notes
-            #            intro = ""
-            #            if self.notes != "": intro = "{}. ".format(self.notes)
-            #            self.notes = "{}Please set manually origin [{}]".format(intro, value)
-            #            self.save()
-            #        else:
-            #            # The origin can be tied to me
-            #            self.origin = origin
-            #            self.save()
-            #    sBack = self.get_origin()
-            #elif path == "provenances":
-            #    provenance_names = value_lst #  json.loads(value)
-            #    for pname in provenance_names:
-            #        pname = pname.strip()
-            #        # Try find this provenance
-            #        prov_found = Provenance.objects.filter(name__iexact=pname).first()
-            #        if prov_found == None:
-            #            prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
-            #        if prov_found == None:
-            #            # Indicate that we didn't find it in the notes
-            #            intro = ""
-            #            if self.notes != "": intro = "{}. ".format(self.notes)
-            #            self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
-            #            self.save()
-            #        else:
-            #            # Make a copy of prov_found
-            #            provenance = Provenance.objects.create(
-            #                name=prov_found.name, location=prov_found.location, note=prov_found.note)
-            #            # Make link between provenance and manuscript
-            #            ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
                 # Ready
             elif path == "external":
                 link_names = value_lst #  json.loads(value)
@@ -4926,9 +4864,9 @@ class Codico(models.Model):
                     else:
                         # Make a copy of prov_found
                         provenance = Provenance.objects.create(
-                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
+                            name=prov_found.name, location=prov_found.location)
                         # Make link between provenance and codico
-                        ProvenanceCod.objects.create(codico=self, provenance=provenance)
+                        ProvenanceCod.objects.create(codico=self, provenance=provenance, note="Automatically added Codico/custom_getkv")
                 # Ready
             else:
                 # Figure out what to do in this case
@@ -7329,6 +7267,20 @@ class MsItem(models.Model):
     def delete(self, using = None, keep_parents = False):
         # Keep track of manuscript
         manu = self.manu
+        # Re-arrange anything pointing to me
+        # (1) My children
+        for child in self.sermon_parent.all():
+            child.parent = self.parent
+            child.save()
+        # (2) A preceding pointing to me
+        for prec in self.sermon_next.all():
+            prec.next = self.next
+            prec.save()
+        # (3) Anything above me of whom I am firstchild
+        for ance in self.sermon_child.all():
+            ance.firstchild = self.firstchild
+            ance.save()
+
         # Perform deletion
         response = super(MsItem, self).delete(using, keep_parents)
         # Re-calculate order
@@ -7788,11 +7740,13 @@ class SermonDescr(models.Model):
         return bResult
 
     def delete(self, using = None, keep_parents = False):
-        # First remove my msitem, if I have one
-        if self.msitem != None:
-            self.msitem.delete()
+        # Keep track of the msitem, if I have one
+        msitem = self.msitem
         # Regular delete operation
         response = super(SermonDescr, self).delete(using, keep_parents)
+        # Now delete the msitem, if it is there
+        if msitem != None:
+            msitem.delete()
         return response
 
     def do_distance(self, bForceUpdate = False):

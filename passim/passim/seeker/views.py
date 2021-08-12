@@ -9357,9 +9357,14 @@ class ManuscriptListView(BasicList):
     def initializations(self):
         # Possibly add to 'uploads'
         bHasExcel = False
+        bHasGalway = False
         for item in self.uploads:
             if item['title'] == "excel":
                 bHasExcel = True
+            elif item['title'] == "galway":
+                bHasGalway = True
+
+        # Should excel be added?
         if not bHasExcel:
             # Add a reference to the Excel upload method
             oExcel = dict(title="excel", label="Excel",
@@ -9367,6 +9372,15 @@ class ManuscriptListView(BasicList):
                           type="multiple",
                           msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
+
+        # Should galway be added?
+        if not bHasGalway:
+            # Add a reference to the Excel upload method
+            oGalway = dict(title="galway", label="Galway",
+                          url=reverse('manuscript_upload_galway'),
+                          type="multiple",
+                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oGalway)
 
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
