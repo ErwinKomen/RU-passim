@@ -34,7 +34,7 @@ import requests
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 
-from passim.seeker.models import Manuscript, SermonDescr, Profile, Report, Codico
+from passim.seeker.models import Manuscript, SermonDescr, Profile, Report, Codico, Location, LocationType, Library
 from passim.seeker.views import app_editor
 from passim.reader.views import ReaderImport
 from passim.reader.forms import UploadFileForm
@@ -239,12 +239,34 @@ class ManuscriptUploadGalway(ReaderImport):
         bOkay = True
         code = ""
         oStatus = self.oStatus
+        # The list of headers to be shown
+        lHeader = ['status', 'msg', 'name', 'daterange', 'library', 'idno', 'url']
+
+        def add_manu(lst_manual, lst_read, status="", msg="", user="", name="", url="", daterange="", 
+                     library="", filename="", sermons="", idno=""):
+            oInfo = {}
+            oInfo['status'] = status
+            oInfo['msg'] = msg
+            oInfo['user'] = user
+            oInfo['name'] = name
+            oInfo['url'] = url
+            oInfo['daterange'] = daterange
+            oInfo['library'] = library
+            oInfo['idno'] = idno
+            oInfo['filename'] = filename
+            oInfo['sermons'] = sermons
+            if status == "error":
+                lst_manual.append(oInfo)
+            else:
+                lst_read.append(oInfo)
+            return True
+
         try:
             # Make sure we have the username
             username = self.username
             profile = Profile.get_user_profile(username)
             team_group = app_editor
-            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'source': source}
 
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
@@ -268,7 +290,7 @@ class ManuscriptUploadGalway(ReaderImport):
                         lst_read = []
 
                         # Further processing depends on the extension
-                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username, 'filename': filename}
 
                         if extension == "csv":
                             # This is a CSV file. We expect the catalogue id's to be in the leftmost column
@@ -295,18 +317,35 @@ class ManuscriptUploadGalway(ReaderImport):
                                     if cell_value != None and cell_value != "":
                                         # Get the catalogue id
                                         catalogue_id = int(cell_value)
+
+                                        # Set the status
+                                        oStatus.set("reading", msg="catalogue id={}".format(catalogue_id))
+
+                                        # Clear the galway and codico objects
+                                        oGalway = None
+                                        oCodico = None
+
                                         # Read the manuscript object from the Galway site
                                         oGalway = self.get_galway(catalogue_id)
                                         # Extract Manuscript information and Codico information from [oGalway]
                                         oManu, oCodico = self.get_manucodico(oGalway)
 
                                         if oManu != None and oCodico != None:
-                                            # Add manuscript (if not yet there)
+                                            libname = "{}, {}, {}".format(oManu['country_name'], oManu['city_name'], oManu['library_name'])
 
+                                            # Add manuscript (if not yet there)
                                             manu = Manuscript.custom_add(oManu, **kwargs)
 
-                                            # Make sure to add the source
+                                            if manu.library == None:
+                                                # Log that the library is not recognized
+                                                oErr.Status("Library not recognized: {}".format(libname))
+                                                # Also add this in the notes
+                                                notes = "" if manu.notes == None else manu.notes
+                                                manu.notes = "Library not found: {}  \n{}".format(libname, notes)
+
+                                            # Make sure to add the source and the RAW data
                                             manu.source = source
+                                            manu.raw = json.dumps(oGalway, indent=2)
                                             manu.save()
 
                                             # Now get the codicological unit that has been automatically created and adapt it
@@ -315,9 +354,18 @@ class ManuscriptUploadGalway(ReaderImport):
                                                 oCodico['manuscript'] = manu
                                                 codico = Codico.custom_add(oCodico, **kwargs)
 
+                                            # Process results
+                                            add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                            name=codico.name, daterange=oCodico['date ranges'],
+                                                            library=libname, filename=manu.idno, sermons=0,
+                                                            idno=manu.idno)
+
                                             oResult['count'] += 1
-                                            oResult['obj'] = manu
-                                            oResult['name'] = manu.idno
+                                            #oResult['obj'] = manu
+                                            #oResult['name'] = manu.idno
+
+                                            oResultManu = dict(name=manu.idno, filename=oManu['url'], sermons=0)
+                                            lResults.append(oResultManu)
 
 
                         # Create a report and add it to what we return
@@ -333,6 +381,9 @@ class ManuscriptUploadGalway(ReaderImport):
             
             # Make sure we have a success message available
             code = "Imported using the [import_galway] function on this file: {}".format(", ".join(file_list))
+
+            # Indicate we are ready
+            oStatus.set("ready")
         except:
             bOkay = False
             code = oErr.get_error_message()
@@ -379,27 +430,86 @@ class ManuscriptUploadGalway(ReaderImport):
             oManu = {}
             oCodico = {}
             oGalwayItem = oGalway['item']
+            city = None
+            country = None
+            library = None
 
-            # Load the manuscript values
-            oManu['country'] = oGalwayItem['shelfmarks'][0]['library']['country']
-            oManu['city'] = oGalwayItem['shelfmarks'][0]['library']['city']
-            oManu['library'] = oGalwayItem['shelfmarks'][0]['library']['library']
-            oManu['shelf mark'] = oGalwayItem['shelfmarks'][0]['shelfmark']
-            oManu['title'] = oGalwayItem['contents']
-            oManu['notes'] = "Script commentary: {}  \nLibrary: {}/ {}/ {}".format(
-               oGalwayItem['script_commentary'], oGalwayItem['shelfmarks'][0]['library']['country'],
-               oGalwayItem['shelfmarks'][0]['library']['city'], oGalwayItem['shelfmarks'][0]['library']['library'])
-            oManu['url'] = oGalwayItem['data_url']
+            loctype_country = LocationType.objects.filter(name="country").first()
+            loctype_city= LocationType.objects.filter(name="city").first()
+
+            # Start with admin notes
+            oManu['notes'] = oGalwayItem['admin_notes']
+
+            # Check for shelf marks
+            shelf_history = ""
+            shelfmark = None
+            oLibrary = None
+            for oShelfmark in oGalwayItem['shelfmarks']:
+                shelfmark = oShelfmark['shelfmark']
+                oLibrary = oShelfmark['library']
+                if oLibrary != "" and oLibrary != None:
+                    country = oLibrary['country']
+                    city = oLibrary['city']
+                    library = oLibrary['library']
+                    shelfmark = "{}, {}, {}, {}".format(country, city, library, shelfmark)
+                shelf_history = "{}  \nshelfmark: {}".format(shelf_history, shelfmark)
+            shelfcount = len(oGalwayItem['shelfmarks'])
+            if shelfcount > 1:
+                # Add the history to notes
+                oManu['notes'] = "{}  \n{}".format(oManu['notes'], shelf_history)
+
+            # Load the values of the *LAST* shelfmark
+            if shelfmark != None and oLibrary != None:
+                # Set the final shelf mark
+                oManu['shelf mark'] = shelfmark
+
+                # derive country/city/library
+                oManu['country_name'] = oLibrary['country']
+                oManu['city_name'] = oLibrary['city']
+                oManu['library_name'] = oLibrary['library']
+
+                # Try get the country id
+                country = Location.objects.filter(loctype=loctype_country, name__iexact=oManu['country_name']).first()
+                if country != None: 
+                    oManu['country id'] = country.id
+
+                    # Try to get the city, restricted to the country
+                    city = Location.objects.filter(loctype=loctype_city,
+                                                   name__iexact=oManu['city_name'],
+                                                   lcountry=country).first()
+                    if city != None:
+                        oManu['city id'] = city.id
+
+                        # Try to get the library, restricted to city
+                        library = Library.objects.filter(name__iexact = oManu['library_name'],
+                                                          lcountry=country, lcity=city).first()
+                        if library != None:
+                            oManu['library id'] = library.id
+
+            oManu['notes'] = "{}  \nScript commentary: {}".format(oManu['notes'],
+               oGalwayItem['script_commentary'])
+            oManu['url'] = oGalwayItem['public_url']
             oManu['external id'] = oGalwayItem['id']
-            oManu['external links'] = oGalwayItem['facsimile_url']
+            lExternal = []
+            dataurl = oManu.get('url')
+            facsimile = oGalwayItem.get('facsimile_url')
+            if dataurl != None and dataurl != "": lExternal.append(dataurl)
+            if facsimile != None and facsimile != "": lExternal.append(facsimile)
+            oManu['external links'] = lExternal
 
             # Load the codico values
-            #oCodico['title'] = oGalwayItem['']
+            oCodico['title'] = oGalwayItem['contents']
             oCodico['date ranges'] = "{}-{}".format(oGalwayItem['numerical_date_start'], oGalwayItem['numerical_date_end'])
             oCodico['support'] = oGalwayItem['support']
+            oCodico['provenances'] = oGalwayItem['provenance']
+
+            # Note: extent and format are not provided:
             #oCodico['extent'] = oGalwayItem['']
             #oCodico['format'] = oGalwayItem['']
-            oCodico['provenances'] = oGalwayItem['provenance']
+
+            # Debugging
+            provenances_txt = oCodico['provenances']
+            # oErr.Status("document [{}] provenances: {}".format(oManu['shelf mark'], oCodico['provenances']))
         except:
             msg = oErr.get_error_message()
             oErr.DoError("get_manucodico")

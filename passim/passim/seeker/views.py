@@ -2433,6 +2433,8 @@ def passim_get_history(instance):
             description = "Delete"
         elif obj['actiontype'] == "change":
             description = "Changes"
+        elif obj['actiontype'] == "import":
+            description = "Import Changes"
         if 'changes' in obj:
             lchanges = []
             for key, value in obj['changes'].items():
@@ -8529,7 +8531,7 @@ class ManuscriptEdit(BasicDetails):
                 # Possibly append notes view
                 if user_is_ingroup(self.request, app_editor):
                     context['mainitems'].append(
-                        {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+                        {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
 
                 # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
@@ -8694,7 +8696,7 @@ class ManuscriptEdit(BasicDetails):
         lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
         lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
         lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
-        lkv.append(dict(label="Notes", value=codico.notes))
+        lkv.append(dict(label="Notes", value=codico.get_notes_markdown()))
         return lkv
 
     def get_codiprovenance_markdown(self, codico):
@@ -9438,9 +9440,11 @@ class ManuscriptListView(BasicList):
                 sTitle = lib      
         elif custom == "name":
             html.append("<span class='manuscript-idno'>{}</span>".format(instance.idno))
-            if instance.name:
-                html.append("<span class='manuscript-title'>| {}</span>".format(instance.name[:100]))
-                sTitle = instance.name
+            # THe name should come from the codico unit!!!
+            codico = Codico.objects.filter(manuscript=instance).first()
+            if codico != None and codico.name != None:
+                html.append("<span class='manuscript-title'>| {}</span>".format(codico.name[:100]))
+                sTitle = codico.name
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
@@ -9815,7 +9819,7 @@ class CodicoEdit(BasicDetails):
             # Possibly append notes view
             if user_is_ingroup(self.request, app_editor):
                 context['mainitems'].append(
-                    {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+                    {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
 
             # Signal that we have select2
             context['has_select2'] = True
