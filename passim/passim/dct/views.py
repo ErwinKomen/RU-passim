@@ -216,6 +216,7 @@ class ResearchSetListView(BasicList):
     has_select2 = True
     bUseFilter = True
     prefix = "rset"
+    plural_name = "DCT tool page"
     new_button = True
     use_team_group = True
     order_cols = ['name', 'saved']
@@ -338,6 +339,7 @@ class ResearchSetDetails(ResearchSetEdit):
     """The HTML variant of [ResearchSetEdit]"""
 
     rtype = "html"
+    listviewtitle = "DCT tool page"
     
     def custom_init(self, instance):
         if instance != None:
