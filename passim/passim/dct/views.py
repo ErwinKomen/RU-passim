@@ -531,14 +531,28 @@ class ResearchSetDetails(ResearchSetEdit):
 
         if type == "manu":
             if custom == "title":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+                url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                    url, instance.get_city(), instance.get_library(), instance.idno)
             elif custom == "size":
                 # Get the number of SSGs related to items in this manuscript
                 count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
                 sBack = "{}".format(count)
         elif type in collection_types:
             if custom == "title":
-                sBack = "none" if instance is None else instance.name
+                sTitle = "none"
+                if instance is None:
+                    sBack = sTitle
+                else:
+                    if type == "hist":
+                        url = reverse("collhist_details", kwargs={'pk': instance.id})
+                    else:
+                        if instance.scope == "publ":
+                            url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                        else:
+                            url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                    title = instance.name
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
             elif custom == "size":
                 # Get the number of SSGs related to items in this collection
                 count = "-1" if instance is None else instance.super_col.count()
