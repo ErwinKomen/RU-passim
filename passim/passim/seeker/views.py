@@ -649,38 +649,6 @@ def guide(request):
 
     return render(request,template_name, context)
 
-def mypassim(request):
-    """Renders the MyPassim page (=PRE)."""
-    assert isinstance(request, HttpRequest)
-    # Specify the template
-    template_name = 'mypassim.html'
-    context =  {'title':'My Passim',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
-    context = get_application_context(request, context)
-
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
-
-    return render(request,template_name, context)
-
-def dct_tool(request):
-    """Renders the DCT tool page."""
-    assert isinstance(request, HttpRequest)
-    # Specify the template
-    template_name = 'dct_tool.html'
-    context =  {'title':'DCT tool',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
-    context = get_application_context(request, context)
-
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "DCT Tool", True)
-
-    return render(request,template_name, context)
-
 def bibliography(request):
     """Renders the more page."""
     assert isinstance(request, HttpRequest)

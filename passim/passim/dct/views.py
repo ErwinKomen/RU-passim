@@ -8,7 +8,7 @@ DCT = Dynamic Comparative Table
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import login, authenticate
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
 from django.urls import reverse
@@ -22,10 +22,12 @@ import json
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails
+from passim.seeker.views import get_application_context, get_breadcrumbs
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList
 from passim.dct.forms import ResearchSetForm
+
 
 def manuscript_ssgs(manu, bDebug = False):
     """Get the ordered list of SSGs related to a manuscript"""
@@ -206,6 +208,30 @@ def test_dct(request):
     sHtml = render_to_string(template_name, context, request)
     response = HttpResponse(sHtml)
     return response
+
+# =================== MY OWN DCT pages ===============
+def mypassim(request):
+    """Renders the MyPassim page (=PRE)."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'mypassim.html'
+    context =  {'title':'My Passim',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context = get_application_context(request, context)
+
+    profile = Profile.get_user_profile(request.user.username)
+    context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
+
+    return render(request,template_name, context)
+
+
+
+# =================== Model views for the DCT ========
 
 
 class ResearchSetListView(BasicList):
