@@ -194,8 +194,10 @@
                              onclick="ru.basic.related_cancel(this);">Cancel</a>
                           <a class="btn btn-xs jumbo-4" title="Save changes" 
                              onclick="ru.basic.related_save(this, '{{related.prefix}}', 'save');">Save</a>
+                          {% if related.saveasbutton %}
                           <a class="btn btn-xs jumbo-4" title="Save changes to a new {{titlesg}}" 
                              onclick="ru.basic.related_save(this, '{{related.prefix}}', 'savenew');">Save as...</a>
+                          {% endif %}
                         </span>
                       {% endif %}
                     </h4>

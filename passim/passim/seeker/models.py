@@ -3632,6 +3632,25 @@ class Manuscript(models.Model):
 
         return ", ".join(lhtml)
 
+    def get_full_name_html(self, field1="city", field2="library", field3="idno"):
+        oBack = {field1: '', field2: '', field3: ''}
+        # (1) City
+        if self.lcity != None:
+            oBack[field1] = self.lcity.name
+        elif self.library != None:
+            oBack[field1] = self.library.lcity.name
+        # (2) Library
+        if self.library != None:
+            oBack[field2] = self.library.name
+        # (3) Idno
+        if self.idno != None:
+            oBack[field3] = self.idno
+        else:
+            # What if we don't have anything?
+            oBack[field3] = "Unnamed [id={}]".format(self.id)
+
+        return oBack
+
     def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
@@ -5894,6 +5913,20 @@ class EqualGold(models.Model):
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
         return sBack
 
+    def get_goldsig_dct(self):
+        """Get the best signature according to DCT rules"""
+
+        sBack = ""
+        first = None
+        editype_preferences = ['gr', 'cl', 'ot']
+        for editype in editype_preferences:
+            siglist = Signature.objects.filter(gold__equal=self, editype=editype).order_by('code').values('code')
+            if len(siglist) > 0:
+                code = siglist[0]['code']
+                sBack = "{}: {}".format(editype, code)
+                break
+        return sBack
+    
     def get_passimcode(self):
         code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         return code
@@ -9264,7 +9297,7 @@ class SermonDescrEqual(models.Model):
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
         combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.super.__str__())
         return combi
-
+    
     def do_scount(self, super):
         # Now calculate the adapted scount for the SSG
         scount = super.equalgold_sermons.count()

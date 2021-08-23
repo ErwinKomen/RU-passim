@@ -2829,6 +2829,25 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * postsubmit
+       *    Submit nearest form as POST
+       *
+       */
+      postsubmit: function (el) {
+        var frm = null;
+
+        try {
+          frm = $(el).closest("form");
+          // Make sure we do a POST
+          frm.attr("method", "POST");
+          // Submit
+          $(frm).submit();
+        } catch (ex) {
+          private_methods.errMsg("postsubmit", ex);
+        }
+      },
+
+      /**
        *  init_charts
        *      Check if this is the homepage and then supply charts
        *

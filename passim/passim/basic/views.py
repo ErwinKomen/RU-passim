@@ -980,7 +980,7 @@ class BasicList(ListView):
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)
-
+        x = context['is_app_editor'] and context['new_button']
         # Return the calculated context
         return context
 

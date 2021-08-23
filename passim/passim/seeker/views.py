@@ -650,7 +650,7 @@ def guide(request):
     return render(request,template_name, context)
 
 def mypassim(request):
-    """Renders the user-manual (guide) page."""
+    """Renders the MyPassim page (=PRE)."""
     assert isinstance(request, HttpRequest)
     # Specify the template
     template_name = 'mypassim.html'
@@ -662,6 +662,22 @@ def mypassim(request):
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
+
+    return render(request,template_name, context)
+
+def dct_tool(request):
+    """Renders the DCT tool page."""
+    assert isinstance(request, HttpRequest)
+    # Specify the template
+    template_name = 'dct_tool.html'
+    context =  {'title':'DCT tool',
+                'year':get_current_datetime().year,
+                'pfx': APP_PREFIX,
+                'site_url': admin.site.site_url}
+    context = get_application_context(request, context)
+
+    # Process this visit
+    context['breadcrumbs'] = get_breadcrumbs(request, "DCT Tool", True)
 
     return render(request,template_name, context)
 
@@ -6891,6 +6907,7 @@ class CollPrivDetails(CollAnyEdit):
                 manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
                 if resizable: manuscripts['gridclass'] = "resizable dragdrop"
                 manuscripts['savebuttons'] = True
+                manuscripts['saveasbutton'] = True
 
                 # Check ordering
                 qs_manu = instance.manuscript_col.all().order_by(
@@ -6947,6 +6964,7 @@ class CollPrivDetails(CollAnyEdit):
                 sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
                 if resizable: sermons['gridclass'] = "resizable dragdrop"
                 sermons['savebuttons'] = True
+                sermons['saveasbutton'] = True
 
                 qs_sermo = instance.sermondescr_col.all().order_by(
                         'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
@@ -7000,6 +7018,7 @@ class CollPrivDetails(CollAnyEdit):
                 goldsermons = dict(title="Gold sermons within this dataset", prefix="gold")   # prefix="sermo") 
                 if resizable: goldsermons['gridclass'] = "resizable dragdrop"
                 goldsermons['savebuttons'] = True
+                goldsermons['saveasbutton'] = True
 
                 qs_sermo = instance.gold_col.all().order_by(
                         'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
@@ -7053,6 +7072,7 @@ class CollPrivDetails(CollAnyEdit):
                 supers = dict(title="Super sermons gold within this dataset", prefix="super")   #prefix="sermo")
                 if resizable: supers['gridclass'] = "resizable dragdrop"
                 supers['savebuttons'] = True
+                supers['saveasbutton'] = True
 
                 qs_sermo = instance.super_col.all().order_by(
                         'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
@@ -7269,6 +7289,7 @@ class CollHistDetails(CollHistEdit):
                 supers = dict(title="Super sermons gold within this historical collection", prefix="super")   #prefix="sermo")
                 if resizable: supers['gridclass'] = "resizable dragdrop"
                 supers['savebuttons'] = True
+                supers['saveasbutton'] = True
                 supers['classes'] = 'collapse'
 
                 qs_sermo = instance.super_col.all().order_by(

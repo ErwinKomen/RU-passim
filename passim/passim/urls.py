@@ -18,6 +18,7 @@ import passim.reader.views
 from passim import views
 from passim.seeker.views import *
 from passim.seeker.visualizations import *
+from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
@@ -237,6 +238,11 @@ urlpatterns = [
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
+
+    url(r'^dct/list', ResearchSetListView.as_view(), name='researchset_list'),
+    url(r'^dct/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
+    url(r'^dct/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+    url(r'^dct/test', passim.dct.views.test_dct, name='test_dct'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

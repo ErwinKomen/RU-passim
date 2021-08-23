@@ -1663,3 +1663,71 @@ svg .nodes text {
 .spacy-border td {
     border: 4px solid transparent;
 }
+
+
+/* DCT stuff */
+table.dct-view {
+    border: 1px solid white;
+    /* border: none; */
+    background-color: lightgray;
+    margin-top: 0px;
+    vertical-align: top;
+    padding: 2px;
+}
+
+
+table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno {
+    font-size: smaller;
+    white-space: nowrap;
+    text-align: center;
+}
+
+table.dct-view th .shelf-city {
+    color: lightblue;
+}
+
+table.dct-view th .shelf-idno {
+    color: chartreuse;
+}
+
+table.dct-view th {
+  border: 1px solid white;
+  font-size: 12px;
+  background-color: darkgreen;
+  color: white;
+  border-radius: 3px 3px;
+  margin-top: 0px;
+  margin-left:20px;
+  vertical-align: top;
+  padding: 2px;
+  background-clip: padding-box;
+}
+table.dct-view th.selected {
+  background-color: darkorange;
+}
+table.dct-view th:hover {
+  background-color: green;
+}
+table.dct-view th.selected:hover {
+    background-color: orangered;
+}
+
+table.dct-view td .func-name {
+  color: black;
+  font-family: monospace;
+  border-radius: 3px 3px;
+}
+table.dct-view td .func-name:hover {
+  background-color: darkgreen;
+  color: white;
+  font-family: monospace;
+  border-radius: 3px 3px;
+}
+table.dct-view td {
+  border: 1px solid white;
+  font-size: 12px;
+  margin-top: 0px;
+  vertical-align: top;
+  padding: 2px;
+  overflow: hidden;
+}
