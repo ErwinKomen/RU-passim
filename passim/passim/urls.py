@@ -239,9 +239,13 @@ urlpatterns = [
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
 
-    url(r'^dct/list', ResearchSetListView.as_view(), name='researchset_list'),
-    url(r'^dct/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
-    url(r'^dct/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+    url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
+    url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
+    url(r'^rset/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+    url(r'^dct/list', SetDefListView.as_view(), name='setdef_list'),
+    url(r'^dct/details(?:/(?P<pk>\d+))?/$', SetDefDetails.as_view(), name='setdef_details'),
+    url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
+
     url(r'^dct/test', passim.dct.views.test_dct, name='test_dct'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),

@@ -25,8 +25,8 @@ from passim.basic.views import BasicList, BasicDetails
 from passim.seeker.views import get_application_context, get_breadcrumbs
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
-from passim.dct.models import ResearchSet, SetList
-from passim.dct.forms import ResearchSetForm
+from passim.dct.models import ResearchSet, SetList, SetDef
+from passim.dct.forms import ResearchSetForm, SetDefForm
 
 
 def manuscript_ssgs(manu, bDebug = False):
@@ -470,6 +470,7 @@ class ResearchSetDetails(ResearchSetEdit):
 
         try:
 
+            # [1] =============================================================
             # Get all 'SetList' objects that are part of this 'ResearchSet'
             setlists = dict(title="Lists within this research set", prefix="setlists")  
             if resizable: setlists['gridclass'] = "resizable dragdrop"
@@ -478,9 +479,10 @@ class ResearchSetDetails(ResearchSetEdit):
 
             qs_setlist = instance.researchset_setlists.all().order_by(
                     'order', 'setlisttype')
+            # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_setlist)
 
-            # Walk these collection sermons
+            # Walk these setlists
             for obj in qs_setlist:
                 # The [obj] is of type `SetList`
 
@@ -503,7 +505,7 @@ class ResearchSetDetails(ResearchSetEdit):
                 add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "title"), False, main=True)
 
                 # SetList: Size (number of SSG in this manu/coll)
-                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False)
+                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False, align="right")
 
                 # Actions that can be performed on this item
                 add_one_item(rel_item, self.get_actions())
@@ -521,6 +523,52 @@ class ResearchSetDetails(ResearchSetEdit):
                 ]
             related_objects.append(setlists)
 
+            # [2] =============================================================
+            # Get all the 'DCT' parameter definitions
+            setdefs = dict(title="DCT definitions", prefix="setdefs")
+            if resizable: setdefs['gridclass'] = "resizable"
+            setdefs['savebuttons'] = False
+            setdefs['saveasbutton'] = False
+            qs_setdefs = instance.researchset_setdefs.all().order_by(
+                'name')
+
+            # Walk these setdefs
+            rel_list = []
+            order = 1
+            for obj in qs_setdefs:
+                rel_item = []
+
+                # SetDef: Order within the ResearchSet
+                add_one_item(rel_item, order, False, align="right")
+                order += 1
+
+                # SetDef: Name
+                add_one_item(rel_item, obj.name, False)
+
+                # SetDef: Notes
+                add_one_item(rel_item, obj.notes, False, main=True)
+
+                # SetDef: Date when last saved
+                add_one_item(rel_item, obj.get_saved(), False)
+
+                # Button to launch this SetDef as a DCT
+                add_one_item(rel_item, self.get_field_value("setdef", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            setdefs['rel_list'] = rel_list
+            setdefs['columns'] = [                
+                '{}<span title="Order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of this DCT">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Notes on this DCT">Notes</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Date when last changed">Changed</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Buttons">DCT</span>{}'.format(sort_start, sort_end), 
+                ''
+                ]
+            related_objects.append(setdefs)
+
+            # [3] =============================================================
             # Make sure the resulting list ends up in the viewable part
             context['related_objects'] = related_objects
         except:
@@ -585,5 +633,107 @@ class ResearchSetDetails(ResearchSetEdit):
                 # Get the number of SSGs related to items in this collection
                 count = "-1" if instance is None else instance.super_col.count()
                 sBack = "{}".format(count)
+        elif type == "setdef":
+            if custom == "buttons":
+                # Create the launch button
+                url = reverse("setdef_details", kwargs={'pk': instance.id})
+                sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
 
         return sBack
+
+
+class SetDefListView(BasicList):
+    """Listview of ResearchSet"""
+
+    model = SetDef
+    listform = SetDefForm
+    has_select2 = True
+    bUseFilter = True
+    prefix = "sdef"
+    plural_name = "DCT definitions"
+    new_button = True
+    use_team_group = True
+    order_cols = ['name', 'researchset__name', 'saved']
+    order_default = order_cols
+    order_heads = [{'name': 'Name',           'order': 'o=1','type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+                   {'name': 'Research set',   'order': 'o=2','type': 'str', 'custom': 'rset'                                },
+                   {'name': 'Date',           'order': 'o=3','type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+                ]
+    filters = [ {"name": "Name",       "id": "filter_name",      "enabled": False} ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name', 'dbfield': 'name', 'keyS': 'name'}
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'profile',     'fkfield': 'researchset__profile', 'keyFk': 'id', 'infield': 'id'}]}
+         ]
+
+    def initializations(self):
+        # Some things are needed for initialization
+        return None
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+        x = fields
+        profile = Profile.get_user_profile( self.request.user.username)
+        fields['profile'] = profile.id
+        return fields, lstExclude, qAlternative
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+
+        if custom == "date":
+            sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "rset":
+            sBack = instance.researchset.name
+
+        return sBack, sTitle
+    
+
+class SetDefEdit(BasicDetails):
+    model = SetDef
+    mForm = SetDefForm
+    prefix = 'sdef'
+    prefix_type = "simple"
+    title = "DCT definition"
+    use_team_group = True
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
+            {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+            {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
+            {'type': 'safe',  'label': "Launch",        'value': self.get_buttons(instance)}
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+    def get_buttons(self, instance):
+        """Get the button(s) to launch this DCT"""
+
+        sBack = ""
+        if instance != None:
+            # Create the launch button
+            url = reverse("setdef_details", kwargs={'pk': instance.id})
+            sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
+
+        return sBack
+    
+
+class SetDefDetails(SetDefEdit):
+    """The HTML variant of [ResearchSetEdit]"""
+
+    rtype = "html"
+    listviewtitle = "All my DCTs"
+

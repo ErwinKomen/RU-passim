@@ -49,6 +49,9 @@ class ResearchSet(models.Model):
         self.saved = get_current_datetime()
         response = super(ResearchSet, self).save(force_insert, force_update, using, update_fields)
 
+        # If there is no DCT definition yet, create a default one
+        SetDef.check_default(self)
+
         # Return the response when saving
         return response
 
@@ -104,6 +107,7 @@ class ResearchSet(models.Model):
                 order += 1
         return None
 
+
 class SetList(models.Model):
     """A setlist belongs to a research set"""
 
@@ -152,4 +156,72 @@ class SetList(models.Model):
             oBack['main'] = self.setlisttype
         # Return the result
         return oBack
+
+
+class SetDef(models.Model):
+    """THe definition of a DCT"""
+
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] A setlist just belongs to a research set
+    researchset = models.ForeignKey(ResearchSet, on_delete=models.CASCADE, related_name="researchset_setdefs")
+
+    # [0-1] Optional notes for this definition
+    notes = models.TextField("Notes", blank=True, null=True)
+
+    # [1] A list of all the DCT parameter-objects defined for this research set
+    contents = models.TextField("Contents", default="[]")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        """Just return the name"""
+        return self.name
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(SetDef, self).save(force_insert, force_update, using, update_fields)
+
+        # If there is no DCT definition yet, create a default one
+        if self.researchset_setdefs.count() == 0:
+            SetDef.create_default(self)
+
+        # Return the response when saving
+        return response
+
+    def check_default(rset):
+        """Create a default SetDef for this research set"""
+
+        # Are there any setdefs?
+        if SetDef.objects.filter(researchset=rset).count() == 0:
+            obj = SetDef.objects.create(name="Default DCT", notes="Automatically created", researchset=rset)
+            # Save once more
+            obj.save()
+        return True
+
+    def get_created(self):
+        """REturn the creation date in a readable form"""
+
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
+    def get_notes_html(self):
+        """Convert the markdown notes"""
+
+        sNotes = "-"
+        if self.notes != None:
+            sNotes = markdown(self.notes)
+        return sNotes
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
+
+
 

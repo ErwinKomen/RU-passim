@@ -130,3 +130,38 @@ class ResearchSetForm(forms.ModelForm):
             msg = oErr.get_error_message()
             oErr.DoError("ResearchSetForm")
         return None
+
+
+class SetDefForm(forms.ModelForm):
+    """Used for listview and details view of SetDef"""
+
+    class Meta:
+        model = SetDef
+        fields = ['name', 'notes']
+        widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'placeholder': 'The name of this DCT...'}),
+                 'notes':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;',
+                                                       'placeholder': 'Optionally add your own notes...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Obligatory for this type of form!!!
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(SetDefForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['notes'].required = False
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']   
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefForm")
+        return None
