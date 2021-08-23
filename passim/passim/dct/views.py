@@ -543,7 +543,7 @@ class ResearchSetDetails(ResearchSetEdit):
                 order += 1
 
                 # SetDef: Name
-                add_one_item(rel_item, obj.name, False)
+                add_one_item(rel_item, self.get_field_value("setdef", obj, "name"), obj.name, False)
 
                 # SetDef: Notes
                 add_one_item(rel_item, obj.notes, False, main=True)
@@ -638,6 +638,9 @@ class ResearchSetDetails(ResearchSetEdit):
                 # Create the launch button
                 url = reverse("setdef_details", kwargs={'pk': instance.id})
                 sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
+            elif custom == "name":
+                url = reverse("setdef_details", kwargs={'pk': instance.id})
+                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
 
         return sBack
 
@@ -706,30 +709,28 @@ class SetDefEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
-            {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
-            {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
+            {'type': 'line',  'label': "Name:",         'value': instance.name,  'field_key': 'name'  },
+            {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(), 'field_key': 'notes' },
             {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
             {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
-            {'type': 'safe',  'label': "Launch",        'value': self.get_buttons(instance)}
             ]
 
         # Signal that we do have select2
         context['has_select2'] = True
 
+        # Add a button back to the research set I belong to
+        rset = instance.researchset
+        if rset  != None:
+            topleftlist = []
+            buttonspecs = {'label': "M", 
+                    'title': "Back to my research set {}".format(rset.name), 
+                    'url': reverse('researchset_details', kwargs={'pk': rset.id})}
+            topleftlist.append(buttonspecs)
+            context['topleftbuttons'] = topleftlist
+
         # Return the context we have made
         return context
 
-    def get_buttons(self, instance):
-        """Get the button(s) to launch this DCT"""
-
-        sBack = ""
-        if instance != None:
-            # Create the launch button
-            url = reverse("setdef_details", kwargs={'pk': instance.id})
-            sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
-
-        return sBack
-    
 
 class SetDefDetails(SetDefEdit):
     """The HTML variant of [ResearchSetEdit]"""

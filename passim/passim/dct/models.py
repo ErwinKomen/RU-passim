@@ -8,6 +8,8 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
+from django.urls import reverse
+
 
 from markdown import markdown
 
@@ -184,10 +186,6 @@ class SetDef(models.Model):
         # Adapt the save date
         self.saved = get_current_datetime()
         response = super(SetDef, self).save(force_insert, force_update, using, update_fields)
-
-        # If there is no DCT definition yet, create a default one
-        if self.researchset_setdefs.count() == 0:
-            SetDef.create_default(self)
 
         # Return the response when saving
         return response
