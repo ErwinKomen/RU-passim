@@ -1680,7 +1680,7 @@ table.dct-view {
 }
 
 
-table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno {
+table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno, table th .shelf-size {
     font-size: smaller;
     white-space: nowrap;
     text-align: center;

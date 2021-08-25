@@ -245,6 +245,7 @@ urlpatterns = [
     url(r'^dct/list', SetDefListView.as_view(), name='setdef_list'),
     url(r'^dct/details(?:/(?P<pk>\d+))?/$', SetDefDetails.as_view(), name='setdef_details'),
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
+    url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
 
     url(r'^dct/test', passim.dct.views.test_dct, name='test_dct'),
 

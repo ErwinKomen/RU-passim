@@ -8,9 +8,9 @@ var $ = jQuery;
   $(function () {
     $(document).ready(function () {
       // Initialize event listeners
-      ru.basic.init_events();
+      // ru.basic.init_events();
       // ru.basic.init_typeahead();
-
+      ru.dct.load_dct();
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
       $('[data-toggle="popover"]').popover();
@@ -33,6 +33,7 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_ssglists = null,     // The object with the DCT information
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
@@ -53,6 +54,8 @@ var ru = (function ($, ru) {
       aaaaaaNotVisibleFromOutside: function () {
         return "something";
       },
+
+
 
       copyToClipboard: function(elem) {
         // create hidden text element, if it doesn't already exist
@@ -426,6 +429,142 @@ var ru = (function ($, ru) {
       },
 
       /** 
+       *  show_one_dct - Show one DCT on the default location
+       */
+      show_one_dct: function (ssglists, pivot_row) {
+        var elDctView = null,
+            elDctShow = null,
+            elDctWait = null,
+            oTitle = null,
+            sTop = "",
+            sMiddle = "",
+            sMain = "",
+            iSize = 0,
+            pivot = null,
+            ssglist = null,
+            oSsgItem = null,
+            oSsgPivot = null,
+            bFound = false,
+            order = 0,
+            ssg = 0,
+            row = 0,
+            i = 0,
+            j = 0,
+            html_row = [],
+            html = [];
+
+        try {
+          // Parameter??
+          if (pivot_row === undefined) {
+            pivot_row = 0;
+          }
+
+          // Find out where the DCT should come
+          elDctView = $(".dct-view").first();
+          elDctShow = $(elDctView).find(".dct-show").first();
+          elDctWait = $(elDctView).find(".dct-wait").first();
+
+          // Clear the show part
+          $(elDctShow).html();
+          // Show the waiting part
+          if ($(elDctWait).hasClass("hidden")) {
+            $(elDctWait).removeClass("hidden");
+          }
+
+          // Walk the data for this DCT and construct the html
+          html.push("<table class='dct-view'>");
+          // Construct the header
+          html.push("<thead><tr><th>Gryson/Clavis</th>");
+          for (i = 0; i < ssglists.length; i++) {
+            // Get the title object
+            oTitle = ssglists[i]['title'];
+            sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
+            if ('top' in oTitle) { sTop = oTitle['top'];}
+            if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
+            if ('main' in oTitle) { sMain = oTitle['main']; }
+            if ('size' in oTitle) { iSize = oTitle['size']; }
+
+            // Show it
+            html.push("<th onclick='ru.dct.dct_pivot(" + i + ")'>");
+            // Top 
+            html.push("<div class='shelf-city'>" + sTop + "</div>");
+            // Middle
+            html.push("<div class='shelf-library'>" + sMiddle + "</div>");
+            // Main
+            html.push("<div class='shelf-idno'>" + sMain + "</div>");
+            // Size
+            html.push("<div class='shelf-size'>" + iSize + "</div>");
+            html.push("</th>");
+          }
+          html.push("</tr></thead>");
+
+          // Construct the body
+          html.push("<tbody>");
+          // Get the pivot: ssglist zero
+          pivot = ssglists[pivot_row]['ssglist'];
+          // Walk the rows of the pivot
+          for (row = 0; row < pivot.length; row++) {
+            // Get details of this SSG
+            oSsgPivot = pivot[row];
+            // Get this SSG id
+            ssg = oSsgPivot.super;
+            // Walk through all the other lists, finding this SSG
+            html_row = [];
+            bFound = false;
+            // Start creating this row
+            html_row.push("<tr><td>" + oSsgPivot.sig + "</td>");
+            html_row.push("<td>" + oSsgPivot.order + "</td>");
+            for (i = 0; i < ssglists.length; i++) {
+              // Skip the pivot_row
+              if (i !== pivot_row) {
+                // Get this setlist
+                ssglist = ssglists[i]['ssglist'];
+                order = -1;
+                // Look for this particular ssg within this list
+                for (j = 0; j < ssglist.length; j++) {
+                  oSsgItem = ssglist[j];
+                  if (oSsgItem.super === ssg) {
+                    // FOund one!
+                    bFound = true;
+                    order = oSsgItem.order;
+                    break;
+                  }
+                }
+                if (order >= 0) {
+                  html_row.push("<td>" + order + "</td>");
+                } else {
+                  html_row.push("<td></td>");
+                }
+              }
+            }
+
+
+            // Finish this row
+            html_row.push("</tr>");
+
+            // Found anything?
+            if (bFound) {
+              // Add this row to the output
+              html.push(html_row.join(""));
+            }
+          }
+
+          html.push("</tbody>");
+
+          // Finish the table
+          html.push("</table>");
+
+          // SHow the created DCT
+          $(elDctShow).html(html.join("\n"));
+
+          // Hide the waiting part
+          $(elDctWait).addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("show_one_dct", ex);
+        }
+      },
+
+      /** 
        *  sortshowDo - perform sorting on this <th> column
        */
       sortshowDo: function (el) {
@@ -622,6 +761,7 @@ var ru = (function ($, ru) {
           }
         });
       },
+
       /** 
        *  toggle_column - show or hide column
        */
@@ -705,6 +845,102 @@ var ru = (function ($, ru) {
     }
     // Public methods
     return {
+      /**
+       * load_dct
+       *    Ask for the DCT definition using AJAX
+       *
+       */
+      load_dct: function () {
+        var data = [],
+            frm = null,
+            targeturl = "",
+            ssglists = null,
+            elDctId = "#dct_id";
+
+        try {
+          // Get the target URL
+          targeturl = $(elDctId).attr("targeturl");
+          // Get to the form
+          frm = $(elDctId).closest("form");
+          data = frm.serializeArray();
+
+          // Get the data right now
+          // Try to delete: send a POST
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Pick up the [ssglists]
+                  ssglists = response['ssglists'];
+                  if (ssglists !== undefined && ssglists != "" && ssglists.length > 0) {
+                    // show this DCT
+                    private_methods.show_one_dct(ssglists);
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("load_dct", ex);
+        }
+      },
+
+      /**
+       * show_dct
+       *    Re-draw the DCT
+       *
+       */
+      show_dct: function () {
+        var elDctView = null;
+
+        try {
+          // Find out where the DCT should come
+          elDctView = $("table.dct-view").first();
+          // Get the data for this DCT view
+
+          frm = $(el).closest("form");
+          // Make sure we do a POST
+          frm.attr("method", "POST");
+          // Submit
+          $(frm).submit();
+        } catch (ex) {
+          private_methods.errMsg("show_dct", ex);
+        }
+      },
+
       /**
        * postsubmit
        *    Submit nearest form as POST

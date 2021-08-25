@@ -13,6 +13,7 @@ from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
 from django.urls import reverse
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
@@ -21,11 +22,11 @@ import json
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
-from passim.basic.views import BasicList, BasicDetails
+from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
-from passim.dct.models import ResearchSet, SetList, SetDef
+from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
 from passim.dct.forms import ResearchSetForm, SetDefForm
 
 
@@ -111,24 +112,6 @@ def collection_ssgs(coll, bDebug = False):
         oErr.DoError("collection_ssgs")
     return lBack
 
-
-def get_passimcode(super_id, super_code):
-    code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
-    return code
-
-def get_goldsig_dct(super_id):
-    """Get the best signature according to DCT rules"""
-
-    sBack = ""
-    first = None
-    editype_preferences = ['gr', 'cl', 'ot']
-    for editype in editype_preferences:
-        siglist = Signature.objects.filter(gold__equal_id=super_id, editype=editype).order_by('code').values('code')
-        if len(siglist) > 0:
-            code = siglist[0]['code']
-            sBack = "{}: {}".format(editype, code)
-            break
-    return sBack
 
 def dct_manulist(lst_manu, bDebug=False):
     """Create a DCT based on the manuscripts in the list"""
@@ -759,3 +742,55 @@ class SetDefDetails(SetDefEdit):
     rtype = "html"
     listviewtitle = "All my DCTs"
 
+    def add_to_context(self, context, instance):
+        # Perform the standard initializations:
+        context = super(SetDefDetails, self).add_to_context(context, instance)
+
+        oErr = ErrHandle()
+        template_name = "dct/dct_view.html"
+
+        try:
+            # Show the DCT according to the parameters that I can find
+            parameters = json.loads(instance.contents)
+            if len(parameters) > 0:
+                # Okay, fetch the parameters and put them into the context
+                pass
+
+            # Make sure the research set is part of the context
+            #oSetlist = instance.get_setlist()
+            #context['setlist'] = oSetlist.get('setlist')
+            #context['ssglists'] = oSetlist.get("ssglists")
+            #msg = json.dumps(instance.get_ssglists() , indent=2)
+            context['setlist'] = [ 1, 2, 3]
+
+            context['dctdata_url'] = reverse('setdef_data', kwargs={'pk': instance.id})
+            context['csrf'] = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
+                get_token(self.request))
+
+            # Create the DCT with a template
+            dct_view = render_to_string(template_name, context)
+
+            # Add the visualisation we made
+            context['add_to_details'] = dct_view
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefDetails/add_to_context")
+
+        # REturn the total context
+        return context
+
+
+class SetDefData(BasicPart):
+    """Provide the data for the indicated SetDef element"""
+
+    MainModel = SetDef
+
+    def add_to_context(self, context):
+        # Gather all necessary data
+        data = {}
+        # Get to the setdef object
+        setdef = self.obj
+        data['ssglists'] = setdef.get_ssglists()
+        # FIll in the [data] part of the context with all necessary information
+        context['data'] = data
+        return context

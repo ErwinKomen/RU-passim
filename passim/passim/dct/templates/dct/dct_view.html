@@ -1,0 +1,31 @@
+{% load i18n %}
+
+<div class="row">
+
+  <div class="col-md-12">
+    <!-- Hidden away show which DCT we are showing -->
+    <div class="hidden">
+      <form>
+        {{csrf|safe}}
+        <div class="hidden" id="dct_id" targeturl="{{dctdata_url}}"></div>
+      </form>
+    </div>
+
+    <h3>Dynamic Comparison Table Tool</h3>
+
+    <div class="dct-view">
+      <div class="dct-wait">
+        Creating the DCT ... 
+        <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+      </div>
+      <div class="dct-show">
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block script %}
+    {% load staticfiles %}
+    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+{% endblock %}
