@@ -52,7 +52,7 @@ class ResearchSet(models.Model):
         response = super(ResearchSet, self).save(force_insert, force_update, using, update_fields)
 
         # If there is no DCT definition yet, create a default one
-        SetDef.check_default(self)
+        SetDef.check_default(self, self.profile.user.username)
 
         # Return the response when saving
         return response
@@ -167,6 +167,8 @@ class SetDef(models.Model):
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [1] A setlist just belongs to a research set
     researchset = models.ForeignKey(ResearchSet, on_delete=models.CASCADE, related_name="researchset_setdefs")
+    # [1] order number of this DCT (assigned automatically)
+    order = models.IntegerField("Order", default = 0)
 
     # [0-1] Optional notes for this definition
     notes = models.TextField("Notes", blank=True, null=True)
@@ -185,17 +187,30 @@ class SetDef(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the save date
         self.saved = get_current_datetime()
+        # Calculate the proper order
+        last = SetDef.objects.filter(researchset=self.researchset).order_by("-order").first()
+        if last == None:
+            order = 1
+        else:
+            order = last.order + 1
+        # Automatically assign a name
+        default_name = "{}_DCT_{:06}".format(self.researchset.profile.user.username, order)
+        self.name = default_name
+        self.notes = "Automatically created"
+        # Initial saving
         response = super(SetDef, self).save(force_insert, force_update, using, update_fields)
 
         # Return the response when saving
         return response
 
-    def check_default(rset):
+    def check_default(rset, username):
         """Create a default SetDef for this research set"""
 
         # Are there any setdefs?
         if SetDef.objects.filter(researchset=rset).count() == 0:
-            obj = SetDef.objects.create(name="Default DCT", notes="Automatically created", researchset=rset)
+            #default_name = "{}_DCT_000".format(
+            #    username)
+            obj = SetDef.objects.create(researchset=rset)
             # Save once more
             obj.save()
         return True

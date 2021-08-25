@@ -223,6 +223,7 @@ def mypassim(request):
 
     profile = Profile.get_user_profile(request.user.username)
     context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
+    context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
@@ -245,10 +246,12 @@ class ResearchSetListView(BasicList):
     plural_name = "DCT tool page"
     new_button = True
     use_team_group = True
-    order_cols = ['name', 'saved']
-    order_default = ['name', 'saved']
-    order_heads = [{'name': 'Name',           'order': 'o=1','type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                   {'name': 'Date',           'order': 'o=1','type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+    order_cols = ['name', 'saved', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Name',    'order': 'o=1','type': 'str', 'field': 'name',                      'linkdetails': True, 'main': True},
+        {'name': 'Date',    'order': 'o=2','type': 'str', 'custom': 'date', 'align': 'right',   'linkdetails': True},
+        {'name': 'DCT',     'order': 'o=3','type': 'str', 'custom': 'dct', 'align': 'right'},
                 ]
     filters = [ {"name": "Name",       "id": "filter_name",      "enabled": False} ]
     searches = [
@@ -267,6 +270,16 @@ class ResearchSetListView(BasicList):
 
         if custom == "date":
             sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "dct":
+            html = []
+            # Find the first DCT for this research set
+            dct = SetDef.objects.filter(researchset=instance).first()
+            if dct == None:
+                sBack = "-"
+            else:
+                url = reverse('setdef_details', kwargs={'pk': dct.id})
+                html.append("<a href='{}' title='Show the default DCT for this research set'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
+                sBack = "\n".join(html)
 
         return sBack, sTitle
 
@@ -658,9 +671,11 @@ class SetDefListView(BasicList):
     use_team_group = True
     order_cols = ['name', 'researchset__name', 'saved']
     order_default = order_cols
-    order_heads = [{'name': 'Name',           'order': 'o=1','type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
-                   {'name': 'Research set',   'order': 'o=2','type': 'str', 'custom': 'rset'                                },
-                   {'name': 'Date',           'order': 'o=3','type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+    order_heads = [
+        {'name': 'Name',           'order': 'o=1','type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
+        {'name': 'Research set',   'order': 'o=2','type': 'str', 'custom': 'rset'                                },
+        {'name': 'Date',           'order': 'o=3','type': 'str', 'custom': 'date', 'align': 'right', 'linkdetails': True},
+        {'name': 'DCT',            'order': 'o=4','type': 'str', 'custom': 'dct',  'align': 'right'},
                 ]
     filters = [ {"name": "Name",       "id": "filter_name",      "enabled": False} ]
     searches = [
@@ -691,6 +706,12 @@ class SetDefListView(BasicList):
             sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
         elif custom == "rset":
             sBack = instance.researchset.name
+        elif custom == "dct":
+            html = []
+            # Find the first DCT for this research set
+            url = reverse('setdef_details', kwargs={'pk': instance.id})
+            html.append("<a href='{}' title='Show this DCT'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
+            sBack = "\n".join(html)
 
         return sBack, sTitle
     
