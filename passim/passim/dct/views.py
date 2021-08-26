@@ -308,6 +308,8 @@ class ResearchSetEdit(BasicDetails):
         """Check if a hlist parameter is given, and hlist saving is called for"""
 
         oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
 
         try:
             arg_hlist = "setlists-hlist"
@@ -339,6 +341,7 @@ class ResearchSetEdit(BasicDetails):
                             if obj.order != order:
                                 obj.order = order
                                 obj.save()
+                                bChanges = True
                 # See if any need to be removed
                 existing_item_id = [str(x.id) for x in SetList.objects.filter(researchset=instance)]
                 delete_id = []
@@ -349,6 +352,12 @@ class ResearchSetEdit(BasicDetails):
                     lstQ = [Q(researchset=instance)]
                     lstQ.append(Q(**{"id__in": delete_id}))
                     SetList.objects.filter(*lstQ).delete()
+                    bChanges = True
+
+                if bChanges:
+                    # (6) Re-calculate the set of setlists
+                    force = True if bDebug else False
+                    instance.update_ssglists(force)
 
             return True
         except:
@@ -396,37 +405,45 @@ class ResearchSetDetails(ResearchSetEdit):
                     # We have a manuscript being added
                     setlisttype = "manu"
                     # Check its presence
-                    if SetList.objects.filter(researchset=instance, manuscript=manu).count() == 0:
-                        # (2) Calculate the JSON list
-                        contents = json.dumps( manuscript_ssgs(manu))
-                        # (3) Create the new list
-                        setlist = SetList.objects.create(
-                            researchset=instance, order=order, 
-                            setlisttype=setlisttype, manuscript=manu, contents=contents)
+                    setlist = SetList.objects.filter(researchset=instance, manuscript=manu).first()
+                    if setlist == None or len(setlist.contents) < 3:
+                        if setlist == None:
+                            # (3) Create the new list
+                            setlist = SetList.objects.create(
+                                researchset=instance, order=order, 
+                                setlisttype=setlisttype, manuscript=manu)
+                        # Make sure the contents is re-calculated
+                        setlist.calculate_contents()
                 elif hist!= None:
                     # This is a historical collection
                     setlisttype = "hist"
                     # Check its presence
-                    if SetList.objects.filter(researchset=instance, collection=hist).count() == 0:
-                        # (2) Calculate the JSON list
-                        contents = json.dumps( collection_ssgs(hist))
-                        # (3) Create the new list
-                        setlist = SetList.objects.create(
-                            researchset=instance, order=order, 
-                            setlisttype=setlisttype, collection=hist, contents=contents)
+                    setlist = SetList.objects.filter(researchset=instance, collection=hist).first()
+                    if setlist == None or len(setlist.contents) < 3:
+                        if setlist == None:
+                            # (3) Create the new list
+                            setlist = SetList.objects.create(
+                                researchset=instance, order=order, 
+                                setlisttype=setlisttype, collection=hist)
+                        # Make sure the contents is re-calculated
+                        setlist.calculate_contents()
                 elif ssgd != None:
                     # This is a personal or public dataset of SSGs
                     setlisttype = "ssgd"
                     # Check its presence
-                    if SetList.objects.filter(researchset=instance, collection=ssgd).count() == 0:
-                        # (2) Calculate the JSON list
-                        contents = json.dumps( collection_ssgs(ssgd))
-                        # (3) Create the new list
-                        setlist = SetList.objects.create(
-                            researchset=instance, order=order, 
-                            setlisttype=setlisttype, collection=ssgd, contents=contents)
+                    setlist = SetList.objects.filter(researchset=instance, collection=ssgd).first()
+                    if setlist == None or len(setlist.contents) < 3:
+                        if setlist == None:
+                            # (3) Create the new list
+                            setlist = SetList.objects.create(
+                                researchset=instance, order=order, 
+                                setlisttype=setlisttype, collection=ssgd, contents=contents)
+                        # Make sure the contents is re-calculated
+                        setlist.calculate_contents()
                 # (4) Re-calculate the order
                 instance.adapt_order()
+                # (6) Re-calculate the set of setlists
+                instance.update_ssglists()
         # Return as usual
         return bStatus, msg
 
@@ -757,10 +774,6 @@ class SetDefDetails(SetDefEdit):
                 pass
 
             # Make sure the research set is part of the context
-            #oSetlist = instance.get_setlist()
-            #context['setlist'] = oSetlist.get('setlist')
-            #context['ssglists'] = oSetlist.get("ssglists")
-            #msg = json.dumps(instance.get_ssglists() , indent=2)
             context['setlist'] = [ 1, 2, 3]
 
             context['dctdata_url'] = reverse('setdef_data', kwargs={'pk': instance.id})
@@ -790,7 +803,14 @@ class SetDefData(BasicPart):
         data = {}
         # Get to the setdef object
         setdef = self.obj
-        data['ssglists'] = setdef.get_ssglists()
+        contents = setdef.get_contents()
+
+        # Set the pivot row to the default value, if it is not yet defined
+        if not 'pivot_col' in contents['params']:
+            contents['params']['pivot_col'] = 0
+
+        # REturn the contents
+        data['contents'] = contents
         # FIll in the [data] part of the context with all necessary information
         context['data'] = data
         return context

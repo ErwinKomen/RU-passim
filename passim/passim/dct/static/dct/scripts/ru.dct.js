@@ -32,8 +32,8 @@ var ru = (function ($, ru) {
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
-        loc_params = "",
-        loc_ssglists = null,     // The object with the DCT information
+        loc_params = "",        // DCT parameters
+        loc_ssglists = null,    // The object with the DCT information
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
@@ -54,9 +54,7 @@ var ru = (function ($, ru) {
       aaaaaaNotVisibleFromOutside: function () {
         return "something";
       },
-
-
-
+      
       copyToClipboard: function(elem) {
         // create hidden text element, if it doesn't already exist
         var targetId = "_hiddenCopyText_";
@@ -174,6 +172,335 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("colwrap_switch", ex);
           return "";
+        }
+      },
+
+      /** 
+       *  dct_remaining_ssgs - Get a list of SSG-ids that have not been dealt with in the pivot_col
+       */
+      dct_remaining_ssgs: function(ssglists, pivot_col, dealt_with) {
+        var lst_remaining = [],
+            i = 0,
+            row = 0,
+            ssg = 0,
+            ssglist = null,
+            oSsgItem = null;
+
+        try {
+
+          // Need to walk all lists
+          for (i = 0; i < ssglists.length; i++) {
+            // Check if this is not the pivot list
+            if (i !== pivot_col) {
+              // Okay, this is not the pivot list: walk all SSGs that do *not* occur in the pivot list
+              ssglist = ssglists[i]['ssglist'];
+              for (row=0; row < ssglist.length; row++) {
+                // Get details of this SSG
+                oSsgItem = ssglist[row];
+                // Get this SSG id
+                ssg = oSsgItem.super;
+                // Check if this SSG has already been dealt with
+                if (dealt_with.indexOf(ssg) === -1) {
+                  // Add the *object* to the list of objects to be treated
+                  lst_remaining.push(oSsgItem);
+                }
+              }
+
+            }
+          }
+          // Sort the remainder list
+          lst_remaining.sort(function (a, b) {
+            var retval = 0;
+
+            if (a.order > b.order) {
+              retval = 1;
+            } else if (a.order === b.order) {
+              retval =  (a.sig > b.sig) ? 1 : -1;
+            } else {
+              retval = -1;
+            }
+            return retval;
+          });
+          //lst_remaining.sort(
+          //  (a, b) => (a.order > b.order ? 1 : (a.sig > b.sig ? 1 : -1))
+          //  );
+          // Return the list that we have ben building up
+          return lst_remaining;
+        } catch (ex) {
+          private_methods.errMsg("dct_remaining_ssgs", ex);
+          // Return empty list
+          return [];
+        }
+      },
+
+      /** 
+       *  dct_row_combine -  Walk through all the other lists, finding this SSG
+       */
+      dct_row_combine: function(ssglists, pivot_col, oSsgThis, bShowPivot) {
+        var oBack = {'error': false},
+            oSsgItem = null,
+            i = 0,
+            j = 0,
+            order = 0,
+            ssg = 0,
+            siglist = "",
+            sUrl = "",
+            ssglist = null,
+            bFound = false,
+            html_row = [];
+
+        try {
+          // Start creating this row
+          if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
+          if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
+          html_row.push("<tr><td><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
+          if (bShowPivot) {
+            html_row.push("<td align='center'>" + oSsgThis.order + "</td>");
+          } else {
+            html_row.push("<td>&nbsp;</td>");
+          }
+          ssg = oSsgThis.super;
+          for (i = 0; i < ssglists.length; i++) {
+            // Skip the pivot_col
+            if (i !== pivot_col) {
+              // Get this setlist
+              ssglist = ssglists[i]['ssglist'];
+              order = -1;
+              // Look for this particular ssg within this list
+              for (j = 0; j < ssglist.length; j++) {
+                oSsgItem = ssglist[j];
+                if (oSsgItem.super === ssg) {
+                  // FOund one!
+                  bFound = true;
+                  order = oSsgItem.order;
+                  break;
+                }
+              }
+              if (order >= 0) {
+                html_row.push("<td align='center'>" + order + "</td>");
+              } else {
+                html_row.push("<td></td>");
+              }
+            }
+          }
+
+          // Finish this row
+          html_row.push("</tr>");
+          // Return whether we found anything or not
+          oBack['result'] = bFound;
+          oBack['html'] = html_row.join("");
+          return oBack;
+        } catch (ex) {
+          private_methods.errMsg("dct_row_combine", ex);
+          // We didn't find anything
+          oBack['error'] = true;
+          oBack['msg'] = ex.message;
+          return oBack;
+        }
+      },
+
+      /** 
+       *  dct_show - Show one DCT on the default location
+       */
+      dct_show: function (ssglists, params) {
+        var elDctView = null,
+            elDctShow = null,
+            elDctWait = null,
+            elDctTools = null,
+            oTitle = null,
+            sTop = "",
+            sMiddle = "",
+            sMain = "",
+            sUrl = "",
+            iSize = 0,
+            pivot = null,
+            dealt_with = [],    // List of SSGs that have appeared in a row
+            remainder = [],     // List with remainder
+            ssglist = null,
+            oSsgItem = null,
+            oSsgPivot = null,
+            oCombi = null,
+            bFound = false,
+            order = 0,
+            ssg = 0,
+            row = 0,
+            a_title = "",
+            b_title = "",
+            i = 0,
+            j = 0,
+            pivot_col = 0,
+            view_mode = "all",        // May have values: 'all', 'match'
+            col_mode = "match_decr",  // May have values: 'match_decr', 'match_incr', 'alpha', 'chrono'
+            html_row = [],
+            html = [];
+
+        try {
+          // Parameter??
+          if (params === undefined) {
+            pivot_col = 0;
+          } else {
+            // Get the pivot row
+            if ("pivot_col" in params) { pivot_col = params['pivot_col'];}
+            if ("view_mode" in params) { view_mode = params['view_mode'];}
+            if ("col_mode" in params) { col_mode = params['col_mode']; }
+          }
+
+          // Find out where the DCT should come
+          elDctView = $(".dct-view").first();
+          elDctShow = $(elDctView).find(".dct-show").first();
+          elDctWait = $(elDctView).find(".dct-wait").first();
+          elDctTools = $(elDctView).find(".dct-tools").first();
+
+          // Clear the show part
+          $(elDctShow).html();
+          $(elDctTools).addClass("hidden");
+          // Show the waiting part
+          if ($(elDctWait).hasClass("hidden")) {
+            $(elDctWait).removeClass("hidden");
+          }
+
+          // Sort the ssglists (the columns) according to what the user indicated
+          for (i = 0; i < ssglists.length; i++) {
+            ssglists[i]['title']['pivot'] = (i === pivot_col) ? 0 : 1;
+          }
+          ssglists.sort(function (a, b) {
+            var retval = 0;
+
+            // The pivot column should come first
+            if (a.title.pivot < b.title.pivot) {
+              retval = -1;
+            } else {
+              switch (col_mode) {
+                case "rset":
+                  // Follow the [order] definition
+                  retval = (a.title.order > b.title.order) ? 1 : -1;
+                  break;
+                case "match_decr":
+                  retval = (a.title.matches < b.title.matches) ? 1 : -1;
+                  break;
+                case "match_incr":
+                  retval = (a.title.matches > b.title.matches) ? 1 : -1;
+                  break;
+                case "alpha":
+                  // NOTE: this needs emending to facilitate: City > Library > shelfmark
+                  if (a.title.top === "hc" || a.title.top === "pd") {
+                    a_title = a.title.main;
+                  } else {
+                    a_title = a.title.top + "_" + a.title.middle + "_" + a.title.main;
+                  }
+                  if (b.title.top === "hc" || b.title.top === "pd") {
+                    b_title = b.title.main;
+                  } else {
+                    b_title = b.title.top + "_" + b.title.middle + "_" + b.title.main;
+                  }
+                  retval = (a_title > b_title) ? 1 : -1;
+                  break;
+              }
+            }
+
+            return retval;
+          });
+
+          // Walk the data for this DCT and construct the html
+          html.push("<table class='dct-view'>");
+          // Construct the header
+          html.push("<thead><tr><th>Gryson/Clavis</th>");
+          for (i = 0; i < ssglists.length; i++) {
+            // Get the title object
+            oTitle = ssglists[i]['title'];
+            sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
+            if ('top' in oTitle) { sTop = oTitle['top'];}
+            if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
+            if ('main' in oTitle) { sMain = oTitle['main']; }
+            if ('size' in oTitle) { iSize = oTitle['size']; }
+            if ('url' in oTitle) { sUrl = oTitle['url']; }
+
+            // Show it
+            html.push("<th onclick='ru.dct.dct_pivot(" + i + ")'>");
+            // Top 
+            html.push("<div class='shelf-city'>" + sTop + "</div>");
+            // Middle
+            html.push("<div class='shelf-library'>" + sMiddle + "</div>");
+            // Main
+            if (sUrl === "") {
+              html.push("<div class='shelf-idno'>" + sMain + "</div>");
+            } else {
+              html.push("<div class='shelf-idno clickable'><a class='nostyle' href='" + sUrl + "'>" + sMain + "</a></div>");
+            }
+            // Size
+            html.push("<div class='shelf-size'>" + iSize + "</div>");
+            html.push("</th>");
+          }
+          html.push("</tr></thead>");
+
+          // Construct the body
+          html.push("<tbody>");
+          // Get the pivot: ssglist zero
+          pivot = ssglists[pivot_col]['ssglist'];
+          // Walk the rows of the pivot
+          for (row = 0; row < pivot.length; row++) {
+            // Get details of this SSG
+            oSsgPivot = pivot[row];
+            // Get this SSG id
+            ssg = oSsgPivot.super;
+            // Mark it as dealt with 
+            dealt_with.push(ssg);
+
+            // Walk through all the other lists, finding this SSG
+            oCombi = private_methods.dct_row_combine(ssglists, pivot_col, oSsgPivot, true);
+            if (!oCombi.error) {
+              // This action depends on the view mode
+              switch (view_mode) {
+                case "all":
+                  // Always show the row
+                  html.push(oCombi.html);
+                  break;
+                case "match":
+                  // Found anything?
+                  if (oCombi.result) {
+                    // Add this row to the output
+                    html.push(oCombi.html);
+                  }
+                  break;
+              }
+            }
+
+          }
+
+          // Depending on view mode: walk all other lists or not
+          switch (view_mode) {
+            case "all":
+              // Get a list of remaining *objects* to be dealt with
+              remainder = private_methods.dct_remaining_ssgs(ssglists, pivot_col, dealt_with);
+              // Walk all these objects
+              for(row=0;row<remainder.length;row++) {
+                // Get this object
+                oSsgPivot = remainder[row];
+
+                // Walk through all the other lists, finding this SSG
+                oCombi = private_methods.dct_row_combine(ssglists, pivot_col, oSsgPivot, false);
+
+                if (!oCombi.error) {
+                  // Always show the row
+                  html.push(oCombi.html);
+                }
+              }
+              break;
+          }
+
+          html.push("</tbody>");
+
+          // Finish the table
+          html.push("</table>");
+
+          // SHow the created DCT
+          $(elDctShow).html(html.join("\n"));
+          $(elDctTools).removeClass("hidden");
+
+          // Hide the waiting part
+          $(elDctWait).addClass("hidden");
+        } catch (ex) {
+          private_methods.errMsg("dct_show", ex);
         }
       },
 
@@ -426,142 +753,6 @@ var ru = (function ($, ru) {
           nxtColWidth = undefined;
           curColWidth = undefined
         });
-      },
-
-      /** 
-       *  show_one_dct - Show one DCT on the default location
-       */
-      show_one_dct: function (ssglists, pivot_row) {
-        var elDctView = null,
-            elDctShow = null,
-            elDctWait = null,
-            oTitle = null,
-            sTop = "",
-            sMiddle = "",
-            sMain = "",
-            iSize = 0,
-            pivot = null,
-            ssglist = null,
-            oSsgItem = null,
-            oSsgPivot = null,
-            bFound = false,
-            order = 0,
-            ssg = 0,
-            row = 0,
-            i = 0,
-            j = 0,
-            html_row = [],
-            html = [];
-
-        try {
-          // Parameter??
-          if (pivot_row === undefined) {
-            pivot_row = 0;
-          }
-
-          // Find out where the DCT should come
-          elDctView = $(".dct-view").first();
-          elDctShow = $(elDctView).find(".dct-show").first();
-          elDctWait = $(elDctView).find(".dct-wait").first();
-
-          // Clear the show part
-          $(elDctShow).html();
-          // Show the waiting part
-          if ($(elDctWait).hasClass("hidden")) {
-            $(elDctWait).removeClass("hidden");
-          }
-
-          // Walk the data for this DCT and construct the html
-          html.push("<table class='dct-view'>");
-          // Construct the header
-          html.push("<thead><tr><th>Gryson/Clavis</th>");
-          for (i = 0; i < ssglists.length; i++) {
-            // Get the title object
-            oTitle = ssglists[i]['title'];
-            sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
-            if ('top' in oTitle) { sTop = oTitle['top'];}
-            if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
-            if ('main' in oTitle) { sMain = oTitle['main']; }
-            if ('size' in oTitle) { iSize = oTitle['size']; }
-
-            // Show it
-            html.push("<th onclick='ru.dct.dct_pivot(" + i + ")'>");
-            // Top 
-            html.push("<div class='shelf-city'>" + sTop + "</div>");
-            // Middle
-            html.push("<div class='shelf-library'>" + sMiddle + "</div>");
-            // Main
-            html.push("<div class='shelf-idno'>" + sMain + "</div>");
-            // Size
-            html.push("<div class='shelf-size'>" + iSize + "</div>");
-            html.push("</th>");
-          }
-          html.push("</tr></thead>");
-
-          // Construct the body
-          html.push("<tbody>");
-          // Get the pivot: ssglist zero
-          pivot = ssglists[pivot_row]['ssglist'];
-          // Walk the rows of the pivot
-          for (row = 0; row < pivot.length; row++) {
-            // Get details of this SSG
-            oSsgPivot = pivot[row];
-            // Get this SSG id
-            ssg = oSsgPivot.super;
-            // Walk through all the other lists, finding this SSG
-            html_row = [];
-            bFound = false;
-            // Start creating this row
-            html_row.push("<tr><td>" + oSsgPivot.sig + "</td>");
-            html_row.push("<td>" + oSsgPivot.order + "</td>");
-            for (i = 0; i < ssglists.length; i++) {
-              // Skip the pivot_row
-              if (i !== pivot_row) {
-                // Get this setlist
-                ssglist = ssglists[i]['ssglist'];
-                order = -1;
-                // Look for this particular ssg within this list
-                for (j = 0; j < ssglist.length; j++) {
-                  oSsgItem = ssglist[j];
-                  if (oSsgItem.super === ssg) {
-                    // FOund one!
-                    bFound = true;
-                    order = oSsgItem.order;
-                    break;
-                  }
-                }
-                if (order >= 0) {
-                  html_row.push("<td>" + order + "</td>");
-                } else {
-                  html_row.push("<td></td>");
-                }
-              }
-            }
-
-
-            // Finish this row
-            html_row.push("</tr>");
-
-            // Found anything?
-            if (bFound) {
-              // Add this row to the output
-              html.push(html_row.join(""));
-            }
-          }
-
-          html.push("</tbody>");
-
-          // Finish the table
-          html.push("</table>");
-
-          // SHow the created DCT
-          $(elDctShow).html(html.join("\n"));
-
-          // Hide the waiting part
-          $(elDctWait).addClass("hidden");
-        } catch (ex) {
-          private_methods.errMsg("show_one_dct", ex);
-        }
       },
 
       /** 
@@ -854,7 +1045,10 @@ var ru = (function ($, ru) {
         var data = [],
             frm = null,
             targeturl = "",
+            contents = null,
             ssglists = null,
+            params = null,
+            view_mode = "",
             elDctId = "#dct_id";
 
         try {
@@ -874,11 +1068,22 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
-                  // Pick up the [ssglists]
-                  ssglists = response['ssglists'];
-                  if (ssglists !== undefined && ssglists != "" && ssglists.length > 0) {
+                  // Pick up and unpack the contents
+                  contents = response['contents'];
+                  ssglists = contents['ssglists'];
+                  params = contents['params'];
+                  // Make sure to also copy it to the local storage
+                  loc_ssglists = ssglists;
+                  loc_params = params;
+
+                  // Get the view mode
+                  view_mode = $("input[name=viewmode]:checked").val();
+                  params['view_mode'] = view_mode;
+
+                  // If all is set, show it
+                  if (loc_ssglists !== undefined && loc_ssglists != "" && loc_ssglists.length > 0) {
                     // show this DCT
-                    private_methods.show_one_dct(ssglists);
+                    private_methods.dct_show(loc_ssglists, params);
                   }
                   break;
                 case "error":
@@ -924,18 +1129,21 @@ var ru = (function ($, ru) {
        *
        */
       show_dct: function () {
-        var elDctView = null;
+        var params = null;
 
         try {
-          // Find out where the DCT should come
-          elDctView = $("table.dct-view").first();
-          // Get the data for this DCT view
+          // Get the values
+          params = loc_params;
 
-          frm = $(el).closest("form");
-          // Make sure we do a POST
-          frm.attr("method", "POST");
-          // Submit
-          $(frm).submit();
+          // Get the view mode and the column order
+          params['view_mode'] = $("input[name=viewmode]:checked").val();
+          params['col_mode'] = $("input[name=colorder]:checked").val();;
+
+          // If all is set, show it
+          if (loc_ssglists !== undefined && loc_ssglists != "" && loc_ssglists.length > 0) {
+            // show this DCT
+            private_methods.dct_show(loc_ssglists, params);
+          }
         } catch (ex) {
           private_methods.errMsg("show_dct", ex);
         }

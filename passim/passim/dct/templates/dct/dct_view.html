@@ -14,10 +14,43 @@
     <h3>Dynamic Comparison Table Tool</h3>
 
     <div class="dct-view">
+      <!-- Proper message for waiting -->
       <div class="dct-wait">
         Creating the DCT ... 
         <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
       </div>
+
+      <!-- The parameters and buttons to change the DCT view -->
+      <div class="dct-tools row hidden">
+        <!-- Empty space -->
+        <div class="col-md-1">&nbsp;</div>
+
+        <!-- Which *rows* to show -->
+        <div class="col-md-2">
+          <div class="radio"><label><input type="radio" name="viewmode" 
+                                           onclick="ru.dct.show_dct();" value="all" />View all</label></div>
+          <div class="radio"><label><input type="radio" name="viewmode" 
+                                           onclick="ru.dct.show_dct();" value="match" checked />Matches only</label></div>
+        </div>
+
+        <!-- Column order -->
+        <div class="col-md-2">
+          <div class="radio"><label><input type="radio" name="colorder" 
+                                           onclick="ru.dct.show_dct();" value="match_decr" checked />Matches (decreasing)</label></div>
+          <div class="radio"><label><input type="radio" name="colorder" 
+                                           onclick="ru.dct.show_dct();" value="match_incr"/>Matches (increasing)</label></div>
+          <div class="radio"><label><input type="radio" name="colorder" 
+                                           onclick="ru.dct.show_dct();" value="alpha"/>Alphabetically</label></div>
+          <div class="radio"><label><input type="radio" name="colorder" 
+                                           onclick="ru.dct.show_dct();" value="rset" />Research set</label></div>
+          <!--
+          <div class="radio"><label><input type="radio" name="colorder" 
+                                           onclick="ru.dct.show_dct();" value="chrono"/>Chronologically</label></div>
+            -->
+        </div>
+      </div>
+
+      <!-- The actual DCT itself-->
       <div class="dct-show">
 
       </div>
