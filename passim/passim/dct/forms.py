@@ -67,9 +67,12 @@ class CollOneHistWidget(CollOneWidget):
 class ResearchSetForm(forms.ModelForm):
     profileid = forms.CharField(required=False)
     manulist = ModelChoiceField(queryset=None, required=False,
-                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
+            widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
     histlist = ModelChoiceField(queryset=None, required=False)
     ssgdlist = ModelChoiceField(queryset=None, required=False)
+    ssgdname = forms.CharField(label="Name", required=False, 
+            widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
+                                          'placeholder': 'User-defined name (optional)...',  'style': 'width: 100%;'}))
 
     class Meta:
         model = ResearchSet

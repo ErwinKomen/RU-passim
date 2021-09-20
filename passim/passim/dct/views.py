@@ -23,12 +23,32 @@ import json
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
-from passim.seeker.views import get_application_context, get_breadcrumbs
+from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
 from passim.dct.forms import ResearchSetForm, SetDefForm
 
+def get_application_name():
+    """Try to get the name of this application"""
+
+    # Walk through all the installed apps
+    for app in apps.get_app_configs():
+        # Check if this is a site-package
+        if "site-package" not in app.path:
+            # Get the name of this app
+            name = app.name
+            # Take the first part before the dot
+            project_name = name.split(".")[0]
+            return project_name
+    return "unknown"
+# Provide application-specific information
+PROJECT_NAME = get_application_name()
+app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_editor = "{}_editor".format(PROJECT_NAME.lower())
+app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_developer = "{}_developer".format(PROJECT_NAME.lower())
+app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 
 def manuscript_ssgs(manu, bDebug = False):
     """Get the ordered list of SSGs related to a manuscript"""
@@ -240,12 +260,22 @@ class ResearchSetListView(BasicList):
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'name', 'dbfield': 'name', 'keyS': 'name'}
-            ]}
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
          ]
 
     def initializations(self):
         # Some things are needed for initialization
         return None
+
+    def get_own_list(self):
+        # Get the user
+        username = self.request.user.username
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        qs = Profile.objects.filter(user=user)
+        return qs
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -270,6 +300,19 @@ class ResearchSetListView(BasicList):
 
         return context
 
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+
+        # Show private datasets as well as those with scope "team", provided the person is in the team
+        ownlist = self.get_own_list()
+        if user_is_ingroup(self.request, app_editor):
+            fields['scope'] = ( ( Q(scope="priv") & Q(profile__in=ownlist)  ) | Q(scope="team") )
+        else:
+            fields['scope'] = ( Q(scope="priv") & Q(profile__in=ownlist)  )
+
+        return fields, lstExclude, qAlternative
+
 
 class ResearchSetEdit(BasicDetails):
     model = ResearchSet
@@ -288,6 +331,7 @@ class ResearchSetEdit(BasicDetails):
             {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
             {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
             {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
+            {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
             {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
             {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
             ]
@@ -300,6 +344,33 @@ class ResearchSetEdit(BasicDetails):
 
         # Signal that we do have select2
         context['has_select2'] = True
+
+        # Determine what the permission level is of this collection for the current user
+        # (1) Is this user a different one than the one who created the collection?
+        profile_owner = instance.profile
+        profile_user = Profile.get_user_profile(self.request.user.username)
+        # (2) Set default permission
+        permission = ""
+        if profile_owner.id == profile_user.id:
+            # (3) Any creator of the collection may write it
+            permission = "write"
+        else:
+            # (4) permission for different users
+            if context['is_app_editor']:
+                # (5) what if the user is an app_editor?
+                if instance.scope == "publ":
+                    # Editors may read/write collections with 'public' scope
+                    permission = "write"
+                elif instance.scope == "team":
+                    # Editors may read collections with 'team' scope
+                    permission = "read"
+            else:
+                # (5) any other users
+                if instance.scope == "publ":
+                    # All users may read collections with 'public' scope
+                    permission = "read"
+
+        context['permission'] = permission
 
         # Return the context we have made
         return context
@@ -393,6 +464,7 @@ class ResearchSetDetails(ResearchSetEdit):
             manu = cleaned.get("manulist")
             hist = cleaned.get("histlist")
             ssgd = cleaned.get("ssgdlist")
+            ssgdname = cleaned.get("ssgdname")
 
             if manu != None or hist != None or ssgd != None:
                  # (1) Preliminary order
@@ -437,7 +509,11 @@ class ResearchSetDetails(ResearchSetEdit):
                             # (3) Create the new list
                             setlist = SetList.objects.create(
                                 researchset=instance, order=order, 
-                                setlisttype=setlisttype, collection=ssgd, contents=contents)
+                                setlisttype=setlisttype, collection=ssgd)
+                            # Possibly add the name
+                            if ssgdname != None and ssgdname != "":
+                                setlist.name = ssgdname
+                                setlist.save()
                         # Make sure the contents is re-calculated
                         setlist.calculate_contents()
                 # (4) Re-calculate the order
@@ -515,7 +591,10 @@ class ResearchSetDetails(ResearchSetEdit):
                 add_one_item(rel_item, obj.get_setlisttype_display(), False)
 
                 # SetList: title of the manu/coll
-                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "title"), False, main=True)
+                kwargs = None
+                if obj.name != None and obj.name != "":
+                    kwargs = dict(name=obj.name)
+                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "title", kwargs=kwargs), False, main=True)
 
                 # SetList: Size (number of SSG in this manu/coll)
                 add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False, align="right")
@@ -614,7 +693,7 @@ class ResearchSetDetails(ResearchSetEdit):
         # Return out HTML string
         return sHtml
 
-    def get_field_value(self, type, instance, custom):
+    def get_field_value(self, type, instance, custom, kwargs=None):
         sBack = ""
         collection_types = ['hist', 'ssgd' ]
 
@@ -640,7 +719,10 @@ class ResearchSetDetails(ResearchSetEdit):
                             url = reverse("collpubl_details", kwargs={'pk': instance.id})
                         else:
                             url = reverse("collpriv_details", kwargs={'pk': instance.id})
-                    title = instance.name
+                    if kwargs != None and 'name' in kwargs:
+                        title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                    else:
+                        title = instance.name
                     sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
             elif custom == "size":
                 # Get the number of SSGs related to items in this collection
@@ -683,12 +765,22 @@ class SetDefListView(BasicList):
             {'filter': 'name', 'dbfield': 'name', 'keyS': 'name'}
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'profile',     'fkfield': 'researchset__profile', 'keyFk': 'id', 'infield': 'id'}]}
+            {'filter': 'profile',   'fkfield': 'researchset__profile',  'keyFk': 'id', 'infield': 'id'},
+            {'filter': 'scope',     'dbfield': 'scope',                 'keyS': 'scope'}
+            ]},
          ]
 
     def initializations(self):
         # Some things are needed for initialization
         return None
+
+    def get_own_list(self):
+        # Get the user
+        username = self.request.user.username
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        qs = Profile.objects.filter(user=user)
+        return qs
 
     def adapt_search(self, fields):
         lstExclude=None
@@ -715,6 +807,19 @@ class SetDefListView(BasicList):
 
         return sBack, sTitle
     
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+
+        # Show private datasets as well as those with scope "team", provided the person is in the team
+        ownlist = self.get_own_list()
+        if user_is_ingroup(self.request, app_editor):
+            fields['scope'] = ( ( Q(researchset__scope="priv") & Q(researchset__profile__in=ownlist)  ) | Q(researchset__scope="team") )
+        else:
+            fields['scope'] = ( Q(researchset__scope="priv") & Q(researchset__profile__in=ownlist)  )
+
+        return fields, lstExclude, qAlternative
+
 
 class SetDefEdit(BasicDetails):
     model = SetDef
@@ -732,6 +837,7 @@ class SetDefEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'line',  'label': "Name:",         'value': instance.name,  'field_key': 'name'  },
             {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(), 'field_key': 'notes' },
+            {'type': 'plain', 'label': "Owner:",        'value': instance.researchset.profile.user.username },
             {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
             {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
             ]
@@ -748,6 +854,33 @@ class SetDefEdit(BasicDetails):
                     'url': reverse('researchset_details', kwargs={'pk': rset.id})}
             topleftlist.append(buttonspecs)
             context['topleftbuttons'] = topleftlist
+
+        # Determine what the permission level is of this collection for the current user
+        # (1) Is this user a different one than the one who created the collection?
+        profile_owner = instance.researchset.profile
+        profile_user = Profile.get_user_profile(self.request.user.username)
+        # (2) Set default permission
+        permission = ""
+        if profile_owner.id == profile_user.id:
+            # (3) Any creator of the collection may write it
+            permission = "write"
+        else:
+            # (4) permission for different users
+            if context['is_app_editor']:
+                # (5) what if the user is an app_editor?
+                if instance.researchset.scope == "publ":
+                    # Editors may read/write collections with 'public' scope
+                    permission = "write"
+                elif instance.researchset.scope == "team":
+                    # Editors may read collections with 'team' scope
+                    permission = "read"
+            else:
+                # (5) any other users
+                if instance.researchset.scope == "publ":
+                    # All users may read collections with 'public' scope
+                    permission = "read"
+
+        context['permission'] = permission
 
         # Return the context we have made
         return context

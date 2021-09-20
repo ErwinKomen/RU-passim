@@ -1670,6 +1670,17 @@ svg .nodes text {
 
 
 /* DCT stuff */
+.table-scroll {
+    position: relative;
+    /* max-width: 600px; */
+    max-width: 10000px;
+    margin: auto;
+    overflow: hidden;
+}
+.table-wrap {
+    width: 100%;
+    overflow: auto;
+}
 table.dct-view {
     border: 1px solid white;
     /* border: none; */
@@ -1677,7 +1688,13 @@ table.dct-view {
     margin-top: 0px;
     vertical-align: top;
     padding: 2px;
+    width: 100%;
+    margin: auto;
 }
+/*
+.table-scroll thead, .table-scroll tfoot {
+    background:#f9f9f9;
+}*/
 
 
 table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno, table th .shelf-size {
@@ -1688,6 +1705,7 @@ table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno, ta
 
 table.dct-view th .shelf-city {
     color: lightblue;
+    cursor: pointer;
 }
 
 table.dct-view th .shelf-idno {
@@ -1734,4 +1752,28 @@ table.dct-view td {
   vertical-align: top;
   padding: 2px;
   overflow: hidden;
+}
+
+.clone {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background-color: transparent !important;
+}
+.clone th, .clone td {
+    visibility: hidden;
+    /* border-color: transparent;*/
+    background-color: transparent;
+}
+.clone th.fixed-side {
+    visibility: visible;
+    background-color: darkgreen !important;
+}
+.clone td.fixed-side {
+    visibility: visible;
+    background-color: lightgray !important;
+}
+
+.clone thead, .clone tfoot {
+    background: transparent;
 }

@@ -246,6 +246,7 @@ var ru = (function ($, ru) {
             siglist = "",
             sUrl = "",
             ssglist = null,
+            sClass = "",
             bFound = false,
             html_row = [];
 
@@ -253,11 +254,11 @@ var ru = (function ($, ru) {
           // Start creating this row
           if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
           if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
-          html_row.push("<tr><td><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
+          html_row.push("<tr><td class='fixed-side tdnowrap'><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
           if (bShowPivot) {
-            html_row.push("<td align='center'>" + oSsgThis.order + "</td>");
+            html_row.push("<td class='fixed-side' align='center'>" + oSsgThis.order + "</td>");
           } else {
-            html_row.push("<td>&nbsp;</td>");
+            html_row.push("<td class='fixed-side'>&nbsp;</td>");
           }
           ssg = oSsgThis.super;
           for (i = 0; i < ssglists.length; i++) {
@@ -276,10 +277,11 @@ var ru = (function ($, ru) {
                   break;
                 }
               }
+              sClass = (i == 0) ? " class='fixed-side'" : "";
               if (order >= 0) {
-                html_row.push("<td align='center'>" + order + "</td>");
+                html_row.push("<td" + sClass + " align='center'>" + order + "</td>");
               } else {
-                html_row.push("<td></td>");
+                html_row.push("<td" + sClass + "></td>");
               }
             }
           }
@@ -312,6 +314,7 @@ var ru = (function ($, ru) {
             sMiddle = "",
             sMain = "",
             sUrl = "",
+            sClass = "",
             iSize = 0,
             pivot = null,
             dealt_with = [],    // List of SSGs that have appeared in a row
@@ -402,9 +405,9 @@ var ru = (function ($, ru) {
           });
 
           // Walk the data for this DCT and construct the html
-          html.push("<table class='dct-view'>");
+          html.push("<div class='table-scroll'><div class='table-wrap'><table class='dct-view'>");
           // Construct the header
-          html.push("<thead><tr><th>Gryson/Clavis</th>");
+          html.push("<thead><tr><th class='fixed-side'>Gryson/Clavis</th>");
           for (i = 0; i < ssglists.length; i++) {
             // Get the title object
             oTitle = ssglists[i]['title'];
@@ -416,9 +419,10 @@ var ru = (function ($, ru) {
             if ('url' in oTitle) { sUrl = oTitle['url']; }
 
             // Show it
-            html.push("<th onclick='ru.dct.dct_pivot(" + i + ")'>");
+            sClass = (i == 0) ? "class='fixed-side'" : "";
+            html.push("<th " + sClass + ">");
             // Top 
-            html.push("<div class='shelf-city'>" + sTop + "</div>");
+            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + i + ")'>" + sTop + "</div>");
             // Middle
             html.push("<div class='shelf-library'>" + sMiddle + "</div>");
             // Main
@@ -491,10 +495,15 @@ var ru = (function ($, ru) {
           html.push("</tbody>");
 
           // Finish the table
-          html.push("</table>");
+          html.push("</div></div></table>");
 
-          // SHow the created DCT
+          // Add the created DCT
           $(elDctShow).html(html.join("\n"));
+
+          // Clone it for fixed-side scrolling
+          $(elDctShow).find("table").first().clone(true).appendTo('.table-scroll').addClass('clone');
+
+          // Now show it
           $(elDctTools).removeClass("hidden");
 
           // Hide the waiting part

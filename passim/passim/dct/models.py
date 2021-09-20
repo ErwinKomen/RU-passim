@@ -16,7 +16,7 @@ import json, copy
 
 # Take from my own app
 from passim.utils import ErrHandle
-from passim.seeker.models import get_current_datetime, build_abbr_list, \
+from passim.seeker.models import get_current_datetime, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature
 
 STANDARD_LENGTH=255
@@ -87,6 +87,10 @@ class ResearchSet(models.Model):
 
     # [1] A list of all the DCT parameters for this DCT
     contents = models.TextField("Contents", default="[]")
+
+    # [1] The scope of this collection: who can view it?
+    #     E.g: private, team, global - default is 'private'
+    scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv", max_length=5)
 
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
@@ -234,6 +238,9 @@ class SetList(models.Model):
     # [1] Each setlist must be of a particular type
     setlisttype = models.CharField("Setlist type", choices=build_abbr_list(SETLIST_TYPE), max_length=5)
 
+    # [0-1] A user-defined name, if this is a SSGD type
+    name = models.CharField("Setlist name", max_length=STANDARD_LENGTH, blank=True, null=True)
+
     # [1] For convenience and faster operation: keep a JSON list of the SSGs in this setlist
     contents = models.TextField("Contents", default="{}")
 
@@ -299,7 +306,10 @@ class SetList(models.Model):
         elif self.setlisttype == "ssgd":
             # Personal collection
             oBack['top'] = "pd"
-            oBack['main'] = self.collection.name
+            if self.name == None or self.name == "":
+                oBack['main'] = self.collection.name
+            else:
+                oBack['main'] = self.name
             oBack['size'] = self.collection.freqsuper()
             oBack['url'] = reverse('collpriv_details', kwargs={'pk': self.collection.id})
         else:
