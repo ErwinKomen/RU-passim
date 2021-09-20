@@ -1764,14 +1764,17 @@ table.dct-view td {
     visibility: hidden;
     /* border-color: transparent;*/
     background-color: transparent;
+    border-color: transparent !important;
 }
 .clone th.fixed-side {
     visibility: visible;
     background-color: darkgreen !important;
+    border-color: white !important;
 }
 .clone td.fixed-side {
     visibility: visible;
     background-color: lightgray !important;
+    border-color: white !important;
 }
 
 .clone thead, .clone tfoot {
