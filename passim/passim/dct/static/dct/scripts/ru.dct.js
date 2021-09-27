@@ -31,7 +31,7 @@ var ru = (function ($, ru) {
     var loc_divErr = "basic_err",
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
-        loc_relatedRow = null,  // Row being dragged
+        loc_columnTh = null,    // TH being dragged
         loc_params = "",        // DCT parameters
         loc_ssglists = null,    // The object with the DCT information
         loc_colwrap = [],       // Column wrapping
@@ -254,11 +254,11 @@ var ru = (function ($, ru) {
           // Start creating this row
           if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
           if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
-          html_row.push("<tr><td class='fixed-side tdnowrap'><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
+          html_row.push("<tr><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
           if (bShowPivot) {
-            html_row.push("<td class='fixed-side' align='center'>" + oSsgThis.order + "</td>");
+            html_row.push("<td class='fixed-side fixed-col1' align='center'>" + oSsgThis.order + "</td>");
           } else {
-            html_row.push("<td class='fixed-side'>&nbsp;</td>");
+            html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
           }
           ssg = oSsgThis.super;
           for (i = 0; i < ssglists.length; i++) {
@@ -277,7 +277,7 @@ var ru = (function ($, ru) {
                   break;
                 }
               }
-              sClass = (i == 0) ? " class='fixed-side'" : "";
+              sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
               if (order >= 0) {
                 html_row.push("<td" + sClass + " align='center'>" + order + "</td>");
               } else {
@@ -301,6 +301,11 @@ var ru = (function ($, ru) {
         }
       },
 
+      dct_saveshow: function() {
+        $(".dct-view .dct-save-options").removeClass("hidden");
+      },
+
+
       /** 
        *  dct_show - Show one DCT on the default location
        */
@@ -319,19 +324,26 @@ var ru = (function ($, ru) {
             pivot = null,
             dealt_with = [],    // List of SSGs that have appeared in a row
             remainder = [],     // List with remainder
+            lst_order = [],
+            ssglists_new = [],
             ssglist = null,
             oSsgItem = null,
             oSsgPivot = null,
             oCombi = null,
             bFound = false,
+            marginleft = 0,
             order = 0,
             ssg = 0,
             row = 0,
             a_title = "",
             b_title = "",
+            order = 0,
             i = 0,
             j = 0,
+            col0 = {},
+            col1 = {},
             pivot_col = 0,
+            pivot_idx = 0,
             view_mode = "all",        // May have values: 'all', 'match'
             col_mode = "match_decr",  // May have values: 'match_decr', 'match_incr', 'alpha', 'chrono'
             html_row = [],
@@ -340,13 +352,43 @@ var ru = (function ($, ru) {
         try {
           // Parameter??
           if (params === undefined) {
-            pivot_col = 0;
+            pivot_idx = 0;
           } else {
             // Get the pivot row
             if ("pivot_col" in params) { pivot_col = params['pivot_col'];}
             if ("view_mode" in params) { view_mode = params['view_mode'];}
             if ("col_mode" in params) { col_mode = params['col_mode']; }
+            if ("lst_order" in params) { lst_order = params['lst_order']; }
+            if (col_mode === "custom") {
+              // $("input[name='colorder']").prop("checked", false);
+              $("#colmode option").prop("disabled", false);
+              $("#colmode option[value='custom']").prop("selected", true);
+            }
+            // Adapt columns if pivot_col is different
+            if (pivot_col !== 0) {
+              // The [pivot_col] is the 'title.order' value - Check which index it is
+              pivot_idx = -1;
+              for (i = 0; i < ssglists.length; i++) {
+                if (ssglists[i].title.order === pivot_col) {
+                  pivot_idx = i;
+                  break;
+                }
+              }
+              ssglists_new.push(ssglists[pivot_idx]);
+              for (i = 0; i < ssglists.length; i++) {
+                if (i !== pivot_idx) {
+                  ssglists_new.push(ssglists[i]);
+                }
+              }
+              ssglists = ssglists_new;
+              loc_ssglists = ssglists_new;
+
+              // THe pivot_idx has now changed to column zero!
+              pivot_idx = 0;
+            }
           }
+          // Make sure we save the parameters
+          loc_params = { "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode, "lst_order": lst_order };
 
           // Find out where the DCT should come
           elDctView = $(".dct-view").first();
@@ -364,7 +406,7 @@ var ru = (function ($, ru) {
 
           // Sort the ssglists (the columns) according to what the user indicated
           for (i = 0; i < ssglists.length; i++) {
-            ssglists[i]['title']['pivot'] = (i === pivot_col) ? 0 : 1;
+            ssglists[i]['title']['pivot'] = (i === pivot_idx) ? 0 : 1;
           }
           ssglists.sort(function (a, b) {
             var retval = 0;
@@ -398,6 +440,9 @@ var ru = (function ($, ru) {
                   }
                   retval = (a_title > b_title) ? 1 : -1;
                   break;
+                case "custom":
+                  retval = (lst_order.indexOf(a.title.order) > lst_order.indexOf(b.title.order)) ? 1 : -1;
+                  break;
               }
             }
 
@@ -407,22 +452,31 @@ var ru = (function ($, ru) {
           // Walk the data for this DCT and construct the html
           html.push("<div class='table-scroll'><div class='table-wrap'><table class='dct-view'>");
           // Construct the header
-          html.push("<thead><tr><th class='fixed-side'>Gryson/Clavis</th>");
+          html.push("<thead><tr><th class='fixed-side fixed-col0' order='0'>Gryson/Clavis</th>");
           for (i = 0; i < ssglists.length; i++) {
             // Get the title object
             oTitle = ssglists[i]['title'];
             sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
-            if ('top' in oTitle) { sTop = oTitle['top'];}
+            if ('top' in oTitle) { sTop = oTitle['top']; if (sTop === "") sTop = "ms";}
             if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
             if ('main' in oTitle) { sMain = oTitle['main']; }
             if ('size' in oTitle) { iSize = oTitle['size']; }
             if ('url' in oTitle) { sUrl = oTitle['url']; }
 
+            order = oTitle.order;
+
             // Show it
-            sClass = (i == 0) ? "class='fixed-side'" : "";
-            html.push("<th " + sClass + ">");
+            if (i === 0) {
+              sClass = "class='fixed-side fixed-col1'";
+            } else {
+              sClass = "class='draggable' draggable='true' " +
+                "ondragstart='ru.dct.dct_drag(event);' " +
+                "ondragend='ru.dct.dct_dragend(event);' " +
+                "ondragover='ru.dct.dct_dragenter(event);'";
+            }
+            html.push("<th " + sClass + " order='" + order.toString() + "'>");
             // Top 
-            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + i + ")'>" + sTop + "</div>");
+            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + order + ")' title='Click to make this the PIVOT'>" + sTop + "</div>");
             // Middle
             html.push("<div class='shelf-library'>" + sMiddle + "</div>");
             // Main
@@ -440,7 +494,7 @@ var ru = (function ($, ru) {
           // Construct the body
           html.push("<tbody>");
           // Get the pivot: ssglist zero
-          pivot = ssglists[pivot_col]['ssglist'];
+          pivot = ssglists[pivot_idx]['ssglist'];
           // Walk the rows of the pivot
           for (row = 0; row < pivot.length; row++) {
             // Get details of this SSG
@@ -451,7 +505,7 @@ var ru = (function ($, ru) {
             dealt_with.push(ssg);
 
             // Walk through all the other lists, finding this SSG
-            oCombi = private_methods.dct_row_combine(ssglists, pivot_col, oSsgPivot, true);
+            oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, true);
             if (!oCombi.error) {
               // This action depends on the view mode
               switch (view_mode) {
@@ -475,14 +529,14 @@ var ru = (function ($, ru) {
           switch (view_mode) {
             case "all":
               // Get a list of remaining *objects* to be dealt with
-              remainder = private_methods.dct_remaining_ssgs(ssglists, pivot_col, dealt_with);
+              remainder = private_methods.dct_remaining_ssgs(ssglists, pivot_idx, dealt_with);
               // Walk all these objects
               for(row=0;row<remainder.length;row++) {
                 // Get this object
                 oSsgPivot = remainder[row];
 
                 // Walk through all the other lists, finding this SSG
-                oCombi = private_methods.dct_row_combine(ssglists, pivot_col, oSsgPivot, false);
+                oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, false);
 
                 if (!oCombi.error) {
                   // Always show the row
@@ -500,14 +554,38 @@ var ru = (function ($, ru) {
           // Add the created DCT
           $(elDctShow).html(html.join("\n"));
 
-          // Clone it for fixed-side scrolling
-          $(elDctShow).find("table").first().clone(true).appendTo('.table-scroll').addClass('clone');
-
           // Now show it
           $(elDctTools).removeClass("hidden");
 
           // Hide the waiting part
           $(elDctWait).addClass("hidden");
+
+          // Calculate the correct "left" values for the first column
+          $(elDctShow).find("table th.fixed-side.fixed-col0").each(function (idx, el) {
+            var iLeft = 0, sWidth = "", oCss = {};
+
+            // Get the current left position
+            iLeft = Math.max(0, el.offsetLeft);
+            sWidth = $(el).css("width");
+            col0 = { "width": sWidth, "min-width": sWidth, "max-width": sWidth, "left": iLeft };
+
+          });
+
+          // Calculate the correct "left" values for the second column
+          $(elDctShow).find("table th.fixed-side.fixed-col1").each(function (idx, el) {
+            var iLeft = 0, sWidth = "", oCss = {};
+
+            // Get the current left position
+            iLeft = Math.max(0, el.offsetLeft);
+            sWidth = $(el).css("width");
+            col1 = { "width": sWidth, "min-width": sWidth, "max-width": sWidth, "left": iLeft };
+
+          });
+
+          // Now fix this throughout the table
+          $(elDctShow.find("table .fixed-col0")).css(col0);
+          $(elDctShow.find("table .fixed-col1")).css(col1);
+
         } catch (ex) {
           private_methods.errMsg("dct_show", ex);
         }
@@ -1045,6 +1123,228 @@ var ru = (function ($, ru) {
     }
     // Public methods
     return {
+
+      /**
+       * dct_cancel
+       *    Cancel saving and return to the previously copied state
+       *
+       */
+      dct_cancel: function (elStart) {
+        var elRoot = null,
+            elCopy = null,
+            elOriginal = null;
+
+        try {
+          elRoot = $(elStart).closest(".dct-root");
+          if (elRoot.length > 0) {
+            elOriginal = $(elRoot).find(".dct-view").first();
+            elCopy = $(elRoot).find(".dct-copy").first();
+            if (elOriginal.length > 0 && elCopy.length > 0) {
+              // Copy from copy to original
+              $(elOriginal).html($(elCopy).html());
+
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("dct_cancel", ex);
+        }        
+      },
+
+      /**
+       * dct_drag
+       *    Starting point of dragging. 
+       *    The DOM object of the <th> is stored in [loc_columnTh]
+       *
+       */
+      dct_drag: function (ev) {
+        var row = "";
+        try {
+          loc_columnTh = null;
+          loc_columnTh = ev.target;
+        } catch (ex) {
+          private_methods.errMsg("dct_drag", ex);
+        }
+      },
+
+      /**
+       * dct_dragenter
+       *    Dragging one column over other columns
+       *
+       */
+      dct_dragenter: function (ev) {
+        var th_src = null,
+            children = null;
+
+        try {
+          // Prevend the default behaviour
+          ev.preventDefault();
+
+          // Get the column that is stored
+          th_src = loc_columnTh;
+          // We must be going over a TH with the right class
+          if (ev.target.nodeName.toLowerCase() === "th" && $(ev.target).hasClass("draggable")) {
+
+            // Get the <th> children in one array
+            children = Array.from(ev.target.parentNode.children);
+            // Check whether we are before or after the target
+            if (children.indexOf(ev.target) > children.indexOf(th_src)) {
+              // Target comes after
+              ev.target.after(th_src);
+            } else if (children.indexOf(ev.target) < children.indexOf(th_src)) {
+              // Target comes before
+              ev.target.before(th_src);
+            }
+
+            // Show that changes can/need to be saved
+            // $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("dct_dragenter", ex);
+        }
+      },
+
+      /**
+       * dct_dragend
+       *    Dragging has finished: re-order
+       *
+       */
+      dct_dragend: function (ev) {
+        var th_src = null,
+            lst_order = [],
+            order = 0,
+            i = 0,
+            children = null;
+
+        try {
+          // Prevend the default behaviour
+          ev.preventDefault();
+
+          // Get the current order of the columns
+          children = Array.from(ev.target.parentNode.children);
+          for (i = 0; i < children.length; i++) {
+            order = parseInt($(children[i]).attr("order"), 10);
+            if (order > 0) {
+              lst_order.push(order);
+            }
+          }
+
+          // Sort custom according to this order
+          loc_params['col_mode'] = "custom";
+          loc_params['lst_order'] = lst_order;
+
+          private_methods.dct_show(loc_ssglists, loc_params);
+
+          // Make sure save buttons are shown
+          private_methods.dct_saveshow();
+        } catch (ex) {
+          private_methods.errMsg("dct_dragend", ex);
+        }
+      },
+
+      /**
+       * dct_pivot
+       *    Take the indicated column as pivot for the DCT
+       *
+       */
+      dct_pivot: function (pivot_col) {
+        var params;
+
+        try {
+          // Take the local parameters
+          params = loc_params;
+          // Change the pivot column
+          params['pivot_col'] = pivot_col;
+          // show this DCT
+          private_methods.dct_show(loc_ssglists, params);
+
+          // Make sure save buttons are shown
+          private_methods.dct_saveshow();
+        } catch (ex) {
+          private_methods.errMsg("dct_pivot", ex);
+        }
+      },
+
+      /**
+       * dct_save
+       *    Save changes to the DCT
+       *
+       */
+      dct_save: function (el, elDctId, save_mode) {
+        var frm = null,
+            data = null,
+            targeturl = null,
+            contents = null,
+            ssglists = null,
+            params = null;
+
+        try {
+          // Get the target URL
+          targeturl = $(elDctId).attr("targeturl");
+
+          // Get to the form
+          frm = $(elDctId).closest("form");
+          data = frm.serializeArray();
+
+          // Add the parameters to the information
+          data.push({ "name": "params", "value": JSON.stringify( loc_params) });
+          data.push({ "name": "save_mode", "value": save_mode });
+
+          //SHow we are waiting
+          $(".dct-save-waiting").removeClass("hidden");
+
+          // Try to delete: send a POST
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+            }
+          });
+        } catch (ex) {
+          private_methods.errMsg("dct_save", ex);
+        }
+      },
+      
       /**
        * load_dct
        *    Ask for the DCT definition using AJAX
@@ -1086,13 +1386,28 @@ var ru = (function ($, ru) {
                   loc_params = params;
 
                   // Get the view mode
-                  view_mode = $("input[name=viewmode]:checked").val();
+                  // view_mode = $("input[name=viewmode]:checked").val();
+                  view_mode = $("#viewmode").val();
                   params['view_mode'] = view_mode;
 
                   // If all is set, show it
                   if (loc_ssglists !== undefined && loc_ssglists != "" && loc_ssglists.length > 0) {
                     // show this DCT
                     private_methods.dct_show(loc_ssglists, params);
+
+                    // Prepare copy
+                    $(".dct-root").each(function (idx, el) {
+                      var elOriginal = $(el).find(".dct-view").first(),
+                          elCopy = $(el).find(".dct-copy").first(),
+                          clone;
+
+                      if (elOriginal.length > 0 && elCopy.length > 0) {
+                        // Copy original to copy
+                        $(elCopy).html($(elOriginal).html());
+
+                      }
+                    });
+
                   }
                   break;
                 case "error":
@@ -1145,8 +1460,10 @@ var ru = (function ($, ru) {
           params = loc_params;
 
           // Get the view mode and the column order
-          params['view_mode'] = $("input[name=viewmode]:checked").val();
-          params['col_mode'] = $("input[name=colorder]:checked").val();;
+          // params['view_mode'] = $("input[name=viewmode]:checked").val();
+          // params['col_mode'] = $("input[name=colorder]:checked").val();;
+          params['view_mode'] = $("#viewmode").val();
+          params['col_mode'] = $("#colmode").val();
 
           // If all is set, show it
           if (loc_ssglists !== undefined && loc_ssglists != "" && loc_ssglists.length > 0) {

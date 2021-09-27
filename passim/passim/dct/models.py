@@ -16,7 +16,8 @@ import json, copy
 
 # Take from my own app
 from passim.utils import ErrHandle
-from passim.seeker.models import get_current_datetime, build_abbr_list, COLLECTION_SCOPE, \
+from passim.settings import TIME_ZONE
+from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature
 
 STANDARD_LENGTH=255
@@ -132,13 +133,15 @@ class ResearchSet(models.Model):
     def get_created(self):
         """REturn the creation date in a readable form"""
 
-        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        # sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.created, True)
         return sDate
 
     def get_saved(self):
         """REturn the saved date in a readable form"""
 
-        sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
         return sDate
 
     def get_notes_html(self):
@@ -441,16 +444,20 @@ class SetDef(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the save date
         self.saved = get_current_datetime()
-        # Calculate the proper order
-        last = SetDef.objects.filter(researchset=self.researchset).order_by("-order").first()
-        if last == None:
-            order = 1
-        else:
-            order = last.order + 1
-        # Automatically assign a name
-        default_name = "{}_DCT_{:06}".format(self.researchset.profile.user.username, order)
-        self.name = default_name
-        self.notes = "Automatically created"
+
+        # Need any name or notes fixed?
+        if self.name == None or self.name == "":
+            # Calculate the proper order
+            last = SetDef.objects.filter(researchset=self.researchset).order_by("-order", "-saved").first()
+            if last == None:
+                order = 1
+            else:
+                order = last.order + 1
+            self.order = order
+            # Automatically assign a name
+            default_name = "{}_DCT_{:06}".format(self.researchset.profile.user.username, order)
+            self.name = default_name
+            self.notes = "Automatically created"
         # Initial saving
         response = super(SetDef, self).save(force_insert, force_update, using, update_fields)
 
@@ -469,7 +476,8 @@ class SetDef(models.Model):
     def get_created(self):
         """REturn the creation date in a readable form"""
 
-        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        # sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.created, True)
         return sDate
 
     def get_notes_html(self):
@@ -483,7 +491,8 @@ class SetDef(models.Model):
     def get_saved(self):
         """REturn the saved date in a readable form"""
 
-        sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
         return sDate
 
     def get_setlist(self, pivot_id=None):

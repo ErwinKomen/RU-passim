@@ -752,6 +752,7 @@ body > div > footer {
   bottom: 0px;
   width: 100%;
   text-align: center;
+  z-index: 100;
 }
 body > div > footer a {
   color: #355e3b;
@@ -1691,10 +1692,7 @@ table.dct-view {
     width: 100%;
     margin: auto;
 }
-/*
-.table-scroll thead, .table-scroll tfoot {
-    background:#f9f9f9;
-}*/
+
 
 
 table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno, table th .shelf-size {
@@ -1751,32 +1749,21 @@ table.dct-view td {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
-  overflow: hidden;
+  /* overflow: hidden;*/
+  background-color: lightgray; 
 }
 
-.clone {
-    position: absolute;
-    left: 0;
-    top: 0;
-    background-color: transparent !important;
-}
-.clone th, .clone td {
-    visibility: hidden;
-    /* border-color: transparent;*/
-    background-color: transparent;
-    border-color: transparent !important;
-}
-.clone th.fixed-side {
-    visibility: visible;
-    background-color: darkgreen !important;
-    border-color: white !important;
-}
-.clone td.fixed-side {
-    visibility: visible;
-    background-color: lightgray !important;
-    border-color: white !important;
+table.dct-view td, table.dct-view th {
+    z-index: 20;
+    position: relative;
+    background-clip: padding-box;
 }
 
-.clone thead, .clone tfoot {
-    background: transparent;
+table.dct-view .fixed-side {
+    position: sticky;
+    z-index: 50;
+}
+
+.dct-tools .form-control {
+    font-size: small;
 }

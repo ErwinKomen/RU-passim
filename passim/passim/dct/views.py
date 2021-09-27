@@ -622,7 +622,7 @@ class ResearchSetDetails(ResearchSetEdit):
             setdefs['savebuttons'] = False
             setdefs['saveasbutton'] = False
             qs_setdefs = instance.researchset_setdefs.all().order_by(
-                'name')
+                'order')
 
             # Walk these setdefs
             rel_list = []
@@ -772,6 +772,20 @@ class SetDefListView(BasicList):
 
     def initializations(self):
         # Some things are needed for initialization
+        #qs = SetDef.objects.filter(order=0)
+        #if qs.count() > 0:
+        #    # Repair the setdefs per research set            
+        #    for rset in ResearchSet.objects.all():
+        #        # Get a correct ordering of all the setdefs
+        #        order = 1
+        #        with transaction.atomic():
+        #            for sdef in SetDef.objects.filter(researchset=rset).order_by("order", "created"):
+        #                if sdef.order == 0:
+        #                    sdef.order = order
+        #                    sdef.save()
+        #                order += 1
+
+        # No return
         return None
 
     def get_own_list(self):
@@ -932,18 +946,39 @@ class SetDefData(BasicPart):
     MainModel = SetDef
 
     def add_to_context(self, context):
+
         # Gather all necessary data
         data = {}
-        # Get to the setdef object
+
+        # Get the SetDef object
         setdef = self.obj
-        contents = setdef.get_contents()
 
-        # Set the pivot row to the default value, if it is not yet defined
-        if not 'pivot_col' in contents['params']:
-            contents['params']['pivot_col'] = 0
+        # Find out what we are doing here
+        mode = self.qd.get("save_mode", "")
+        params = self.qd.get("params")
+        if mode == "save":
+            # Simple saving of current object
+            if params != None:
+                setdef.contents = params
+                setdef.save()
+                data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef.id})
+        elif mode == "savenew":
+            # Save as a new item and open that one
+            setdef_new = SetDef.objects.create(
+                researchset=setdef.researchset,
+                contents=params)
+            data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef_new.id})
 
-        # REturn the contents
-        data['contents'] = contents
+        else:
+            # Get to the setdef object
+            contents = setdef.get_contents()
+
+            # Set the pivot row to the default value, if it is not yet defined
+            if not 'pivot_col' in contents['params']:
+                contents['params']['pivot_col'] = 0
+
+            # REturn the contents
+            data['contents'] = contents
         # FIll in the [data] part of the context with all necessary information
         context['data'] = data
         return context
