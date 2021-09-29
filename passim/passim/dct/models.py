@@ -201,11 +201,31 @@ class ResearchSet(models.Model):
             # Figure out what the first best list is
             idx_pm = -1
             max_matches = -1
+            min_order = len(ssglists) + 2
+            min_year_start = 3000
+            min_year_finish = 3000
             for idx, oListItem in enumerate(ssglists):
                 unique_matches = oListItem['unique_matches']
+                year_start = oListItem['title']['year_start']
+                year_finish = oListItem['title']['year_finish']
+                order = oListItem['title']['order']
+
                 # Check which is the best so far
-                if unique_matches > max_matches:
+                bTakeThis = False
+                bTakeThis = (unique_matches > max_matches)
+                if not bTakeThis and unique_matches == max_matches:
+                    bTakeThis = (year_start < min_year_start)
+                    if not bTakeThis and year_start == min_year_start:
+                        bTakeThis = (year_finish < min_year_finish)
+                        if not bTakeThis and year_finish == min_year_finish:
+                            bTakeThis = (order < min_order)
+
+                # Adapt if this is the one
+                if bTakeThis:
                     max_matches = unique_matches
+                    min_year_start = year_start
+                    min_year_finish = year_finish
+                    min_order = order
                     idx_pm = idx
 
             # What we return is the 'order' value of the best matching list

@@ -1259,16 +1259,29 @@ var ru = (function ($, ru) {
        * dct_pivot
        *    Take the indicated column as pivot for the DCT
        *
+       * Note from issue #396:
+       *    If there are multiple source-lists with the same number of matches, 
+       *    the oldest (manuscript) source-list should be selected.
+       *
        */
       dct_pivot: function (pivot_col) {
         var params,
             i = 0,
             unique_matches = -1,
             min_order = -1,
+            min_year_finish = 3000,
+            min_year_start = 3000,
             order = -1,
+            default_colmode = "match_decr",
+            year_finish = -1,
+            year_start = -1,
             max_matches = -1;
 
         try {
+          // Need to adapt the colmode
+          $("#colmode option[value='" + default_colmode + "']").prop("selected", true);
+          $("#colmode option[value='custom']").prop("disabled", true);
+          loc_params['col_mode'] = default_colmode;
           // Take the local parameters
           params = loc_params;
           // Change the pivot column
@@ -1278,9 +1291,16 @@ var ru = (function ($, ru) {
             for (i = 0; i < loc_ssglists.length; i++) {
               unique_matches = loc_ssglists[i]['unique_matches'];
               order = loc_ssglists[i]['title']['order'];
-              if (unique_matches > max_matches || (unique_matches === max_matches && order < min_order)) {
+              year_start = loc_ssglists[i]['title']['year_start'];
+              year_finish = loc_ssglists[i]['title']['year_finish'];
+              if (unique_matches > max_matches ||
+                  (unique_matches === max_matches && year_start < min_year_start ) ||
+                  (unique_matches === max_matches && year_start === min_year_start && year_finish < min_year_finish) ||
+                  (unique_matches === max_matches && year_start === min_year_start && year_finish === min_year_finish && order < min_order)) {
                 max_matches = unique_matches;
                 min_order = order;
+                min_year_finish = year_finish;
+                min_year_start = year_start;
                 // pivot_col = loc_ssglists[i]['title']['order'];
                 pivot_col = order;
               }
