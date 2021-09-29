@@ -333,6 +333,8 @@ var ru = (function ($, ru) {
             bFound = false,
             marginleft = 0,
             order = 0,
+            unique_matches = 0,
+            oMatchSet = null,
             ssg = 0,
             row = 0,
             a_title = "",
@@ -344,6 +346,7 @@ var ru = (function ($, ru) {
             col1 = {},
             pivot_col = 0,
             pivot_idx = 0,
+            order_key = "",
             view_mode = "all",        // May have values: 'all', 'match'
             col_mode = "match_decr",  // May have values: 'match_decr', 'match_incr', 'alpha', 'chrono'
             html_row = [],
@@ -390,6 +393,9 @@ var ru = (function ($, ru) {
           // Make sure we save the parameters
           loc_params = { "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode, "lst_order": lst_order };
 
+          // For further processing we need to have the actual 'order' value for the pivot column
+          order_key = ssglists[pivot_idx]['title']['order'].toString();
+
           // Find out where the DCT should come
           elDctView = $(".dct-view").first();
           elDctShow = $(elDctView).find(".dct-show").first();
@@ -407,6 +413,11 @@ var ru = (function ($, ru) {
           // Sort the ssglists (the columns) according to what the user indicated
           for (i = 0; i < ssglists.length; i++) {
             ssglists[i]['title']['pivot'] = (i === pivot_idx) ? 0 : 1;
+            // And set the right 'matches' value with respect to pivot_col
+            oMatchSet = ssglists[i]['title']['matchset'];
+            if (order_key in oMatchSet) {
+              ssglists[i]['title']['matches'] = oMatchSet[order_key];
+            }
           }
           ssglists.sort(function (a, b) {
             var retval = 0;
@@ -462,6 +473,7 @@ var ru = (function ($, ru) {
             if ('main' in oTitle) { sMain = oTitle['main']; }
             if ('size' in oTitle) { iSize = oTitle['size']; }
             if ('url' in oTitle) { sUrl = oTitle['url']; }
+            if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches'];}
 
             order = oTitle.order;
 
@@ -476,7 +488,8 @@ var ru = (function ($, ru) {
             }
             html.push("<th " + sClass + " order='" + order.toString() + "'>");
             // Top 
-            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + order + ")' title='Click to make this the PIVOT'>" + sTop + "</div>");
+            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + order +
+              ")' title='Click to make this the PIVOT&#10;&#13; (it would have " + unique_matches + " unique match[es])'>" + sTop + "</div>");
             // Middle
             html.push("<div class='shelf-library'>" + sMiddle + "</div>");
             // Main
@@ -1248,12 +1261,31 @@ var ru = (function ($, ru) {
        *
        */
       dct_pivot: function (pivot_col) {
-        var params;
+        var params,
+            i = 0,
+            unique_matches = -1,
+            min_order = -1,
+            order = -1,
+            max_matches = -1;
 
         try {
           // Take the local parameters
           params = loc_params;
           // Change the pivot column
+          if (pivot_col < 0) {
+            // Take the best matching column from loc_ssglists
+            min_order = loc_ssglists.length + 2;
+            for (i = 0; i < loc_ssglists.length; i++) {
+              unique_matches = loc_ssglists[i]['unique_matches'];
+              order = loc_ssglists[i]['title']['order'];
+              if (unique_matches > max_matches || (unique_matches === max_matches && order < min_order)) {
+                max_matches = unique_matches;
+                min_order = order;
+                // pivot_col = loc_ssglists[i]['title']['order'];
+                pivot_col = order;
+              }
+            }
+          }
           params['pivot_col'] = pivot_col;
           // show this DCT
           private_methods.dct_show(loc_ssglists, params);
@@ -1453,22 +1485,37 @@ var ru = (function ($, ru) {
        *
        */
       show_dct: function () {
-        var params = null;
+        var params = null,
+            view_mode = "",
+            col_mode = "",
+            bChanged = false;
 
         try {
           // Get the values
           params = loc_params;
 
           // Get the view mode and the column order
-          // params['view_mode'] = $("input[name=viewmode]:checked").val();
-          // params['col_mode'] = $("input[name=colorder]:checked").val();;
-          params['view_mode'] = $("#viewmode").val();
-          params['col_mode'] = $("#colmode").val();
+          view_mode = $("#viewmode").val();
+          col_mode = $("#colmode").val();
+
+          if (view_mode !== params['view_mode']) {
+            params['view_mode'] = $("#viewmode").val();
+            bChanged = true;
+          }
+          if (col_mode !== params['col_mode']) {
+            params['col_mode'] = $("#colmode").val();
+            bChanged = true;
+          }
 
           // If all is set, show it
           if (loc_ssglists !== undefined && loc_ssglists != "" && loc_ssglists.length > 0) {
             // show this DCT
             private_methods.dct_show(loc_ssglists, params);
+            // Any changes?
+            if (bChanged) {
+              // Make sure save buttons are shown
+              private_methods.dct_saveshow();
+            }
           }
         } catch (ex) {
           private_methods.errMsg("show_dct", ex);

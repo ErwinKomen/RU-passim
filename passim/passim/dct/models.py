@@ -130,18 +130,99 @@ class ResearchSet(models.Model):
                 order += 1
         return None
 
+    def calculate_matches(self, ssglists):
+        """Calculate the number of pm-matches for each list from ssglists"""
+
+        oErr = ErrHandle()
+        lBack = []
+        try:
+            # Preparation: create a list of SSG ids per list
+            for oItem in ssglists:
+                oItem['ssgid'] = [x['super'] for x in oItem['ssglist']]
+                oItem['unique_matches'] = 0
+
+            # Calculate the number of matches for each SSglist
+            for idx_list in range(len(ssglists)):
+                # Take this as the possible pivot list
+                lPivot = ssglists[idx_list]['ssgid']
+
+                # Walk all lists that are not this pivot and count matches
+                lUnique = []
+                oMatches = {}
+                if 'matchset' in ssglists[idx_list]['title']:
+                    oMatches = ssglists[idx_list]['title']['matchset']
+                for idx, setlist in enumerate(ssglists):
+                    if idx != idx_list:
+                        # Get this ssglist
+                        lSsgId = setlist['ssgid']
+
+                        # Start calculating the number of matches this list has with the currently suggested PM
+                        sKey = str(ssglists[idx]['title']['order'])
+                        lMatches = []
+
+                        # Consider all ssg id's in this list
+                        for ssg_id in lSsgId:
+                            # Global unique matches
+                            if ssg_id in lPivot and not ssg_id in lUnique:
+                                lUnique.append(ssg_id)
+                            # Calculation with respect to the currently suggested PM
+                            if ssg_id in lPivot: # and not ssg_id in lMatches:
+                                lMatches.append(ssg_id)
+                        # Keep track of the matches (for sorting)
+                        oMatches[sKey] = len(lMatches)
+                # Store the between-list matches
+                ssglists[idx_list]['title']['matchset'] = oMatches
+
+                # Store the number of matches for this list
+                unique_matches = len(lUnique)
+                ssglists[idx_list]['unique_matches'] = unique_matches
+
+            # What we return
+            lBack = ssglists
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/calculate_matches")
+            lBack = None
+        # Return the status
+        return lBack
+
+    def calculate_pm(self):
+        """Calculate the Pivot Manuscript/item for this research set"""
+
+        oErr = ErrHandle()
+        iBack = -1
+        try:
+            # Get the lists that we have made
+            ssglists = self.get_ssglists()
+
+            # Calculate the matches
+            ssglists = self.calculate_matches(ssglists)
+
+            # Figure out what the first best list is
+            idx_pm = -1
+            max_matches = -1
+            for idx, oListItem in enumerate(ssglists):
+                unique_matches = oListItem['unique_matches']
+                # Check which is the best so far
+                if unique_matches > max_matches:
+                    max_matches = unique_matches
+                    idx_pm = idx
+
+            # What we return is the 'order' value of the best matching list
+            iBack = ssglists[idx_pm]['title']['order']
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/calculate_pm")
+            iBack = -1
+        # Return the PM that we have found
+        return iBack
+
     def get_created(self):
         """REturn the creation date in a readable form"""
 
         # sDate = self.created.strftime("%d/%b/%Y %H:%M")
         sDate = get_crpp_date(self.created, True)
-        return sDate
-
-    def get_saved(self):
-        """REturn the saved date in a readable form"""
-
-        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
-        sDate = get_crpp_date(self.saved, True)
         return sDate
 
     def get_notes_html(self):
@@ -151,6 +232,13 @@ class ResearchSet(models.Model):
         if self.notes != None:
             sNotes = markdown(self.notes)
         return sNotes
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
 
     def get_size_markdown(self):
         """Get a markdown representation of the size of this set"""
@@ -177,6 +265,13 @@ class ResearchSet(models.Model):
             else:
                 lst_contents = []
             if not recalculate and len(lst_contents) > 0:
+                # Should the unique_matches be re-calculated?
+                if not 'unique_matches' in lst_contents[0]:
+                    # Yes, re-calculate
+                    lst_contents = self.calculate_matches(lst_contents)
+                    # And make sure this gets saved!
+                    self.contents = json.dumps(lst_contents)
+                    self.save()
                 lBack = lst_contents
             else:
                 # Re-calculate the lists
@@ -217,10 +312,21 @@ class ResearchSet(models.Model):
 
                 # Add the list object to the list
                 lst_ssglists.append(oSsgList)
-                
-            # Put it in the SetDef and save it
+
+            # Calculate the unique_matches for each list
+            lst_ssglists = self.calculate_matches(lst_ssglists)
+
+            # Put it in the ResearchSet and save it
             self.contents = json.dumps(lst_ssglists)
             self.save()
+
+            # All related SetDef items should be warned
+            with transaction.atomic():
+                for obj in SetDef.objects.filter(researchset=self.id):
+                    contents = json.loads(obj.contents)
+                    contents['recalc'] = True
+                    obj.contents = json.dumps(contents)
+                    obj.save()
 
             # Return this list of lists
             bResult = True

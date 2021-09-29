@@ -772,18 +772,6 @@ class SetDefListView(BasicList):
 
     def initializations(self):
         # Some things are needed for initialization
-        #qs = SetDef.objects.filter(order=0)
-        #if qs.count() > 0:
-        #    # Repair the setdefs per research set            
-        #    for rset in ResearchSet.objects.all():
-        #        # Get a correct ordering of all the setdefs
-        #        order = 1
-        #        with transaction.atomic():
-        #            for sdef in SetDef.objects.filter(researchset=rset).order_by("order", "created"):
-        #                if sdef.order == 0:
-        #                    sdef.order = order
-        #                    sdef.save()
-        #                order += 1
 
         # No return
         return None
@@ -972,10 +960,21 @@ class SetDefData(BasicPart):
         else:
             # Get to the setdef object
             contents = setdef.get_contents()
+            do_calc_pm = ('recalc' in contents['params'])
 
             # Set the pivot row to the default value, if it is not yet defined
             if not 'pivot_col' in contents['params']:
                 contents['params']['pivot_col'] = 0
+                do_calc_pm = True
+
+            if do_calc_pm:
+                # We need to calculate (or re-calculate) the PM based on the whole research set
+                pivot_col = setdef.researchset.calculate_pm()
+                contents['params']['pivot_col'] = pivot_col
+                # Make sure to also save this
+                contents['params'].pop("recalc", "")
+                setdef.contents = json.dumps(contents['params'])
+                setdef.save()
 
             # REturn the contents
             data['contents'] = contents
