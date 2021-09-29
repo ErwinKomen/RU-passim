@@ -206,8 +206,8 @@ class ResearchSet(models.Model):
             min_year_finish = 3000
             for idx, oListItem in enumerate(ssglists):
                 unique_matches = oListItem['unique_matches']
-                year_start = oListItem['title']['year_start']
-                year_finish = oListItem['title']['year_finish']
+                year_start = oListItem['title']['yearstart']
+                year_finish = oListItem['title']['yearfinish']
                 order = oListItem['title']['order']
 
                 # Check which is the best so far

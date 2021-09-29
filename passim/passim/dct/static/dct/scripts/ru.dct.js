@@ -28,7 +28,7 @@ var ru = (function ($, ru) {
 
   ru.dct = (function ($, config) {
     // Define variables for ru.basic here
-    var loc_divErr = "basic_err",
+    var loc_divErr = "passim_err",
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_progr = [],         // Progress tracking
         loc_columnTh = null,    // TH being dragged
@@ -254,7 +254,11 @@ var ru = (function ($, ru) {
           // Start creating this row
           if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
           if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
-          html_row.push("<tr><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" + sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span></td>");
+          html_row.push("<tr><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" +
+            sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span>" +
+            "<span class='pull-right clickable dct-hide' >" +
+            "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
+            "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
           if (bShowPivot) {
             html_row.push("<td class='fixed-side fixed-col1' align='center'>" + oSsgThis.order + "</td>");
           } else {
@@ -346,8 +350,11 @@ var ru = (function ($, ru) {
             col1 = {},
             pivot_col = 0,
             pivot_idx = 0,
+            lHiddenRows = [],
+            rowIndex = -1,
             order_key = "",
-            view_mode = "all",        // May have values: 'all', 'match'
+            view_mode = "all",        // May have values: 'all', 'match', 'expand'
+            default_viewmode = "match",
             col_mode = "match_decr",  // May have values: 'match_decr', 'match_incr', 'alpha', 'chrono'
             html_row = [],
             html = [];
@@ -362,6 +369,7 @@ var ru = (function ($, ru) {
             if ("view_mode" in params) { view_mode = params['view_mode'];}
             if ("col_mode" in params) { col_mode = params['col_mode']; }
             if ("lst_order" in params) { lst_order = params['lst_order']; }
+            if ("hidden_rows" in params) { lHiddenRows = params['hidden_rows']; }
             if (col_mode === "custom") {
               // $("input[name='colorder']").prop("checked", false);
               $("#colmode option").prop("disabled", false);
@@ -390,8 +398,23 @@ var ru = (function ($, ru) {
               pivot_idx = 0;
             }
           }
+
+          // Action depends on the view mode
+          switch (view_mode) {
+            case "all":
+            case "expand":
+              lHiddenRows = [];
+              view_mode = "match";
+              // Need to adapt the viewmode
+              $("#viewmode option[value='" + default_viewmode + "']").prop("selected", true);
+              $("#viewmode option[value='expand']").prop("disabled", true);
+              break;
+          }
           // Make sure we save the parameters
-          loc_params = { "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode, "lst_order": lst_order };
+          loc_params = {
+            "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode,
+            "lst_order": lst_order, "hidden_rows": lHiddenRows
+          };
 
           // For further processing we need to have the actual 'order' value for the pivot column
           order_key = ssglists[pivot_idx]['title']['order'].toString();
@@ -566,6 +589,14 @@ var ru = (function ($, ru) {
 
           // Add the created DCT
           $(elDctShow).html(html.join("\n"));
+          // Walk all the rows of <tbody>
+          if (lHiddenRows.length > 0) {
+            $(elDctShow).find("table tbody tr").each(function (idx, el) {
+              if (lHiddenRows.indexOf(idx) >= 0) {
+                $(el).addClass("hidden");
+              }
+            });
+          }
 
           // Now show it
           $(elDctTools).removeClass("hidden");
@@ -580,6 +611,7 @@ var ru = (function ($, ru) {
             // Get the current left position
             iLeft = Math.max(0, el.offsetLeft);
             sWidth = $(el).css("width");
+            sWidth = el.offsetWidth + 30;
             col0 = { "width": sWidth, "min-width": sWidth, "max-width": sWidth, "left": iLeft };
 
           });
@@ -1252,6 +1284,41 @@ var ru = (function ($, ru) {
           private_methods.dct_saveshow();
         } catch (ex) {
           private_methods.errMsg("dct_dragend", ex);
+        }
+      },
+
+      /**
+       * dct_hiderow
+       *    Hide the row from view
+       *
+       */
+      dct_hiderow: function (elStart) {
+        var elRow = null,
+            lHiddenRows = [],
+            iRow = -1;
+
+        try {
+          // Get the row
+          elRow = $(elStart).closest("tr");
+          // Store the rowindex
+          iRow = elRow.index();
+          if ('hidden_rows' in loc_params) {
+            lHiddenRows = loc_params['hidden_rows'];
+          }
+          lHiddenRows.push(iRow);
+          loc_params['hidden_rows'] = lHiddenRows;
+
+          // Hide it
+          $(elRow).addClass("hidden");
+
+          // Need to adapt the viewmode
+          $("#viewmode option[value='expand']").prop("disabled", false);
+          // $("#viewmode option[value='expand']").prop("selected", true);
+
+          // Make sure save buttons are shown - this implies that the current status can be saved
+          private_methods.dct_saveshow();
+        } catch (ex) {
+          private_methods.errMsg("dct_hiderow", ex);
         }
       },
 
