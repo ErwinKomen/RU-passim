@@ -456,8 +456,15 @@ class SetList(models.Model):
         try:
             coll = self.collection
             # Get the list of SSGs inside this collection
+            # Per issue #402 additional info needs to be there:
+            #   author, 
+            #   PASSIM code, 
+            #   incipit, explicit, HC (if the SSG is part of a historical collection), 
+            #   number of SGs contained in the equality set, 
+            #   number of links to other SSGs
             qs = CollectionSuper.objects.filter(collection=coll).order_by('order').values(
-                'order', 'super', 'super__code')
+                'order', 'super', 'super__code', 'super__author__name',
+                'super__incipit', 'super__explicit', 'super__sgcount', 'super__ssgcount')
             lBack = []
             with transaction.atomic():
                 for obj in qs:
@@ -466,6 +473,15 @@ class SetList(models.Model):
                     # Get the SSG
                     super = obj['super']
                     code = obj['super__code']
+                    authorname = obj['super__author__name']
+                    incipit = obj['super__incipit']
+                    explicit = obj['super__explicit']
+                    sgcount = obj['super__sgcount']
+                    ssgcount = obj['super__ssgcount']
+                    # Get the name(s) of the HC
+                    lst_hc = CollectionSuper.objects.filter(super=super, collection__settype="hc").values(
+                        'collection__id', 'collection__name')
+                    hcs = ", ".join( [x['collection__name'] for x in lst_hc])
                     # Get a URL for this ssg
                     url = reverse('equalgold_details', kwargs={'pk': super})
                     # Treat signatures for this SSG
@@ -476,7 +492,9 @@ class SetList(models.Model):
                     siglist = get_goldsiglist_dct(super)
                     # Put into object
                     oItem = dict(super=super, sig=sigbest, siglist=siglist,
-                                 order=order, code=code, url=url)
+                                 order=order, code=code, url=url, author=authorname,
+                                 incipit=incipit, explicit=explicit, sgcount=sgcount, 
+                                 ssgcount=ssgcount, hcs=hcs)
                     # Add to list
                     lBack.append(oItem)
 
@@ -503,16 +521,53 @@ class SetList(models.Model):
         try:
             manu = self.manuscript
             # Get a list of SSGs to which the sermons in this manuscript point
+            # Per issue #402 additional info needs to be there:
+            #   author, 
+            #   PASSIM code, 
+            #   incipit, explicit, HC (if the SSG is part of a historical collection), 
+            #   number of SGs contained in the equality set, 
+            #   number of links to other SSGs
+            # Per issue #402, phase 2, even more info needs to be added:
+            #   for MANUSCRIPT source-lists, there should be an option for the user 
+            #       to select additional SERMON manifestation details fields to be shown 
+            #       (options: attributed author, section title, lectio, title, incipit, explicit, 
+            #       postscriptum, feast, bible reference, cod. notes, notes, keywords)
             qs = manu.sermondescr_super.all().order_by('sermon__msitem__order').values(
-                'sermon__msitem__order', 'super', 'super__code')
+                'sermon__msitem__order', 'super', 'super__code', 'super__author__name',
+                'super__incipit', 'super__explicit', 'super__sgcount', 'super__ssgcount',
+                'sermon__author__name', 'sermon__sectiontitle', 'sermon__quote', 'sermon__title', 
+                'sermon__incipit', 'sermon__explicit', 'sermon__postscriptum', 'sermon__feast__name', 
+                'sermon__bibleref', 'sermon__additional', 'sermon__note')
+            # NOTE: the 'keywords' for issue #402 are a bit more cumbersome to collect...
             lBack = []
             with transaction.atomic():
                 for obj in qs:
                     # Get the order number
                     order = obj['sermon__msitem__order']
-                    # Get the SSG
+                    # Get the SSG and all its characteristics
                     super = obj['super']
                     code = obj['super__code']
+                    authorname = obj['super__author__name']
+                    incipit = obj['super__incipit']
+                    explicit = obj['super__explicit']
+                    sgcount = obj['super__sgcount']
+                    ssgcount = obj['super__ssgcount']
+                    # Sermon characteristics
+                    srm_author = obj['super__author__name']
+                    srm_sectiontitle = obj['sermon__sectiontitle']
+                    srm_lectio = obj['sermon__quote']
+                    srm_title = obj['sermon__title']
+                    srm_incipit = obj['sermon__incipit']
+                    srm_explicit = obj['sermon__explicit']
+                    srm_postscriptum = obj['sermon__postscriptum']
+                    srm_feast = obj['sermon__feast__name']
+                    srm_bibleref = obj['sermon__bibleref']
+                    srm_codnotes = obj['sermon__additional']
+                    srm_notes = obj['sermon__note']
+
+                    # TODO: Get the keywords
+                    # 
+
                     # Get a URL for this ssg
                     url = reverse('equalgold_details', kwargs={'pk': super})
                     # Treat signatures for this SSG: get the best for showing
@@ -523,7 +578,12 @@ class SetList(models.Model):
                     siglist = get_goldsiglist_dct(super)
                     # Put into object
                     oItem = dict(super=super, sig=sigbest, siglist=siglist,
-                                 order=order, code=code, url=url)
+                                 order=order, code=code, url=url, author=authorname,
+                                 incipit=incipit, explicit=explicit, sgcount=sgcount, ssgcount=ssgcount,
+                                 srm_author=srm_author, srm_sectiontitle=srm_sectiontitle, srm_lectio=srm_lectio,
+                                 srm_title=srm_title, srm_incipit=srm_incipit, srm_explicit=srm_explicit,
+                                 srm_postscriptum=srm_postscriptum, srm_feast=srm_feast, 
+                                 srm_bibleref=srm_bibleref, srm_codnotes=srm_codnotes, srm_notes=srm_notes)
                     # Add to list
                     lBack.append(oItem)
 
@@ -605,6 +665,28 @@ class SetDef(models.Model):
         # sDate = self.created.strftime("%d/%b/%Y %H:%M")
         sDate = get_crpp_date(self.created, True)
         return sDate
+
+    def get_contents(self, pivot_id=None, recalculate=False):
+        """Get the set of lists for this particular DCT"""
+
+        oErr = ErrHandle()
+        oBack = None
+        try:
+            # Get the SSGlists from the research set
+            ssglists = self.researchset.get_ssglists(recalculate)
+
+            # Possibly get (stored) parameters from myself
+            params = {}
+            if self.contents != "" and self.contents[0] == "{":
+                params = json.loads(self.contents)
+            
+            # Return the parameters and the lists
+            oBack = dict(params=params, ssglists=ssglists)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDef/get_contents")
+        return oBack
 
     def get_notes_html(self):
         """Convert the markdown notes"""
@@ -698,28 +780,6 @@ class SetDef(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SetDef/get_setlist")
-        return oBack
-
-    def get_contents(self, pivot_id=None, recalculate=False):
-        """Get the set of lists for this particular DCT"""
-
-        oErr = ErrHandle()
-        oBack = None
-        try:
-            # Get the SSGlists from the research set
-            ssglists = self.researchset.get_ssglists(recalculate)
-
-            # Possibly get (stored) parameters from myself
-            params = {}
-            if self.contents != "" and self.contents[0] == "{":
-                params = json.loads(self.contents)
-            
-            # Return the parameters and the lists
-            oBack = dict(params=params, ssglists=ssglists)
-
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("SetDef/get_contents")
         return oBack
 
 

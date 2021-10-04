@@ -1613,7 +1613,7 @@ div.tooltip {
     box-shadow: 1px 1px;
     pointer-events: none;
     opacity: 0.8;
-    z-index:1;
+    z-index: 1;
 }
 svg .histogram-bar {
     fill: #337ab7; /* #69b3a2; */
@@ -1800,6 +1800,25 @@ table.dct-view .fixed-side {
 
 .dct-hide:hover .dct-blinded {
     opacity: 1.0;
+}
+
+div.tooltip.dct {
+    width: unset;
+    height: unset;
+    z-index: 200 ;
+    text-align: left;
+    color: darkblue;
+    background-color: whitesmoke;
+}
+div.tooltip.dct .tooltip-inner {
+    color: black;
+    background-color: lavenderblush;
+    max-width: 400px;
+    text-align: left;
+}
+div.toolbox.dct .tooltip-inner tr td,
+table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
+    background-color: lavenderblush;
 }
 
 

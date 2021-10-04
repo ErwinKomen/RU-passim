@@ -43,6 +43,15 @@ var ru = (function ($, ru) {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
           END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46
         },
+        loc_dctTooltip = [
+          { "label": "Author", "key": "author" },
+          { "label": "PASSIM code", "key": "code" },
+          { "label": "Incipit", "key": "incipit" },
+          { "label": "Explicit", "key": "explicit" },
+          { "label": "Part of HC[s]", "key": "hcs" },
+          { "label": "SGs in equality set", "key": "sg_count" },
+          { "label": "Links to other SSGs", "key": "ssg_count" },
+        ],
         dummy = 1;
 
     // Private methods specification
@@ -282,8 +291,11 @@ var ru = (function ($, ru) {
             "<span class='pull-right clickable dct-hide' >" +
             "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
+
           if (bShowPivot) {
-            html_row.push("<td class='fixed-side fixed-col1' align='center'>" + oSsgThis.order + "</td>");
+            html_row.push("<td class=\"fixed-side fixed-col1\" data-toggle=\"tooltip\" align=\"center\"" +
+              " title=\"" + private_methods.dct_tooltip(oSsgThis) + "\" data-placement=\"bottom\">" +
+              oSsgThis.order + "</td>");
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
           }
@@ -306,7 +318,9 @@ var ru = (function ($, ru) {
               }
               sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
               if (order >= 0) {
-                html_row.push("<td" + sClass + " align='center'>" + order + "</td>");
+                html_row.push("<td" + sClass + " data-toggle=\"tooltip\"  align=\"center\"" +
+                  " title=\"" + private_methods.dct_tooltip(oSsgItem) + "\" data-placement=\"bottom\">" +
+                  order + "</td>");
               } else {
                 html_row.push("<td" + sClass + "></td>");
               }
@@ -634,6 +648,12 @@ var ru = (function ($, ru) {
             private_methods.dct_highlight(this);
           });
 
+          // initialize tooltipping
+          $('.dct-view td[data-toggle="tooltip"]').tooltip({
+            html: true,
+            template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+          });
+
           // Now show it
           $(elDctTools).removeClass("hidden");
 
@@ -669,6 +689,35 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("dct_show", ex);
+        }
+      },
+
+      /** 
+       *  dct_tooltip - Calculate the tooltip for this one
+       */
+      dct_tooltip: function (oSsgItem) {
+        var html = [], i=0, label="", key="";
+
+        try {
+          // html.push("<div class='tooltip' role='tooltip'>");
+          // html.push("<div class='tooltip-arrow'></div>");
+          // html.push("<div class='tooltip-inner'>");
+          html.push("<table><tbody>");
+          for (i = 0; i < loc_dctTooltip.length; i++) {
+            label = loc_dctTooltip[i]["label"];
+            key = loc_dctTooltip[i]["key"];
+            if (key in oSsgItem) {
+              html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+              // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
+            }
+          }
+
+          html.push("</tbody></table>");
+          // html.push("</div></div>");
+          // Combine the html
+          return html.join("");
+        } catch (ex) {
+          private_methods.errMsg("dct_tooltip", ex);
         }
       },
 
