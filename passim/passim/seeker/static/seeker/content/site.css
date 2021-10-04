@@ -1362,7 +1362,7 @@ a.nostyle:link, a.nostyle:visited {
 }
 
 td a.nostyle {
-  display: block;
+  display: inline-block;
 }
 
 a.sermon:link, a.sermon:visited {
@@ -1749,8 +1749,27 @@ table.dct-view td {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
-  /* overflow: hidden;*/
-  background-color: lightgray; 
+  /* overflow: hidden;
+  background-color: lightgray; */
+}
+table.dct-view tr.dct-even td {
+    background-color: #D9D9BF	;
+}
+
+table.dct-view tr.dct-odd td {
+    background-color: lightgray;
+}
+
+table.dct-view tr.dct-highlight td {
+    background-color: yellow;
+}
+
+table.dct-view tr td:hover {
+    background-color: #BCBC8F;
+}
+
+table.dct-view tr td.fixed-col1 {
+    cursor: pointer;
 }
 
 table.dct-view td, table.dct-view th {
@@ -1767,3 +1786,20 @@ table.dct-view .fixed-side {
 .dct-tools .form-control {
     font-size: small;
 }
+
+.dct-blinded {
+    opacity: 0.0;
+    min-width: 20px;
+    max-width: 20px;
+}
+
+.dct-blinded .glyphicon {
+    color: red;
+    margin-left: 4px;
+}
+
+.dct-hide:hover .dct-blinded {
+    opacity: 1.0;
+}
+
+

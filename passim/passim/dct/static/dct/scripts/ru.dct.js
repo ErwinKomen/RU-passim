@@ -176,6 +176,28 @@ var ru = (function ($, ru) {
       },
 
       /** 
+       *  dct_highlight - Highlight or reset a particular row
+       */
+      dct_highlight: function (elStart) {
+        var elRow = null;
+
+        try {
+          // Get the row
+          elRow = $(elStart).closest("tr");
+          // Action depends on whether the highlighting is there or not
+          if ($(elRow).hasClass("dct-highlight")) {
+            // REmove it
+            $(elRow).removeClass("dct-highlight");
+          } else {
+            // Add it
+            $(elRow).addClass("dct-highlight");
+          }
+        } catch (ex) {
+          private_methods.errMsg("dct_highlight", ex);
+        }
+      },
+
+      /** 
        *  dct_remaining_ssgs - Get a list of SSG-ids that have not been dealt with in the pivot_col
        */
       dct_remaining_ssgs: function(ssglists, pivot_col, dealt_with) {
@@ -236,7 +258,7 @@ var ru = (function ($, ru) {
       /** 
        *  dct_row_combine -  Walk through all the other lists, finding this SSG
        */
-      dct_row_combine: function(ssglists, pivot_col, oSsgThis, bShowPivot) {
+      dct_row_combine: function(ssglists, pivot_col, oSsgThis, rowcolor, bShowPivot) {
         var oBack = {'error': false},
             oSsgItem = null,
             i = 0,
@@ -254,7 +276,8 @@ var ru = (function ($, ru) {
           // Start creating this row
           if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
           if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
-          html_row.push("<tr><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" +
+          html_row.push("<tr class='" + rowcolor +
+            "'><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" +
             sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span>" +
             "<span class='pull-right clickable dct-hide' >" +
             "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
@@ -346,6 +369,7 @@ var ru = (function ($, ru) {
             order = 0,
             i = 0,
             j = 0,
+            rowcolor = "",
             col0 = {},
             col1 = {},
             pivot_col = 0,
@@ -399,17 +423,11 @@ var ru = (function ($, ru) {
             }
           }
 
-          // Action depends on the view mode
-          switch (view_mode) {
-            case "all":
-            case "expand":
-              lHiddenRows = [];
-              view_mode = "match";
-              // Need to adapt the viewmode
-              $("#viewmode option[value='" + default_viewmode + "']").prop("selected", true);
-              $("#viewmode option[value='expand']").prop("disabled", true);
-              break;
+          // If we are going to view all, then make sure the hidden rows disappear
+          if (view_mode === "all" && lHiddenRows.length > 0) {
+            lHiddenRows = [];
           }
+
           // Make sure we save the parameters
           loc_params = {
             "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode,
@@ -531,6 +549,7 @@ var ru = (function ($, ru) {
           html.push("<tbody>");
           // Get the pivot: ssglist zero
           pivot = ssglists[pivot_idx]['ssglist'];
+          rowcolor = "";
           // Walk the rows of the pivot
           for (row = 0; row < pivot.length; row++) {
             // Get details of this SSG
@@ -541,7 +560,7 @@ var ru = (function ($, ru) {
             dealt_with.push(ssg);
 
             // Walk through all the other lists, finding this SSG
-            oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, true);
+            oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, true);
             if (!oCombi.error) {
               // This action depends on the view mode
               switch (view_mode) {
@@ -572,7 +591,7 @@ var ru = (function ($, ru) {
                 oSsgPivot = remainder[row];
 
                 // Walk through all the other lists, finding this SSG
-                oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, false);
+                oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, false);
 
                 if (!oCombi.error) {
                   // Always show the row
@@ -593,10 +612,27 @@ var ru = (function ($, ru) {
           if (lHiddenRows.length > 0) {
             $(elDctShow).find("table tbody tr").each(function (idx, el) {
               if (lHiddenRows.indexOf(idx) >= 0) {
-                $(el).addClass("hidden");
+                $(el).addClass("hidden dct_hidden");
               }
             });
+            // Make sure we show the 'expand' button
+            $(".dct-expand").removeClass("hidden");
+          } else {
+            // Make sure the expand button is hidden
+            $(".dct-expand").addClass("hidden");
           }
+
+          // Perform row-coloring
+          $(elDctShow).find("table tbody tr").each(function (idx, el) {
+            // Row coloring, stage 1
+            var rowcolor = (idx % 2 === 0) ? "dct-even" : "dct-odd";
+
+            $(el).addClass(rowcolor);
+          });
+          // Attach row-highlighting handler
+          $(elDctShow.find("table tbody tr td.fixed-col1")).unbind("click").on("click", function (evt) {
+            private_methods.dct_highlight(this);
+          });
 
           // Now show it
           $(elDctTools).removeClass("hidden");
@@ -1288,6 +1324,33 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * dct_expand
+       *    Expand all rows that were manually hidden
+       *
+       */
+      dct_expand: function (elStart) {
+        var elRow = null,
+            lHiddenRows = [],
+            iRow = -1;
+
+        try {
+          // Reset the hidden_rows storage
+          loc_params['hidden_rows'] = [];
+
+          // Un-hide the rows
+          $(".dct-view tbody tr.dct_hidden").removeClass("hidden dct_hidden");
+
+          // Now hide the 'Expand' button
+          $(".dct-expand").addClass("hidden");
+
+          // Make sure save buttons are shown - this implies that the current status can be saved
+          private_methods.dct_saveshow();
+        } catch (ex) {
+          private_methods.errMsg("dct_expand", ex);
+        }
+      },
+
+      /**
        * dct_hiderow
        *    Hide the row from view
        *
@@ -1308,12 +1371,11 @@ var ru = (function ($, ru) {
           lHiddenRows.push(iRow);
           loc_params['hidden_rows'] = lHiddenRows;
 
-          // Hide it
-          $(elRow).addClass("hidden");
+          // Hide it and give it a label for recognition
+          $(elRow).addClass("hidden dct_hidden");
 
-          // Need to adapt the viewmode
-          $("#viewmode option[value='expand']").prop("disabled", false);
-          // $("#viewmode option[value='expand']").prop("selected", true);
+          // Now show the 'Expand' button
+          $(".dct-expand").removeClass("hidden");
 
           // Make sure save buttons are shown - this implies that the current status can be saved
           private_methods.dct_saveshow();
@@ -1505,7 +1567,6 @@ var ru = (function ($, ru) {
                   loc_params = params;
 
                   // Get the view mode
-                  // view_mode = $("input[name=viewmode]:checked").val();
                   view_mode = $("#viewmode").val();
                   params['view_mode'] = view_mode;
 

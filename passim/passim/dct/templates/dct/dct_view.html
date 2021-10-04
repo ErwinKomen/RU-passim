@@ -34,7 +34,6 @@
             <select class="form-control" id="viewmode" name="viewmode">
               <option value="all"   onclick="ru.dct.show_dct();" >View all</option>
               <option value="match" onclick="ru.dct.show_dct();" selected>Matches only</option>
-              <option value="expand" onclick="ru.dct.show_dct();" disabled>Expand all</option>
             </select>
           </label>
         </div>
@@ -54,6 +53,13 @@
 
         <!-- Save buttons -->
         <div class="col-md-6">
+          <!-- Expanding -->
+          <span class="hidden dct-expand">
+            <a class="btn btn-xs jumbo-1" title="Show manually hidden lines" 
+                onclick="ru.dct.dct_expand(this);">Expand</a>
+          </span>
+
+          <!-- DCT save options -->
           <span class="hidden dct-save-options pull-right">
             <span class="dct-wait hidden">
               <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
