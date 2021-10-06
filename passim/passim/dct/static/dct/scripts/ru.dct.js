@@ -49,8 +49,21 @@ var ru = (function ($, ru) {
           { "label": "Incipit", "key": "incipit" },
           { "label": "Explicit", "key": "explicit" },
           { "label": "Part of HC[s]", "key": "hcs" },
-          { "label": "SGs in equality set", "key": "sg_count" },
-          { "label": "Links to other SSGs", "key": "ssg_count" },
+          { "label": "SGs in equality set", "key": "sgcount" },
+          { "label": "Links to other SSGs", "key": "ssgcount" },
+        ],
+        loc_dctTooltipAdditional = [
+          { "label": "Attributed author", "key": "srm_author" },
+          { "label": "Section title",     "key": "srm_sectiontitle" },
+          { "label": "Lectio",            "key": "srm_lectio" },
+          { "label": "Title",             "key": "srm_title" },
+          { "label": "Incipit",           "key": "srm_incipit" },
+          { "label": "Explicit",          "key": "srm_explicit" },
+          { "label": "Postscriptum",      "key": "srm_postscriptum" },
+          { "label": "Feast",             "key": "srm_feast" },
+          { "label": "Bible reference",   "key": "srm_bibleref" },
+          { "label": "Cod. notes",        "key": "srm_codnotes" },
+          { "label": "Notes",             "key": "srm_notes" },
         ],
         dummy = 1;
 
@@ -293,8 +306,10 @@ var ru = (function ($, ru) {
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
 
           if (bShowPivot) {
-            html_row.push("<td class=\"fixed-side fixed-col1\" data-toggle=\"tooltip\" align=\"center\"" +
-              " title=\"" + private_methods.dct_tooltip(oSsgThis) + "\" data-placement=\"bottom\">" +
+            html_row.push("<td class=\"fixed-side fixed-col1\" data-toggle=\"tooltip\" data-tooltip=\"dct-hover\" align=\"center\"" +
+              " title=\"" + private_methods.dct_tooltip(oSsgThis, false) + "\" data-placement=\"bottom\" " +
+              " alttitle=\"" + private_methods.dct_tooltip(oSsgThis, true) + 
+              "\" >" +
               oSsgThis.order + "</td>");
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
@@ -318,8 +333,10 @@ var ru = (function ($, ru) {
               }
               sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
               if (order >= 0) {
-                html_row.push("<td" + sClass + " data-toggle=\"tooltip\"  align=\"center\"" +
-                  " title=\"" + private_methods.dct_tooltip(oSsgItem) + "\" data-placement=\"bottom\">" +
+                html_row.push("<td" + sClass + " data-toggle=\"tooltip\" data-tooltip=\"dct-hover\" align=\"center\"" +
+                  " title=\"" + private_methods.dct_tooltip(oSsgItem, false) + "\" data-placement=\"bottom\" " +
+                  " alttitle=\"" + private_methods.dct_tooltip(oSsgThis, true) +
+                  "\" >" +
                   order + "</td>");
               } else {
                 html_row.push("<td" + sClass + "></td>");
@@ -648,11 +665,28 @@ var ru = (function ($, ru) {
             private_methods.dct_highlight(this);
           });
 
-          // initialize tooltipping
-          $('.dct-view td[data-toggle="tooltip"]').tooltip({
+          // initialize tooltipping: hover-type
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip({
             html: true,
+            container: 'body',
+            placement: 'bottom auto',
+            animation: true,
+            trigger: "hover",
+            delay:  800,
             template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
           });
+
+          /*
+          // initialize tooltipping: click-type for further information
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-click"]').tooltip({
+            html: true,
+            container: 'body',
+            placement: 'top auto',
+            animation: true,
+            trigger: "click",
+            delay: 10,
+            template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+          });*/
 
           // Now show it
           $(elDctTools).removeClass("hidden");
@@ -695,7 +729,7 @@ var ru = (function ($, ru) {
       /** 
        *  dct_tooltip - Calculate the tooltip for this one
        */
-      dct_tooltip: function (oSsgItem) {
+      dct_tooltip: function (oSsgItem, bSermon) {
         var html = [], i=0, label="", key="";
 
         try {
@@ -703,12 +737,23 @@ var ru = (function ($, ru) {
           // html.push("<div class='tooltip-arrow'></div>");
           // html.push("<div class='tooltip-inner'>");
           html.push("<table><tbody>");
-          for (i = 0; i < loc_dctTooltip.length; i++) {
-            label = loc_dctTooltip[i]["label"];
-            key = loc_dctTooltip[i]["key"];
-            if (key in oSsgItem) {
-              html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
-              // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
+          if (bSermon === undefined || !bSermon) {
+            for (i = 0; i < loc_dctTooltip.length; i++) {
+              label = loc_dctTooltip[i]["label"];
+              key = loc_dctTooltip[i]["key"];
+              if (key in oSsgItem) {
+                html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+                // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
+              }
+            }
+          } else {
+            for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
+              label = loc_dctTooltipAdditional[i]["label"];
+              key = loc_dctTooltipAdditional[i]["key"];
+              if (key in oSsgItem) {
+                html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+                // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
+              }
             }
           }
 
