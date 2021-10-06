@@ -775,7 +775,7 @@ var ru = (function ($, ru) {
        *  dct_tooltip - Calculate the tooltip for this one
        */
       dct_tooltip: function (oSsgItem) {
-        var html = [], i = 0, label = "", key = ""
+        var html = [], i = 0, label = "", key = "",
             phase = 1;
 
         try {

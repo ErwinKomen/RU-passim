@@ -4,6 +4,7 @@ Adaptations of the database that are called up from the (list)views in the SEEKE
 
 from django.db import transaction
 import re
+import json
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
@@ -589,7 +590,7 @@ def adapt_passim_code():
     try:
         # Walk all SSGs
         need_correction = {}
-        for obj in EqualGold.objects.all():
+        for obj in EqualGold.objects.all().order_by("-id"):
             code = obj.code
             if code != None and code != "ZZZ_DETERMINE":
                 count = EqualGold.objects.filter(code=code).count()
