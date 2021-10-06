@@ -775,7 +775,8 @@ var ru = (function ($, ru) {
        *  dct_tooltip - Calculate the tooltip for this one
        */
       dct_tooltip: function (oSsgItem) {
-        var html = [], i=0, label="", key="";
+        var html = [], i = 0, label = "", key = ""
+            phase = 1;
 
         try {
           html.push("<table><tbody>");
@@ -788,12 +789,14 @@ var ru = (function ($, ru) {
             }
           }
 
-          // Add the sermon-items, but hide them initially
-          for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
-            label = loc_dctTooltipAdditional[i]["label"];
-            key = loc_dctTooltipAdditional[i]["key"];
-            if (key in oSsgItem) {
-              html.push("<tr class='hidden dct-alt'><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+          if (phase > 1) {
+            // Add the sermon-items, but hide them initially
+            for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
+              label = loc_dctTooltipAdditional[i]["label"];
+              key = loc_dctTooltipAdditional[i]["key"];
+              if (key in oSsgItem) {
+                html.push("<tr class='hidden dct-alt'><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+              }
             }
           }
 
