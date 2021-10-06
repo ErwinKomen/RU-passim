@@ -571,6 +571,11 @@ form .panel-heading.row {
 .jumbo-1 text {
   fill: goldenrod;
 }
+.jumbo-1.active {
+    background-color: lightgray;
+    color: saddlebrown;
+}
+
 .jumbo-2 {
   background-color: chocolate;
   color: lavender !important;
@@ -1602,7 +1607,7 @@ g > text {
 div.tooltip {
     position: fixed; /*   !important; */
     text-align: center;
-    width: 120px;
+    width: 120px; 
     height: 35px;
     padding: 2px;
     font: 12px sans-serif;
@@ -1813,7 +1818,7 @@ div.tooltip.dct {
 div.tooltip.dct .tooltip-inner {
     color: black;
     background-color: lavenderblush;
-    max-width: 400px;
+    max-width: 500px; /* */
     text-align: left;
 }
 div.toolbox.dct .tooltip-inner tr td,

@@ -198,6 +198,32 @@ var ru = (function ($, ru) {
       },
 
       /** 
+        *  dct_author - Get the name of the (attributed) author
+        */
+      dct_author: function (oSsgItem) {
+        var i = 0,
+            sText = "",
+            keys = ["srm_author", "author"];
+
+        try {
+          // Try the keys in turn
+          for (i = 0; i < keys.length; i++) {
+            if (keys[i] in oSsgItem) {
+              sText = oSsgItem[keys[i]];
+              break;
+            }
+          }
+          // Abbreviate the text of the author
+          sText = ". " + sText.substring(0, 5) + "...";
+
+          // Combine the html
+          return sText;
+        } catch (ex) {
+          private_methods.errMsg("dct_author", ex);
+        }
+      },
+
+      /** 
        *  dct_highlight - Highlight or reset a particular row
        */
       dct_highlight: function (elStart) {
@@ -306,11 +332,9 @@ var ru = (function ($, ru) {
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
 
           if (bShowPivot) {
-            html_row.push("<td class=\"fixed-side fixed-col1\" data-toggle=\"tooltip\" data-tooltip=\"dct-hover\" align=\"center\"" +
-              " title=\"" + private_methods.dct_tooltip(oSsgThis, false) + "\" data-placement=\"bottom\" " +
-              " alttitle=\"" + private_methods.dct_tooltip(oSsgThis, true) + 
-              "\" >" +
-              oSsgThis.order + "</td>");
+            html_row.push("<td class='fixed-side fixed-col1' data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
+              " title='" + private_methods.dct_tooltip(oSsgThis) + "' >" +
+              oSsgThis.order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgThis) + "</span></td>");
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
           }
@@ -333,11 +357,9 @@ var ru = (function ($, ru) {
               }
               sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
               if (order >= 0) {
-                html_row.push("<td" + sClass + " data-toggle=\"tooltip\" data-tooltip=\"dct-hover\" align=\"center\"" +
-                  " title=\"" + private_methods.dct_tooltip(oSsgItem, false) + "\" data-placement=\"bottom\" " +
-                  " alttitle=\"" + private_methods.dct_tooltip(oSsgThis, true) +
-                  "\" >" +
-                  order + "</td>");
+                html_row.push("<td" + sClass + " data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
+                  " title='" + private_methods.dct_tooltip(oSsgItem) + "'  >" +
+                  order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
               } else {
                 html_row.push("<td" + sClass + "></td>");
               }
@@ -672,8 +694,14 @@ var ru = (function ($, ru) {
             placement: 'bottom auto',
             animation: true,
             trigger: "hover",
-            delay:  800,
+            delay: 800,
             template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+          });
+
+          // What to do when a tooltip has been shown
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').on('shown.bs.tooltip', function () {
+            private_methods.dct_showhidealt();
+            //$('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip("update");
           });
 
           /*
@@ -727,40 +755,52 @@ var ru = (function ($, ru) {
       },
 
       /** 
+       *  dct_showhidealt - Show or hide the [dct-alt]
+       */
+      dct_showhidealt: function () {
+        try {
+          if ($(".dct-showhidealt").first().hasClass("active")) {
+            // SHow the alt text
+            $(".dct-alt").removeClass("hidden");
+          } else {
+            // Hide the alt text
+            $(".dct-alt").addClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("dct_showhidealt", ex);
+        }
+      },
+
+      /** 
        *  dct_tooltip - Calculate the tooltip for this one
        */
-      dct_tooltip: function (oSsgItem, bSermon) {
+      dct_tooltip: function (oSsgItem) {
         var html = [], i=0, label="", key="";
 
         try {
-          // html.push("<div class='tooltip' role='tooltip'>");
-          // html.push("<div class='tooltip-arrow'></div>");
-          // html.push("<div class='tooltip-inner'>");
           html.push("<table><tbody>");
-          if (bSermon === undefined || !bSermon) {
-            for (i = 0; i < loc_dctTooltip.length; i++) {
-              label = loc_dctTooltip[i]["label"];
-              key = loc_dctTooltip[i]["key"];
-              if (key in oSsgItem) {
-                html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
-                // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
-              }
+          // Add the 'regular' items (see issue #402)
+          for (i = 0; i < loc_dctTooltip.length; i++) {
+            label = loc_dctTooltip[i]["label"];
+            key = loc_dctTooltip[i]["key"];
+            if (key in oSsgItem) {
+              html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
             }
-          } else {
-            for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
-              label = loc_dctTooltipAdditional[i]["label"];
-              key = loc_dctTooltipAdditional[i]["key"];
-              if (key in oSsgItem) {
-                html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
-                // html.push("<b>" + label + ":</b>&nbsp;" + oSsgItem[key] + "<br>");
-              }
+          }
+
+          // Add the sermon-items, but hide them initially
+          for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
+            label = loc_dctTooltipAdditional[i]["label"];
+            key = loc_dctTooltipAdditional[i]["key"];
+            if (key in oSsgItem) {
+              html.push("<tr class='hidden dct-alt'><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
             }
           }
 
           html.push("</tbody></table>");
-          // html.push("</div></div>");
+
           // Combine the html
-          return html.join("");
+          return html.join("").replaceAll("'", "\"");
         } catch (ex) {
           private_methods.errMsg("dct_tooltip", ex);
         }
@@ -1298,6 +1338,70 @@ var ru = (function ($, ru) {
     }
     // Public methods
     return {
+
+      /**
+       * dct_additional
+       *    Show or hide additional information on hovering
+       *
+       */
+      dct_additional: function (elStart) {
+        var bPressed = false;
+
+        try {
+          //TOggle it
+          if ($(elStart).hasClass("active")) {
+            $(elStart).removeClass("active");
+            $(elStart).removeAttr("aria-pressed");
+          } else {
+            $(elStart).addClass("active");
+            $(elStart).attr("aria-pressed", true);
+          }
+          // Check what now
+          bPressed = $(elStart).hasClass("active");
+          if (bPressed !== undefined && bPressed) {
+            // Show the additional information
+            $(".dct-view .dct-alt").removeClass("hidden");
+          } else {
+            // Hide the additional information
+            $(".dct-view .dct-alt").addClass("hidden");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("dct_additional", ex);
+        }
+      },
+
+      /**
+       * dct_author
+       *    Show or hide author information
+       *
+       */
+      dct_author: function (elStart) {
+        var bPressed = false;
+
+        try {
+          //TOggle it
+          if ($(elStart).hasClass("active")) {
+            $(elStart).removeClass("active");
+            $(elStart).removeAttr("aria-pressed");
+          } else {
+            $(elStart).addClass("active");
+            $(elStart).attr("aria-pressed", true);
+          }
+          // Check what now
+          bPressed = $(elStart).hasClass("active");
+          if (bPressed !== undefined && bPressed) {
+            // Show the additional information
+            $(".dct-view .dct-author").removeClass("hidden");
+          } else {
+            // Hide the additional information
+            $(".dct-view .dct-author").addClass("hidden");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("dct_author", ex);
+        }
+      },
 
       /**
        * dct_cancel
