@@ -1441,6 +1441,11 @@ var ru = (function ($, ru) {
       dct_drag: function (ev) {
         var row = "";
         try {
+          // Check this out
+          if ($(ev.target).parent().hasClass("shelf-idno")) {
+            loc_columnTh = null;
+            return;
+          }
           loc_columnTh = null;
           loc_columnTh = ev.target;
         } catch (ex) {
@@ -1458,6 +1463,10 @@ var ru = (function ($, ru) {
             children = null;
 
         try {
+          if (loc_columnTh === null) {
+            // Leave immediately
+            return;
+          }
           // Prevend the default behaviour
           ev.preventDefault();
 
