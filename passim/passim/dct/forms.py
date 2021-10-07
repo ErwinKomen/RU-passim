@@ -64,22 +64,36 @@ class CollOneHistWidget(CollOneWidget):
     settype = "hc"
 
 
+class ProfileWidget(ModelSelect2MultipleWidget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
+
+
 class ResearchSetForm(forms.ModelForm):
     profileid = forms.CharField(required=False)
     manulist = ModelChoiceField(queryset=None, required=False,
             widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
     histlist = ModelChoiceField(queryset=None, required=False)
     ssgdlist = ModelChoiceField(queryset=None, required=False)
+    ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgdname = forms.CharField(label="Name", required=False, 
             widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
                                           'placeholder': 'User-defined name (optional)...',  'style': 'width: 100%;'}))
 
     class Meta:
         model = ResearchSet
-        fields = ['name', 'notes']
+        fields = ['name', 'notes', 'scope']
         widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'placeholder': 'The name of this research set...'}),
                  'notes':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;',
-                                                       'placeholder': 'Optionally add your own notes...'})
+                                                       'placeholder': 'Optionally add your own notes...'}),
+                 'scope':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -99,6 +113,7 @@ class ResearchSetForm(forms.ModelForm):
             # Some fields are not required
             self.fields['name'].required = False
             self.fields['notes'].required = False
+            self.fields['scope'].required = False
 
             # Make sure the profile is set correctly
             self.fields['profileid'].initial = profile.id
@@ -108,6 +123,8 @@ class ResearchSetForm(forms.ModelForm):
                         'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['ssgdlist'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
                         'data-placeholder': 'Select a personal dataset of SSGs...', 'style': 'width: 100%;', 'class': 'searching'})
+
+            self.fields['ownlist'].queryset = Profile.objects.all()
 
             # Set queryset(s) - for details view
             self.fields['manulist'].queryset = Manuscript.objects.none()

@@ -249,17 +249,23 @@ class ResearchSetListView(BasicList):
     plural_name = "DCT tool page"
     new_button = True
     use_team_group = True
-    order_cols = ['name', 'saved', '']
+    order_cols = ['name', 'scope', 'profile__user__username', 'saved', '']
     order_default = order_cols
     order_heads = [
         {'name': 'Name',    'order': 'o=1','type': 'str', 'field': 'name',                      'linkdetails': True, 'main': True},
-        {'name': 'Date',    'order': 'o=2','type': 'str', 'custom': 'date', 'align': 'right',   'linkdetails': True},
-        {'name': 'DCT',     'order': 'o=3','type': 'str', 'custom': 'dct', 'align': 'right'},
+        {'name': 'Scope',   'order': 'o=2', 'type': 'str', 'custom': 'scope',                   'linkdetails': True},
+        {'name': 'Owner',   'order': 'o=3', 'type': 'str', 'custom': 'owner',                   'linkdetails': True},
+        {'name': 'Date',    'order': 'o=4','type': 'str', 'custom': 'date', 'align': 'right',   'linkdetails': True},
+        {'name': 'DCT',     'order': 'o=5','type': 'str', 'custom': 'dct', 'align': 'right'},
                 ]
-    filters = [ {"name": "Name",       "id": "filter_name",      "enabled": False} ]
+    filters = [ 
+        {"name": "Name",       "id": "filter_name",      "enabled": False},
+        {"name": "Owner",      "id": "filter_owner",     "enabled": False} 
+        ]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'name', 'dbfield': 'name', 'keyS': 'name'}
+            {'filter': 'name',  'dbfield': 'name',      'keyS': 'name'},
+            {'filter': 'owner', 'fkfield': 'profile',   'keyList': 'ownlist', 'infield': 'id' },
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
@@ -293,6 +299,10 @@ class ResearchSetListView(BasicList):
                 url = reverse('setdef_details', kwargs={'pk': dct.id})
                 html.append("<a href='{}' title='Show the default DCT for this research set'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
                 sBack = "\n".join(html)
+        elif custom == "scope":
+            sBack = instance.get_scope_display()
+        elif custom == "owner":
+            sBack = instance.profile.user.username
 
         return sBack, sTitle
 
@@ -330,8 +340,9 @@ class ResearchSetEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
             {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
-            {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
+            {'type': 'plain', 'label': "Scope:",        'value': instance.get_scope_display, 'field_key': 'scope'},
             {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
+            {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
             {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
             {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
             ]
