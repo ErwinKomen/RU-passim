@@ -317,9 +317,9 @@ class ResearchSetListView(BasicList):
         # Show private datasets as well as those with scope "team", provided the person is in the team
         ownlist = self.get_own_list()
         if user_is_ingroup(self.request, app_editor):
-            fields['scope'] = ( ( Q(scope="priv") & Q(profile__in=ownlist)  ) | Q(scope="team") )
+            fields['scope'] = ( ( Q(scope="priv") & Q(profile__in=ownlist)  ) | Q(scope="team") | Q(scope="publ") )
         else:
-            fields['scope'] = ( Q(scope="priv") & Q(profile__in=ownlist)  )
+            fields['scope'] = ( ( Q(scope="priv") & Q(profile__in=ownlist)  ) | Q(scope="publ") )
 
         return fields, lstExclude, qAlternative
 
