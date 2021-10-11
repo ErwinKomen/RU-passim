@@ -62,7 +62,6 @@
           <span>Create dataset</span>
         </a>
       </li>
-      <li role="separator" class="divider"></li>
       <li>
         <a id="basket_colladd" title="Add search results to a personal dataset or historical collection" href="#" operation="colladdstart" 
             targetid="colladdinterface" onclick="ru.passim.seeker.do_basket(this);">
@@ -70,6 +69,17 @@
           <span>Add to a dataset...</span>
         </a>
       </li>
+      {% if colltype == "manu" %}
+        <li role="separator" class="divider"></li>
+        <li>
+          <a id="basket_collcreate" title="Add search results to a 'ResearchSet', from which a DCT can be made" href="#" operation="rsetcreate" 
+              targetid="basket_buttons"
+              ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+            <span class="glyphicon glyphicon-send"></span>
+            <span>Create research-set</span>
+          </a>
+        </li>
+      {% endif %}
     {% endif %}
   </ul>
 

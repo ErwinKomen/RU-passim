@@ -84,6 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
+from passim.dct.models import ResearchSet, SetList
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -9395,6 +9396,8 @@ class ManuscriptListView(BasicList):
         context['basket_show'] = reverse('basket_show_manu')
         context['basket_update'] = reverse('basket_update_manu')
 
+        context['colltype'] = "manu"
+
         return context
 
     def get_basketqueryset(self):
@@ -12422,11 +12425,14 @@ class BasketUpdate(BasicPart):
 
         # Note: only operations in either of these two lists will be executed
         lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd"]
+        lst_basket_source = ["collcreate", "colladd", "rsetcreate"]
 
         # Get our profile
         profile = Profile.get_user_profile(self.request.user.username)
         if profile != None:
+
+            # Obligatory initialization
+            rset = None
 
             # Get the queryset
             self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
@@ -12535,9 +12541,37 @@ class BasketUpdate(BasicPart):
                     name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)
                     coll.name = name
                     coll.save()
+                elif operation == "rsetcreate":
+                    # Save the current basket as a research-set that needs to receive a name
+                    rset = ResearchSet.objects.create(
+                        name="tijdelijk",
+                        notes="Created from a {} listview basket".format(self.colltype),
+                        profile=profile)
+                    # Assign it a name based on its ID number and the owner
+                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                    rset.name = name
+                    rset.save()
                 elif oFields['collone']:
                     coll = oFields['collone']
-                if coll == None:
+
+                # Process the basket elements into the ResearchSet or into the Collection
+                if rset != None:
+                    with transaction.atomic():
+                        for idx, item in enumerate(qs):
+                            # Check if it doesn't exist yet
+                            obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
+                            if obj == None:
+                                # Create this
+                                order = idx + 1
+                                SetList.objects.create(researchset=rset, 
+                                                       order = order,
+                                                       setlisttype="manu",
+                                                       manuscript=item.manu)
+
+                    # Make sure to redirect to this instance -- but only for RSETCREATE
+                    if operation == "rsetcreate":
+                        self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                elif coll == None:
                     # TODO: provide some kind of error??
                     pass
                 else:
@@ -12555,6 +12589,8 @@ class BasketUpdate(BasicPart):
                     elif self.colltype == "super":
                         clsColl = CollectionSuper
                         field = "super"
+
+                    # THis is only needed for collections
                     with transaction.atomic():
                         for item in qs:
                             kwargs[field] = getattr( item, self.s_field)
@@ -12564,9 +12600,9 @@ class BasketUpdate(BasicPart):
                                 clsColl.objects.create(**kwargs)
                                 # Note that some changes have been made
                                 bChanged = True
+
                     # Make sure to redirect to this instance -- but only for COLLCREATE
                     if operation == "collcreate":
-                        # self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
                         self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
                     else:
                         # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
@@ -12602,6 +12638,7 @@ class BasketUpdate(BasicPart):
             else:
                 context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
                 context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
+            context['colltype'] = self.colltype
 
         # Return the updated context
         return context

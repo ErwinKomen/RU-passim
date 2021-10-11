@@ -500,17 +500,6 @@ class KeywordOneWidget(ModelSelect2Widget):
         return qs
 
 
-#class LibtypeWidget(ModelSelect2Widget):
-#    model = FieldChoice
-#    search_fields = [ 'english_name__icontains']
-
-#    def label_from_instance(self, obj):
-#        return obj.english_name
-
-#    def get_queryset(self):
-#        return FieldChoice.objects.filter(field=LIBRARY_TYPE).order_by("english_name")
-
-
 class LitrefWidget(ModelSelect2Widget):
     model = Litref
     search_fields = [ 'full__icontains' ]
