@@ -453,7 +453,7 @@ var ru = (function ($, ru) {
               $("#colmode option[value='custom']").prop("selected", true);
             }
             // Adapt columns if pivot_col is different
-            if (pivot_col !== 0) {
+            if (pivot_col >= 0) {
               // The [pivot_col] is the 'title.order' value - Check which index it is
               pivot_idx = -1;
               for (i = 0; i < ssglists.length; i++) {
@@ -517,19 +517,36 @@ var ru = (function ($, ru) {
             var retval = 0;
 
             // The pivot column should come first
-            if (a.title.pivot < b.title.pivot) {
-              retval = -1;
-            } else {
+            retval = a.title.pivot - b.title.pivot;
+
+            // But if the pivot columns are equal (both are 1), then use a different measure
+            if (retval == 0) {
               switch (col_mode) {
                 case "rset":
                   // Follow the [order] definition
                   retval = (a.title.order > b.title.order) ? 1 : -1;
                   break;
                 case "match_decr":
-                  retval = (a.title.matches < b.title.matches) ? 1 : -1;
+                  // First level: matches
+                  if (a.title.matches < b.title.matches) {
+                    retval = 1;
+                  } else if (a.title.matches > b.title.matches) {
+                    retval = -1;
+                  } else {
+                    // They are equal: check for order
+                    retval = (a.title.order > b.title.order) ? 1 : -1;
+                  }
                   break;
                 case "match_incr":
-                  retval = (a.title.matches > b.title.matches) ? 1 : -1;
+                  // First level: matches
+                  if (a.title.matches > b.title.matches) {
+                    retval = 1;
+                  } else if (a.title.matches < b.title.matches) {
+                    retval = -1;
+                  } else {
+                    // They are equal: check for order
+                    retval = (a.title.order > b.title.order) ? 1 : -1;
+                  }
                   break;
                 case "alpha":
                   // NOTE: this needs emending to facilitate: City > Library > shelfmark
@@ -549,7 +566,13 @@ var ru = (function ($, ru) {
                   retval = (lst_order.indexOf(a.title.order) > lst_order.indexOf(b.title.order)) ? 1 : -1;
                   break;
               }
+
             }
+
+            // DEBUGGING: what is happening?
+            console.log("ssglists a=[" + a.title.main + "].p" + a.title.pivot + ".m" + a.title.matches +
+              " b=[" + b.title.main + "].p" + b.title.pivot + ".m" + b.title.matches +
+              " --> " + retval);
 
             return retval;
           });
@@ -687,34 +710,8 @@ var ru = (function ($, ru) {
             private_methods.dct_highlight(this);
           });
 
-          // initialize tooltipping: hover-type
-          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip({
-            html: true,
-            container: 'body',
-            placement: 'bottom auto',
-            animation: true,
-            trigger: "hover",
-            delay: 800,
-            template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
-          });
-
-          // What to do when a tooltip has been shown
-          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').on('shown.bs.tooltip', function () {
-            private_methods.dct_showhidealt();
-            //$('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip("update");
-          });
-
-          /*
-          // initialize tooltipping: click-type for further information
-          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-click"]').tooltip({
-            html: true,
-            container: 'body',
-            placement: 'top auto',
-            animation: true,
-            trigger: "click",
-            delay: 10,
-            template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
-          });*/
+          // initialize tooltipping:
+          private_methods.dct_showtooltip_init();
 
           // Now show it
           $(elDctTools).removeClass("hidden");
@@ -768,6 +765,33 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("dct_showhidealt", ex);
+        }
+      },
+
+      /** 
+       *  dct_showtooltip_init - Initialize tooltip processing
+       */
+      dct_showtooltip_init: function () {
+        try {
+          // initialize tooltipping: hover-type
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip({
+            html: true,
+            container: 'body',
+            placement: 'bottom auto',
+            animation: true,
+            trigger: "hover",
+            delay: 800,
+            template: '<div class="tooltip dct"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+          });
+
+          // What to do when a tooltip has been shown
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').on('shown.bs.tooltip', function () {
+            private_methods.dct_showhidealt();
+          });
+
+
+        } catch (ex) {
+          private_methods.errMsg("dct_showtooltip_init", ex);
         }
       },
 
@@ -1424,6 +1448,9 @@ var ru = (function ($, ru) {
             if (elOriginal.length > 0 && elCopy.length > 0) {
               // Copy from copy to original
               $(elOriginal).html($(elCopy).html());
+
+              // initialize tooltipping:
+              private_methods.dct_showtooltip_init();
 
             }
           }

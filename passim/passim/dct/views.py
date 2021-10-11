@@ -556,15 +556,25 @@ class ResearchSetDetails(ResearchSetEdit):
                         obj.order = idx + 1
                         obj.save()
 
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Authorization: only app-editors may edit!
+        bMayEdit = user_is_ingroup(self.request, team_group)
+            
         # All PDs: show the content
         related_objects = []
         lstQ = []
         rel_list =[]
         resizable = True
         index = 1
-        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_end = '</span>'
+        sort_start = ""
+        sort_start_int = ""
+        sort_end = ""
+        if bMayEdit:
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
 
         oErr = ErrHandle()
 
@@ -574,7 +584,7 @@ class ResearchSetDetails(ResearchSetEdit):
             # Get all 'SetList' objects that are part of this 'ResearchSet'
             setlists = dict(title="Lists within this research set", prefix="setlists")  
             if resizable: setlists['gridclass'] = "resizable dragdrop"
-            setlists['savebuttons'] = True
+            setlists['savebuttons'] = bMayEdit
             setlists['saveasbutton'] = False
 
             qs_setlist = instance.researchset_setlists.all().order_by(
@@ -610,8 +620,9 @@ class ResearchSetDetails(ResearchSetEdit):
                 # SetList: Size (number of SSG in this manu/coll)
                 add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False, align="right")
 
-                # Actions that can be performed on this item
-                add_one_item(rel_item, self.get_actions())
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_actions())
 
                 # Add this line to the list
                 rel_list.append(dict(id=obj.id, cols=rel_item))
@@ -621,9 +632,10 @@ class ResearchSetDetails(ResearchSetEdit):
                 '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
                 '{}<span title="Type of setlist">Type of this setlist</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="The title of the manuscript/dataset/collection">Title</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Number of SSGs part of this setlist">Size</span>{}'.format(sort_start_int, sort_end), 
-                ''
+                '{}<span title="Number of SSGs part of this setlist">Size</span>{}'.format(sort_start_int, sort_end)
                 ]
+            if bMayEdit:
+                setlists['columns'].append("")
             related_objects.append(setlists)
 
             # [2] =============================================================
@@ -666,8 +678,7 @@ class ResearchSetDetails(ResearchSetEdit):
                 '{}<span title="Name of this DCT">Name</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Notes on this DCT">Notes</span>{}'.format(sort_start, sort_end), 
                 '{}<span title="Date when last changed">Changed</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Buttons">DCT</span>{}'.format(sort_start, sort_end), 
-                ''
+                '{}<span title="Buttons">DCT</span>{}'.format(sort_start, sort_end)
                 ]
             related_objects.append(setdefs)
 
@@ -685,7 +696,7 @@ class ResearchSetDetails(ResearchSetEdit):
         html = []
         buttons = ['remove']    # This contains all the button names that need to be added
 
-        # Start the whole spane
+        # Start the whole div
         html.append("<div class='blinded'>")
         
         # Add components
@@ -696,8 +707,8 @@ class ResearchSetDetails(ResearchSetEdit):
         if 'remove' in buttons: 
             html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
 
-        # Finish up the span
-        html.append("&nbsp;</span>")
+        # Finish up the div
+        html.append("&nbsp;</div>")
 
         # COmbine the list into a string
         sHtml = "\n".join(html)
@@ -913,6 +924,12 @@ class SetDefDetails(SetDefEdit):
         template_name = "dct/dct_view.html"
 
         try:
+            username = self.request.user.username
+            team_group = app_editor
+
+            # Authorization: only app-editors may edit!
+            bMayEdit = user_is_ingroup(self.request, team_group)
+
             # Show the DCT according to the parameters that I can find
             parameters = json.loads(instance.contents)
             if len(parameters) > 0:
@@ -925,6 +942,7 @@ class SetDefDetails(SetDefEdit):
             context['dctdata_url'] = reverse('setdef_data', kwargs={'pk': instance.id})
             context['csrf'] = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
                 get_token(self.request))
+            context['mayedit'] = bMayEdit
 
             # Create the DCT with a template
             dct_view = render_to_string(template_name, context)
