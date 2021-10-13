@@ -553,7 +553,7 @@ class SetList(models.Model):
                     sgcount = obj['super__sgcount']
                     ssgcount = obj['super__ssgcount']
                     # Sermon characteristics
-                    srm_author = obj['super__author__name']
+                    srm_author = obj['sermon__author__name']
                     srm_sectiontitle = obj['sermon__sectiontitle']
                     srm_lectio = obj['sermon__quote']
                     srm_title = obj['sermon__title']
