@@ -86,11 +86,12 @@ def get_ssg_corpus(profile, instance):
 def get_ssg_sig(ssg_id):
     oErr = ErrHandle()
     sig = ""
+    issue_375 = True
     try:
         # Get the Signature that is most appropriate
         sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
         sig = "" if sig_obj == None else sig_obj.code
-        if ',' in sig:
+        if not issue_375 and ',' in sig:
             sig = sig.split(",")[0].strip()
     except:
         msg = oErr.get_error_message()
@@ -160,12 +161,13 @@ class EqualGoldOverlap(BasicPart):
                 ssg_link[src].append(dst)
 
             # Create the overlap network
-            node_list, link_list, max_value = self.do_overlap(ssg_link, networkslider)
+            node_list, link_list, max_value, max_group = self.do_overlap(ssg_link, networkslider)
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
                                    max_value=max_value,
+                                   max_group=max_group,
                                    networkslider=networkslider,
                                    legend="SSG overlap network")
             
@@ -180,6 +182,8 @@ class EqualGoldOverlap(BasicPart):
 
         def add_nodeset(ssg_id, group):
             node_key = ssg_id
+            if node_key == 4968:
+                iStop = 1
             # Possibly add the node to the set
             if not node_key in node_set:
                 code_sig = get_ssg_sig(ssg_id)
@@ -195,6 +199,7 @@ class EqualGoldOverlap(BasicPart):
         node_set = {}
         link_set = {}
         max_value = 0
+        max_group = 1
         oErr = ErrHandle()
 
         try:
@@ -243,12 +248,20 @@ class EqualGoldOverlap(BasicPart):
             # Turn the sets into lists
             node_list = [v for k,v in node_set.items()]
             link_list = [v for k,v in link_set.items()]
+
+            # Calculate max_value
+            for oItem in link_list:
+                value = oItem['value']
+                if value > max_value: max_value = value
+            for oItem in node_list:
+                group = oItem['group']
+                if group > max_group: max_group = group
             
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldOverlap/do_overlap")
 
-        return node_list, link_list, max_value
+        return node_list, link_list, max_value, max_group
 
 
 class EqualGoldTrans(BasicPart):
@@ -332,6 +345,7 @@ class EqualGoldTrans(BasicPart):
         
         The @min_value is the minimum link-value the user wants to see
         """
+
         oErr = ErrHandle()
         author_dict = {}
         node_list = []
@@ -362,8 +376,6 @@ class EqualGoldTrans(BasicPart):
                     title = code.split(" ")[1]
                 # Get the Signature that is most appropriate
                 sig = get_ssg_sig(ssg_id)
-                #sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
-                #sig = "" if sig_obj == None else sig_obj.code
 
                 # Add author to dictionary
                 if not category in author_dict: author_dict[category] = 0

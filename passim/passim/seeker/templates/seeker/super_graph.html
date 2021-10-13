@@ -128,38 +128,80 @@
       <input name='downloadtype' id='downloadtype' class='form-control' value='' >
       <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
-    <div class="row">
-      <div class="col-md-5 col-md-offset-3 align-right">
-        <span>Overlap network degree: </span>
-        <span id="network_overlap_slider_value">1</span>
-      </div>
-      <div class="col-md-3 slidecontainer">
-        <input name="network_overlap_slider" id="id_network_overlap_slider" valueid="network_overlap_slider_value"
-                type="range" min="1" max="10" value="1" class="slider" />
-      </div>
 
-      <!-- Button to stop -->
-      <div class="col-md-1 align-right">
-        <a role="button" class="btn btn-xs jumbo-2"
-           targeturl={{equalgold_overlap}}
-           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+    <div class="row">
+      <div class="col-md-offset-3 col-md-9">
+        <table class="spacy-border" style="width: 100%;">
+          <tr>
+            <td class="tdnowrap"><span>Show direction&nbsp;</span></td>
+            <td>
+              <label class="switch" title="Show direction">
+                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_direction');" />
+                <span class="switchslider round"></span>
+              </label>
+            </td>
+
+            <td class="tdnowrap" ><span>Alternative options&nbsp;</span></td>
+            <td>
+              <label class="switch" title="Highlight alternative options">
+                <input type="checkbox" />
+                <span class="switchslider round"></span>
+              </label>
+            </td>
+
+            <td class="tdnowrap" align="right">
+              <span>Overlap network degree: </span>
+              <span id="network_overlap_slider_value">1</span>
+              <span>&nbsp;</span>
+            </td>
+            <td class="slidecontainer" style="width: 100%;">
+              <input name="network_overlap_slider" id="id_network_overlap_slider" valueid="network_overlap_slider_value"
+                      type="range" min="1" max="10" value="1" class="slider" />
+            </td>
+
+            <td align="right">
+              <a role="button" class="btn btn-xs jumbo-2"
+                 targeturl={{equalgold_overlap}}
+                 onclick="ru.passim.seeker.network_stop(this);">Close</a>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="tdnowrap"><span>Show link types&nbsp;</span></td>
+            <td>
+              <label class="switch" title="Show link types">
+                <input type="checkbox" />
+                <span class="switchslider round"></span>
+              </label>
+            </td>
+
+            <td class="tdnowrap"><span>Manuscript count&nbsp;</span></td>
+            <td>
+              <label class="switch" title="Show number of manuscripts">
+                <input type="checkbox" />
+                <span class="switchslider round"></span>
+              </label>
+            </td>
+
+            <td class="tdnowrap" align="right">
+              <span>Gravity: </span>
+              <span id="gravity_overlap_value">100</span>
+              <span>&nbsp;</span>
+            </td>
+            <td class="slidecontainer" style="width: 100%;">
+              <input name="gravity_overlap_slider" id="id_gravity_overlap_slider" valueid="gravity_overlap_value"
+                      type="range" min="-100" max="300" value="100" class="slider" />
+            </td>
+
+            <td align="right">
+              {% include 'seeker/download.html' with downloadid="overlap" urlname="equalgold_overlap_download" object_id=object.id %}
+            </td>
+          </tr>
+
+        </table>
       </div>
     </div>
-    <div class="row">
-      <div class="col-md-5 col-md-offset-3 align-right">
-        <span>Gravity: </span>
-        <span id="gravity_overlap_value">100</span>
-      </div>
-      <div class="col-md-3 slidecontainer">
-        <input name="gravity_overlap_slider" id="id_gravity_overlap_slider" valueid="gravity_overlap_value"
-                type="range" min="-100" max="300" value="100" class="slider" />
-      </div>
 
-      <!-- Download button -->
-      <div class="col-md-1 align-right">
-        {% include 'seeker/download.html' with downloadid="overlap" urlname="equalgold_overlap_download" object_id=object.id %}
-      </div>
-    </div>
   </form>
 
   <div id="super_network_overlap_wait" class="hidden">

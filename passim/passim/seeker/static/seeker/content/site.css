@@ -75,6 +75,10 @@ table tbody tr td.clickable:hover, table tbody tr.clickable td:hover, table tbod
   background-color: lightgoldenrodyellow ;
 }
 
+table tbody tr td .clickable {
+
+}
+
 th div a.clickable.ordered {
   color: darkgoldenrod;
 }
@@ -567,6 +571,11 @@ form .panel-heading.row {
 .jumbo-1 text {
   fill: goldenrod;
 }
+.jumbo-1.active {
+    background-color: lightgray;
+    color: saddlebrown;
+}
+
 .jumbo-2 {
   background-color: chocolate;
   color: lavender !important;
@@ -748,6 +757,7 @@ body > div > footer {
   bottom: 0px;
   width: 100%;
   text-align: center;
+  z-index: 100;
 }
 body > div > footer a {
   color: #355e3b;
@@ -1357,7 +1367,7 @@ a.nostyle:link, a.nostyle:visited {
 }
 
 td a.nostyle {
-  display: block;
+  display: inline-block;
 }
 
 a.sermon:link, a.sermon:visited {
@@ -1421,8 +1431,7 @@ tr.selected > td.selectable:hover {
 /* Hide default HTML checkbox */
 .switch input, .badge.filter input { opacity: 0; width: 0; height: 0;}
 /* Slider of the switch */
-/*
-.slider {
+.switchslider {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -1434,7 +1443,7 @@ tr.selected > td.selectable:hover {
   transition: .4s;
 }
 
-.slider:before {
+.switchslider:before {
   position: absolute;
   content: "";
   height: 15px;
@@ -1446,21 +1455,20 @@ tr.selected > td.selectable:hover {
   transition: .4s;
 }
 
-input:checked + .slider { background-color: #2196F3; }
+input:checked + .switchslider { background-color: #2196F3; }
 
-input:focus + .slider {  box-shadow: 0 0 1px #2196F3; }
+input:focus + .switchslider {  box-shadow: 0 0 1px #2196F3; }
 
-input:checked + .slider:before {
+input:checked + .switchslider:before {
   -webkit-transform: translateX(26px);
   -ms-transform: translateX(26px);
   transform: translateX(26px);
 }
-*/
 
 /* Rounded sliders */
-.slider.round {   border-radius: 34px; }
+.slider.round, .switchslider.round {   border-radius: 34px; }
 
-.slider.round:before {   border-radius: 50%; }
+.slider.round:before, .switchslider.round:before {   border-radius: 50%; }
 
 /* Sermon tree */
 .tree[level='1'] {
@@ -1599,7 +1607,7 @@ g > text {
 div.tooltip {
     position: fixed; /*   !important; */
     text-align: center;
-    width: 120px;
+    width: 120px; 
     height: 35px;
     padding: 2px;
     font: 12px sans-serif;
@@ -1610,7 +1618,7 @@ div.tooltip {
     box-shadow: 1px 1px;
     pointer-events: none;
     opacity: 0.8;
-    z-index:1;
+    z-index: 1;
 }
 svg .histogram-bar {
     fill: #337ab7; /* #69b3a2; */
@@ -1661,4 +1669,161 @@ svg .nodes text {
     margin-top: 1px;
     margin-bottom: 1px;
 }
+
+.spacy-border td {
+    border: 4px solid transparent;
+}
+
+
+/* DCT stuff */
+.table-scroll {
+    position: relative;
+    /* max-width: 600px; */
+    max-width: 10000px;
+    margin: auto;
+    overflow: hidden;
+}
+.table-wrap {
+    width: 100%;
+    overflow: auto;
+}
+table.dct-view {
+    border: 1px solid white;
+    /* border: none; */
+    background-color: lightgray;
+    margin-top: 0px;
+    vertical-align: top;
+    padding: 2px;
+    width: 100%;
+    margin: auto;
+}
+
+
+
+table.dct-view th .shelf-city, table th .shelf-library, table th .shelf-idno, table th .shelf-size {
+    font-size: smaller;
+    white-space: nowrap;
+    text-align: center;
+}
+
+table.dct-view th .shelf-city {
+    color: lightblue;
+    cursor: pointer;
+}
+
+table.dct-view th .shelf-idno {
+    color: chartreuse;
+}
+
+table.dct-view th {
+  border: 1px solid white;
+  font-size: 12px;
+  background-color: darkgreen;
+  color: white;
+  border-radius: 3px 3px;
+  margin-top: 0px;
+  margin-left:20px;
+  vertical-align: top;
+  padding: 2px;
+  background-clip: padding-box;
+}
+table.dct-view th.selected {
+  background-color: darkorange;
+}
+table.dct-view th:hover {
+  background-color: green;
+}
+table.dct-view th.selected:hover {
+    background-color: orangered;
+}
+
+table.dct-view td .func-name {
+  color: black;
+  font-family: monospace;
+  border-radius: 3px 3px;
+}
+table.dct-view td .func-name:hover {
+  background-color: darkgreen;
+  color: white;
+  font-family: monospace;
+  border-radius: 3px 3px;
+}
+table.dct-view td {
+  border: 1px solid white;
+  font-size: 12px;
+  margin-top: 0px;
+  vertical-align: top;
+  padding: 2px;
+  /* overflow: hidden;
+  background-color: lightgray; */
+}
+table.dct-view tr.dct-even td {
+    background-color: #D9D9BF	;
+}
+
+table.dct-view tr.dct-odd td {
+    background-color: lightgray;
+}
+
+table.dct-view tr.dct-highlight td {
+    background-color: yellow;
+}
+
+table.dct-view tr td:hover {
+    background-color: #BCBC8F;
+}
+
+table.dct-view tr td.fixed-col1 {
+    cursor: pointer;
+}
+
+table.dct-view td, table.dct-view th {
+    z-index: 20;
+    position: relative;
+    background-clip: padding-box;
+}
+
+table.dct-view .fixed-side {
+    position: sticky;
+    z-index: 50;
+}
+
+.dct-tools .form-control {
+    font-size: small;
+}
+
+.dct-blinded {
+    opacity: 0.0;
+    min-width: 20px;
+    max-width: 20px;
+}
+
+.dct-blinded .glyphicon {
+    color: red;
+    margin-left: 4px;
+}
+
+.dct-hide:hover .dct-blinded {
+    opacity: 1.0;
+}
+
+div.tooltip.dct {
+    width: unset;
+    height: unset;
+    z-index: 200 ;
+    text-align: left;
+    color: darkblue;
+    background-color: whitesmoke;
+}
+div.tooltip.dct .tooltip-inner {
+    color: black;
+    background-color: lavenderblush;
+    max-width: 500px; /* */
+    text-align: left;
+}
+div.toolbox.dct .tooltip-inner tr td,
+table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
+    background-color: lavenderblush;
+}
+
 

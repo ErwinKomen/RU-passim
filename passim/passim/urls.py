@@ -18,9 +18,10 @@ import passim.reader.views
 from passim import views
 from passim.seeker.views import *
 from passim.seeker.visualizations import *
+from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
-from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -56,7 +57,7 @@ urlpatterns = [
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^guide', passim.seeker.views.guide, name='guide'),
-    url(r'^mypassim', passim.seeker.views.mypassim, name='mypassim'),
+    url(r'^mypassim', passim.dct.views.mypassim, name='mypassim'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
@@ -95,6 +96,7 @@ urlpatterns = [
     url(r'^manuscript/download(?:/(?P<pk>\d+))?/$', ManuscriptDownload.as_view(), name='manuscript_download'),
     url(r'^manuscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
+    url(r'^manuscript/import/galway/$', ManuscriptUploadGalway.as_view(), name='manuscript_upload_galway'),
     url(r'^manuscript/codico/$', ManuscriptCodico.as_view(), name='manuscript_codico'),
 
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
@@ -236,6 +238,16 @@ urlpatterns = [
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
+
+    url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
+    url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
+    url(r'^rset/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+    url(r'^dct/list', SetDefListView.as_view(), name='setdef_list'),
+    url(r'^dct/details(?:/(?P<pk>\d+))?/$', SetDefDetails.as_view(), name='setdef_details'),
+    url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
+    url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
+
+    url(r'^dct/test', passim.dct.views.test_dct, name='test_dct'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

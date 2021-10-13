@@ -113,6 +113,7 @@ INSTALLED_APPS = [
     'passim.bible',
     'passim.reader',
     'passim.seeker',
+    'passim.dct',
     'passim.enrich'
 ]
 

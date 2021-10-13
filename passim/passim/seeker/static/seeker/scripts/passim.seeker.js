@@ -1785,6 +1785,9 @@ var ru = (function ($, ru) {
         var svg,      // the SVG element within the DOM that is being used
             divSvg,   // The target svg div
             color,    // D3 color scheme
+            grayrange,  // D3 gray color
+            widthrange, // D3 width range
+            colrange,   // D3 color range (attempt) for node coloring
             factor,
             width,
             height,
@@ -1792,6 +1795,9 @@ var ru = (function ($, ru) {
             calcH,
             i,
             count,
+            max_width = 2,
+            max_value = 1,
+            max_group = 1,
             bDoTransform = true,
             maxcount = 0,
             gravityvalue = 100,
@@ -1821,6 +1827,25 @@ var ru = (function ($, ru) {
           height = options['height'];
           factor = options['factor'];
           degree = options['degree'];
+          max_value = options['max_value'];
+          max_group = options['max_group'];
+
+          // Create a grayscale color range
+          grayrange = d3.scaleLinear()
+            .domain([1, max_value])
+            .range(["#999", "000"]);
+
+          widthrange = d3.scaleLinear()
+            .domain([1, max_value])
+            .range([1, max_width]);
+
+          //colrange = d3.scaleQuantile()
+          //  .range(["#fe433c", "#f31d64", "#a224ad", "#6a38b3", "#3c50b1", "#0095ef"])
+          //  .domain([1, max_group]);
+
+          colrange = d3.scaleLinear()
+            .range(["red", "darkblue"])
+            .domain([1, max_group]);
 
           // Calculate the maxcount within the nodes 'scount' feature
           for (i = 0; i < options['nodes'].length; i++) {
@@ -1866,10 +1891,6 @@ var ru = (function ($, ru) {
               .force("collide", d3.forceCollide(d => 65).radius(function (d) {
                 return get_height(d) + 1;
               }).iterations(3))
-              // .force("collision", rectCollide().size(function (d) {
-              //  return [get_width(d), get_height(d)];
-              //}))
-              //.nodes(options['nodes']);
               .on("tick", ticked);
           
           if (bDoTransform) {
@@ -1880,14 +1901,39 @@ var ru = (function ($, ru) {
               .on("zoom", zoomed));
           }
 
+          // Define arrow heads
+          g.append("defs").selectAll("marker")
+            .data(["arrow_uses"])
+            .enter().append("marker")
+            .attr("id", function (d) {
+              return d;
+            })
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 18)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("fill", "black")
+            .attr("d", 'M0,-5L10,0L0,5');
+
           // Define a d3 function based on the information in 'nodes' and 'links'
           link = g.append("g")
                     .attr("class", "links")
                     .selectAll("line")
                     .data(options['links'])
                     .join("line")
+                    .attr("stroke", function (d) {
+                      return grayrange(d.value);
+                    })
                     .attr("stroke-width", function (d) {
-                      return Math.sqrt(2 * d.value);
+                      // return (max_width * d.value / max_value);
+                      return widthrange(d.value);
+                    })
+                    .attr("marker-end", function (d) {
+                      var m = ru.passim.seeker.overlap_marker_end(d);
+                      return m;
                     });
           node = g.append("g")
                     .attr("class", "nodes")
@@ -1953,7 +1999,12 @@ var ru = (function ($, ru) {
             g.attr("transform", event.transform);
 
             link.style("stroke-width", function (d) {
-              return Math.sqrt(2 * d.value);
+              // return (max_width * d.value / max_value);
+              return widthrange(d.value);
+            });
+
+            link.style("stroke", function (d) {
+              return grayrange(d.value);
             });
 
             // Make sure that the circle retain their size by dividing by the scale factor
@@ -1997,9 +2048,11 @@ var ru = (function ($, ru) {
 
             node.attr("transform", function (d) {
               var radius = 10, ix, iy;
-              if (d.scount !== undefined) { radius = get_radius(d); }
-              ix = Math.max(radius, Math.min(width - radius, d.x));
-              iy = Math.max(radius, Math.min(height - radius, d.y));
+              //if (d.scount !== undefined) { radius = get_radius(d); }
+              //ix = Math.max(radius, Math.min(width - radius, d.x));
+              //iy = Math.max(radius, Math.min(height - radius, d.y));
+              ix = d.x;
+              iy = d.y;
               return `translate(${ix},${iy})`
             });
 
@@ -2167,7 +2220,8 @@ var ru = (function ($, ru) {
 
           function network_color(d) {
             var col_result = "";
-            col_result = scale(d.group);
+            // col_result = scale(d.group);
+            col_result = colrange(d.group);
             return col_result;
           }
 
@@ -2771,6 +2825,25 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("codico_toggle", ex);
+        }
+      },
+
+      /**
+       * postsubmit
+       *    Submit nearest form as POST
+       *
+       */
+      postsubmit: function (el) {
+        var frm = null;
+
+        try {
+          frm = $(el).closest("form");
+          // Make sure we do a POST
+          frm.attr("method", "POST");
+          // Submit
+          $(frm).submit();
+        } catch (ex) {
+          private_methods.errMsg("postsubmit", ex);
         }
       },
 
@@ -6039,6 +6112,40 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * network_overlap_option
+       *   Set or clear a network graph option
+       *
+       */
+      network_overlap_option: function (elStart, type) {
+        var status = elStart.checked;
+
+        try {
+          loc_network_options[type] = status;
+          // Redraw
+          ru.passim.seeker.network_overlap(elStart);
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_option", ex);
+        }
+      },
+
+      /**
+       * network_graph_option
+       *   Set or clear a network graph option
+       *
+       */
+      overlap_marker_end: function (d) {
+        try {
+          if (loc_network_options['overlap_direction'] === true) {
+            return "url(#arrow_uses)";
+          } else {
+            return "";
+          }
+        } catch (ex) {
+          private_methods.errMsg("overlap_marker_end", ex);
+        }
+      },
+
+      /**
        * network_overlap
        *   Create and show a SSG-overlap network
        *
@@ -6099,8 +6206,18 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['max_value'] = max_value;
+                  options['max_group'] = response.max_group;
 
-                  loc_network_options = options;
+                  // Copy from [options] to [loc]
+                  for (var key in options) {
+                    loc_network_options[key] = options[key];
+                  }
+                  // COpy from [loc] to [options]
+                  for (var key in loc_network_options) {
+                    options[key] = loc_network_options[key];
+                  }
+                  // loc_network_options = options;
 
                   // Use D3 to draw a force-directed network
                   private_methods.draw_network_overlap(options);

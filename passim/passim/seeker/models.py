@@ -1234,11 +1234,13 @@ class Action(models.Model):
     def get_object(self):
         """Get an object representation of this particular Action item"""
 
+        processable_actiontypes = ['save', 'add', 'new', 'import']
+
         actiontype = self.actiontype
         model = ""
         oDetails = None
         changes = {}
-        if actiontype == "save" or actiontype == "add" or actiontype == "new":
+        if actiontype in processable_actiontypes:
             oDetails = json.loads(self.details)
             actiontype = oDetails.get('savetype', '')
             changes = oDetails.get('changes', {})
@@ -2244,13 +2246,18 @@ class SourceInfo(models.Model):
         return sBack
 
     def get_manu_html(self):
-        """Get the HTML display of the manuscript to which I am attached"""
+        """Get the HTML display of the manuscript[s] to which I am attached"""
 
         sBack = "Make sure to connect this source to a manuscript and save it. Otherwise it will be automatically deleted"
-        manu = self.sourcemanuscripts.first()
-        if manu != None:
-            url = reverse('manuscript_details', kwargs={'pk': manu.id})
-            sBack = "Linked to: <span class='signature ot'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        qs = self.sourcemanuscripts.all()
+        if qs.count() > 0:
+            html = ["Linked to {} manuscript[s]:".format(qs.count())]
+            for idx, manu in enumerate(qs):
+                url = reverse('manuscript_details', kwargs={'pk': manu.id})
+                sManu = "<span class='source-number'>{}.</span><span class='signature ot'><a href='{}'>{}</a></span>".format(
+                    idx+1, url, manu.get_full_name())
+                html.append(sManu)
+            sBack = "<br />".join(html)
         return sBack
 
 
@@ -3065,6 +3072,10 @@ class Manuscript(models.Model):
     # [0-1] Format: the size
     format = models.CharField("Format", max_length=LONG_STRING, null=True, blank=True)
 
+    # RAW (json) data of a manuscript, when imported from an external source
+    # [0-1] Raw: imported data in JSON
+    raw = models.TextField("Raw", null=True, blank=True)
+
     # [1] Every manuscript has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
     # [0-1] Status note
@@ -3072,6 +3083,9 @@ class Manuscript(models.Model):
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
+
+    # [0-1] A manuscript may have an ID from the database from which it was read
+    external = models.IntegerField("ID in external DB", null=True)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     #     The third alternative is: a reconstruction
@@ -3105,24 +3119,23 @@ class Manuscript(models.Model):
     # Scheme for downloading and uploading
     specification = [
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
-        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
-        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
-        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'Url',                 'type': 'field', 'path': 'url'},
+        {'name': 'External id',         'type': 'field', 'path': 'external'},
         {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
-        #{'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        #{'name': 'Support',             'type': 'field', 'path': 'support'},
-        #{'name': 'Extent',              'type': 'field', 'path': 'extent'},
-        #{'name': 'Format',              'type': 'field', 'path': 'format'},
+        {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
+        {'name': 'Country id',          'type': 'fk_id', 'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
+        {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        {'name': 'City id',             'type': 'fk_id', 'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
-        # {'name': 'Origin',              'type': 'func',  'path': 'origin'},
-        # {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
-        {'name': 'Notes',               'type': 'field', 'path': 'notes'},
-        {'name': 'External links',      'type': 'func',  'path': 'external'},
+        {'name': 'External links',      'type': 'func',  'path': 'external_links'},
         ]
 
     def __str__(self):
@@ -3213,17 +3226,25 @@ class Manuscript(models.Model):
         bResult, msg = add_codico_to_manuscript(self)
         return bResult, msg
 
+    def action_add_change(self, username, actiontype, path, old_value, new_value):
+        # Show that this overwriting took place
+        change_text = "from [{}] to [{}]".format(old_value, new_value)
+        details = dict(id=self.id, savetype="change", changes={path: change_text})
+        Action.add(username, "Manuscript", self.id, actiontype, json.dumps(details))
+
     def custom_add(oManu, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
         manu = None
+        bOverwriting = False
         lst_msg = []
 
         try:
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            source = kwargs.get("source")
             # First get the shelf mark
             idno = oManu.get('shelf mark')
             if idno == None:
@@ -3232,10 +3253,17 @@ class Manuscript(models.Model):
                 # Get the standard project
                 project = Project.get_default(username)
                 # Retrieve or create a new manuscript with default values
-                obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                if source == None:
+                    obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                else:
+                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man", project=project).first()
                 if obj == None:
                     # Doesn't exist: create it
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
+                else:
+                    # We are overwriting
+                    oErr.Status("Overwriting manuscript [{}]".format(idno))
+                    bOverwriting = True
                         
                 # Process all fields in the Specification
                 for oField in Manuscript.specification:
@@ -3246,17 +3274,32 @@ class Manuscript(models.Model):
                         path = oField.get("path")
                         type = oField.get("type")
                         if type == "field":
-                            # Set the correct field's value
-                            setattr(obj, path, value)
-                        elif type == "fk":
+                            # Note overwriting
+                            old_value = getattr(obj, path)
+                            if value != old_value:
+                                if bOverwriting:
+                                    # Show that this overwriting took place
+                                    obj.action_add_change(username, "import", path, old_value, value)
+                                # Set the correct field's value
+                                setattr(obj, path, value)
+                        elif type == "fk" or type == "fk_id":
                             fkfield = oField.get("fkfield")
                             model = oField.get("model")
                             if fkfield != None and model != None:
                                 # Find an item with the name for the particular model
                                 cls = apps.app_configs['seeker'].get_model(model)
-                                instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                if type == "fk":
+                                    instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                else:
+                                    instance = cls.objects.filter(**{"id".format(fkfield): value}).first()
                                 if instance != None:
-                                    setattr(obj, path, instance)
+                                    old_value = getattr(obj,path)
+                                    if instance != old_value:
+                                        if bOverwriting:
+                                            # Show that this overwriting took place
+                                            old_id = "" if old_value == None else old_value.id
+                                            obj.action_add_change(username, "import", path, old_id, instance.id)
+                                        setattr(obj, path, instance)
                         elif type == "func":
                             # Set the KV in a special way
                             obj.custom_set(path, value, **kwargs)
@@ -3275,12 +3318,7 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
-            #if path == "dateranges":
-            #    qs = self.manuscript_dateranges.all().order_by('yearstart')
-            #    dates = []
-            #    for obj in qs:
-            #        dates.append(obj.__str__())
-            #    sBack = json.dumps(dates)
+
             if path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
@@ -3289,11 +3327,7 @@ class Manuscript(models.Model):
                 sBack = self.get_collections_markdown(username, team_group, settype="pd", plain=True)
             elif path == "literature":
                 sBack = self.get_litrefs_markdown(plain=True)
-            #elif path == "origin":
-            #    sBack = self.get_origin()
-            #elif path == "provenances":
-            #    sBack = self.get_provenance_markdown(plain=True)
-            elif path == "external":
+            elif path == "external_links":
                 sBack = self.get_external_markdown(plain=True)
             elif path == "brefs":
                 sBack = self.get_bibleref(plain=True)
@@ -3346,19 +3380,8 @@ class Manuscript(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
-            #if path == "dateranges":
-            #    # TRanslate the string into a list
-            #    dates = value_lst # json.loads(value)
-            #    # Possibly add each item from the list, if it doesn't yet exist
-            #    for date_item in dates:
-            #        years = date_item.split("-")
-            #        yearstart = years[0]
-            #        yearfinish = yearstart
-            #        if len(years) > 0: yearfinish = years[1]
-            #        obj = Daterange.objects.filter(manuscript=self, yearstart=yearstart, yearfinish=yearfinish).first()
-            #        if obj == None:
-            #            # Doesn't exist, so create it
-            #            obj = Daterange.objects.create(manuscript=self, yearstart=yearstart, yearfinish=yearfinish)
+            elif isinstance(value, list):
+                value_lst = value
             if path == "keywordsU":
                 # Get the list of keywords
                 user_keywords = value_lst #  json.loads(value)
@@ -3402,46 +3425,7 @@ class Manuscript(models.Model):
                         # Create an appropriate LitrefMan object
                         obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
                 # Ready
-            #elif path == "origin":
-            #    if value != "" and value != "-":
-            #        # THere is an origin specified
-            #        origin = Origin.objects.filter(name__iexact=value).first()
-            #        if origin == None:
-            #            # Try find it through location
-            #            origin = Origin.objects.filter(location__name__iexact=value).first()
-            #        if origin == None:
-            #            # Indicate that we didn't find it in the notes
-            #            intro = ""
-            #            if self.notes != "": intro = "{}. ".format(self.notes)
-            #            self.notes = "{}Please set manually origin [{}]".format(intro, value)
-            #            self.save()
-            #        else:
-            #            # The origin can be tied to me
-            #            self.origin = origin
-            #            self.save()
-            #    sBack = self.get_origin()
-            #elif path == "provenances":
-            #    provenance_names = value_lst #  json.loads(value)
-            #    for pname in provenance_names:
-            #        pname = pname.strip()
-            #        # Try find this provenance
-            #        prov_found = Provenance.objects.filter(name__iexact=pname).first()
-            #        if prov_found == None:
-            #            prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
-            #        if prov_found == None:
-            #            # Indicate that we didn't find it in the notes
-            #            intro = ""
-            #            if self.notes != "": intro = "{}. ".format(self.notes)
-            #            self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
-            #            self.save()
-            #        else:
-            #            # Make a copy of prov_found
-            #            provenance = Provenance.objects.create(
-            #                name=prov_found.name, location=prov_found.location, note=prov_found.note)
-            #            # Make link between provenance and manuscript
-            #            ProvenanceMan.objects.create(manuscript=self, provenance=provenance)
-                # Ready
-            elif path == "external":
+            elif path == "external_links":
                 link_names = value_lst #  json.loads(value)
                 for link_name in link_names:
                     # Create this stuff
@@ -3648,6 +3632,25 @@ class Manuscript(models.Model):
 
         return ", ".join(lhtml)
 
+    def get_full_name_html(self, field1="city", field2="library", field3="idno"):
+        oBack = {field1: '', field2: '', field3: ''}
+        # (1) City
+        if self.lcity != None:
+            oBack[field1] = self.lcity.name
+        elif self.library != None:
+            oBack[field1] = self.library.lcity.name
+        # (2) Library
+        if self.library != None:
+            oBack[field2] = self.library.name
+        # (3) Idno
+        if self.idno != None:
+            oBack[field3] = self.idno
+        else:
+            # What if we don't have anything?
+            oBack[field3] = "Unnamed [id={}]".format(self.id)
+
+        return oBack
+
     def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
@@ -3716,6 +3719,12 @@ class Manuscript(models.Model):
             sBack = json.dumps(lHtml)
         else:
             sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_notes_markdown(self):
+        sBack = ""
+        if self.notes != None:
+            sBack = markdown(self.notes, extensions=['nl2br'])
         return sBack
 
     def get_origin(self):
@@ -4764,11 +4773,17 @@ class Codico(models.Model):
         # Return the correct response
         return response
 
+    def action_add_change(self, username, actiontype, path, old_value, new_value):
+        # Show that this overwriting took place
+        details = dict(id=self.id, savetype="change", old={path: old_value}, changes={path: new_value})
+        Action.add(username, "Codico", self.id, actiontype, json.dumps(details))
+
     def custom_add(oCodico, **kwargs):
         """Add a codico according to the specifications provided"""
 
         oErr = ErrHandle()
         manu = None
+        bOverwriting = False
         lst_msg = []
 
         try:
@@ -4785,6 +4800,8 @@ class Codico(models.Model):
                 if obj == None:
                     # Doesn't exist: create it
                     obj = Codico.objects.create(manuscript=manu, stype="imp")
+                else:
+                    bOverwriting = True
                         
                 # Process all fields in the Specification
                 for oField in Codico.specification:
@@ -4795,8 +4812,14 @@ class Codico(models.Model):
                         path = oField.get("path")
                         type = oField.get("type")
                         if type == "field":
-                            # Set the correct field's value
-                            setattr(obj, path, value)
+                            # Note overwriting
+                            old_value = getattr(obj, path)
+                            if value != old_value:
+                                if bOverwriting:
+                                    # Show that this overwriting took place
+                                    obj.action_add_change(username, "import", path, old_value, value)
+                                # Set the correct field's value
+                                setattr(obj, path, value)
                         elif type == "fk":
                             fkfield = oField.get("fkfield")
                             model = oField.get("model")
@@ -4805,7 +4828,13 @@ class Codico(models.Model):
                                 cls = apps.app_configs['seeker'].get_model(model)
                                 instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
                                 if instance != None:
-                                    setattr(obj, path, instance)
+                                    old_value = getattr(obj,path)
+                                    if instance != old_value:
+                                        if bOverwriting:
+                                            # Show that this overwriting took place
+                                            old_id = "" if old_value == None else old_value.id
+                                            obj.action_add_change(username, "import", path, old_id, instance.id)
+                                        setattr(obj, path, instance)
                         elif type == "func":
                             # Set the KV in a special way
                             obj.custom_set(path, value, **kwargs)
@@ -4920,15 +4949,15 @@ class Codico(models.Model):
                     if prov_found == None:
                         # Indicate that we didn't find it in the notes
                         intro = ""
-                        if self.notes != "": intro = "{}. ".format(self.notes)
-                        self.notes = "{}Please set manually provenance [{}]".format(intro, pname)
+                        if self.notes != "" and self.notes != None: intro = "{}. ".format(self.notes)
+                        self.notes = "{}\nPlease set manually provenance [{}]".format(intro, pname)
                         self.save()
                     else:
                         # Make a copy of prov_found
                         provenance = Provenance.objects.create(
-                            name=prov_found.name, location=prov_found.location, note=prov_found.note)
+                            name=prov_found.name, location=prov_found.location)
                         # Make link between provenance and codico
-                        ProvenanceCod.objects.create(codico=self, provenance=provenance)
+                        ProvenanceCod.objects.create(codico=self, provenance=provenance, note="Automatically added Codico/custom_getkv")
                 # Ready
             else:
                 # Figure out what to do in this case
@@ -5025,6 +5054,12 @@ class Codico(models.Model):
         if manu != None and manu.idno != None:
             url = reverse("manuscript_details", kwargs={'pk': manu.id})
             sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
+        return sBack
+
+    def get_notes_markdown(self):
+        sBack = ""
+        if self.notes != None:
+            sBack = markdown(self.notes, extensions=['nl2br'])
         return sBack
 
     def get_origin(self):
@@ -5613,6 +5648,17 @@ class EqualGold(models.Model):
                         if self.number == None:
                             # Check the highest sermon number for this author
                             self.number = EqualGold.sermon_number(self.author)
+                    else:
+                        # we have a code and [auth_num]: are these the same?
+                        arPart = re.split("\s|\.", self.code)
+                        if len(arPart) == 3 and arPart[0] == "PASSIM":
+                            # Get the author code from here
+                            existing_auth_num = int(arPart[1])
+                            if auth_num != existing_auth_num:
+                                # Calculate a new number for this author
+                                self.number = EqualGold.sermon_number(self.author)
+
+
                     # Now we have both an author and a number...
                     passim_code = EqualGold.passim_code(auth_num, self.number)
                     if not self.code or self.code != passim_code:
@@ -5878,6 +5924,20 @@ class EqualGold(models.Model):
             sBack = "<span class='badge signature {}'>{}</span>".format(first.editype, first.short())
         return sBack
 
+    def get_goldsig_dct(self):
+        """Get the best signature according to DCT rules"""
+
+        sBack = ""
+        first = None
+        editype_preferences = ['gr', 'cl', 'ot']
+        for editype in editype_preferences:
+            siglist = Signature.objects.filter(gold__equal=self, editype=editype).order_by('code').values('code')
+            if len(siglist) > 0:
+                code = siglist[0]['code']
+                sBack = "{}: {}".format(editype, code)
+                break
+        return sBack
+    
     def get_passimcode(self):
         code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         return code
@@ -7329,6 +7389,20 @@ class MsItem(models.Model):
     def delete(self, using = None, keep_parents = False):
         # Keep track of manuscript
         manu = self.manu
+        # Re-arrange anything pointing to me
+        # (1) My children
+        for child in self.sermon_parent.all():
+            child.parent = self.parent
+            child.save()
+        # (2) A preceding pointing to me
+        for prec in self.sermon_next.all():
+            prec.next = self.next
+            prec.save()
+        # (3) Anything above me of whom I am firstchild
+        for ance in self.sermon_child.all():
+            ance.firstchild = self.firstchild
+            ance.save()
+
         # Perform deletion
         response = super(MsItem, self).delete(using, keep_parents)
         # Re-calculate order
@@ -7788,11 +7862,13 @@ class SermonDescr(models.Model):
         return bResult
 
     def delete(self, using = None, keep_parents = False):
-        # First remove my msitem, if I have one
-        if self.msitem != None:
-            self.msitem.delete()
+        # Keep track of the msitem, if I have one
+        msitem = self.msitem
         # Regular delete operation
         response = super(SermonDescr, self).delete(using, keep_parents)
+        # Now delete the msitem, if it is there
+        if msitem != None:
+            msitem.delete()
         return response
 
     def do_distance(self, bForceUpdate = False):
@@ -9232,7 +9308,7 @@ class SermonDescrEqual(models.Model):
         # E.G: manuscript+locus?? (assuming each sermon has a locus)
         combi = "sermon {} {} {}".format(self.sermon.id, self.get_linktype_display(), self.super.__str__())
         return combi
-
+    
     def do_scount(self, super):
         # Now calculate the adapted scount for the SSG
         scount = super.equalgold_sermons.count()

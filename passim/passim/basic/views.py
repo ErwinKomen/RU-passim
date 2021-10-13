@@ -980,7 +980,7 @@ class BasicList(ListView):
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)
-
+        x = context['is_app_editor'] and context['new_button']
         # Return the calculated context
         return context
 
@@ -1314,6 +1314,7 @@ class BasicDetails(DetailView):
     no_delete = False
     afterdelurl = None
     listview = None
+    listviewtitle = None
     backbutton = True
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
@@ -1733,7 +1734,10 @@ class BasicDetails(DetailView):
                     prevpage = context['listview']
                     context['prevpage'] = prevpage
                     crumbs = []
-                    crumbs.append([title + " list", prevpage])
+                    if self.listviewtitle == None:
+                        crumbs.append([title + " list", prevpage])
+                    else:
+                        crumbs.append([ self.listviewtitle, prevpage])
                     current_name = title if instance else "{} (new)".format(title)
                     context['breadcrumbs'] = get_breadcrumbs(self.request, current_name, True, crumbs)
 

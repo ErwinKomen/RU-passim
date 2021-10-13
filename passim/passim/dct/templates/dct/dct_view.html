@@ -1,0 +1,102 @@
+{% load i18n %}
+
+<div class="row">
+
+  <div class="col-md-12 dct-root">
+    <!-- Hidden away show which DCT we are showing -->
+    <div class="hidden">
+      <form class="dct">
+        {{csrf|safe}}
+        <div class="hidden" id="dct_id" targeturl="{{dctdata_url}}"></div>
+      </form>
+    </div>
+
+    <h3>Dynamic Comparison Table Tool</h3>
+
+    <div class="dct-view">
+      <!-- Proper message for waiting -->
+      <div class="dct-wait">
+        Creating the DCT ... 
+        <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+      </div>
+
+      <!-- The parameters and buttons to change the DCT view -->
+      <div class="dct-tools row hidden">
+        <!-- Recalc button -->
+        <div class="col-md-1">&nbsp;
+            <a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
+                onclick="ru.dct.dct_pivot(-1);">Pivot</a>
+        </div>
+
+        <!-- VIEW: Which *rows* to show -->
+        <div class="col-md-2">
+          <label class="control-label" >View:
+            <select class="form-control" id="viewmode" name="viewmode" onchange="ru.dct.show_dct();">
+              <option value="all"   >View all</option>
+              <option value="match" selected>Matches only</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- COLUMNS: Column order -->
+        <div class="col-md-3">
+          <label class="control-label" >Columns:
+            <select class="form-control" id="colmode" onchange="ru.dct.show_dct();" >
+              <option value="match_decr"  selected>Matches (decreasing)</option>
+              <option value="match_incr"  >Matches (increasing)</option>
+              <option value="alpha"       >Alphabetically</option>
+              <option value="rset"        >Research set</option>
+              <option value="custom"      disabled >Custom</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Options -->
+        <div class="col-md-2">
+          <!-- Option #2: show/hide author information per item -->
+          <a class="btn btn-xs jumbo-1" title="Show or hide author information" 
+                onclick="ru.dct.dct_author(this);">Author</a>
+        </div>
+
+        <!-- Save buttons -->
+        <div class="col-md-4">
+          <!-- Expanding -->
+          <span class="hidden dct-expand">
+            <a class="btn btn-xs jumbo-1" title="Show manually hidden lines" 
+                onclick="ru.dct.dct_expand(this);">Expand</a>
+          </span>
+
+          {% if mayedit %}
+            <!-- DCT save options -->
+            <span class="hidden dct-save-options pull-right">
+              <span class="dct-wait hidden">
+                <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+              </span>
+              <a class="btn btn-xs jumbo-1" title="Cancel changes" 
+                  onclick="ru.dct.dct_cancel(this);">Cancel</a>
+              <a class="btn btn-xs jumbo-4" title="Save changes" 
+                  onclick="ru.dct.dct_save(this, '#dct_id', 'save');">Save</a>
+              <a class="btn btn-xs jumbo-4" title="Save changes to a new DCT" 
+                  onclick="ru.dct.dct_save(this, '#dct_id', 'savenew');">Save as new DCT</a>
+            </span>
+          {% endif %}
+        </div>
+
+      </div>
+
+      <!-- The actual DCT itself-->
+      <div class="dct-show">
+
+      </div>
+    </div>
+
+    <div class="dct-copy hidden">
+      <!-- THis is where a copy of the dct-view is kept -->
+    </div>
+  </div>
+</div>
+
+{% block script %}
+    {% load staticfiles %}
+    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+{% endblock %}

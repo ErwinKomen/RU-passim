@@ -84,6 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
+from passim.dct.models import ResearchSet, SetList
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -646,22 +647,6 @@ def guide(request):
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
-
-    return render(request,template_name, context)
-
-def mypassim(request):
-    """Renders the user-manual (guide) page."""
-    assert isinstance(request, HttpRequest)
-    # Specify the template
-    template_name = 'mypassim.html'
-    context =  {'title':'My Passim',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
-    context = get_application_context(request, context)
-
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
 
     return render(request,template_name, context)
 
@@ -2433,6 +2418,8 @@ def passim_get_history(instance):
             description = "Delete"
         elif obj['actiontype'] == "change":
             description = "Changes"
+        elif obj['actiontype'] == "import":
+            description = "Import Changes"
         if 'changes' in obj:
             lchanges = []
             for key, value in obj['changes'].items():
@@ -4817,7 +4804,7 @@ class SermonListView(BasicList):
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'id' }, 
             {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
             {'filter': 'collsuper',     'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }, 
-            {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hc', 'infield': 'id' }
+            {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'id' }
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
@@ -6629,14 +6616,16 @@ class CollAnyEdit(BasicDetails):
             elif instance.type == "super":
                 # collection of SSG
                 abbr = "ssg"
+                if self.settype == "hc": abbr = "hist"
             if url_m != None and url_s != None and url_sg != None and url_ssg != None and abbr != None:
                 context['url_manu'] = "{}?manu-collist_{}={}".format(url_m, abbr, instance.id)
                 context['url_sermo'] = "{}?sermo-collist_{}={}".format(url_s, abbr, instance.id)
                 context['url_gold'] = "{}?gold-collist_{}={}".format(url_sg, abbr, instance.id)
-                if self.settype == "hc":
-                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
-                else:
-                    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, "hc", instance.id)
+                context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
+                #if self.settype == "hc":
+                #    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, "hc", instance.id)
+                #else:
+                #    context['url_super'] = "{}?ssg-collist_{}={}".format(url_ssg, abbr, instance.id)
 
                 sBack = render_to_string('seeker/coll_buttons.html', context, self.request)
 
@@ -6887,6 +6876,7 @@ class CollPrivDetails(CollAnyEdit):
                 manuscripts = dict(title="Manuscripts within this dataset", prefix="manu")
                 if resizable: manuscripts['gridclass'] = "resizable dragdrop"
                 manuscripts['savebuttons'] = True
+                manuscripts['saveasbutton'] = True
 
                 # Check ordering
                 qs_manu = instance.manuscript_col.all().order_by(
@@ -6943,6 +6933,7 @@ class CollPrivDetails(CollAnyEdit):
                 sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
                 if resizable: sermons['gridclass'] = "resizable dragdrop"
                 sermons['savebuttons'] = True
+                sermons['saveasbutton'] = True
 
                 qs_sermo = instance.sermondescr_col.all().order_by(
                         'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
@@ -6996,6 +6987,7 @@ class CollPrivDetails(CollAnyEdit):
                 goldsermons = dict(title="Gold sermons within this dataset", prefix="gold")   # prefix="sermo") 
                 if resizable: goldsermons['gridclass'] = "resizable dragdrop"
                 goldsermons['savebuttons'] = True
+                goldsermons['saveasbutton'] = True
 
                 qs_sermo = instance.gold_col.all().order_by(
                         'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
@@ -7049,6 +7041,7 @@ class CollPrivDetails(CollAnyEdit):
                 supers = dict(title="Super sermons gold within this dataset", prefix="super")   #prefix="sermo")
                 if resizable: supers['gridclass'] = "resizable dragdrop"
                 supers['savebuttons'] = True
+                supers['saveasbutton'] = True
 
                 qs_sermo = instance.super_col.all().order_by(
                         'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
@@ -7265,6 +7258,7 @@ class CollHistDetails(CollHistEdit):
                 supers = dict(title="Super sermons gold within this historical collection", prefix="super")   #prefix="sermo")
                 if resizable: supers['gridclass'] = "resizable dragdrop"
                 supers['savebuttons'] = True
+                supers['saveasbutton'] = True
                 supers['classes'] = 'collapse'
 
                 qs_sermo = instance.super_col.all().order_by(
@@ -8527,7 +8521,7 @@ class ManuscriptEdit(BasicDetails):
                 # Possibly append notes view
                 if user_is_ingroup(self.request, app_editor):
                     context['mainitems'].append(
-                        {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+                        {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
 
                 # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
@@ -8692,7 +8686,7 @@ class ManuscriptEdit(BasicDetails):
         lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
         lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
         lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
-        lkv.append(dict(label="Notes", value=codico.notes))
+        lkv.append(dict(label="Notes", value=codico.get_notes_markdown()))
         return lkv
 
     def get_codiprovenance_markdown(self, codico):
@@ -9355,9 +9349,14 @@ class ManuscriptListView(BasicList):
     def initializations(self):
         # Possibly add to 'uploads'
         bHasExcel = False
+        bHasGalway = False
         for item in self.uploads:
             if item['title'] == "excel":
                 bHasExcel = True
+            elif item['title'] == "galway":
+                bHasGalway = True
+
+        # Should excel be added?
         if not bHasExcel:
             # Add a reference to the Excel upload method
             oExcel = dict(title="excel", label="Excel",
@@ -9365,6 +9364,15 @@ class ManuscriptListView(BasicList):
                           type="multiple",
                           msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
+
+        # Should galway be added?
+        if not bHasGalway:
+            # Add a reference to the Excel upload method
+            oGalway = dict(title="galway", label="Galway",
+                          url=reverse('manuscript_upload_galway'),
+                          type="multiple",
+                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oGalway)
 
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
@@ -9387,6 +9395,8 @@ class ManuscriptListView(BasicList):
         context['basketsize'] = 0 if profile == None else profile.basketsize_manu
         context['basket_show'] = reverse('basket_show_manu')
         context['basket_update'] = reverse('basket_update_manu')
+
+        context['colltype'] = "manu"
 
         return context
 
@@ -9422,9 +9432,11 @@ class ManuscriptListView(BasicList):
                 sTitle = lib      
         elif custom == "name":
             html.append("<span class='manuscript-idno'>{}</span>".format(instance.idno))
-            if instance.name:
-                html.append("<span class='manuscript-title'>| {}</span>".format(instance.name[:100]))
-                sTitle = instance.name
+            # THe name should come from the codico unit!!!
+            codico = Codico.objects.filter(manuscript=instance).first()
+            if codico != None and codico.name != None:
+                html.append("<span class='manuscript-title'>| {}</span>".format(codico.name[:100]))
+                sTitle = codico.name
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
@@ -9799,7 +9811,7 @@ class CodicoEdit(BasicDetails):
             # Possibly append notes view
             if user_is_ingroup(self.request, app_editor):
                 context['mainitems'].append(
-                    {'type': 'plain', 'label': "Notes:",       'value': instance.notes,               'field_key': 'notes'}  )
+                    {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
 
             # Signal that we have select2
             context['has_select2'] = True
@@ -10132,6 +10144,7 @@ class SermonGoldListView(BasicList):
         {"name": "Sermon",          "id": "filter_collsermo",   "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon Gold",     "id": "filter_collgold",    "enabled": False, "head_id": "filter_collection"},
         {"name": "Super sermon gold","id": "filter_collsuper",  "enabled": False, "head_id": "filter_collection"},
+        {"name": "Historical",      "id": "filter_collhist",    "enabled": False, "head_id": "filter_collection"},
         ]       
     searches = [
         {'section': '', 'filterlist': [
@@ -10151,7 +10164,9 @@ class SermonGoldListView(BasicList):
             {'filter': 'collmanu',  'fkfield': 'sermondescr__manu__collections','keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
             {'filter': 'collsermo', 'fkfield': 'sermondescr__collections',      'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
             {'filter': 'collgold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
-            {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' } 
+            {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
+            {'filter': 'collhist',  'fkfield': 'equal__collections',                            
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
             ]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
@@ -12410,11 +12425,14 @@ class BasketUpdate(BasicPart):
 
         # Note: only operations in either of these two lists will be executed
         lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd"]
+        lst_basket_source = ["collcreate", "colladd", "rsetcreate"]
 
         # Get our profile
         profile = Profile.get_user_profile(self.request.user.username)
         if profile != None:
+
+            # Obligatory initialization
+            rset = None
 
             # Get the queryset
             self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
@@ -12523,9 +12541,37 @@ class BasketUpdate(BasicPart):
                     name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)
                     coll.name = name
                     coll.save()
+                elif operation == "rsetcreate":
+                    # Save the current basket as a research-set that needs to receive a name
+                    rset = ResearchSet.objects.create(
+                        name="tijdelijk",
+                        notes="Created from a {} listview basket".format(self.colltype),
+                        profile=profile)
+                    # Assign it a name based on its ID number and the owner
+                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                    rset.name = name
+                    rset.save()
                 elif oFields['collone']:
                     coll = oFields['collone']
-                if coll == None:
+
+                # Process the basket elements into the ResearchSet or into the Collection
+                if rset != None:
+                    with transaction.atomic():
+                        for idx, item in enumerate(qs):
+                            # Check if it doesn't exist yet
+                            obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
+                            if obj == None:
+                                # Create this
+                                order = idx + 1
+                                SetList.objects.create(researchset=rset, 
+                                                       order = order,
+                                                       setlisttype="manu",
+                                                       manuscript=item.manu)
+
+                    # Make sure to redirect to this instance -- but only for RSETCREATE
+                    if operation == "rsetcreate":
+                        self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                elif coll == None:
                     # TODO: provide some kind of error??
                     pass
                 else:
@@ -12543,6 +12589,8 @@ class BasketUpdate(BasicPart):
                     elif self.colltype == "super":
                         clsColl = CollectionSuper
                         field = "super"
+
+                    # THis is only needed for collections
                     with transaction.atomic():
                         for item in qs:
                             kwargs[field] = getattr( item, self.s_field)
@@ -12552,9 +12600,9 @@ class BasketUpdate(BasicPart):
                                 clsColl.objects.create(**kwargs)
                                 # Note that some changes have been made
                                 bChanged = True
+
                     # Make sure to redirect to this instance -- but only for COLLCREATE
                     if operation == "collcreate":
-                        # self.redirectpage = reverse('coll{}_details'.format(self.colltype), kwargs={'pk': coll.id})
                         self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
                     else:
                         # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
@@ -12590,6 +12638,7 @@ class BasketUpdate(BasicPart):
             else:
                 context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
                 context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
+            context['colltype'] = self.colltype
 
         # Return the updated context
         return context
