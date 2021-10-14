@@ -187,31 +187,6 @@ def dct_manulist(lst_manu, bDebug=False):
         oErr.DoError("dct_manulist")
     return lBack
 
-def test_dct(request):
-
-    oErr = ErrHandle()
-    # Specify the template
-    template_name = 'dct/dct.html'
-    context = {'title': 'DCT','pfx': APP_PREFIX }
-    try:
-        assert isinstance(request, HttpRequest)
-
-        context['year'] = get_current_datetime().year
-        context['site_url'] = admin.site.site_url
-
-        manu_ids = [1909, 1912, 1813, 1796]
-        manus = Manuscript.objects.filter(id__in=manu_ids)
-        lBack = dct_manulist(manus, True)
-        context['setlist'] = lBack
-
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("test_dct")
-
-    sHtml = render_to_string(template_name, context, request)
-    response = HttpResponse(sHtml)
-    return response
-
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
     """Renders the MyPassim page (=PRE)."""

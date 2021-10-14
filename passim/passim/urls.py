@@ -247,8 +247,6 @@ urlpatterns = [
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
 
-    url(r'^dct/test', passim.dct.views.test_dct, name='test_dct'),
-
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
     url(r'^api/libraries/$', passim.seeker.views.get_libraries, name='api_libraries'),

@@ -44,6 +44,7 @@ var ru = (function ($, ru) {
           END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46
         },
         loc_dctTooltip = [
+          { "label": "Gryson/Clavis", "key": "siglist" },
           { "label": "Author", "key": "author" },
           { "label": "PASSIM code", "key": "code" },
           { "label": "Incipit", "key": "incipit" },
@@ -64,6 +65,7 @@ var ru = (function ($, ru) {
           { "label": "Bible reference",   "key": "srm_bibleref" },
           { "label": "Cod. notes",        "key": "srm_codnotes" },
           { "label": "Notes",             "key": "srm_notes" },
+          { "label": "Keywords",          "key": "kws" },
         ],
         dummy = 1;
 
@@ -210,6 +212,9 @@ var ru = (function ($, ru) {
           for (i = 0; i < keys.length; i++) {
             if (keys[i] in oSsgItem) {
               sText = oSsgItem[keys[i]];
+              if (sText === null) {
+                sText = "";
+              }
               break;
             }
           }
@@ -219,7 +224,7 @@ var ru = (function ($, ru) {
           // Combine the html
           return sText;
         } catch (ex) {
-          private_methods.errMsg("dct_author", ex);
+          private_methods.errMsg("private/dct_author", ex);
         }
       },
 
@@ -325,15 +330,16 @@ var ru = (function ($, ru) {
           if ("siglist" in oSsgThis) { siglist = oSsgThis.siglist; }
           if ("url" in oSsgThis) { sUrl = oSsgThis.url; }
           html_row.push("<tr class='" + rowcolor +
-            "'><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' href='" +
-            sUrl + "' title='" + siglist + "'>" + oSsgThis.sig + "</a></span>" +
+            "'><td class='fixed-side fixed-col0 tdnowrap'><span class='clickable'><a class='nostyle' " +
+            " data-toggle='tooltip' data-tooltip='dct-hover' href='" +
+            sUrl + "' title='" + private_methods.dct_tooltip(oSsgThis, 'ssg') + "'>" + oSsgThis.sig + "</a></span>" +
             "<span class='pull-right clickable dct-hide' >" +
             "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
 
           if (bShowPivot) {
             html_row.push("<td class='fixed-side fixed-col1' data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
-              " title='" + private_methods.dct_tooltip(oSsgThis) + "' >" +
+              " title='" + private_methods.dct_tooltip(oSsgThis, 'srm') + "' >" +
               oSsgThis.order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgThis) + "</span></td>");
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
@@ -358,7 +364,7 @@ var ru = (function ($, ru) {
               sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
               if (order >= 0) {
                 html_row.push("<td" + sClass + " data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
-                  " title='" + private_methods.dct_tooltip(oSsgItem) + "'  >" +
+                  " title='" + private_methods.dct_tooltip(oSsgItem, 'srm') + "'  >" +
                   order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
               } else {
                 html_row.push("<td" + sClass + "></td>");
@@ -569,10 +575,11 @@ var ru = (function ($, ru) {
 
             }
 
+            /*
             // DEBUGGING: what is happening?
             console.log("ssglists a=[" + a.title.main + "].p" + a.title.pivot + ".m" + a.title.matches +
               " b=[" + b.title.main + "].p" + b.title.pivot + ".m" + b.title.matches +
-              " --> " + retval);
+              " --> " + retval);*/
 
             return retval;
           });
@@ -774,7 +781,7 @@ var ru = (function ($, ru) {
       dct_showtooltip_init: function () {
         try {
           // initialize tooltipping: hover-type
-          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip({
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"], .dct-view a[data-toggle="tooltip"][data-tooltip="dct-hover"]').tooltip({
             html: true,
             container: 'body',
             placement: 'bottom auto',
@@ -785,7 +792,7 @@ var ru = (function ($, ru) {
           });
 
           // What to do when a tooltip has been shown
-          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"]').on('shown.bs.tooltip', function () {
+          $('.dct-view td[data-toggle="tooltip"][data-tooltip="dct-hover"], .dct-view a[data-toggle="tooltip"][data-tooltip="dct-hover"]').on('shown.bs.tooltip', function () {
             private_methods.dct_showhidealt();
           });
 
@@ -797,31 +804,52 @@ var ru = (function ($, ru) {
 
       /** 
        *  dct_tooltip - Calculate the tooltip for this one
+       *
+       *  type can be: 'ssg' or 'srm'
        */
-      dct_tooltip: function (oSsgItem) {
+      dct_tooltip: function (oSsgItem, type) {
         var html = [], i = 0, label = "", key = "",
+            itemtype = "",
+            sValue = "",
             phase = 1;
 
         try {
           html.push("<table><tbody>");
-          // Add the 'regular' items (see issue #402)
-          for (i = 0; i < loc_dctTooltip.length; i++) {
-            label = loc_dctTooltip[i]["label"];
-            key = loc_dctTooltip[i]["key"];
-            if (key in oSsgItem) {
-              html.push("<tr><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+
+          // Get the item type
+          if ("type" in oSsgItem) {
+            itemtype = oSsgItem['type'];
+            if ((itemtype === "hc" || itemtype === "pd") && type === "srm") {
+              // It doesn't make sense to show [srm] for a collection, since that doesn't exist
+              type = "ssg";
             }
           }
 
-          if (phase > 1) {
-            // Add the sermon-items, but hide them initially
-            for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
-              label = loc_dctTooltipAdditional[i]["label"];
-              key = loc_dctTooltipAdditional[i]["key"];
-              if (key in oSsgItem) {
-                html.push("<tr class='hidden dct-alt'><td class='tdnowrap'>" + label + ":</td><td>" + oSsgItem[key] + "</td></tr>");
+          // Action depends on the type
+          switch (type) {
+            case "ssg": // Information for the leftmost cell in the DCT
+              for (i = 0; i < loc_dctTooltip.length; i++) {
+                label = loc_dctTooltip[i]["label"];
+                key = loc_dctTooltip[i]["key"];
+                if (key in oSsgItem) {
+                  sValue = oSsgItem[key];
+                  if (sValue === null) { sValue = "-";}
+                  html.push("<tr><td class='tdnowrap' valign='top'>" + label + ":</td><td valign='top'>" + sValue + "</td></tr>");
+                }
               }
-            }
+              break;
+            case "srm": // Information for the regular cells in the DCT
+              // Add the sermon-items, but hide them initially
+              for (i = 0; i < loc_dctTooltipAdditional.length; i++) {
+                label = loc_dctTooltipAdditional[i]["label"];
+                key = loc_dctTooltipAdditional[i]["key"];
+                if (key in oSsgItem) {
+                  sValue = oSsgItem[key];
+                  if (sValue === null) { sValue = "-"; }
+                  html.push("<tr><td class='tdnowrap' valign='top'>" + label + ":</td><td valign='top'>" + sValue + "</td></tr>");
+                }
+              }
+              break;
           }
 
           html.push("</tbody></table>");
