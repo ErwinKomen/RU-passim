@@ -53,6 +53,10 @@ var ru = (function ($, ru) {
           { "label": "SGs in equality set", "key": "sgcount" },
           { "label": "Links to other SSGs", "key": "ssgcount" },
         ],
+        loc_dctTooltipCollection = [
+          { "label": "Name",        "key": "name" },
+          { "label": "Description", "key": "descr" },
+        ],
         loc_dctTooltipAdditional = [
           { "label": "Attributed author", "key": "srm_author" },
           { "label": "Section title",     "key": "srm_sectiontitle" },
@@ -836,6 +840,20 @@ var ru = (function ($, ru) {
                   if (sValue === null) { sValue = "-";}
                   html.push("<tr><td class='tdnowrap' valign='top'>" + label + ":</td><td valign='top'>" + sValue + "</td></tr>");
                 }
+              }
+              switch (itemtype) {
+                case "hc":
+                case "pd":
+                  for (i = 0; i < loc_dctTooltipCollection.length; i++) {
+                    label = loc_dctTooltipCollection[i]["label"];
+                    key = loc_dctTooltipCollection[i]["key"];
+                    if (key in oSsgItem) {
+                      sValue = oSsgItem[key];
+                      if (sValue === null) { sValue = "-"; }
+                      html.push("<tr><td class='tdnowrap' valign='top'>" + label + ":</td><td valign='top'>" + sValue + "</td></tr>");
+                    }
+                  }
+                  break;
               }
               break;
             case "srm": // Information for the regular cells in the DCT
