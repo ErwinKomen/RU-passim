@@ -9281,12 +9281,14 @@ class ManuscriptListView(BasicList):
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis",        "id": "filter_signature",           "enabled": False, "head_id": "filter_sermon"},
         {"name": "Bible reference",         "id": "filter_bibref",              "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
-        {"name": "HC overlap",              "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Sermon Gold",         "id": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
+        # {"name": "Manuscript overlap",      "id": "filter_collection_manuptc",  "enabled": False, "head_id": "filter_collection"},
         {"name": "Project",                 "id": "filter_project",             "enabled": False, "head_id": "filter_other"},
       ]
 
@@ -9310,6 +9312,10 @@ class ManuscriptListView(BasicList):
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
+            # === Overlap with a specific manuscript ===
+            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id' },
+            #{'filter': 'collection_manuptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
+            # 'title': 'Percentage overlap between the "Comparison manuscript" SSGs and the SSGs referred to in other manuscripts'},
             # === Historical Collection ===
             {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
@@ -9461,6 +9467,17 @@ class ManuscriptListView(BasicList):
         return sBack, sTitle
 
     def adapt_search(self, fields):
+
+        def get_overlap_ptc(base_ssgs, comp_ssgs):
+            """Calculate the overlap percentage between base and comp"""
+
+            total = len(base_ssgs)
+            count = 0
+            for ssg_id in comp_ssgs:
+                if ssg_id in base_ssgs: count += 1
+            result = 100 * count / total
+            return result
+
         # Adapt the search to the keywords that *may* be shown
         lstExclude=None
         qAlternative = None
@@ -9521,6 +9538,45 @@ class ManuscriptListView(BasicList):
                             for coll in coll_list:
                                 for manu in manu_list:
                                     ptc = CollOverlap.get_overlap(profile, coll, manu)
+                if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
+                    # The base manuscripts with which the comparison goes
+                    base_manu_list = fields['cmpmanuidlist']
+                    if len(base_manu_list) > 0:
+                        # Yes, overlap specified
+                        if isinstance(overlap, int):
+                            # Make sure the string is interpreted as an integer
+                            overlap = int(overlap)
+                            # Now add a Q expression
+                            # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+
+                            # (1) Get a list of SSGs associated with these manuscripts
+                            base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
+                            base_ssg_list = [x['id'] for x in base_ssg_list]
+                            base_count = len(base_ssg_list)
+                
+                            # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                            lstQ = []
+                            if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                            lstQ.append(Q(mtype="man"))
+                            lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                            manu_list = Manuscript.objects.filter(*lstQ)
+
+                            # We also need to have the profile
+                            profile = Profile.get_user_profile(self.request.user.username)
+                            # Now calculate the overlap for all
+                            manu_include = []
+                            with transaction.atomic():
+                                for manu in manu_list:
+                                    # Get a list of SSG id's associated with this particular manuscript
+                                    manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
+                                    if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
+                                        # Add this manuscript to the list 
+                                        if not manu.id in manu_include:
+                                            manu_include.append(manu.id)
+                            fields['cmpmanuidlist'] = None
+                            fields['cmpmanu'] = Q(id__in=manu_include)
+
 
         # Adapt the manutype filter
         #if 'manutype' in fields and fields['manutype'] != None:

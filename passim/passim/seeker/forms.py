@@ -1245,6 +1245,8 @@ class SearchManuForm(PassimModelForm):
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -1344,6 +1346,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['name'].required = False
 
             self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
+            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
