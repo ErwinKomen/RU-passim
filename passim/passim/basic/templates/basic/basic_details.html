@@ -32,7 +32,7 @@
             <!-- Any additional buttons here in the topleft -->
             {% for buttonspec in topleftbuttons %}
               <a class="btn jumbo-1" href="{{buttonspec.url}}"
-                 title="{{buttonspec.title}}">{{buttonspec.label}}</a>
+                 title="{{buttonspec.title}}">{{buttonspec.label|safe}}</a>
             {% endfor %}
           </div>
 

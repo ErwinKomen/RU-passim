@@ -35,6 +35,7 @@ var ru = (function ($, ru) {
         loc_params = "",        // DCT parameters
         loc_ssglists = null,    // The object with the DCT information
         loc_colwrap = [],       // Column wrapping
+        loc_dctdata = [],
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
@@ -233,6 +234,22 @@ var ru = (function ($, ru) {
       },
 
       /** 
+        *  dct_getdata - 
+        *     Get the DCT data as stringified JSON
+        */
+      dct_getdata: function () {
+        var sData = "";
+
+        try {
+          sData = JSON.stringify(loc_dctdata);
+          return sData;
+        } catch (ex) {
+          private_methods.errMsg("dct_getdata", ex);
+          return "[]";
+        }
+      },
+
+      /** 
        *  dct_highlight - Highlight or reset a particular row
        */
       dct_highlight: function (elStart) {
@@ -327,6 +344,7 @@ var ru = (function ($, ru) {
             ssglist = null,
             sClass = "",
             bFound = false,
+            datarow = [],
             html_row = [];
 
         try {
@@ -340,13 +358,19 @@ var ru = (function ($, ru) {
             "<span class='pull-right clickable dct-hide' >" +
             "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
+          // Keep track of data for getdata()
+          datarow.push({ txt: oSsgThis.sig, alt: private_methods.dct_tooltip(oSsgThis, 'ssg') });
 
           if (bShowPivot) {
             html_row.push("<td class='fixed-side fixed-col1' data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
               " title='" + private_methods.dct_tooltip(oSsgThis, 'srm') + "' >" +
               oSsgThis.order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgThis) + "</span></td>");
+            // Keep track of data for getdata()
+            datarow.push({ txt: oSsgThis.order.toString(), alt: private_methods.dct_author(oSsgThis) });
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
+            // Keep track of data for getdata()
+            datarow.push({txt: ""});
           }
           ssg = oSsgThis.super;
           for (i = 0; i < ssglists.length; i++) {
@@ -370,11 +394,18 @@ var ru = (function ($, ru) {
                 html_row.push("<td" + sClass + " data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
                   " title='" + private_methods.dct_tooltip(oSsgItem, 'srm') + "'  >" +
                   order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
+                // Keep track of data for getdata()
+                datarow.push({ txt: order.toString(), alt: private_methods.dct_author(oSsgItem) });
               } else {
                 html_row.push("<td" + sClass + "></td>");
+                // Keep track of data for getdata()
+                datarow.push({ txt: "" });
               }
             }
           }
+
+          // Keep track of data for getdata()
+          loc_dctdata.push(datarow);
 
           // Finish this row
           html_row.push("</tr>");
@@ -394,7 +425,6 @@ var ru = (function ($, ru) {
       dct_saveshow: function() {
         $(".dct-view .dct-save-options").removeClass("hidden");
       },
-
 
       /** 
        *  dct_show - Show one DCT on the default location
@@ -443,6 +473,7 @@ var ru = (function ($, ru) {
             view_mode = "all",        // May have values: 'all', 'match', 'expand'
             default_viewmode = "match",
             col_mode = "match_decr",  // May have values: 'match_decr', 'match_incr', 'alpha', 'chrono'
+            datarow = [],
             html_row = [],
             html = [];
 
@@ -589,9 +620,12 @@ var ru = (function ($, ru) {
           });
 
           // Walk the data for this DCT and construct the html
-          html.push("<div class='table-scroll'><div class='table-wrap'><table class='dct-view'>");
+          html.push("<div class='table-scroll'><div class='table-wrap' id='dct_current_view'><table class='dct-view'>");
           // Construct the header
           html.push("<thead><tr><th class='fixed-side fixed-col0' order='0'>Gryson/Clavis</th>");
+          datarow = [];
+          loc_dctdata = [];
+          datarow.push({ txt: "Gryson/Clavis" });
           for (i = 0; i < ssglists.length; i++) {
             // Get the title object
             oTitle = ssglists[i]['title'];
@@ -601,7 +635,10 @@ var ru = (function ($, ru) {
             if ('main' in oTitle) { sMain = oTitle['main']; }
             if ('size' in oTitle) { iSize = oTitle['size']; }
             if ('url' in oTitle) { sUrl = oTitle['url']; }
-            if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches'];}
+            if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches']; }
+
+            // Keep track of the data for retrieval
+            datarow.push({ obj: oTitle });
 
             order = oTitle.order;
 
@@ -631,6 +668,10 @@ var ru = (function ($, ru) {
             html.push("</th>");
           }
           html.push("</tr></thead>");
+
+          // Keep track of the data for getdata()
+          loc_dctdata.push(datarow);
+          datarow = [];
 
           // Construct the body
           html.push("<tbody>");
@@ -1503,6 +1544,28 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("dct_cancel", ex);
         }        
+      },
+
+      /**
+       * dct_download
+       *    Facilitate downloading a DCT
+       *
+       */
+      dct_download: function (elStart) {
+        try {
+          switch ($(elStart).attr("downloadtype")) {
+            case "json":
+            case "excel":
+              // Prepare a JSON to work from
+              $("#downloaddata").val(private_methods.dct_getdata());
+              break;
+          }
+
+          // Now make the actual call for the downloading
+          ru.basic.post_download(elStart);
+        } catch (ex) {
+          private_methods.errMsg("dct_download", ex);
+        }
       },
 
       /**

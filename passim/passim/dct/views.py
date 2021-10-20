@@ -17,7 +17,9 @@ from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
+from io import StringIO
 import json
+import csv
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -597,7 +599,8 @@ class ResearchSetDetails(ResearchSetEdit):
 
                 if bMayEdit:
                     # Actions that can be performed on this item
-                    add_one_item(rel_item, self.get_actions())
+                    # Was (see issue #393): add_one_item(rel_item, self.get_actions())
+                    add_one_item(rel_item, self.get_field_value("setlist", obj, "buttons"), False)
 
                 # Add this line to the list
                 rel_list.append(dict(id=obj.id, cols=rel_item))
@@ -733,6 +736,10 @@ class ResearchSetDetails(ResearchSetEdit):
             elif custom == "name":
                 url = reverse("setdef_details", kwargs={'pk': instance.id})
                 sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
+        elif type == "setlist":
+            if custom == "buttons":
+                # Create the remove button
+                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
 
         return sBack
 
@@ -848,8 +855,8 @@ class SetDefEdit(BasicDetails):
         rset = instance.researchset
         if rset  != None:
             topleftlist = []
-            buttonspecs = {'label': "M", 
-                    'title': "Back to my research set {}".format(rset.name), 
+            buttonspecs = {'label': "<span class='glyphicon glyphicon-wrench'></span>", 
+                    'title': "Back to my research set: '{}'".format(rset.name), 
                     'url': reverse('researchset_details', kwargs={'pk': rset.id})}
             topleftlist.append(buttonspecs)
             context['topleftbuttons'] = topleftlist
@@ -924,6 +931,11 @@ class SetDefDetails(SetDefEdit):
 
             # Add the visualisation we made
             context['add_to_details'] = dct_view
+
+            # Define navigation buttons
+            self.custombuttons = [
+                {"name": "dct_tools", "title": "Back to DCT tool page", "icon": "wrench", "template_name": "seeker/scount_histogram.html" }
+                ]
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SetDefDetails/add_to_context")
@@ -985,3 +997,62 @@ class SetDefData(BasicPart):
         # FIll in the [data] part of the context with all necessary information
         context['data'] = data
         return context
+
+
+class SetDefDownload(BasicPart):
+    """Downloading for DCTs"""
+
+    MainModel = SetDef
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = ""
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Retrieve the actual data from self.data
+            # oData = self.data['contents']
+            sData = self.qd.get('downloaddata', "[]")
+            oData = json.loads(sData)
+            sData = json.dumps(oData, indent=2)
+        elif dtype == "dct-svg":
+            pass
+        elif dtype == "dct-png":
+            pass
+        elif dtype == "csv" or dtype == "xlsx":
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+            csvwriter.writerow(headers)
+            for obj in self.get_queryset(prefix):
+                round = obj.get('testset__round')                # obj.testset.round
+                number = obj.get('testset__number')             # obj.testset.number
+                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
+                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
+                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
+                fname = obj.get('testunit__fname')              # Pre-calculated filename
+                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
+                row = [round, number, speaker, gender, fname, sentence, ntype]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+

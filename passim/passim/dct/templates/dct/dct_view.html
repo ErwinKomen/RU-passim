@@ -22,24 +22,17 @@
 
       <!-- The parameters and buttons to change the DCT view -->
       <div class="dct-tools row hidden">
-        <!-- Recalc button -->
-        <div class="col-md-1">&nbsp;
-            <a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
-                onclick="ru.dct.dct_pivot(-1);">Pivot</a>
-        </div>
 
-        <!-- VIEW: Which *rows* to show -->
-        <div class="col-md-2">
-          <label class="control-label" >View:
+        <div class="col-md-4">
+          <!-- VIEW: Which *rows* to show -->
+          <label class="control-label" >Rows:
             <select class="form-control" id="viewmode" name="viewmode" onchange="ru.dct.show_dct();">
               <option value="all"   >View all</option>
               <option value="match" selected>Matches only</option>
             </select>
           </label>
-        </div>
 
-        <!-- COLUMNS: Column order -->
-        <div class="col-md-3">
+          <!-- COLUMNS: Column order -->
           <label class="control-label" >Columns:
             <select class="form-control" id="colmode" onchange="ru.dct.show_dct();" >
               <option value="match_decr"  selected>Matches (decreasing)</option>
@@ -49,13 +42,35 @@
               <option value="custom"      disabled >Custom</option>
             </select>
           </label>
+
         </div>
 
-        <!-- Options -->
-        <div class="col-md-2">
-          <!-- Option #2: show/hide author information per item -->
+        <!-- Recalc button -->
+        <div class="col-md-4">&nbsp;
+          <!-- Allow returning to the DCT tools pages -->
+          <a class="btn btn-xs jumbo-1" title="back to DCT tool page" href=""><< Tool</a>
+
+          <!-- Download button -->
+          <div class="col-md-1 container-small align-right">
+            <form action="" method="post" >
+              {{csrf|safe}}
+              <div id="downloadcenter" class="hidden">
+                <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+                <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+              </div>
+              <div>
+                {% include 'dct/download.html' with downloadid="dct" urlname="setdef_download" object_id=object.id %}
+              </div>
+            </form>
+          </div>
+
+          <!-- Option #1: show/hide author information per item -->
           <a class="btn btn-xs jumbo-1" title="Show or hide author information" 
                 onclick="ru.dct.dct_author(this);">Author</a>
+
+          <!-- Pivot recalculation -->
+          <a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
+              onclick="ru.dct.dct_pivot(-1);">Pivot</a>
         </div>
 
         <!-- Save buttons -->

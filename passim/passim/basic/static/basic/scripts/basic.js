@@ -2264,7 +2264,11 @@ var ru = (function ($, ru) {
                     el = $(contentid).first().get(0);
 
                     el.scrollIntoView();
-                    html2canvas(el, { scale: scaleFactor, y: window.scrollY  })
+                    html2canvas(el, {
+                      scale: scaleFactor, y: window.scrollY, x: window.scrollX,
+                      logging: true, foreignObjectRendering: true,
+                      removeContainer: true
+                    })
                       .then(function (canvas) {
                         // Convert to data
                         var imageData = canvas.toDataURL("image/png");
