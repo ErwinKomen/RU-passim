@@ -1581,7 +1581,7 @@ var ru = (function ($, ru) {
           }
 
           // Now make the actual call for the downloading
-          ru.basic.post_download(elStart);
+          ru.basic.post_download(elStart, {waitclass: "waiting"});
         } catch (ex) {
           private_methods.errMsg("dct_download", ex);
         }

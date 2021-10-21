@@ -61,6 +61,8 @@
               <div>
                 {% include 'dct/download.html' with downloadid="dct" urlname="setdef_download" object_id=object.id %}
               </div>
+              <!-- Waiting symbol -->
+              <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
             </form>
           </div>
 
@@ -71,6 +73,7 @@
           <!-- Pivot recalculation -->
           <a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
               onclick="ru.dct.dct_pivot(-1);">Pivot</a>
+
         </div>
 
         <!-- Save buttons -->

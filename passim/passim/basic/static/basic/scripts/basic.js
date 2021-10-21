@@ -2189,7 +2189,7 @@ var ru = (function ($, ru) {
         *   Trigger creating and downloading a result CSV / XLSX / JSON
         *
         */
-      post_download: function (elStart) {
+      post_download: function (elStart, options) {
         var ajaxurl = "",
             action = "",
             contentid = null,
@@ -2201,10 +2201,11 @@ var ru = (function ($, ru) {
             elData = null,
             sHtml = "",
             oBack = null,
-            options = {},
+            // options = {},
             dtype = "",
             sMsg = "",
             svgText = "",
+            waitclass = null,
             method = "normal",
             data = [];
 
@@ -2215,6 +2216,10 @@ var ru = (function ($, ru) {
           // obligatory parameter: ajaxurl
           ajaxurl = $(elStart).attr("ajaxurl");
           contentid = $(elStart).attr("contentid");
+
+          if (options !== undefined && "waitclass" in options) {
+            waitclass = "." + options.waitclass;
+          }
 
           // Gather the information
           frm = $(elStart).closest(".container-small").find("form");
@@ -2259,7 +2264,14 @@ var ru = (function ($, ru) {
                 elData = $(frm).find("#downloaddata");
                 // Process download data
                 switch (dtype) {
-                  case "hist-png":  // Download histogram as PNG
+                  case "hist-png":  // Download (histogram) as PNG
+                    // Need to show waiting?
+                    if (waitclass !== null) {
+                      // Start waiting
+                      $(frm).find(waitclass).removeClass("hidden");
+                      $(frm).find(".dropdown-menu").addClass("hidden");
+                    }
+
                     // Convert the HTML into a canvas and turn the canvas into a PNG
                     el = $(contentid).first().get(0);
 
@@ -2275,8 +2287,16 @@ var ru = (function ($, ru) {
                         if (elData.length > 0) {
                           $(elData).val(imageData);
                         }
+
+                        // Need to stop showing waiting?
+                        if (waitclass !== null) {
+                          // Start waiting
+                          $(frm).find(waitclass).addClass("hidden");
+                        }
+
                         // Now submit the form
                         oBack = frm.submit();
+
                       });
                     break;
                   case "hist-svg":
