@@ -1020,39 +1020,76 @@ class SetDefDownload(BasicPart):
         # Initialize
         lData = []
         sData = ""
+        oErr = ErrHandle()
 
-        if dtype == "json":
-            # Retrieve the actual data from self.data
-            # oData = self.data['contents']
-            sData = self.qd.get('downloaddata', "[]")
-            oData = json.loads(sData)
-            sData = json.dumps(oData, indent=2)
-        elif dtype == "dct-svg":
-            pass
-        elif dtype == "dct-png":
-            pass
-        elif dtype == "csv" or dtype == "xlsx":
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
-            csvwriter.writerow(headers)
-            for obj in self.get_queryset(prefix):
-                round = obj.get('testset__round')                # obj.testset.round
-                number = obj.get('testset__number')             # obj.testset.number
-                speaker = obj.get('testunit__speaker__name')    # obj.testunit.speaker.name
-                gender = obj.get('testunit__speaker__gender')   # obj.testunit.speaker.gender
-                sentence = obj.get('testunit__sentence__name')  # obj.testunit.sentence.name
-                fname = obj.get('testunit__fname')              # Pre-calculated filename
-                ntype = obj.get('testunit__ntype')              # obj.testunit.ntype
-                row = [round, number, speaker, gender, fname, sentence, ntype]
-                csvwriter.writerow(row)
+        try:
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+            if dtype == "json":
+                # Retrieve the actual data from self.data
+                sData = self.qd.get('downloaddata', "[]")
+                # Load it as object (from JSON)
+                oData = json.loads(sData)
+                # Save it as string, but with indentation for easy reading
+                sData = json.dumps(oData, indent=2)
+            elif dtype == "dct-svg":
+                # Note: this does not occur - no SVG is used
+                pass
+            elif dtype == "dct-png":
+                # Note: the Javascript routine provides the needed information
+                pass
+            elif dtype == "csv" or dtype == "xlsx":
+                # Retrieve the actual data from self.data
+                sData = self.qd.get('downloaddata', "[]")
+                # Load it as object (from JSON)
+                lst_rows = json.loads(sData)
+
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+
+                # Headers: the column names are largely determined by the first row in the JSON information
+                row = lst_rows[0]
+                header_fields = ['top', 'middle', 'main', 'size']
+                for field in header_fields:
+                    headers = []
+                    # First column processing
+                    if field == "top": 
+                        headers.append("Gryson/Clavis")
+                    else:
+                        headers.append("")
+                    # Processing of the remaining columns
+                    for item in row[1:]:
+                        oHeader = item['header']
+                        if field in oHeader:
+                            headers.append(oHeader[field])
+                        else:
+                            headers.append("")
+                    # Output this header row
+                    csvwriter.writerow(headers)
+
+                # Process the remaining rows in the list of input rows
+                for lst_row in lst_rows[1:]:
+                    # Start an output row
+                    row = []
+                    # Walk through the columns
+                    for idx, col in enumerate(lst_row):
+                        if idx == 0:
+                            # THis is the first column: get the siglist
+                            siglist = ", ".join(col['siglist'])
+                            row.append(siglist)
+                        else:
+                            # This is a different column
+                            row.append(col['txt'])
+                    # Output this row
+                    csvwriter.writerow(row)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefDownload/get_data")
 
         return sData
 

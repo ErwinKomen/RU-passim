@@ -207,7 +207,7 @@ var ru = (function ($, ru) {
       /** 
         *  dct_author - Get the name of the (attributed) author
         */
-      dct_author: function (oSsgItem) {
+      dct_author: function (oSsgItem, bFull) {
         var i = 0,
             sText = "",
             keys = ["srm_author", "author"];
@@ -223,8 +223,10 @@ var ru = (function ($, ru) {
               break;
             }
           }
-          // Abbreviate the text of the author
-          sText = ". " + sText.substring(0, 5) + "...";
+          if (bFull === undefined || !bFull) {
+            // Abbreviate the text of the author
+            sText = ". " + sText.substring(0, 5) + "...";
+          }
 
           // Combine the html
           return sText;
@@ -238,10 +240,22 @@ var ru = (function ($, ru) {
         *     Get the DCT data as stringified JSON
         */
       dct_getdata: function () {
-        var sData = "";
+        var sData = "",
+            oRow = null,
+            data = [],
+            i = 0,
+            view_mode = "";
 
         try {
-          sData = JSON.stringify(loc_dctdata);
+          view_mode = loc_params['view_mode'];
+          // Copy all data that should be included
+          for (i = 0; i < loc_dctdata.length; i++) {
+            oRow = loc_dctdata[i];
+            if (oRow['match'] === true || view_mode === "all") {
+              data.push(oRow['row']);
+            }
+          }
+          sData = JSON.stringify(data);
           return sData;
         } catch (ex) {
           private_methods.errMsg("dct_getdata", ex);
@@ -339,7 +353,7 @@ var ru = (function ($, ru) {
             j = 0,
             order = 0,
             ssg = 0,
-            siglist = "",
+            siglist = [],
             sUrl = "",
             ssglist = null,
             sClass = "",
@@ -359,14 +373,14 @@ var ru = (function ($, ru) {
             "<a class='nostyle dct-blinded' onclick='ru.dct.dct_hiderow(this);' title='Hide this row'>" +
             "<span class='glyphicon glyphicon-minus' ></span></a></span></td>");
           // Keep track of data for getdata()
-          datarow.push({ txt: oSsgThis.sig, alt: private_methods.dct_tooltip(oSsgThis, 'ssg') });
+          datarow.push({ txt: oSsgThis.sig, siglist: siglist });
 
           if (bShowPivot) {
             html_row.push("<td class='fixed-side fixed-col1' data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
               " title='" + private_methods.dct_tooltip(oSsgThis, 'srm') + "' >" +
               oSsgThis.order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgThis) + "</span></td>");
             // Keep track of data for getdata()
-            datarow.push({ txt: oSsgThis.order.toString(), alt: private_methods.dct_author(oSsgThis) });
+            datarow.push({ txt: oSsgThis.order.toString(), author: private_methods.dct_author(oSsgThis, true) });
           } else {
             html_row.push("<td class='fixed-side fixed-col1'>&nbsp;</td>");
             // Keep track of data for getdata()
@@ -395,7 +409,7 @@ var ru = (function ($, ru) {
                   " title='" + private_methods.dct_tooltip(oSsgItem, 'srm') + "'  >" +
                   order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
                 // Keep track of data for getdata()
-                datarow.push({ txt: order.toString(), alt: private_methods.dct_author(oSsgItem) });
+                datarow.push({ txt: order.toString(), author: private_methods.dct_author(oSsgItem, true) });
               } else {
                 html_row.push("<td" + sClass + "></td>");
                 // Keep track of data for getdata()
@@ -405,7 +419,7 @@ var ru = (function ($, ru) {
           }
 
           // Keep track of data for getdata()
-          loc_dctdata.push(datarow);
+          loc_dctdata.push({match: bFound, row: datarow });
 
           // Finish this row
           html_row.push("</tr>");
@@ -435,6 +449,7 @@ var ru = (function ($, ru) {
             elDctWait = null,
             elDctTools = null,
             oTitle = null,
+            oHeader = null,
             sTop = "",
             sMiddle = "",
             sMain = "",
@@ -638,7 +653,11 @@ var ru = (function ($, ru) {
             if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches']; }
 
             // Keep track of the data for retrieval
-            datarow.push({ obj: oTitle });
+            oHeader = {
+              url: oTitle.url, top: oTitle.top, middle: oTitle.middle, main: oTitle.main,
+              yearstart: oTitle.yearstart, yearfinish: oTitle.yearfinish, size: oTitle.size
+            };
+            datarow.push({ header: oHeader });
 
             order = oTitle.order;
 
@@ -670,7 +689,7 @@ var ru = (function ($, ru) {
           html.push("</tr></thead>");
 
           // Keep track of the data for getdata()
-          loc_dctdata.push(datarow);
+          loc_dctdata.push({ match: true, row: datarow });
           datarow = [];
 
           // Construct the body
@@ -1555,7 +1574,7 @@ var ru = (function ($, ru) {
         try {
           switch ($(elStart).attr("downloadtype")) {
             case "json":
-            case "excel":
+            case "xlsx":
               // Prepare a JSON to work from
               $("#downloaddata").val(private_methods.dct_getdata());
               break;

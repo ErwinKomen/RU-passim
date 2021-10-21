@@ -2289,6 +2289,7 @@ var ru = (function ($, ru) {
                     oBack = frm.submit();
                     break;
                   case "json":
+                  case "xlsx":
                     // Now submit the form
                     oBack = frm.submit();
                     break;
