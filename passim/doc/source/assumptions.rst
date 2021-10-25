@@ -3,14 +3,16 @@ Assumptions
 
 The 'tagtext' app
 -----------------
-The use of the ``tagtext`` app assumes...
+The use of the ``tagtext`` app makes some assumptions.
+It is best to check the ``tagtext`` documentation further down.
 
 The 'basic' app
 ---------------
-bladibla
+The ``basic`` app can best be included by source. This facilitates easier debugging. It also provides an opportunity to extend it application-wide.
 
-Older: BasicListView
+The BasicListView
 --------------------
+This listview is part of the ``basic`` app (see above).
 There are a few assumptions for using the ``BasicListView``:
 
 1. The class using it must be inside ``views.py``
