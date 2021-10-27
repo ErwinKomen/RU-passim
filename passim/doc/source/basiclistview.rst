@@ -1,14 +1,14 @@
 Basic List View
 ===============
 
-Creating and using the ``BasicListView`` class can best be described by an example model.
+Creating and using the ``BasicList`` class can be described by an example model.
 
 .. code-block:: python
    :linenos:
    
-   class AuthorListView(BasicListView):
+   class AuthorListView(BasicList):
       """Search and list authors"""
-
+	    
       model = Author
       listform = AuthorSearchForm
       has_select2 = True
@@ -30,9 +30,9 @@ Creating and using the ``BasicListView`` class can best be described by an examp
          sTitle = ""
          return sBack, sTitle
 
-Note that the start of using ``BasicListView`` is in deriving the new listview class from it.
+Note that the start of using ``BasicList`` is in deriving the new listview class from it.
 The class is based on the regular ``ListView``, which means that it comes with all the standard listview methods and attributes.
-Here is a discussion of the attributes and methods of ``BasicListView``.
+Here is a discussion of the attributes and methods of ``BasicList``.
 
 Attributes
 ----------
@@ -159,7 +159,7 @@ Attributes
    A list of download option objects. The fields used in the objects are: 
    
    - ``label`` the label as it will appear to the user
-   - ``dtype`` the short download type name as used in ``BasicListView`` (``csv``, ``xlsx``, ``json``)
+   - ``dtype`` the short download type name as used in ``BasicList`` (``csv``, ``xlsx``, ``json``)
    - ``url``   the name of the url - taken from ``urls.py`` - where the download request will be posted to
    
 ``uploads``
@@ -173,7 +173,7 @@ Attributes
 Methods
 -------
 
-All the methods available with Django's regular ``ListView`` can be used. The class ``BasicListView`` adds a few methods itself.
+All the methods available with Django's regular ``ListView`` can be used. The class ``BasicList`` adds a few methods itself.
 
 ``get_field_value()``
    This method allows 'calculating' the *html* value for a particular listview column in Python.   
