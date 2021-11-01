@@ -36,6 +36,7 @@ var ru = (function ($, ru) {
         loc_ssglists = null,    // The object with the DCT information
         loc_colwrap = [],       // Column wrapping
         loc_dctdata = [],
+        loc_dragDst = null,     // Destination of the dragging
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
@@ -346,7 +347,7 @@ var ru = (function ($, ru) {
       /** 
        *  dct_row_combine -  Walk through all the other lists, finding this SSG
        */
-      dct_row_combine: function(ssglists, pivot_col, oSsgThis, rowcolor, bShowPivot) {
+      dct_row_combine: function(ssglists, pivot_col, oSsgThis, rowcolor, bShowPivot, lst_exclude) {
         var oBack = {'error': false},
             oSsgItem = null,
             i = 0,
@@ -392,28 +393,32 @@ var ru = (function ($, ru) {
             if (i !== pivot_col) {
               // Get this setlist
               ssglist = ssglists[i]['ssglist'];
-              order = -1;
-              // Look for this particular ssg within this list
-              for (j = 0; j < ssglist.length; j++) {
-                oSsgItem = ssglist[j];
-                if (oSsgItem.super === ssg) {
-                  // FOund one!
-                  bFound = true;
-                  order = oSsgItem.order;
-                  break;
+              // Check if this one is not excluded
+              if (lst_exclude.indexOf(ssglists[i].title.order) < 0) {
+                // May include this one
+                order = -1;
+                // Look for this particular ssg within this list
+                for (j = 0; j < ssglist.length; j++) {
+                  oSsgItem = ssglist[j];
+                  if (oSsgItem.super === ssg) {
+                    // FOund one!
+                    bFound = true;
+                    order = oSsgItem.order;
+                    break;
+                  }
                 }
-              }
-              sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
-              if (order >= 0) {
-                html_row.push("<td" + sClass + " data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
-                  " title='" + private_methods.dct_tooltip(oSsgItem, 'srm') + "'  >" +
-                  order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
-                // Keep track of data for getdata()
-                datarow.push({ txt: order.toString(), author: private_methods.dct_author(oSsgItem, true) });
-              } else {
-                html_row.push("<td" + sClass + "></td>");
-                // Keep track of data for getdata()
-                datarow.push({ txt: "" });
+                sClass = (i == 0) ? " class='fixed-side fixed-col1'" : "";
+                if (order >= 0) {
+                  html_row.push("<td" + sClass + " data-toggle='tooltip' data-tooltip='dct-hover' align='center'" +
+                    " title='" + private_methods.dct_tooltip(oSsgItem, 'srm') + "'  >" +
+                    order + "<span class='hidden dct-author'>" + private_methods.dct_author(oSsgItem) + "</span></td>");
+                  // Keep track of data for getdata()
+                  datarow.push({ txt: order.toString(), author: private_methods.dct_author(oSsgItem, true) });
+                } else {
+                  html_row.push("<td" + sClass + "></td>");
+                  // Keep track of data for getdata()
+                  datarow.push({ txt: "" });
+                }
               }
             }
           }
@@ -459,7 +464,8 @@ var ru = (function ($, ru) {
             pivot = null,
             dealt_with = [],    // List of SSGs that have appeared in a row
             remainder = [],     // List with remainder
-            lst_order = [],
+            lst_order = [],     // Which to include, in which order (if manually set)
+            lst_exclude = [],   // Which to exclude (in any mode)
             ssglists_new = [],
             ssglist = null,
             oSsgItem = null,
@@ -502,6 +508,7 @@ var ru = (function ($, ru) {
             if ("view_mode" in params) { view_mode = params['view_mode'];}
             if ("col_mode" in params) { col_mode = params['col_mode']; }
             if ("lst_order" in params) { lst_order = params['lst_order']; }
+            if ("lst_exclude" in params) { lst_exclude = params['lst_exclude']; }
             if ("hidden_rows" in params) { lHiddenRows = params['hidden_rows']; }
             if (col_mode === "custom") {
               // $("input[name='colorder']").prop("checked", false);
@@ -540,7 +547,7 @@ var ru = (function ($, ru) {
           // Make sure we save the parameters
           loc_params = {
             "pivot_col": pivot_col, "view_mode": view_mode, "col_mode": col_mode,
-            "lst_order": lst_order, "hidden_rows": lHiddenRows
+            "lst_order": lst_order, "lst_exclude": lst_exclude, "hidden_rows": lHiddenRows
           };
 
           // For further processing we need to have the actual 'order' value for the pivot column
@@ -644,47 +651,52 @@ var ru = (function ($, ru) {
           for (i = 0; i < ssglists.length; i++) {
             // Get the title object
             oTitle = ssglists[i]['title'];
-            sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
-            if ('top' in oTitle) { sTop = oTitle['top']; if (sTop === "") sTop = "ms";}
-            if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
-            if ('main' in oTitle) { sMain = oTitle['main']; }
-            if ('size' in oTitle) { iSize = oTitle['size']; }
-            if ('url' in oTitle) { sUrl = oTitle['url']; }
-            if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches']; }
-
-            // Keep track of the data for retrieval
-            oHeader = {
-              url: oTitle.url, top: oTitle.top, middle: oTitle.middle, main: oTitle.main,
-              yearstart: oTitle.yearstart, yearfinish: oTitle.yearfinish, size: oTitle.size
-            };
-            datarow.push({ header: oHeader });
-
+            // And get the order
             order = oTitle.order;
+            // Should this one be included?
+            if (lst_exclude.indexOf(order) < 0) {
+              // This may be included
+              sTop = "&nbsp;"; sMiddle = "&nbsp;"; sMain = "&nbsp;"; iSize = 0;
+              if ('top' in oTitle) { sTop = oTitle['top']; if (sTop === "") sTop = "ms"; }
+              if ('middle' in oTitle) { sMiddle = oTitle['middle']; }
+              if ('main' in oTitle) { sMain = oTitle['main']; }
+              if ('size' in oTitle) { iSize = oTitle['size']; }
+              if ('url' in oTitle) { sUrl = oTitle['url']; }
+              if ('unique_matches' in ssglists[i]) { unique_matches = ssglists[i]['unique_matches']; }
 
-            // Show it
-            if (i === 0) {
-              sClass = "class='fixed-side fixed-col1'";
-            } else {
-              sClass = "class='draggable' draggable='true' " +
-                "ondragstart='ru.dct.dct_drag(event);' " +
-                "ondragend='ru.dct.dct_dragend(event);' " +
-                "ondragover='ru.dct.dct_dragenter(event);'";
+              // Keep track of the data for retrieval
+              oHeader = {
+                url: oTitle.url, top: oTitle.top, middle: oTitle.middle, main: oTitle.main,
+                yearstart: oTitle.yearstart, yearfinish: oTitle.yearfinish, size: oTitle.size
+              };
+              datarow.push({ header: oHeader });
+
+              // Show it
+              if (i === 0) {
+                sClass = "class='fixed-side fixed-col1'";
+              } else {
+                sClass = "class='draggable' draggable='true' " +
+                  "ondragstart='ru.dct.dct_drag(event);' " +
+                  "ondragend='ru.dct.dct_dragend(event);' " +
+                  "ondragover='ru.dct.dct_dragenter(event);'";
+              }
+              html.push("<th " + sClass + " order='" + order.toString() + "'>");
+              // Top 
+              html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + order +
+                ")' title='Click to make this the PIVOT&#10;&#13; (it would have " + unique_matches + " unique match[es])'>" + sTop + "</div>");
+              // Middle
+              html.push("<div class='shelf-library'>" + sMiddle + "</div>");
+              // Main
+              if (sUrl === "") {
+                html.push("<div class='shelf-idno'>" + sMain + "</div>");
+              } else {
+                html.push("<div class='shelf-idno clickable'><a class='nostyle' href='" + sUrl + "'>" + sMain + "</a></div>");
+              }
+              // Size
+              html.push("<div class='shelf-size'>" + iSize + "</div>");
+              html.push("</th>");
             }
-            html.push("<th " + sClass + " order='" + order.toString() + "'>");
-            // Top 
-            html.push("<div class='shelf-city' onclick='ru.dct.dct_pivot(" + order +
-              ")' title='Click to make this the PIVOT&#10;&#13; (it would have " + unique_matches + " unique match[es])'>" + sTop + "</div>");
-            // Middle
-            html.push("<div class='shelf-library'>" + sMiddle + "</div>");
-            // Main
-            if (sUrl === "") {
-              html.push("<div class='shelf-idno'>" + sMain + "</div>");
-            } else {
-              html.push("<div class='shelf-idno clickable'><a class='nostyle' href='" + sUrl + "'>" + sMain + "</a></div>");
-            }
-            // Size
-            html.push("<div class='shelf-size'>" + iSize + "</div>");
-            html.push("</th>");
+
           }
           html.push("</tr></thead>");
 
@@ -707,7 +719,7 @@ var ru = (function ($, ru) {
             dealt_with.push(ssg);
 
             // Walk through all the other lists, finding this SSG
-            oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, true);
+            oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, true, lst_exclude);
             if (!oCombi.error) {
               // This action depends on the view mode
               switch (view_mode) {
@@ -1505,6 +1517,52 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * dct_addsrc
+       *    Actually add this source list
+       *
+       */
+      dct_addsrc: function (elStart) {
+        var sType = "",
+            sId = "",
+            ajaxurl = "",
+            frm = null,
+            data = null;
+
+        try {
+          // Check which one is visible
+          if (!$(elStart).find(".source-manu").hasClass("hidden")) {
+            sType = "manu";
+            sId = $("#id_sdef-manulist").val();
+          } else if (!$(elStart).find(".source-coll").hasClass("hidden")) {
+            sType = "coll";
+            sId = $("#id_sdef-histlist").val();
+          }
+          // Process these values
+          if (sType !== "" && sId !== "") {
+            $("#addtype").val(sType);
+            $("#addid").val(sId);
+          }
+
+          // Always:
+          $(".source-list").addClass("hidden");
+
+          // Do we have an url?
+          ajaxurl = $(elStart).attr("ajaxurl");
+          if (ajaxurl !== "" && ajaxurl !== undefined) {
+            frm = $(elStart).closest("form").first();
+            // Show waiting
+            $(".waiting").removeClass("hidden");
+            // Submit with this data
+            $(frm).attr("target", ajaxurl);
+            $(frm).submit();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("dct_addsrc", ex);
+        }
+      },
+
+      /**
        * dct_author
        *    Show or hide author information
        *
@@ -1625,6 +1683,9 @@ var ru = (function ($, ru) {
           // Prevend the default behaviour
           ev.preventDefault();
 
+          // make sure the drag destination is up to date
+          loc_dragDst = ev.target;
+
           // Get the column that is stored
           th_src = loc_columnTh;
           // We must be going over a TH with the right class
@@ -1658,6 +1719,7 @@ var ru = (function ($, ru) {
       dct_dragend: function (ev) {
         var th_src = null,
             lst_order = [],
+            lst_exclude = [],
             order = 0,
             i = 0,
             children = null;
@@ -1666,18 +1728,32 @@ var ru = (function ($, ru) {
           // Prevend the default behaviour
           ev.preventDefault();
 
-          // Get the current order of the columns
-          children = Array.from(ev.target.parentNode.children);
-          for (i = 0; i < children.length; i++) {
-            order = parseInt($(children[i]).attr("order"), 10);
-            if (order > 0) {
-              lst_order.push(order);
+          // Is this deleting or what?
+          if (loc_dragDst !== null && $(loc_dragDst).hasClass("delete")) {
+            // Need to delete this node
+            order = $(ev.target).attr("order");
+            // Add this to the exclude list
+            if ("lst_exclude" in loc_params) {
+              lst_exclude = loc_params['lst_exclude'];
             }
+            lst_exclude.push(parseInt(order, 10));
+            loc_params['lst_exclude'] = lst_exclude;
+          } else {
+            // Get the current order of the columns
+            children = Array.from(ev.target.parentNode.children);
+            for (i = 0; i < children.length; i++) {
+              order = parseInt($(children[i]).attr("order"), 10);
+              if (order > 0) {
+                lst_order.push(order);
+              }
+            }
+
+            // Sort custom according to this order
+            loc_params['col_mode'] = "custom";
+            loc_params['lst_order'] = lst_order;
+
           }
 
-          // Sort custom according to this order
-          loc_params['col_mode'] = "custom";
-          loc_params['lst_order'] = lst_order;
 
           private_methods.dct_show(loc_ssglists, loc_params);
 
@@ -1888,6 +1964,34 @@ var ru = (function ($, ru) {
           });
         } catch (ex) {
           private_methods.errMsg("dct_save", ex);
+        }
+      },
+
+        /**
+       * dct_source
+       *    Show or hide a source list
+       *
+       */
+      dct_source: function (elStart) {
+        var sType = "";
+
+        try {
+          sType = $(elStart).attr("source");
+          switch (sType) {
+            case "manu":
+              $(".source-list").addClass("hidden");
+              $(".source-manu").removeClass("hidden");
+              break;
+            case "coll":
+              $(".source-list").addClass("hidden");
+              $(".source-coll").removeClass("hidden");
+              break;
+            default:
+              $(".source-list").addClass("hidden");
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("dct_source", ex);
         }
       },
       

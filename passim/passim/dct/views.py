@@ -898,6 +898,109 @@ class SetDefDetails(SetDefEdit):
     rtype = "html"
     listviewtitle = "All my DCTs"
 
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Check if we get any addtype and addid values
+            addtype = self.qd.get("addtype", None)
+            addid = self.qd.get("addid", None)
+            if addtype != None and addid != None:
+                # We have something to add
+                researchset = instance.researchset
+                order = researchset.researchset_setlists.count() + 1
+                setlisttype = ""
+                setlist = None
+                # Note: are we creating or adding an existing one?
+                mode = ""
+                if addtype == "manu":
+                    # Add a manuscript
+                    setlisttype = "manu"
+                    # Check existence
+                    obj = SetList.objects.filter(
+                        researchset=researchset, setlisttype=setlisttype, manuscript_id=addid).first()
+                    if obj == None:
+                        # Create this setlist
+                        setlist = SetList.objects.create(
+                            researchset=researchset, order = order,
+                            setlisttype=setlisttype, manuscript_id=addid)
+                        mode = "create"
+                    else:
+                        # Pick up its correct order
+                        order = obj.order
+                        # Adapt mode
+                        mode = "exists"
+                elif addtype == "coll":
+                    # Add a collection
+                    setlisttype = "hist"
+                    # Check existence
+                    obj = SetList.objects.filter(
+                        researchset=researchset, setlisttype=setlisttype, collection_id=addid).first()
+                    if obj == None:
+                        # Create this setlist
+                        setlist = SetList.objects.create(
+                            researchset=researchset, order = order,
+                            setlisttype=setlisttype, collection_id=addid)
+                        mode = "create"
+                    else:
+                        # Pick up its correct order
+                        order = obj.order
+                        # Adapt mode
+                        mode = "exists"
+                elif addtype == "ssgd":
+                    # Add a collection
+                    setlisttype = "ssgd"
+                    pass
+
+                if mode == "create":
+                    # Make sur ssglists are re-calculated for this researchset
+                    researchset.update_ssglists(True)
+                    # Walk all SetDefs in this research set
+                    with transaction.atomic():
+                        for sdef in researchset.researchset_setdefs.all():
+                            bNeedSaving = False
+                            # Is this the setdef I am in?
+                            if sdef.id == instance.id:
+                                # Yes, this is my setdef: add it to the include list
+                                contents = json.loads(sdef.contents)
+                                lst_order = contents.get("lst_order", None)
+                                if lst_order != None and not order in lst_order:
+                                    lst_order.append(order)
+                                    sdef.contents = json.dumps(contents)
+                                    bNeedSaving = True
+                            else:
+                                # No, this is not my setdef: switch it off here
+                                contents = json.loads(sdef.contents)
+                                lst_exclude = contents.get("lst_exclude", [])
+                                if not order in lst_exclude:
+                                    lst_exclude.append(order)
+                                    contents['lst_exclude'] = lst_exclude
+                                    sdef.contents = json.dumps(contents)
+                                    bNeedSaving = True
+                            # IN all cases: save results
+                            if bNeedSaving: sdef.save()
+                elif mode == "exists":
+                    # This particular list already exists.
+                    # It needs to be switched 'on' in the current Sdef
+                    contents = json.loads(instance.contents)
+                    # If needed, add in lst_order
+                    lst_order = contents.get("lst_order", None)
+                    if lst_order != None and not order in lst_order:
+                        lst_order.append(order)
+                        contents['lst_order'] = lst_order
+                    # If needed, take it out of exclude
+                    lst_exclude = contents.get("lst_exclude", None)
+                    if lst_exclude != None and order in lst_exclude:
+                        lst_exclude.pop(lst_exclude.index(order))
+                        contents['lst_exclude'] = lst_exclude
+                    # Adapt changes
+                    instance.contents = json.dumps(contents)
+                    instance.save()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefDetails/custom_init")
+        return None
+
     def add_to_context(self, context, instance):
         # Perform the standard initializations:
         context = super(SetDefDetails, self).add_to_context(context, instance)
@@ -922,6 +1025,7 @@ class SetDefDetails(SetDefEdit):
             context['setlist'] = [ 1, 2, 3]
 
             context['dctdata_url'] = reverse('setdef_data', kwargs={'pk': instance.id})
+            context['dctdetails_url'] = reverse('setdef_details', kwargs={'pk': instance.id})
             context['csrf'] = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
                 get_token(self.request))
             context['mayedit'] = bMayEdit
