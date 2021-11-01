@@ -5436,6 +5436,12 @@ class Author(models.Model):
             author.save()
         return author
 
+    def is_undecided(self):
+        """Check if this is the undecided author"""
+
+        bResult = (self.name.lower() == "undecided")
+        return bResult
+
     def get_editable(self):
         """Get a HTML expression of this author's editability"""
 
@@ -5630,14 +5636,15 @@ class EqualGold(models.Model):
             if self.author:
                 # Get the author number
                 auth_num = self.author.get_number()
-
+                
                 # Can we process this author further into a code?
-                if auth_num < 0:
+                if auth_num < 0: # or Author.is_undecided(self.author):
                     self.code = None
                 else:
                     # There is an author--is this different than the author we used to have?
-
-                    if self.number == None:
+                    prev_auth = EqualGold.objects.filter(id=self.id).first().author
+                    was_undecided = False if prev_auth == None else (prev_auth.name.lower() == "undecided")
+                    if self.number == None or was_undecided:
                         # This may be a mistake: see if there is a code already
                         if self.code != None and "PASSIM" in self.code:
                             # There already is a code: get the number from here
@@ -5645,7 +5652,7 @@ class EqualGold(models.Model):
                             if len(arPart) == 3 and arPart[0] == "PASSIM":
                                 # Get the author number
                                 self.number = int(arPart[2])
-                        if self.number == None:
+                        if self.number == None or was_undecided:
                             # Check the highest sermon number for this author
                             self.number = EqualGold.sermon_number(self.author)
                     else:
