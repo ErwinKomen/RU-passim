@@ -6134,9 +6134,31 @@ var ru = (function ($, ru) {
        *
        */
       overlap_marker_end: function (d) {
+        var sArrow = "url(#arrow_uses)",
+            sResponse = "";
+
         try {
           if (loc_network_options['overlap_direction'] === true) {
-            return "url(#arrow_uses)";
+            if (d.source.id === 2576 && d.target.id === 799) {
+              sResponse = "";
+            } else if (d.source.id === 799 && d.target.id === 2576) {
+              sResponse = "";
+            }
+            // Check what kind of value is returned
+            switch (d.spectype) {
+              case "usd":
+              case "usi":
+                sResponse = "";
+                break;
+              case "udd":
+              case "udi":
+                sResponse = sArrow;
+                break;
+              default:
+                sResponse = "";
+                break;
+            }
+            return sResponse;
           } else {
             return "";
           }

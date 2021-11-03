@@ -84,13 +84,19 @@ def get_ssg_corpus(profile, instance):
     return ssg_corpus, lock_status
 
 def get_ssg_sig(ssg_id):
+
     oErr = ErrHandle()
     sig = ""
+    editype_preferences = ['gr', 'cl', 'ot']
     issue_375 = True
     try:
-        # Get the Signature that is most appropriate
-        sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
-        sig = "" if sig_obj == None else sig_obj.code
+        for editype in editype_preferences:
+            siglist = Signature.objects.filter(gold__equal__id=ssg_id, editype=editype).order_by('code').values('code')
+            if len(siglist) > 0:
+                sig = siglist[0]['code']
+                break
+        # We now have the most appropriate signature, or the empty string, if there is none
+        # The folloing is old code, not quite clear why it was necessary
         if not issue_375 and ',' in sig:
             sig = sig.split(",")[0].strip()
     except:
@@ -148,17 +154,25 @@ class EqualGoldOverlap(BasicPart):
 
             # Initializations
             ssg_link = {}
+            bUseDirectionality = True
 
             # Read the table with links from SSG to SSG
-            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values('src', 'dst')
+            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values('src', 'dst', 'spectype')
             # Transform into a dictionary with src as key and list-of-dst as value
             for item in eqg_link:
                 src = item['src']
                 dst = item['dst']
-                # Make room for the SRC if needed
-                if not src in ssg_link: ssg_link[src] = []
-                # Add this link to the list
-                ssg_link[src].append(dst)
+                if bUseDirectionality:
+                    spectype = item['spectype']
+                    # Make room for the SRC if needed
+                    if not src in ssg_link: ssg_link[src] = []
+                    # Add this link to the list
+                    ssg_link[src].append({'dst': dst, 'spectype': spectype})
+                else:
+                    # Make room for the SRC if needed
+                    if not src in ssg_link: ssg_link[src] = []
+                    # Add this link to the list
+                    ssg_link[src].append(dst)
 
             # Create the overlap network
             node_list, link_list, max_value, max_group = self.do_overlap(ssg_link, networkslider)
@@ -219,13 +233,15 @@ class EqualGoldOverlap(BasicPart):
                 # Add links from this SSG to others
                 if node_key in ssg_link:
                     dst_list = ssg_link[node_key]
-                    for dst in dst_list:
+                    for oDst in dst_list:
+                        dst = oDst['dst']
                         # Add this one to the add list
                         ssg_add.append(dst)
                         link_key = "{}_{}".format(node_key, dst)
                         if not link_key in link_set:
                             oLink = dict(source=node_key,
                                          target=dst,
+                                         spectype=oDst['spectype'],
                                          value=0)
                             # Add the link to the set
                             link_set[link_key] = oLink
