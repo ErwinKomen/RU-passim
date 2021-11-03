@@ -79,6 +79,14 @@
             <span>Create research-set</span>
           </a>
         </li>
+        <li>
+          <a id="basket_dctlaunch" title="Launch a DCT based on the manuscripts in the basket (this also creates a 'ResearchSet')" href="#" operation="dctlaunch" 
+              targetid="basket_buttons"
+              ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+            <span class="glyphicon glyphicon-send"></span>
+            <span>Launch DCT</span>
+          </a>
+        </li>
       {% endif %}
     {% endif %}
   </ul>

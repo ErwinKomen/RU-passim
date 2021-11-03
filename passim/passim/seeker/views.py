@@ -12481,7 +12481,7 @@ class BasketUpdate(BasicPart):
 
         # Note: only operations in either of these two lists will be executed
         lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd", "rsetcreate"]
+        lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
 
         # Get our profile
         profile = Profile.get_user_profile(self.request.user.username)
@@ -12607,6 +12607,16 @@ class BasketUpdate(BasicPart):
                     name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
                     rset.name = name
                     rset.save()
+                elif operation == "dctlaunch":
+                    # Save the current basket as a research-set that needs to receive a name
+                    rset = ResearchSet.objects.create(
+                        name="tijdelijk",
+                        notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
+                        profile=profile)
+                    # Assign it a name based on its ID number and the owner
+                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                    rset.name = name
+                    rset.save()
                 elif oFields['collone']:
                     coll = oFields['collone']
 
@@ -12624,9 +12634,13 @@ class BasketUpdate(BasicPart):
                                                        setlisttype="manu",
                                                        manuscript=item.manu)
 
-                    # Make sure to redirect to this instance -- but only for RSETCREATE
+                    # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
                     if operation == "rsetcreate":
                         self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                    elif operation == "dctlaunch":
+                        # Get the default DCT for this ad-hoc ResearchSet
+                        dct = rset.researchset_setdefs.first()
+                        self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
                 elif coll == None:
                     # TODO: provide some kind of error??
                     pass
