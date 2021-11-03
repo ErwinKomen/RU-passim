@@ -66,7 +66,8 @@
           <!-- Top part of this area -->
           <div class="form-inline">
             <!-- Allow returning to the DCT tools pages -->
-            <div class="form-group"><a class="btn btn-xs jumbo-1" title="back to DCT tool page" href=""><< Tool</a></div>
+            <div class="form-group"><a class="btn btn-xs jumbo-1" title="back to DCT tool page" 
+                                       href="{{rset_url}}"><< Tool</a></div>
 
             <!-- Option #1: show/hide author information per item -->
             <div class="form-group"><a class="btn btn-xs jumbo-1" title="Show or hide author information" 
@@ -75,6 +76,12 @@
             <!-- Pivot recalculation -->
             <div class="form-group"><a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
                 onclick="ru.dct.dct_pivot(-1);">Pivot</a></div>
+
+            <!-- Expanding -->
+            <span class="hidden dct-expand">
+              <a class="btn btn-xs jumbo-3" title="Show manually hidden lines" 
+                  onclick="ru.dct.dct_expand(this);">Expand</a>
+            </span>
 
             <div class="form-group dropdown">
               <button class="btn btn-xs jumbo-1 dropdown-toggle" type="button" title="Add a source list to this DCT..." data-toggle="dropdown">Source...
@@ -126,12 +133,6 @@
 
         <!-- Save buttons -->
         <div class="col-md-4">
-          <!-- Expanding -->
-          <span class="hidden dct-expand">
-            <a class="btn btn-xs jumbo-1" title="Show manually hidden lines" 
-                onclick="ru.dct.dct_expand(this);">Expand</a>
-          </span>
-
           {% if mayedit %}
             <!-- DCT save options -->
             <span class="hidden dct-save-options pull-right">

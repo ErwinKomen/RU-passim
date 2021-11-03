@@ -1530,10 +1530,10 @@ var ru = (function ($, ru) {
 
         try {
           // Check which one is visible
-          if (!$(elStart).find(".source-manu").hasClass("hidden")) {
+          if (!$(".source-list.source-manu").hasClass("hidden")) {
             sType = "manu";
             sId = $("#id_sdef-manulist").val();
-          } else if (!$(elStart).find(".source-coll").hasClass("hidden")) {
+          } else if (!$(".source-list.source-coll").hasClass("hidden")) {
             sType = "coll";
             sId = $("#id_sdef-histlist").val();
           }
@@ -1553,7 +1553,7 @@ var ru = (function ($, ru) {
             // Show waiting
             $(".waiting").removeClass("hidden");
             // Submit with this data
-            $(frm).attr("target", ajaxurl);
+            $(frm).attr("action", ajaxurl);
             $(frm).submit();
           }
 

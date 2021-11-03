@@ -855,11 +855,14 @@ class SetDefEdit(BasicDetails):
         rset = instance.researchset
         if rset  != None:
             topleftlist = []
+            rset_url = reverse('researchset_details', kwargs={'pk': rset.id})
             buttonspecs = {'label': "<span class='glyphicon glyphicon-wrench'></span>", 
                     'title': "Back to my research set: '{}'".format(rset.name), 
-                    'url': reverse('researchset_details', kwargs={'pk': rset.id})}
+                    'url': rset_url}
             topleftlist.append(buttonspecs)
             context['topleftbuttons'] = topleftlist
+            # ALso make the rset url availabl
+            context['rset_url'] = rset_url
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
