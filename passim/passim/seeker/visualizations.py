@@ -157,17 +157,24 @@ class EqualGoldOverlap(BasicPart):
             bUseDirectionality = True
 
             # Read the table with links from SSG to SSG
-            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values('src', 'dst', 'spectype')
+            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values(
+                'src', 'dst', 'spectype', 'linktype', 'alternatives')
             # Transform into a dictionary with src as key and list-of-dst as value
             for item in eqg_link:
                 src = item['src']
                 dst = item['dst']
                 if bUseDirectionality:
                     spectype = item['spectype']
+                    linktype = item['linktype']
+                    alternatives = item['alternatives']
+                    if alternatives == None: alternatives = False
                     # Make room for the SRC if needed
                     if not src in ssg_link: ssg_link[src] = []
                     # Add this link to the list
-                    ssg_link[src].append({'dst': dst, 'spectype': spectype})
+                    ssg_link[src].append({'dst': dst, 
+                                          'spectype': spectype, 
+                                          'linktype': linktype,
+                                          'alternatives': alternatives})
                 else:
                     # Make room for the SRC if needed
                     if not src in ssg_link: ssg_link[src] = []
@@ -242,6 +249,8 @@ class EqualGoldOverlap(BasicPart):
                             oLink = dict(source=node_key,
                                          target=dst,
                                          spectype=oDst['spectype'],
+                                         linktype=oDst['linktype'],
+                                         alternatives = oDst['alternatives'],
                                          value=0)
                             # Add the link to the set
                             link_set[link_key] = oLink

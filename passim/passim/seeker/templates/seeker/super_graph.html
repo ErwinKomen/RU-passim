@@ -130,7 +130,7 @@
     </div>
 
     <div class="row">
-      <div class="col-md-offset-3 col-md-9">
+      <div class="col-md-offset-1 col-md-11">
         <table class="spacy-border" style="width: 100%;">
           <tr>
             <td class="tdnowrap"><span>Show direction&nbsp;</span></td>
@@ -144,7 +144,7 @@
             <td class="tdnowrap" ><span>Alternative options&nbsp;</span></td>
             <td>
               <label class="switch" title="Highlight alternative options">
-                <input type="checkbox" />
+                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_alternatives');" />
                 <span class="switchslider round"></span>
               </label>
             </td>
@@ -170,7 +170,7 @@
             <td class="tdnowrap"><span>Show link types&nbsp;</span></td>
             <td>
               <label class="switch" title="Show link types">
-                <input type="checkbox" />
+                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktypes');"  />
                 <span class="switchslider round"></span>
               </label>
             </td>
@@ -196,6 +196,34 @@
             <td align="right">
               {% include 'seeker/download.html' with downloadid="overlap" urlname="equalgold_overlap_download" object_id=object.id %}
             </td>
+          </tr>
+
+          <tr>
+            <td colspan="5">
+              <div class="hidden linktypes">
+                <label class="checkbox-inline">
+                  <input type="checkbox" value="linktype_neq" checked
+                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                  <span>Nearly Equals</span>
+                </label>
+                <label class="checkbox-inline">
+                  <input type="checkbox" value="linktype_prt" checked
+                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                  <span>Partially Equals</span>
+                </label>
+                <label class="checkbox-inline">
+                  <input type="checkbox" value="linktype_ech" checked
+                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                  <span>Echoes</span>
+                </label>
+                <label class="checkbox-inline">
+                  <input type="checkbox" value="linktype_uns" checked 
+                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');"/>
+                  <span>Unspecified</span>
+                </label>
+              </div>
+            </td>
+            <td colspan="2">&nbsp;</td>
           </tr>
 
         </table>
