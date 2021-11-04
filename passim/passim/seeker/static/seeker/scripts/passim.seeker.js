@@ -31,6 +31,7 @@ var ru = (function ($, ru) {
         loc_vscrolling = 0,
         loc_simulation = null,
         loc_network_options = {},
+        loc_network_linktypes = null,
         loc_newSermonNumber = 0,
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
@@ -1782,12 +1783,13 @@ var ru = (function ($, ru) {
        * @returns {Boolean}
        */
       draw_network_overlap: function (options) {
-        var svg,      // the SVG element within the DOM that is being used
-            divSvg,   // The target svg div
-            color,    // D3 color scheme
-            grayrange,  // D3 gray color
-            widthrange, // D3 width range
-            colrange,   // D3 color range (attempt) for node coloring
+        var svg,          // the SVG element within the DOM that is being used
+            divSvg,       // The target svg div
+            color,        // D3 color scheme
+            // grayrange,    // D3 gray color
+            opacityrange, // D3 opacity range
+            widthrange,   // D3 width range
+            colrange,     // D3 color range (attempt) for node coloring
             factor,
             width,
             height,
@@ -1799,6 +1801,8 @@ var ru = (function ($, ru) {
             max_value = 1,
             max_group = 1,
             bDoTransform = true,
+            linktypes = ["prt", "neq", "ech", "uns"],
+            sLinktype = "",
             maxcount = 0,
             gravityvalue = 100,
             gravityid = "#gravity_overlap_value",
@@ -1831,9 +1835,13 @@ var ru = (function ($, ru) {
           max_group = options['max_group'];
 
           // Create a grayscale color range
-          grayrange = d3.scaleLinear()
+          //grayrange = d3.scaleLinear()
+          //  .domain([1, max_value])
+          //  .range(["#DDD", "#000"]);
+
+          opacityrange = d3.scaleLinear()
             .domain([1, max_value])
-            .range(["#999", "000"]);
+            .range([0.1, 0.9]);
 
           widthrange = d3.scaleLinear()
             .domain([1, max_value])
@@ -1920,27 +1928,54 @@ var ru = (function ($, ru) {
 
           // Define a d3 function based on the information in 'nodes' and 'links'
           link = g.append("g")
-                    .attr("class", "links")
-                    .selectAll("line")
-                    .data(options['links'])
-                    .join("line")
-                    .attr("stroke", function (d) {
-                      return grayrange(d.value);
-                    })
-                    .attr("stroke-width", function (d) {
-                      // return (max_width * d.value / max_value);
-                      return widthrange(d.value);
-                    })
-                    .attr("marker-end", function (d) {
-                      var m = ru.passim.seeker.overlap_marker_end(d);
-                      return m;
-                    });
+                  .attr("class", "links")
+                  .selectAll("line")
+                  .data(options['links'])
+                  .join("line")
+                  .attr("class", function (d) {
+                    var m = "linktype_" + d.linktype;
+                    return m;
+                  })
+                  .attr("stroke", function (d) {
+                    var m = ru.passim.seeker.overlap_stroke(d);
+                    return m;
+                  })
+                  .attr("stroke-opacity", function (d, or) {
+                    var m = "";
+                    if ("overlap_linktypes" in loc_network_options &&
+                      loc_network_options["overlap_linktypes"] === true &&
+                      loc_network_linktypes !== null &&
+                      loc_network_linktypes.indexOf(d.linktype) < 0) {
+                      // Hide it by using a low opacity
+                      m = "0.02";
+                    } else {
+                      // Calculate the opacity
+                      m = ru.passim.seeker.overlap_stroke_opacity(d, opacityrange);
+                    }
+                    return m;
+                  })
+                  .attr("stroke-opacity-copy", function (d, or) {
+                    var m = ru.passim.seeker.overlap_stroke_opacity(d, opacityrange);
+                    return m;
+                  })
+                  .attr("stroke-width", function (d) {
+                    // return (max_width * d.value / max_value);
+                    return widthrange(d.value);
+                  })
+                  .attr("marker-end", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  })
+                  .attr("marker-end-copy", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  });
           node = g.append("g")
-                    .attr("class", "nodes")
-                    .selectAll("g")
-                    .data(options['nodes'])
-                    .join("g")
-                    .call(network_drag(loc_simulation));
+                  .attr("class", "nodes")
+                  .selectAll("g")
+                  .data(options['nodes'])
+                  .join("g")
+                  .call(network_drag(loc_simulation));
 
           // Add the circle below the <g>
           node.append("circle")
@@ -1975,7 +2010,14 @@ var ru = (function ($, ru) {
           // ====================== HELP FUNCTIONS =============================
           function get_radius(d) {
             var scount = d.scount;
-            var iSize = Math.max(5, scount / 4);
+            var iSize = 1;
+            if ("overlap_scount" in loc_network_options && loc_network_options["overlap_scount"] === true) {
+              // Need to pay more attention to the scount
+              iSize = Math.max(4, scount+1);
+            } else {
+              // This is usually [5]
+              iSize = Math.max(5, scount / 4);
+            }
             return iSize;
           }
 
@@ -2004,7 +2046,8 @@ var ru = (function ($, ru) {
             });
 
             link.style("stroke", function (d) {
-              return grayrange(d.value);
+              var m = ru.passim.seeker.overlap_stroke(d);
+              return m;
             });
 
             // Make sure that the circle retain their size by dividing by the scale factor
@@ -6117,14 +6160,86 @@ var ru = (function ($, ru) {
        *
        */
       network_overlap_option: function (elStart, type) {
-        var status = elStart.checked;
+        var status = elStart.checked,
+            bShow = false,
+            idx = -1,
+            linktype = "";
 
         try {
+          //loc_network_linktypes = null;
+          // Action depends on [type]
+          switch (type) {
+            case "overlap_linktypes":
+              // Hide or show the link types
+              if ($(".linktypes").hasClass("hidden")) {
+                // Show them
+                $(".linktypes").removeClass("hidden");
+                // Make sure to store this status
+                loc_network_options[type] = true;
+                // Push all the linktypes
+                loc_network_linktypes = [];
+                loc_network_linktypes.push("neq");
+                loc_network_linktypes.push("prt");
+                loc_network_linktypes.push("ech");
+                loc_network_linktypes.push("uns");
+              } else {
+                // Hide and reset them
+                $(".linktypes input").prop("checked", true);
+                $(".linktypes").addClass("hidden");
+                // And make sure all linktypes are shown again
+                $("svg line").removeClass("hidden");
+                // Make sure to store this status
+                loc_network_options[type] = false;
+                // Set the list to null again
+                loc_network_linktypes = null;
+              }
+              // No need to continue
+              return;
+            case "overlap_linktype_change":
+              ru.passim.seeker.network_overlap_linktype_changed(elStart);
+              // No need to continue
+              return;
+          }
           loc_network_options[type] = status;
           // Redraw
           ru.passim.seeker.network_overlap(elStart);
+ 
         } catch (ex) {
           private_methods.errMsg("network_overlap_option", ex);
+        }
+      },
+
+      /**
+       * network_overlap_linktype_changed
+       *   Hide or show a particular linktype
+       *
+       */
+      network_overlap_linktype_changed: function (elStart) {
+        var linktype, bShow, idx;
+        try {
+          linktype = $(elStart).val();
+          bShow = $(elStart)[0].checked;
+          if (bShow) {
+            $("svg line." + linktype).each(function (idx, el) {
+              var opacity = $(el).attr("stroke-opacity-copy"),
+                  marker_end = $(el).attr("marker-end-copy");
+              $(el).attr("stroke-opacity", opacity);
+              $(el).attr("marker-end", marker_end);
+            });
+            loc_network_linktypes.push(linktype.replace("linktype_", ""));
+          } else {
+            $("svg line." + linktype)
+              .attr("stroke-opacity", "0.02")
+              .attr("marker-end", "");
+            // Remove it from the list
+            idx = loc_network_linktypes.indexOf(linktype.replace("linktype_", ""));
+            if (idx >= 0) {
+              loc_network_linktypes.splice(idx, 1);
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_linktype_changed", ex);
         }
       },
 
@@ -6139,11 +6254,6 @@ var ru = (function ($, ru) {
 
         try {
           if (loc_network_options['overlap_direction'] === true) {
-            if (d.source.id === 2576 && d.target.id === 799) {
-              sResponse = "";
-            } else if (d.source.id === 799 && d.target.id === 2576) {
-              sResponse = "";
-            }
             // Check what kind of value is returned
             switch (d.spectype) {
               case "usd":
@@ -6164,6 +6274,40 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("overlap_marker_end", ex);
+        }
+      },
+
+      overlap_stroke: function(d) {
+        var m = "#222";  // Default blackish
+        try {
+          if ('overlap_alternatives' in loc_network_options &&
+            loc_network_options['overlap_alternatives'] === true && 
+            d.alternatives === "true") {
+            m = "#00F";
+          }
+          return m;
+        } catch (ex) {
+          private_methods.errMsg("overlap_stroke", ex);
+        }
+      },
+
+      overlap_stroke_opacity: function (d, or) {
+        var m = "0.2";  // Default black
+        try {
+          if ('overlap_direction' in loc_network_options && loc_network_options['overlap_direction'] === true) {
+            // Check what kind of value is returned
+            switch (d.spectype) {
+              case "usi":
+              case "udi":
+                m = "0.8";
+                break;
+            }
+          } else {
+            m = or(d.value).toString();
+          }
+          return m;
+        } catch (ex) {
+          private_methods.errMsg("overlap_stroke_opacity", ex);
         }
       },
 
