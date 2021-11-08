@@ -1975,6 +1975,10 @@ var ru = (function ($, ru) {
                   .selectAll("g")
                   .data(options['nodes'])
                   .join("g")
+                  .attr("hcs", function (d) {
+                    return d.hcs;
+                  })
+                  .attr("class", "overlap-node")
                   .call(network_drag(loc_simulation));
 
           // Add the circle below the <g>
@@ -2009,8 +2013,11 @@ var ru = (function ($, ru) {
 
           // ====================== HELP FUNCTIONS =============================
           function get_radius(d) {
-            var scount = d.scount;
-            var iSize = 1;
+            var scount = 0,
+                iSize = 4;
+            if (d !== undefined) {
+              scount = d.scount;
+            }
             if ("overlap_scount" in loc_network_options && loc_network_options["overlap_scount"] === true) {
               // Need to pay more attention to the scount
               iSize = Math.max(4, scount+1);
@@ -6338,17 +6345,46 @@ var ru = (function ($, ru) {
        *
        */
       network_overlap_hist: function (elStart) {
+        var dataid = 0,
+            lst_data = [];
+
         try {
+          // Perform switching on/off 
           if ($(elStart).hasClass("ot")) {
             // Switch 'on': transition from [gr] to [ot]
             $(elStart).removeClass("ot");
-            $(elStart).addClass("gr");
+            $(elStart).addClass("gr");            
           } else {
             // Switch 'off': transition from [ot] to [gr]
             $(elStart).removeClass("gr");
             $(elStart).addClass("ot");
-
           }
+
+          // Get the list of those that are switched on
+          $(".histcolls span.gr").each(function (idx, el) {
+            lst_data.push($(el).attr("data-id"));
+          });
+
+          // Re-visit what needs to be shown
+          $(".overlap-node").each(function (idx, el) {
+            var i = 0,
+                count = 0,
+                lst_ids = $(el).attr("hcs").split(",");
+            // Check how many are matching
+            for (i = 0; i < lst_ids.length; i++) {
+              if (lst_data.indexOf(lst_ids[i]) >= 0) {
+                count += 1;
+              }
+            }
+            // Highlighting depends on the number of matches
+            if (count === 0) {
+              $(el).attr("class", "overlap-node");
+            } else if (count === 1) {
+              $(el).attr("class", "overlap-node node-highlight");
+            } else if (count > 1) {
+              $(el).attr("class", "overlap-node node-highlight-multi");
+            }
+          });
 
         } catch (ex) {
           private_methods.errMsg("network_overlap_hist", ex);

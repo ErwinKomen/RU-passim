@@ -1826,4 +1826,12 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     background-color: lavenderblush;
 }
 
-
+/* SVG class */
+.node-highlight circle {
+    stroke: goldenrod; 
+    stroke-width: 2px;
+}
+.node-highlight-multi circle {
+    stroke: greenyellow; 
+    stroke-width: 3px;
+}
