@@ -186,7 +186,9 @@ class EqualGoldOverlap(BasicPart):
             node_list, link_list, hist_set, max_value, max_group = self.do_overlap(ssg_link, networkslider)
 
             # Create the buttons for the historical collections
-            context = dict(hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()])
+            hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()]
+            hist_list = sorted(hist_list, key=lambda x: x['name']);
+            context = dict(hist_list = hist_list)
             hist_buttons = render_to_string('seeker/super_graph_hist.html', context, self.request)
 
             # Add the information to the context in data
@@ -252,6 +254,7 @@ class EqualGoldOverlap(BasicPart):
             ssg_queue = [ ssg_id ]
             ssg_add = []
             group = 1
+            degree -= 1
             while len(ssg_queue) > 0 and degree >= 0:
                 # Get the next available node
                 node_key = ssg_queue.pop()
@@ -286,6 +289,7 @@ class EqualGoldOverlap(BasicPart):
                 if len(ssg_queue) == 0 and degree >= 0:
                     # Decrement the degree
                     degree -= 1
+
                     group += 1
                     # Add the items from ssg_add into the queue
                     while len(ssg_add) > 0:
