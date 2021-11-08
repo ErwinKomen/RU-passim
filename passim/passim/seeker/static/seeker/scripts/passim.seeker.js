@@ -6212,6 +6212,15 @@ var ru = (function ($, ru) {
                 // Show the historical collection buttons
                 $(".histcolls").removeClass("hidden");
               } else {
+                // Unset the buttons
+                $(".histcolls .badge.signature.gr").each(function (idx, el) {
+                  $(el).removeClass("gr");
+                  $(el).addClass("ot");
+                });
+                // Re-set what needs to be shown
+                $(".overlap-node").each(function (idx, el) {
+                  $(el).attr("class", "overlap-node");
+                });
                 // Hide the historical collection buttons
                 $(".histcolls").addClass("hidden");
               }
@@ -6349,15 +6358,17 @@ var ru = (function ($, ru) {
             lst_data = [];
 
         try {
-          // Perform switching on/off 
-          if ($(elStart).hasClass("ot")) {
-            // Switch 'on': transition from [gr] to [ot]
-            $(elStart).removeClass("ot");
-            $(elStart).addClass("gr");            
-          } else {
-            // Switch 'off': transition from [ot] to [gr]
-            $(elStart).removeClass("gr");
-            $(elStart).addClass("ot");
+          if (elStart !== undefined) {
+            // Perform switching on/off 
+            if ($(elStart).hasClass("ot")) {
+              // Switch 'on': transition from [gr] to [ot]
+              $(elStart).removeClass("ot");
+              $(elStart).addClass("gr");
+            } else {
+              // Switch 'off': transition from [ot] to [gr]
+              $(elStart).removeClass("gr");
+              $(elStart).addClass("ot");
+            }
           }
 
           // Get the list of those that are switched on
