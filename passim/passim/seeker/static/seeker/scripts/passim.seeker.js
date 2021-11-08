@@ -6199,6 +6199,17 @@ var ru = (function ($, ru) {
               ru.passim.seeker.network_overlap_linktype_changed(elStart);
               // No need to continue
               return;
+            case "overlap_histcoll":
+              // Hide or show the historical collection buttons
+              if ($(".histcolls").hasClass("hidden")) {
+                // Show the historical collection buttons
+                $(".histcolls").removeClass("hidden");
+              } else {
+                // Hide the historical collection buttons
+                $(".histcolls").addClass("hidden");
+              }
+              // No need to continue
+              return;
           }
           loc_network_options[type] = status;
           // Redraw
@@ -6277,7 +6288,12 @@ var ru = (function ($, ru) {
         }
       },
 
-      overlap_stroke: function(d) {
+      /**
+       * overlap_stroke
+       *   Helper function for network overlap
+       *
+       */
+      overlap_stroke: function (d) {
         var m = "#222";  // Default blackish
         try {
           if ('overlap_alternatives' in loc_network_options &&
@@ -6291,6 +6307,11 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * overlap_stroke_opacity
+       *   Helper function for network overlap
+       *
+       */
       overlap_stroke_opacity: function (d, or) {
         var m = "0.2";  // Default black
         try {
@@ -6308,6 +6329,29 @@ var ru = (function ($, ru) {
           return m;
         } catch (ex) {
           private_methods.errMsg("overlap_stroke_opacity", ex);
+        }
+      },
+
+      /**
+       * network_overlap_hist
+       *   Color particular historical collections
+       *
+       */
+      network_overlap_hist: function (elStart) {
+        try {
+          if ($(elStart).hasClass("ot")) {
+            // Switch 'on': transition from [gr] to [ot]
+            $(elStart).removeClass("ot");
+            $(elStart).addClass("gr");
+          } else {
+            // Switch 'off': transition from [ot] to [gr]
+            $(elStart).removeClass("gr");
+            $(elStart).addClass("ot");
+
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_hist", ex);
         }
       },
 
@@ -6355,6 +6399,7 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['hcset'] = response.hist_set;
                   options['degree'] = 1;
                   if ("networkslider" in response) {
                     $("#network_overlap_slider_value").html(response.networkslider);
@@ -6364,6 +6409,11 @@ var ru = (function ($, ru) {
                   iWidth = $("#" + divTarget).width();
                   // iHeight = iWidth / fFactor - 100;
                   iHeight = $("#" + divTarget).height();
+
+                  // Process the hist coll buttons
+                  if (response.hist_buttons !== undefined) {
+                    $(".histcolls").first().html(response.hist_buttons);
+                  }
 
                   // Other data
                   max_value = response.max_value;

@@ -4,6 +4,7 @@ Definition of visualization views for the SEEKER app.
 
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
+from django.template.loader import render_to_string
 import pandas as pd 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -182,11 +183,17 @@ class EqualGoldOverlap(BasicPart):
                     ssg_link[src].append(dst)
 
             # Create the overlap network
-            node_list, link_list, max_value, max_group = self.do_overlap(ssg_link, networkslider)
+            node_list, link_list, hist_set, max_value, max_group = self.do_overlap(ssg_link, networkslider)
+
+            # Create the buttons for the historical collections
+            context = dict(hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()])
+            hist_buttons = render_to_string('seeker/super_graph_hist.html', context, self.request)
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   hist_set=hist_set,
+                                   hist_buttons=hist_buttons,
                                    max_value=max_value,
                                    max_group=max_group,
                                    networkslider=networkslider,
@@ -203,8 +210,12 @@ class EqualGoldOverlap(BasicPart):
 
         def add_nodeset(ssg_id, group):
             node_key = ssg_id
+
+            # ---------- DEBUG --------------
             if node_key == 4968:
                 iStop = 1
+            # -------------------------------
+
             # Possibly add the node to the set
             if not node_key in node_set:
                 code_sig = get_ssg_sig(ssg_id)
@@ -212,13 +223,24 @@ class EqualGoldOverlap(BasicPart):
                 code_pas = get_ssg_passim(ssg_id, ssg)
                 scount = ssg.scount
 
-                node_value = dict(label=code_sig, id=ssg_id, group=group, passim=code_pas, scount=scount)
+                # Get a list of the HCs that this SSG is part of
+                hc_list = ssg.collections.filter(settype="hc").values("id", "name")
+                hcs = []
+                for oItem in hc_list:
+                    id = oItem['id']
+                    if not id in hist_set:
+                        hist_set[id] = oItem['name']
+                    hcs.append(id)
+
+                node_value = dict(label=code_sig, id=ssg_id, group=group, 
+                                  passim=code_pas, scount=scount, hcs=hcs)
                 node_set[node_key] = node_value
                 
         node_list = []
         link_list = []
         node_set = {}
         link_set = {}
+        hist_set = {}
         max_value = 0
         max_group = 1
         oErr = ErrHandle()
@@ -286,7 +308,7 @@ class EqualGoldOverlap(BasicPart):
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldOverlap/do_overlap")
 
-        return node_list, link_list, max_value, max_group
+        return node_list, link_list, hist_set, max_value, max_group
 
 
 class EqualGoldTrans(BasicPart):

@@ -133,7 +133,7 @@
       <div class="col-md-offset-1 col-md-11">
         <table class="spacy-border" style="width: 100%;">
           <tr>
-            <td class="tdnowrap"><span>Show direction&nbsp;</span></td>
+            <td class="tdnowrap"><span>Direction&nbsp;</span></td>
             <td>
               <label class="switch" title="Show direction">
                 <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_direction');" />
@@ -145,6 +145,14 @@
             <td>
               <label class="switch" title="Highlight alternative options">
                 <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_alternatives');" />
+                <span class="switchslider round"></span>
+              </label>
+            </td>
+
+            <td class="tdnowrap" ><span>Historical collections&nbsp;</span></td>
+            <td>
+              <label class="switch" title="Show historical collections">
+                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_histcoll');" />
                 <span class="switchslider round"></span>
               </label>
             </td>
@@ -167,7 +175,7 @@
           </tr>
 
           <tr>
-            <td class="tdnowrap"><span>Show link types&nbsp;</span></td>
+            <td class="tdnowrap"><span>Link types&nbsp;</span></td>
             <td>
               <label class="switch" title="Show link types">
                 <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktypes');"  />
@@ -182,6 +190,9 @@
                 <span class="switchslider round"></span>
               </label>
             </td>
+
+            <td>&nbsp;</td>
+            <td>&nbsp;</td>
 
             <td class="tdnowrap" align="right">
               <span>Gravity: </span>
@@ -200,6 +211,7 @@
 
           <tr>
             <td colspan="5">
+              <!-- Possibility one: linktypes -->
               <div class="hidden linktypes">
                 <label class="checkbox-inline">
                   <input type="checkbox" value="linktype_neq" checked
@@ -222,10 +234,19 @@
                   <span>Unspecified</span>
                 </label>
               </div>
+
             </td>
             <td colspan="2">&nbsp;</td>
           </tr>
 
+          <tr>
+            <td colspan="9">
+              <!-- Possibility two: historical collection buttons -->
+              <div class="hidden histcolls">
+
+              </div>
+            </td>
+          </tr>
         </table>
       </div>
     </div>
