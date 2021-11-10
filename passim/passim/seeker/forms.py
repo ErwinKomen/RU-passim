@@ -35,7 +35,7 @@ def user_is_in_team(username, team_group, userplus=None):
     return bResult
 
 CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
-AUTHOR_TYPE = [('-', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
+AUTHOR_TYPE = [('', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 

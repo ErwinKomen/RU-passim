@@ -4717,16 +4717,17 @@ class SermonListView(BasicList):
     
     model = SermonDescr
     listform = SermonForm
-    prefix = "sermo"
+    has_select2 = True
+    use_team_group = True
     paginate_by = 20
+    bUseFilter = True
+    prefix = "sermo"
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Sermons"
     basic_name = "sermon"
-    use_team_group = True
     template_help = "seeker/filter_help.html"
-    has_select2 = True
-    page_function = "ru.passim.seeker.search_paged_start"
+
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
     order_default = order_cols
     order_heads = [
@@ -9253,7 +9254,9 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
+    basketview = False
     template_help = "seeker/filter_help.html"
+
     order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
