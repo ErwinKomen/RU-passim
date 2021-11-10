@@ -9328,7 +9328,7 @@ class ManuscriptListView(BasicList):
              'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
             {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
              'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__goldsermons__equal__collections', 
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
             ]},
@@ -11272,7 +11272,9 @@ class EqualGoldListView(BasicList):
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        
+            {'filter': 'collsermo', 'fkfield': 'equalgold_sermons__sermondescr_col__collection',        
+            # issue #466: fkfield was 'equal_goldsermons__sermondescr__collections'
+            #             changed into 'equalgold_sermons__sermondescr_col__collection'
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
             {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
