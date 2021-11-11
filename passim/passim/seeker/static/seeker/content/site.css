@@ -1294,12 +1294,20 @@ div > span.twitter-typeahead {
     width: 80%;
     margin: 30px auto;
   }
+.modal-dialog.nodecolorpicker {
+    width: 350px;
+}
 .modal-comment {
     width: 50%;
     margin: 20px auto;
   }
 .modal-header {
   cursor: move;
+}
+
+.nodecolorpicker td {
+    padding-left: 5px;
+    padding-right: 5px;
 }
 
 td.hightlighted {
@@ -1834,4 +1842,7 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
 .node-highlight-multi circle {
     stroke: greenyellow; 
     stroke-width: 3px;
+}
+.overlap-node {
+    cursor: pointer;
 }

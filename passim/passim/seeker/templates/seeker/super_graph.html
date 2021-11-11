@@ -284,3 +284,47 @@
   </div>
 </div>
 
+<!-- Modal form that helps define a color -->
+<div id="modal-nodecolor" class="modal fade" role="dialog">
+  <div class="modal-dialog nodecolorpicker">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <!-- introduction header -->
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" title="Cancel color selection">&times;</button>
+        <h4 class="modal-title">Select a color</h4>
+      </div>
+
+      <!-- Body of the modal-->
+      <div class="modal-body modal-dragpoint" id="view-nodecolor">
+        <!-- This is where the list of possible colors shows up -->
+        <table>
+          <tr>
+            <td valign="top" align="right">Click the button and select a color:</td>
+            <td valign="top" align="left"><input type="color" value="#ff0000" id="nodecolor" list="presets" /></td>
+          </tr>
+        </table>
+        <div>
+          <datalist id="presets">
+            <option value="#ea2028">Red</option>
+            <option value="#f02d93">Pink</option>
+            <option value="#78cbd1">Light blue</option>
+            <option value="#5c9924">Green</option>
+            <option value="#d4d426">Light green</option>
+          </datalist>
+        </div>
+      </div>
+
+      <!-- Footer with the save button -->
+      <div class="modal-footer">
+        <a class="btn jumbo-1" data-dismiss="modal" >
+          <span class="glyphicon glyphicon-ok" 
+                onclick="ru.passim.seeker.network_overlap_setcolor(this);"
+                title="Back to the original and apply the selected color">&nbsp;Ok</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+

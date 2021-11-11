@@ -33,6 +33,8 @@ var ru = (function ($, ru) {
         loc_network_options = {},
         loc_network_linktypes = null,
         loc_newSermonNumber = 0,
+        loc_clicked_nodeid = "",
+        loc_manual_colors = [],
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_goldlink_td = null, // Where the goldlink selection should go
@@ -82,6 +84,8 @@ var ru = (function ($, ru) {
           { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
+
+    const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
 
 
     // Private methods specification
@@ -1978,6 +1982,9 @@ var ru = (function ($, ru) {
                   .attr("hcs", function (d) {
                     return d.hcs;
                   })
+                  .attr("nodeid", function (d) { return d.id;})
+                  .attr("data-toggle", "modal")
+                  .attr("data-target", "#modal-nodecolor")
                   .attr("class", "overlap-node")
                   .call(network_drag(loc_simulation));
 
@@ -2010,6 +2017,18 @@ var ru = (function ($, ru) {
           // Add popup title to links: this provides the actual weight
           link.append("title")
             .text(function (d) { return d.value; });
+
+          // Link a handler to select the right color
+          $(".overlap-node").on("click", function (event) {
+            var el = $(this),
+                color = "";
+            // Get the color
+            color = $(el).find("circle").first().attr("fill");
+            // Set the color
+            $("#nodecolor").val(rgb2hex(color));
+            // Remember this node
+            loc_clicked_nodeid = $(el).attr("nodeid");
+          });
 
           // ====================== HELP FUNCTIONS =============================
           function get_radius(d) {
@@ -6345,6 +6364,27 @@ var ru = (function ($, ru) {
           return m;
         } catch (ex) {
           private_methods.errMsg("overlap_stroke_opacity", ex);
+        }
+      },
+
+      /**
+       * network_overlap_setcolor
+       *   Apply the color that has just been selected to the clicked node
+       *
+       */
+      network_overlap_setcolor: function (elStart) {
+        var color = "",
+            elNode = null;
+
+        try {
+          // Get the selected color
+          color = $(elStart).closest(".modal-dialog").find("input[type=color]").first().val();
+          // Apply it to the currently selected node
+          elNode = $("g[nodeid=" + loc_clicked_nodeid + "]").find("circle").first().attr("fill", color);
+          // Somehow remember this list of manually defined colors
+          loc_manual_colors.push({nodeid: loc_clicked_nodeid, color: color});
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_setcolor", ex);
         }
       },
 
