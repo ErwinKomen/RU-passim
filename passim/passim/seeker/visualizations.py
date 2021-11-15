@@ -18,7 +18,7 @@ from passim.basic.views import BasicPart
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
-    SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
+    FieldChoice, SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
@@ -143,7 +143,16 @@ class EqualGoldOverlap(BasicPart):
     def add_to_context(self, context):
 
         oErr = ErrHandle()
+        spec_dict = {}
+        link_dict = {}
+
         try:
+            # Define the linktype and spectype
+            for obj in FieldChoice.objects.filter(field="seeker.spectype"):
+                spec_dict[obj.abbr]= obj.english_name
+            for obj in FieldChoice.objects.filter(field="seeker.linktype"):
+                link_dict[obj.abbr]= obj.english_name
+
             # Need to figure out who I am
             profile = Profile.get_user_profile(self.request.user.username)
             instance = self.obj
@@ -159,7 +168,7 @@ class EqualGoldOverlap(BasicPart):
 
             # Read the table with links from SSG to SSG
             eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values(
-                'src', 'dst', 'spectype', 'linktype', 'alternatives')
+                'src', 'dst', 'spectype', 'linktype', 'alternatives', 'note')
             # Transform into a dictionary with src as key and list-of-dst as value
             for item in eqg_link:
                 src = item['src']
@@ -167,15 +176,23 @@ class EqualGoldOverlap(BasicPart):
                 if bUseDirectionality:
                     spectype = item['spectype']
                     linktype = item['linktype']
+                    note = item['note']
                     alternatives = item['alternatives']
                     if alternatives == None: alternatives = False
                     # Make room for the SRC if needed
                     if not src in ssg_link: ssg_link[src] = []
                     # Add this link to the list
-                    ssg_link[src].append({'dst': dst, 
-                                          'spectype': spectype, 
-                                          'linktype': linktype,
-                                          'alternatives': alternatives})
+                    oLink = {   'dst': dst, 
+                                'note': note,
+                                'spectype': "", 
+                                'linktype': linktype,
+                                'spec': "",
+                                'link': link_dict[linktype],
+                                'alternatives': alternatives}
+                    if spectype != None:
+                        oLink['spectype'] = spectype
+                        oLink['spec'] = spec_dict[spectype]
+                    ssg_link[src].append(oLink)
                 else:
                     # Make room for the SRC if needed
                     if not src in ssg_link: ssg_link[src] = []
@@ -275,7 +292,10 @@ class EqualGoldOverlap(BasicPart):
                                          target=dst,
                                          spectype=oDst['spectype'],
                                          linktype=oDst['linktype'],
+                                         spec=oDst['spec'],
+                                         link=oDst['link'],
                                          alternatives = oDst['alternatives'],
+                                         note=oDst['note'],
                                          value=0)
                             # Add the link to the set
                             link_set[link_key] = oLink

@@ -1973,6 +1973,13 @@ var ru = (function ($, ru) {
                   .attr("marker-end-copy", function (d) {
                     var m = ru.passim.seeker.overlap_marker_end(d);
                     return m;
+                  })
+                  .on("mousover", function (d) {
+                    return 5;
+                  })
+                  .on("mouseout", function (d) {
+                    // return (max_width * d.value / max_value);
+                    return widthrange(d.value);
                   });
           node = g.append("g")
                   .attr("class", "nodes")
@@ -2013,10 +2020,25 @@ var ru = (function ($, ru) {
 
           // Add popup title to nodes;
           node.append("title")
-            .text(function (d) { return d.passim + " (id=" + d.id + " S=" + d.scount + ")"; });
+            .text(function (d) {
+              return "Authority File(s): " + d.passim + "\n Linked manifestations: " + d.scount + " (id=" + d.id + ")";
+            });
           // Add popup title to links: this provides the actual weight
           link.append("title")
-            .text(function (d) { return d.value; });
+            .text(function (d) {
+              var sTitle = "";
+              // Construct what is shown: link type, spec type, notes
+              if (d.link !== undefined && d.link !== null && d.link !== "") {
+                sTitle = "Link type: " + d.link;
+              }
+              if (d.spec !== undefined && d.spec !== null && d.spec !== "") {
+                sTitle = sTitle + "\nSpecification: " + d.spec;
+              }
+              if (d.note !== undefined && d.note !== null && d.note !== "") {
+                sTitle = sTitle + "\n\nnote: " + d.note;
+              }
+              return sTitle
+            });
 
           // Link a handler to select the right color
           $(".overlap-node").on("click", function (event) {
