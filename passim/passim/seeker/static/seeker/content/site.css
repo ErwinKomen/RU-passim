@@ -1,4 +1,4 @@
-﻿body {
+body {
     padding-top: 50px;
     padding-bottom: 20px;
 }
@@ -1655,6 +1655,36 @@ svg .links {
     stroke: #999;
     stroke-opacity: 0.6;
 }
+svg .links .linktype_eqs:hover {
+    stroke-width: 4;
+    fill: red;
+}
+svg .links .linktype_prt:hover {
+    stroke-width: 4;
+    fill: blue;
+}
+svg .links .linktype_sim:hover {
+    stroke-width: 4;
+    fill: green;
+}
+svg .links .linktype_use:hover {
+    stroke-width: 4;
+    fill: yellow;
+}
+svg .links .linktype_neq:hover {
+    stroke-width: 4;
+    fill: orange;
+}
+svg .links .linktype_uns:hover {
+    stroke-width: 4;
+    fill: purple;
+}
+svg .links .linktype_ech:hover {
+    stroke-width: 4;
+    fill: pink;
+}
+
+
 svg .nodes {
     stroke: #fff;
     stroke-width: 1.5;

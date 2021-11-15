@@ -1974,13 +1974,14 @@ var ru = (function ($, ru) {
                     var m = ru.passim.seeker.overlap_marker_end(d);
                     return m;
                   })
-                  .on("mousover", function (d) {
-                    return 5;
-                  })
-                  .on("mouseout", function (d) {
-                    // return (max_width * d.value / max_value);
-                    return widthrange(d.value);
-                  });
+                  //.on("mousover", function (d) {
+                  //  return 5;
+                  //})
+                  //.on("mouseout", function (d) {
+                  //  // return (max_width * d.value / max_value);
+                  //  return widthrange(d.value);
+                  //})
+          ;
           node = g.append("g")
                   .attr("class", "nodes")
                   .selectAll("g")
