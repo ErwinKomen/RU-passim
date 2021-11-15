@@ -1969,6 +1969,37 @@ class Library(models.Model):
         obj = self.get_country(False)
         return super(Library, self).save(force_insert, force_update, using, update_fields)
 
+    def get_best_match(sCountry, sCity, sLibrary):
+        """Get the best matching objects for country, city, library"""
+
+        oErr = ErrHandle()
+        country = None
+        city = None
+        library = None
+        try:
+            if sCountry != "":
+                country = Location.objects.filter(name__iexact=sCountry).first()
+                if country != None:
+                    city = Location.objects.filter(lcountry=country, name__iexact=sCity).first()
+                    if city != None:
+                        library = Library.objects.filter(lcountry=country, lcity=city, name__iexact=sLibrary).first()
+                    else:
+                        library = Library.objects.filter(lcountry=country, name__iexact=sLibrary).first()
+                else:
+                    library = Library.objects.filter(name__iexact=sLibrary).first()
+            elif sCity != "":
+                city = Location.objects.filter(name__iexact=sCity).first()
+                if city != None:
+                    library = Library.objects.filter(lcity=city, name__iexact=sLibrary).first()
+                else:
+                    library = Library.objects.filter(name__iexact=sLibrary).first()
+            elif sLibrary != "":
+                library = Library.objects.filter(name__iexact=sLibrary).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Library/get_best_match")
+        return country, city, library
+
     def get_library(sId, sLibrary, bBracketed, country, city):
         iId = int(sId)
         lstQ = []
@@ -2880,12 +2911,17 @@ class Litref(models.Model):
             self.read_zotero()
         return self.short
 
-    def get_short_markdown(self):
+    def get_short_markdown(self, plain=False):
         """Get the short text in markdown, reading from Zotero if not yet done"""
 
+        sBack = ""
         if self.short == "":
             self.read_zotero()
-        return adapt_markdown(self.short, lowercase=False)
+        if plain:
+            sBack = self.short
+        else:
+            adapt_markdown(self.short, lowercase=False)
+        return sBack
 
 
 class Project(models.Model):
@@ -3122,7 +3158,7 @@ class Manuscript(models.Model):
         {'name': 'Notes',               'type': 'field', 'path': 'notes'},
         {'name': 'Url',                 'type': 'field', 'path': 'url'},
         {'name': 'External id',         'type': 'field', 'path': 'external'},
-        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno',      'readonly': True},
+        {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},                            # WAS: ,      'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
         {'name': 'Country id',          'type': 'fk_id', 'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
@@ -3245,8 +3281,9 @@ class Manuscript(models.Model):
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
             source = kwargs.get("source")
+            keyfield = kwargs.get("keyfield", "name")
             # First get the shelf mark
-            idno = oManu.get('shelf mark')
+            idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
@@ -3265,9 +3302,14 @@ class Manuscript(models.Model):
                     oErr.Status("Overwriting manuscript [{}]".format(idno))
                     bOverwriting = True
                         
+                country = ""
+                city = ""
+                library = ""
                 # Process all fields in the Specification
                 for oField in Manuscript.specification:
-                    field = oField.get("name").lower()
+                    field = oField.get(keyfield).lower()
+                    if keyfield == "path" and oField.get("type") == "fk_id":
+                        field = "{}_id".format(field)
                     value = oManu.get(field)
                     readonly = oField.get('readonly', False)
                     if value != None and value != "" and not readonly:
@@ -3300,9 +3342,27 @@ class Manuscript(models.Model):
                                             old_id = "" if old_value == None else old_value.id
                                             obj.action_add_change(username, "import", path, old_id, instance.id)
                                         setattr(obj, path, instance)
+                            # Keep track of country/city/library for further fine-tuning
+                            if type == "fk":
+                                if path == "lcountry":
+                                    country = value
+                                elif path == "lcity":
+                                    city = value
+                                elif path == "library":
+                                    library = value
                         elif type == "func":
                             # Set the KV in a special way
                             obj.custom_set(path, value, **kwargs)
+
+                # Check what we now have for Country/City/Library
+                lcountry, lcity, library = Library.get_best_match(country, city, library)
+                if lcountry != None and lcountry != obj.lcountry:
+                    obj.lcountry = lcountry
+                if lcity != None and lcity != obj.lcity:
+                    obj.lcity = lcity
+                if library != None and library != obj.library:
+                    obj.library = library
+
 
                 # Make sure the update the object
                 obj.save()
@@ -3349,7 +3409,10 @@ class Manuscript(models.Model):
         key = ""
         value = ""
         try:
-            key = item['name']
+            keyfield = kwargs.get("keyfield", "name")
+            key = item[keyfield]
+            if keyfield == "path" and item['type'] == "fk_id":
+                key = "{}_id".format(key)
             if self != None:
                 if item['type'] == 'field':
                     value = getattr(self, item['path'])
@@ -3357,10 +3420,23 @@ class Manuscript(models.Model):
                     fk_obj = getattr(self, item['path'])
                     if fk_obj != None:
                         value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == "fk_id":
+                    # On purpose: do not allow downloading the actual ID of a foreign ky - id's migh change
+                    pass
+                    #fk_obj = getattr(self, item['path'])
+                    #if fk_obj != None:
+                    #    value = getattr( fk_obj, "id")
                 elif item['type'] == 'func':
                     value = self.custom_get(item['path'], kwargs=kwargs)
-                    # Adaptation for empty lists
-                    if value == "[]": value = ""
+                    # return either as string or as object
+                    if keyfield == "name":
+                        # Adaptation for empty lists
+                        if value == "[]": value = ""
+                    else:
+                        if value == "": 
+                            value = None
+                        elif value[0] == '[':
+                            value = json.loads(value)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/custom_getkv")
@@ -3705,20 +3781,26 @@ class Manuscript(models.Model):
 
     def get_litrefs_markdown(self, plain=False):
         lHtml = []
-        # Visit all literature references
-        for litref in self.manuscript_litrefs.all().order_by('reference__short'):
-            if plain:
-                lHtml.append(litref.get_short_markdown())
-            else:
-                # Determine where clicking should lead to
-                url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
-                # Create a display for this item
-                lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            # Visit all literature references
+            for litref in self.manuscript_litrefs.all().order_by('reference__short'):
+                if plain:
+                    lHtml.append(litref.get_short_markdown(plain))
+                else:
+                    # Determine where clicking should lead to
+                    url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
+                    # Create a display for this item
+                    lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
 
-        if plain:
-            sBack = json.dumps(lHtml)
-        else:
-            sBack = ", ".join(lHtml)
+            if plain:
+                sBack = json.dumps(lHtml)
+            else:
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_litrefs_markdown")
         return sBack
 
     def get_notes_markdown(self):
@@ -4790,6 +4872,7 @@ class Codico(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            keyfield = kwargs.get("keyfield", "name")
             # First get the shelf mark
             manu = oCodico.get('manuscript')
             if manu == None:
@@ -4805,7 +4888,9 @@ class Codico(models.Model):
                         
                 # Process all fields in the Specification
                 for oField in Codico.specification:
-                    field = oField.get("name").lower()
+                    field = oField.get(keyfield).lower()
+                    if keyfield == "path" and oField.get("type") == "fk_id":
+                        field = "{}_id".format(field)
                     value = oCodico.get(field)
                     readonly = oField.get('readonly', False)
                     if value != None and value != "" and not readonly:
@@ -4875,7 +4960,10 @@ class Codico(models.Model):
         key = ""
         value = ""
         try:
-            key = item['name']
+            keyfield = kwargs.get("keyfield", "name")
+            key = item[keyfield]
+            if keyfield == "path" and item['type'] == "fk_id":
+                key = "{}_id".format(key)
             if self != None:
                 if item['type'] == 'field':
                     value = getattr(self, item['path'])
@@ -4883,10 +4971,23 @@ class Codico(models.Model):
                     fk_obj = getattr(self, item['path'])
                     if fk_obj != None:
                         value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == "fk_id":
+                    # On purpose: do not allow downloading the actual ID of a foreign ky - id's migh change
+                    pass
+                    #fk_obj = getattr(self, item['path'])
+                    #if fk_obj != None:
+                    #    value = getattr( fk_obj, "id")
                 elif item['type'] == 'func':
                     value = self.custom_get(item['path'], kwargs=kwargs)
-                    # Adaptation for empty lists
-                    if value == "[]": value = ""
+                    # return either as string or as object
+                    if keyfield == "name":
+                        # Adaptation for empty lists
+                        if value == "[]": value = ""
+                    else:
+                        if value == "": 
+                            value = None
+                        elif value[0] == '[':
+                            value = json.loads(value)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Codico/custom_getkv")
@@ -7553,11 +7654,11 @@ class SermonDescr(models.Model):
 
     # SPecification for download/upload
     specification = [
-        {'name': 'Order',               'type': ''},
-        {'name': 'Parent',              'type': ''},
-        {'name': 'FirstChild',          'type': ''},
-        {'name': 'Next',                'type': ''},
-        {'name': 'Type',                'type': ''},
+        {'name': 'Order',               'type': '',      'path': 'order'},
+        {'name': 'Parent',              'type': '',      'path': 'parent'},
+        {'name': 'FirstChild',          'type': '',      'path': 'firstchild'},
+        {'name': 'Next',                'type': '',      'path': 'next'},
+        {'name': 'Type',                'type': '',      'path': 'type'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
         {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
@@ -7573,7 +7674,7 @@ class SermonDescr(models.Model):
         {'name': 'Note',                'type': 'field', 'path': 'note'},
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords'},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
-        {'name': 'Gryson/Clavis (manual)',  'type': 'func',  'path': 'signaturesM'},
+        {'name': 'Gryson/Clavis (manual)','type': 'func',  'path': 'signaturesM'},
         {'name': 'Gryson/Clavis (auto)','type': 'func',  'path': 'signaturesA'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
@@ -7659,7 +7760,7 @@ class SermonDescr(models.Model):
             bStatus = False
         return bStatus, msg
 
-    def custom_add(oSermo, manuscript, order=None):
+    def custom_add(oSermo, manuscript, order=None, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
@@ -7667,11 +7768,18 @@ class SermonDescr(models.Model):
         lst_msg = []
 
         try:
+            # Understand where we are coming from
+            keyfield = kwargs.get("keyfield", "name")
+
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
+            type = oSermo['type']
             if locus != None and locus != "":
                 # Try retrieve an existing or 
-                obj = SermonDescr.objects.filter(msitem__manu=manuscript, locus=locus, mtype="man").first()
+                if type.lower() == "structural":
+                    obj = SermonHead.objects.filter(msitem__manu=manuscript, locus=locus).first()
+                else:
+                    obj = SermonDescr.objects.filter(msitem__manu=manuscript, locus=locus, mtype="man").first()
             if obj == None:
                 # Create a MsItem
                 msitem = MsItem(manu=manuscript)
@@ -7680,33 +7788,49 @@ class SermonDescr(models.Model):
                 # Save the msitem
                 msitem.save()
 
-                # Create a new SermonDescr with default values, tied to the msitem
-                obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
+                if type.lower() == "structural":
+                    # Create a new SermonDescr with default values, tied to the msitem
+                    obj = SermonHead.objects.create(msitem=msitem)
+                else:
+                    # Create a new SermonDescr with default values, tied to the msitem
+                    obj = SermonDescr.objects.create(msitem=msitem, stype="imp", mtype="man")
                         
-            # Process all fields in the Specification
-            for oField in SermonDescr.specification:
-                field = oField.get("name").lower()
-                value = oSermo.get(field)
-                readonly = oField.get('readonly', False)
+            if type.lower() == "structural":
+                # Possibly add the title
+                title = oSermo.get('title')
+                if title != "" and title != None:
+                    obj.title = title
+                # Possibly add the locus
+                locus = oSermo.get('locus')
+                if locus != "" and locus != None:
+                    obj.locus = locus
+            else:
+                # Process all fields in the Specification
+                for oField in SermonDescr.specification:
+                    field = oField.get(keyfield).lower()
+                    if keyfield == "path" and oField.get("type") == "fk_id":
+                        field = "{}_id".format(field)
+                    value = oSermo.get(field)
+                    readonly = oField.get('readonly', False)
                 
-                if value != None and value != "" and not readonly:
-                    type = oField.get("type")
-                    path = oField.get("path")
-                    if type == "field":
-                        # Set the correct field's value
-                        setattr(obj, path, value)
-                    elif type == "fk":
-                        fkfield = oField.get("fkfield")
-                        model = oField.get("model")
-                        if fkfield != None and model != None:
-                            # Find an item with the name for the particular model
-                            cls = apps.app_configs['seeker'].get_model(model)
-                            instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
-                            if instance != None:
-                                setattr(obj, path, instance)
-                    elif type == "func":
-                        # Set the KV in a special way
-                        obj.custom_set(path, value)
+                    if value != None and value != "" and not readonly:
+                        type = oField.get("type")
+                        path = oField.get("path")
+                        if type == "field":
+                            # Set the correct field's value
+                            setattr(obj, path, value)
+                        elif type == "fk":
+                            fkfield = oField.get("fkfield")
+                            model = oField.get("model")
+                            if fkfield != None and model != None:
+                                # Find an item with the name for the particular model
+                                cls = apps.app_configs['seeker'].get_model(model)
+                                instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                if instance != None:
+                                    setattr(obj, path, instance)
+                        elif type == "func":
+                            # Set the KV in a special way
+                            obj.custom_set(path, value)
 
             # Make sure the updae the object
             obj.save()
@@ -7763,7 +7887,10 @@ class SermonDescr(models.Model):
         key = ""
         value = ""
         try:
-            key = item['name']
+            keyfield = kwargs.get("keyfield", "name")
+            if keyfield == "path" and item['type'] == "fk_id":
+                key = "{}_id".format(key)
+            key = item[keyfield]
             if self != None:
                 if item['type'] == 'field':
                     value = getattr(self, item['path'])
@@ -7771,10 +7898,23 @@ class SermonDescr(models.Model):
                     fk_obj = getattr(self, item['path'])
                     if fk_obj != None:
                         value = getattr( fk_obj, item['fkfield'])
+                elif item['type'] == "fk_id":
+                    # On purpose: do not allow downloading the actual ID of a foreign ky - id's migh change
+                    pass
+                    #fk_obj = getattr(self, item['path'])
+                    #if fk_obj != None:
+                    #    value = getattr( fk_obj, "id")
                 elif item['type'] == 'func':
                     value = self.custom_get(item['path'], kwargs=kwargs)
-                    # Adaptation for empty lists
-                    if value == "[]": value = ""
+                    # return either as string or as object
+                    if keyfield == "name":
+                        # Adaptation for empty lists
+                        if value == "[]": value = ""
+                    else:
+                        if value == "": 
+                            value = None
+                        elif value[0] == '[':
+                            value = json.loads(value)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonDescr/custom_getkv")
@@ -9678,9 +9818,13 @@ class LitrefMan(models.Model):
                 short = "{}, pp {}".format(short, self.pages)
         return short
 
-    def get_short_markdown(self):
+    def get_short_markdown(self, plain=False):
         short = self.get_short()
-        return adapt_markdown(short, lowercase=False)
+        if plain:
+            sBack = short
+        else:
+            sBack = adapt_markdown(short, lowercase=False)
+        return sBack
 
 
 class LitrefSG(models.Model):
@@ -9710,9 +9854,13 @@ class LitrefSG(models.Model):
                 short = "{}, pp {}".format(short, self.pages)
         return short
 
-    def get_short_markdown(self):
+    def get_short_markdown(self, plain=False):
         short = self.get_short()
-        return adapt_markdown(short, lowercase=False)
+        if plain:
+            sBack = short
+        else:
+            sBack = adapt_markdown(short, lowercase=False)
+        return sBack
 
 
 class LitrefCol(models.Model):
@@ -9742,9 +9890,13 @@ class LitrefCol(models.Model):
                 short = "{}, pp {}".format(short, self.pages)
         return short
 
-    def get_short_markdown(self):
+    def get_short_markdown(self, plain=False):
         short = self.get_short()
-        return adapt_markdown(short, lowercase=False)
+        if plain:
+            sBack = short
+        else:
+            sBack = adapt_markdown(short, lowercase=False)
+        return sBack
 
 
 class EdirefSG(models.Model):
@@ -9774,9 +9926,13 @@ class EdirefSG(models.Model):
                 short = "{}, pp {}".format(short, self.pages)
         return short
 
-    def get_short_markdown(self):
+    def get_short_markdown(self, plain=False):
         short = self.get_short()
-        return adapt_markdown(short, lowercase=False)
+        if plain:
+            sBack = short
+        else:
+            sBack = adapt_markdown(short, lowercase=False)
+        return sBack
 
 
 class NewsItem(models.Model):

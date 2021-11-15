@@ -8547,8 +8547,13 @@ class ManuscriptEdit(BasicDetails):
 
                 # Action depends on template/not
                 if not istemplate:
-                    # Button to download this manuscript
-                    downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
+                    if user_is_superuser(self.request):
+                        # Button to download this manuscript as JSON
+                        lbuttons.append(dict(title="Download manuscript as JSON file", 
+                                             click="manuscript_download_json", label="JSON"))
+
+                    # Button to download this manuscript as EXCEL
+                    # downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
                     lbuttons.append(dict(title="Download manuscript as Excel file", 
                                          click="manuscript_download", label="Download"))
 
@@ -9359,11 +9364,23 @@ class ManuscriptListView(BasicList):
         # Possibly add to 'uploads'
         bHasExcel = False
         bHasGalway = False
+        bHasJson = False
         for item in self.uploads:
             if item['title'] == "excel":
                 bHasExcel = True
             elif item['title'] == "galway":
                 bHasGalway = True
+            elif item['title'] == "json":
+                bHasJson = True
+
+        # Should galway be added?
+        if not bHasGalway:
+            # Add a reference to the Excel upload method
+            oGalway = dict(title="galway", label="Galway",
+                          url=reverse('manuscript_upload_galway'),
+                          type="multiple",
+                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oGalway)
 
         # Should excel be added?
         if not bHasExcel:
@@ -9374,14 +9391,14 @@ class ManuscriptListView(BasicList):
                           msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
 
-        # Should galway be added?
-        if not bHasGalway:
+        # Should json be added?
+        if not bHasJson:
             # Add a reference to the Excel upload method
-            oGalway = dict(title="galway", label="Galway",
-                          url=reverse('manuscript_upload_galway'),
+            oJson = dict(title="json", label="Json",
+                          url=reverse('manuscript_upload_json'),
                           type="multiple",
-                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
-            self.uploads.append(oGalway)
+                          msg="Import manuscripts from one or more JSON files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oJson)
 
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
@@ -9680,89 +9697,149 @@ class ManuscriptDownload(BasicPart):
             username = profile.user.username
             team_group = app_editor
 
-            # Start workbook
-            wb = openpyxl.Workbook()
+            # Is this Excel?
+            if dtype == "excel" or dtype == "xlsx":
+                # Start workbook
+                wb = openpyxl.Workbook()
 
-            # First worksheet: MANUSCRIPT itself
-            ws = wb.get_active_sheet()
-            ws.title="Manuscript"
+                # First worksheet: MANUSCRIPT itself
+                ws = wb.get_active_sheet()
+                ws.title="Manuscript"
 
-            # Read the header cells and make a header row in the MANUSCRIPT worksheet
-            headers = ["Field", "Value"]
-            for col_num in range(len(headers)):
-                c = ws.cell(row=1, column=col_num+1)
-                c.value = headers[col_num]
-                c.font = openpyxl.styles.Font(bold=True)
-                # Set width to a fixed size
-                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+                # Read the header cells and make a header row in the MANUSCRIPT worksheet
+                headers = ["Field", "Value"]
+                for col_num in range(len(headers)):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = headers[col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-            # Walk the mainitems
-            row_num = 2
-            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
-            for item in Manuscript.specification:
-                key, value = self.obj.custom_getkv(item, kwargs=kwargs)
-                # Add the K/V row
-                ws.cell(row=row_num, column = 1).value = key
-                ws.cell(row=row_num, column = 2).value = value
-                row_num += 1
+                # Walk the mainitems
+                row_num = 2
+                kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+                for item in Manuscript.specification:
+                    key, value = self.obj.custom_getkv(item, kwargs=kwargs)
+                    # Add the K/V row
+                    ws.cell(row=row_num, column = 1).value = key
+                    ws.cell(row=row_num, column = 2).value = value
+                    row_num += 1
 
-            # Second worksheet: ALL SERMONS in the manuscript
-            ws = wb.create_sheet("Sermons")
+                # Second worksheet: ALL SERMONS in the manuscript
+                ws = wb.create_sheet("Sermons")
 
-            # Read the header cells and make a header row in the SERMON worksheet
-            headers = [x['name'] for x in SermonDescr.specification ]
-            for col_num in range(len(headers)):
-                c = ws.cell(row=1, column=col_num+1)
-                c.value = headers[col_num]
-                c.font = openpyxl.styles.Font(bold=True)
-                # Set width to a fixed size
-                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+                # Read the header cells and make a header row in the SERMON worksheet
+                headers = [x['name'] for x in SermonDescr.specification ]
+                for col_num in range(len(headers)):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = headers[col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-            row_num = 1
-            # Walk all msitems of this manuscript
-            for msitem in self.obj.manuitems.all().order_by('order'):
-                row_num += 1
-                col_num = 1
-                ws.cell(row=row_num, column=col_num).value = msitem.order
-                # Get other stuff
-                parent = "" if msitem.parent == None else msitem.parent.order
-                firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
-                next = "" if msitem.next == None else msitem.next.order
+                row_num = 1
+                # Walk all msitems of this manuscript
+                for msitem in self.obj.manuitems.all().order_by('order'):
+                    row_num += 1
+                    col_num = 1
+                    ws.cell(row=row_num, column=col_num).value = msitem.order
+                    # Get other stuff
+                    parent = "" if msitem.parent == None else msitem.parent.order
+                    firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
+                    next = "" if msitem.next == None else msitem.next.order
 
-                # Process the structural elements
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = parent
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = firstchild
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = next
-
-                # What kind of item is this?
-                col_num += 1
-                if msitem.itemheads.count() > 0:
-                    sermonhead = msitem.itemheads.first()
-                    # This is a SermonHead
-                    ws.cell(row=row_num, column=col_num).value = "Structural"
-                    col_num += 2
-                    ws.cell(row=row_num, column=col_num).value = sermonhead.locus
-                    col_num += 4
-                    ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
-                else:
-                    # This is a SermonDescr
-                    ws.cell(row=row_num, column=col_num).value = "Plain"
+                    # Process the structural elements
                     col_num += 1
-                    sermon = msitem.itemsermons.first()
-                    # Walk the items
-                    for item in SermonDescr.specification:
-                        if item['type'] != "":
-                            key, value = sermon.custom_getkv(item, kwargs=kwargs)
-                            ws.cell(row=row_num, column=col_num).value = value
-                            col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = parent
+                    col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = firstchild
+                    col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = next
+
+                    # What kind of item is this?
+                    col_num += 1
+                    if msitem.itemheads.count() > 0:
+                        sermonhead = msitem.itemheads.first()
+                        # This is a SermonHead
+                        ws.cell(row=row_num, column=col_num).value = "Structural"
+                        col_num += 2
+                        ws.cell(row=row_num, column=col_num).value = sermonhead.locus
+                        col_num += 4
+                        ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
+                    else:
+                        # This is a SermonDescr
+                        ws.cell(row=row_num, column=col_num).value = "Plain"
+                        col_num += 1
+                        sermon = msitem.itemsermons.first()
+                        # Walk the items
+                        for item in SermonDescr.specification:
+                            if item['type'] != "":
+                                key, value = sermon.custom_getkv(item, kwargs=kwargs)
+                                ws.cell(row=row_num, column=col_num).value = value
+                                col_num += 1
                 
 
-            # Save it
-            wb.save(response)
-            sData = response
+                # Save it
+                wb.save(response)
+                sData = response
+            elif dtype == "json":
+                # Start a *list* of manuscripts
+                #  (so that we have one generic format for both a single as well as a number of manuscripts)
+                lst_manu = []
+
+                # Start one object for this particular manuscript
+                oManu = dict(msitems=[])
+
+                # Walk the mainitems
+                kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+                for item in Manuscript.specification:
+                    # Only skip key_id items
+                    if item['type'] != "fk_id":
+                        key, value = self.obj.custom_getkv(item, **kwargs)
+                        # Add the K/V row
+                        oManu[key] = value
+
+                # Walk all msitems of this manuscript
+                for msitem in self.obj.manuitems.all().order_by('order'):
+                    # Create an object for this sermon
+                    oMsItem = {}
+
+                    # Add the order of this item as well as he parent, firstchild, next
+                    oMsItem['order'] = msitem.order
+                    oMsItem['parent'] = "" if msitem.parent == None else msitem.parent.order
+                    oMsItem['firstchild'] = "" if msitem.firstchild == None else msitem.firstchild.order
+                    oMsItem['next'] = "" if msitem.next == None else msitem.next.order
+
+                    # Create an object for this sermon
+                    oSermon = {}
+
+                    # What kind of item is this?
+                    if msitem.itemheads.count() > 0:
+                        sermonhead = msitem.itemheads.first()
+                        # This is a SermonHead
+                        oSermon['type'] = "Structural"
+                        oSermon['locus'] = sermonhead.locus
+                        oSermon['title'] = sermonhead.title.strip()
+                    else:
+                        # This is a SermonDescr
+                        oSermon['type'] = "Plain"
+
+                        # Get the actual sermon
+                        sermon = msitem.itemsermons.first()
+                        # Walk the items of this sermon (defined in specification)
+                        for item in SermonDescr.specification:
+                            if item['type'] != "" and item['type'] != "fk_id":
+                                key, value = sermon.custom_getkv(item, **kwargs)
+                                oSermon[key] = value
+                    # Add sermon to msitem
+                    oMsItem['sermon'] = oSermon
+                    # Add this sermon to the list of sermons within the manuscript
+                    oManu['msitems'].append(oMsItem)
+
+                # Add object to the list
+                lst_manu.append(oManu)
+                # Make sure to return this list
+                sData = json.dumps( lst_manu, indent=2)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDownload/get_data")
