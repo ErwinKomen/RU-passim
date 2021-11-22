@@ -1657,31 +1657,31 @@ svg .links {
 }
 svg .links .linktype_eqs:hover {
     stroke-width: 4;
-    fill: red;
+    stroke: red;
 }
 svg .links .linktype_prt:hover {
     stroke-width: 4;
-    fill: blue;
+    stroke: blue;
 }
 svg .links .linktype_sim:hover {
     stroke-width: 4;
-    fill: green;
+    stroke: green;
 }
 svg .links .linktype_use:hover {
     stroke-width: 4;
-    fill: yellow;
+    stroke: yellow;
 }
 svg .links .linktype_neq:hover {
     stroke-width: 4;
-    fill: orange;
+    stroke: orange;
 }
 svg .links .linktype_uns:hover {
     stroke-width: 4;
-    fill: purple;
+    stroke: purple;
 }
 svg .links .linktype_ech:hover {
     stroke-width: 4;
-    fill: pink;
+    stroke: pink;
 }
 
 
