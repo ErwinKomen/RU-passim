@@ -170,7 +170,7 @@ class CodeWidget(ModelSelect2MultipleWidget):
     search_fields = [ 'code__icontains' ]
 
     def label_from_instance(self, obj):
-        return obj.code
+        return obj.get_code()
 
     def get_queryset(self):
         return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
@@ -363,7 +363,7 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
 
     def label_from_instance(self, obj):
         # sLabel = obj.get_label(do_incexpl = False)
-        sLabel = obj.code
+        sLabel = obj.get_code()
         return sLabel
 
     def get_queryset(self):

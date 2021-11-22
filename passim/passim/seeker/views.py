@@ -11018,6 +11018,19 @@ class EqualGoldEdit(BasicDetails):
                     if reverse == None:
                         # Create the reversal 
                         reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if obj.spectype != None and obj.spectype != "":
+                          reverse.spectype = get_reverse_spec(obj.spectype)
+                          bNeedSaving = True
+                        # Possibly copy note
+                        if obj.note != None and obj.note != "":
+                          reverse.note = obj.note
+                          bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                          reverse.save()
 
             # (3) 'keywords'
             kwlist = form.cleaned_data['kwlist']

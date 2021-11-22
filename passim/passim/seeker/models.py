@@ -1229,6 +1229,12 @@ class Action(models.Model):
         action = Action(user=oUser, itemtype=itemtype, itemid=itemid, actiontype=actiontype)
         if details != None: action.details = details
         action.save()
+
+        # DEBUGGING
+        if "None is" in details:
+          iStop = 1
+
+
         return action
 
     def get_object(self):
@@ -4015,7 +4021,7 @@ class Manuscript(models.Model):
         html = []
         for ssg in ssg_list:
             url = reverse('equalgold_details', kwargs={'pk': ssg.id})
-            code = ssg.code if ssg.code else "(ssg_{})".format(ssg.id)
+            code = ssg.get_code() # ssg.code if ssg.code else "(ssg_{})".format(ssg.id)
             # Add a link to this SSG in the list
             html.append("<span class='passimlink'><a href='{}'>{}</a></span>".format(url, code))
         sBack = ", ".join(html)
@@ -5838,6 +5844,16 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def get_code(self):
+      """Make sure to return an intelligable form of the code"""
+
+      sBack = ""
+      if self.code == None:
+        sBack = "ssg_{}".format(self.id)
+      else:
+        sBack = self.code
+      return sBack
+
     def get_collections_markdown(self, username, team_group, settype = None):
 
         lHtml = []
@@ -6065,7 +6081,7 @@ class EqualGold(models.Model):
 
         lHtml = []
         # Add the PASSIM code
-        lHtml.append("{}".format(self.code))
+        lHtml.append("{}".format(self.get_code()))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
         qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
@@ -6130,7 +6146,7 @@ class EqualGold(models.Model):
 
         lHtml = []
         # Add the PASSIM code
-        lHtml.append("{}".format(self.code))
+        lHtml.append("{}".format(self.get_code()))
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
         qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
@@ -7018,7 +7034,12 @@ class EqualGoldLink(models.Model):
     note = models.TextField("Notes on this link", blank=True, null=True)
 
     def __str__(self):
-        combi = "{} is {} of {}".format(self.src.code, self.linktype, self.dst.code)
+        src_code = ""
+        if self.src == None:
+          src_code = "id{}".format(self.src.id)
+        else:
+          src_code = self.src.code
+        combi = "{} is {} of {}".format(src_code, self.linktype, self.dst.code)
         return combi
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
