@@ -2200,6 +2200,8 @@ var ru = (function ($, ru) {
             canvas = null,
             elData = null,
             sHtml = "",
+            x = 0,
+            y = 0,
             oBack = null,
             // options = {},
             dtype = "",
@@ -2272,32 +2274,42 @@ var ru = (function ($, ru) {
                       $(frm).find(".dropdown-menu").addClass("hidden");
                     }
 
-                    // Convert the HTML into a canvas and turn the canvas into a PNG
-                    el = $(contentid).first().get(0);
+                    // Check if this is SVG to PNG or strict HTML:
+                    if ($(contentid).find("svg").length > 0) {
+                      // Convert the SVG part
+                      svgText = $(contentid).find("svg").html();
+                      private_methods.svgToPng(svgText);
+                    } else {
+                      // Convert the HTML into a canvas and turn the canvas into a PNG
+                      el = $(contentid).first().get(0);
 
-                    el.scrollIntoView();
-                    html2canvas(el, {
-                      scale: scaleFactor, y: window.scrollY, x: window.scrollX,
-                      logging: true, foreignObjectRendering: true,
-                      removeContainer: true
-                    })
-                      .then(function (canvas) {
-                        // Convert to data
-                        var imageData = canvas.toDataURL("image/png");
-                        if (elData.length > 0) {
-                          $(elData).val(imageData);
-                        }
+                      el.scrollIntoView();
+                      x = window.scrollX; //
+                      y = window.scrollY; //
+                      html2canvas(el, {
+                        scale: scaleFactor, y: y, x: x,
+                        logging: true, foreignObjectRendering: true,
+                        removeContainer: true
+                      })
+                        .then(function (canvas) {
+                          // Convert to data
+                          var imageData = canvas.toDataURL("image/png");
+                          if (elData.length > 0) {
+                            $(elData).val(imageData);
+                          }
 
-                        // Need to stop showing waiting?
-                        if (waitclass !== null) {
-                          // Start waiting
-                          $(frm).find(waitclass).addClass("hidden");
-                        }
+                          // Need to stop showing waiting?
+                          if (waitclass !== null) {
+                            // Start waiting
+                            $(frm).find(waitclass).addClass("hidden");
+                          }
 
-                        // Now submit the form
-                        oBack = frm.submit();
+                          // Now submit the form
+                          oBack = frm.submit();
 
-                      });
+                        });
+
+                    }
                     break;
                   case "hist-svg":
                     sHtml = private_methods.prepend_styles(contentid, "svg");

@@ -7035,8 +7035,8 @@ class EqualGoldLink(models.Model):
 
     def __str__(self):
         src_code = ""
-        if self.src == None:
-          src_code = "id{}".format(self.src.id)
+        if self.src.code == None:
+          src_code = "ssg_{}".format(self.src.id)
         else:
           src_code = self.src.code
         combi = "{} is {} of {}".format(src_code, self.linktype, self.dst.code)
