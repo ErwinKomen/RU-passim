@@ -123,6 +123,21 @@ def get_ssg_passim(ssg_id, obj=None):
         oErr.DoError("get_ssg_passim")
     return code
 
+def get_watermark():
+    """Create and return a watermark"""
+
+    oErr = ErrHandle()
+    watermark_template = "seeker/passim_watermark.html"
+    watermark = ""
+    try:
+            # create a watermark with the right datestamp
+            context_wm = dict(datestamp=get_crpp_date(get_current_datetime(), True))
+            watermark = render_to_string(watermark_template, context_wm)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_watermark")
+    # Return the result
+    return watermark
 
 
 
@@ -146,7 +161,6 @@ class EqualGoldOverlap(BasicPart):
         spec_dict = {}
         link_dict = {}
         graph_template = 'seeker/super_graph_hist.html'
-        watermark_template = "seeker/passim_watermark.html"
 
         try:
             # Define the linktype and spectype
@@ -210,14 +224,10 @@ class EqualGoldOverlap(BasicPart):
             context = dict(hist_list = hist_list)
             hist_buttons = render_to_string(graph_template, context, self.request)
 
-            # create a watermark with the right datestamp
-            context_wm = dict(datestamp=get_crpp_date(get_current_datetime(), True))
-            watermark = render_to_string(watermark_template, context_wm)
-
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
-                                   watermark=watermark,
+                                   watermark=get_watermark(),
                                    hist_set=hist_set,
                                    hist_buttons=hist_buttons,
                                    max_value=max_value,
@@ -402,6 +412,7 @@ class EqualGoldTrans(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    author_list=author_list,
                                    max_value=max_value,
                                    networkslider=networkslider,
@@ -647,6 +658,7 @@ class EqualGoldGraph(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    max_value=max_value,
                                    networkslider=networkslider,
                                    legend="SSG network")
@@ -742,26 +754,30 @@ class EqualGoldGraph(BasicPart):
                 ssg_list_id = [x['super_id'] for x in ssg_list]
                 # evaluate links between a source and target SSG
                 for idx_s, source_id in enumerate(ssg_list_id):
-                    # Get the title of the source
-                    source = ssg_dict[source_id]
-                    for idx_t in range(idx_s+1, len(ssg_list_id)-1):
-                        target_id = ssg_list_id[idx_t]
-                        # Get the title of the target
-                        target = ssg_dict[target_id]
-                        # Retrieve or create a link from the link_listT
-                        link_code = "{}_{}".format(source_id, target_id)
-                        if link_code in link_dict:
-                            oLink = link_listT[link_dict[link_code]]
-                        else:
-                            oLink = dict(source=source, source_id=source_id,
-                                         target=target, target_id=target_id,
-                                         value=0)
-                            link_listT.append(oLink)
-                            link_dict[link_code] = len(link_listT) - 1
-                        # Now add to the value
-                        oLink['value'] += 1
-                        if oLink['value'] > max_value:
-                            max_value = oLink['value']
+                    # sanity check
+                    if source_id in ssg_dict:
+                        # Get the title of the source
+                        source = ssg_dict[source_id]
+                        for idx_t in range(idx_s+1, len(ssg_list_id)-1):
+                            target_id = ssg_list_id[idx_t]
+                            # Double check
+                            if target_id in ssg_dict:
+                                # Get the title of the target
+                                target = ssg_dict[target_id]
+                                # Retrieve or create a link from the link_listT
+                                link_code = "{}_{}".format(source_id, target_id)
+                                if link_code in link_dict:
+                                    oLink = link_listT[link_dict[link_code]]
+                                else:
+                                    oLink = dict(source=source, source_id=source_id,
+                                                 target=target, target_id=target_id,
+                                                 value=0)
+                                    link_listT.append(oLink)
+                                    link_dict[link_code] = len(link_listT) - 1
+                                # Now add to the value
+                                oLink['value'] += 1
+                                if oLink['value'] > max_value:
+                                    max_value = oLink['value']
             
             # Only accept the links that have a value >= min_value
             node_dict = []
@@ -890,6 +906,7 @@ class EqualGoldPca(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    max_value=max_value,
                                    legend="SSG network")
             

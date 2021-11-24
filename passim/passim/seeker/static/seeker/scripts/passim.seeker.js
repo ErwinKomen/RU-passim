@@ -1692,7 +1692,7 @@ var ru = (function ($, ru) {
           // Now add the watermark
           gwm = svg.append("g");
           gwm.attr("class", "watermark-main")
-             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+             .attr("transform", "translate(" + options['width'] / 2 + "," + (options['height'] - 33) + ") scale(2.0)");
           $(".watermark-main").html(watermark);
 
           // Defind the 'zoomed' function
@@ -2397,6 +2397,7 @@ var ru = (function ($, ru) {
             gravityid = "#gravity_trans_value",
             p = {},
             g = null,
+            gwm = null,
             author,
             link,
             node;
@@ -2419,6 +2420,7 @@ var ru = (function ($, ru) {
           width = options['width'];
           height = options['height'];
           factor = options['factor'];
+          watermark = options['watermark'];
 
           // Calculate the maxcount
           for (i = 0; i < options['nodes'].length; i++) {
@@ -2562,6 +2564,12 @@ var ru = (function ($, ru) {
                 })
                 .attr("text-anchor", "left")
                 .style("alignment-baseline", "middle");
+
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
 
           // ====================== HELP FUNCTIONS =============================
           // Defind the 'zoomed' function
@@ -6649,6 +6657,7 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['watermark'] = response.watermark;
 
                   loc_network_options = options;
 
@@ -6724,6 +6733,7 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['watermark'] = response.watermark;
 
                   loc_network_options = options;
 
