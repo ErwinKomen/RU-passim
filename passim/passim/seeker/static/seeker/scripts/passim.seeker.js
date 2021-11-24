@@ -1582,10 +1582,12 @@ var ru = (function ($, ru) {
             factor,
             width,
             height,
+            watermark,
             gravityvalue = 10,
             gravityid = "#gravityvalue",
             p = {},
             g = null,
+            gwm = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1607,6 +1609,7 @@ var ru = (function ($, ru) {
           width = options['width'];
           height = options['height'];
           factor = options['factor'];
+          watermark = options['watermark'];
 
           // Define the SVG element and the color scheme
           divSvg = "#" + options['target'] + " svg";
@@ -1685,6 +1688,12 @@ var ru = (function ($, ru) {
           // Add popup title to links: this provides the actual weight
           link.append("title")
                   .text(function (d) { return d.value; });
+
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
 
           // Defind the 'zoomed' function
           function zoomed(event) {
@@ -1797,6 +1806,7 @@ var ru = (function ($, ru) {
             factor,
             width,
             height,
+            watermark,
             calcW,
             calcH,
             i,
@@ -1813,6 +1823,7 @@ var ru = (function ($, ru) {
             degree = 1,
             p = {},
             g = null,
+            gwm = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1837,6 +1848,7 @@ var ru = (function ($, ru) {
           degree = options['degree'];
           max_value = options['max_value'];
           max_group = options['max_group'];
+          watermark = options['watermark'];
 
           // Create a grayscale color range
           //grayrange = d3.scaleLinear()
@@ -2040,6 +2052,12 @@ var ru = (function ($, ru) {
               }
               return sTitle
             });
+
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
 
           // Link a handler to select the right color
           $(".overlap-node").on("click", function (event) {
@@ -6137,6 +6155,7 @@ var ru = (function ($, ru) {
             options = {},
             link_list = null,
             node_list = null,
+            watermark = "",
             lock_status = "",
             iWidth = 800,
             iHeight = 500,
@@ -6168,6 +6187,7 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['watermark'] = response.watermark;
                   if ("networkslider" in response) {
                     $("#networkslidervalue").html(response.networkslider);
                   }
@@ -6509,6 +6529,7 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['watermark'] = response.watermark;
                   options['hcset'] = response.hist_set;
                   options['degree'] = 1;
                   if ("networkslider" in response) {

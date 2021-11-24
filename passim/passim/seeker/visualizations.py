@@ -145,6 +145,8 @@ class EqualGoldOverlap(BasicPart):
         oErr = ErrHandle()
         spec_dict = {}
         link_dict = {}
+        graph_template = 'seeker/super_graph_hist.html'
+        watermark_template = "seeker/passim_watermark.html"
 
         try:
             # Define the linktype and spectype
@@ -206,11 +208,16 @@ class EqualGoldOverlap(BasicPart):
             hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()]
             hist_list = sorted(hist_list, key=lambda x: x['name']);
             context = dict(hist_list = hist_list)
-            hist_buttons = render_to_string('seeker/super_graph_hist.html', context, self.request)
+            hist_buttons = render_to_string(graph_template, context, self.request)
+
+            # create a watermark with the right datestamp
+            context_wm = dict(datestamp=get_crpp_date(get_current_datetime(), True))
+            watermark = render_to_string(watermark_template, context_wm)
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=watermark,
                                    hist_set=hist_set,
                                    hist_buttons=hist_buttons,
                                    max_value=max_value,
