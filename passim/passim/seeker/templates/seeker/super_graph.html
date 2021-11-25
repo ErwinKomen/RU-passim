@@ -1,3 +1,20 @@
+<div class="row">
+  <div class="md-col-12">
+    <span class="pull-right" style="margin-bottom: 10px;">
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network" 
+         data-target="#ssg_network_overlap"
+         onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Manuscript Transmission" 
+         data-target="#ssg_network_trans"
+         onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Network graph" 
+         data-target="#ssg_network_graph"
+         onclick="ru.passim.seeker.network_graph(this);">Graph</a>
+    </span>
+  </div>
+
+</div>
+
 <div id="ssg_network_trans" class="hidden container-small">
   <form action="{{equalgold_trans}}" method="post" >
     {% csrf_token %}
@@ -5,6 +22,7 @@
       <input name='downloadtype' id='downloadtype' class='form-control' value='' >
       <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
+
     <div class="row">
       <div class="col-md-5 col-md-offset-3 align-right">
         <span>Minimum number of manuscripts in which SSGs co-occur: </span>
@@ -18,10 +36,11 @@
       <!-- Button to stop -->
       <div class="col-md-1 align-right">
         <a role="button" class="btn btn-xs jumbo-2"
-           targeturl={{equalgold_trans}}
-           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+            targeturl={{equalgold_trans}}
+            onclick="ru.passim.seeker.network_transmission(this);">Update</a>
       </div>
     </div>
+
     <div class="row">
       <div class="col-md-5 col-md-offset-3 align-right">
         <span>Gravity: </span>
@@ -82,8 +101,8 @@
       <!-- Button to stop -->
       <div class="col-md-1 align-right">
         <a role="button" class="btn btn-xs jumbo-2"
-           targeturl={{equalgold_graph}}
-           onclick="ru.passim.seeker.network_stop(this);">Close</a>
+            targeturl={{equalgold_graph}}
+            onclick="ru.passim.seeker.network_graph(this);">Update</a>
       </div>
 
     </div>
@@ -170,7 +189,7 @@
             <td align="right">
               <a role="button" class="btn btn-xs jumbo-2"
                  targeturl={{equalgold_overlap}}
-                 onclick="ru.passim.seeker.network_stop(this);">Close</a>
+                 onclick="ru.passim.seeker.network_overlap(this);">Update</a>
             </td>
           </tr>
 
@@ -191,8 +210,16 @@
               </label>
             </td>
 
-            <td>&nbsp;</td>
-            <td>&nbsp;</td>
+            <!-- waiting -->
+            <td>
+              <span class="waiting hidden">
+                <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+              </span>
+            </td>
+            <!-- Update button -->
+            <td align="right">
+
+            </td>
 
             <td class="tdnowrap" align="right">
               <span>Gravity: </span>

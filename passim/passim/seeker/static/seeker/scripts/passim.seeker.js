@@ -2389,6 +2389,7 @@ var ru = (function ($, ru) {
             size = 10,  //Size of each author selection square
             width,
             height,
+            watermark = "",
             i,
             count,
             maxcount = 0,
@@ -2705,6 +2706,49 @@ var ru = (function ($, ru) {
         var elWait = $(".main-wait").first();
         if (elWait !== undefined && elWait !== null) {
           $(elWait).addClass("hidden");
+        }
+      },
+
+      /*
+       * sticky_switch - switch visualization
+       */
+      sticky_switch: function (elStart) {
+        var sStatus = "",
+            divNetwork = "";
+
+        try {
+          // Figure out what course of action to take
+          if ($(elStart).hasClass("sticky-visualization")) {
+            // Need to do switching on/off
+            if ($(elStart).hasClass("jumbo-1")) {
+              // Close all visualizations
+              $(".sticky-visualization").each(function (idx, el) {
+
+                // Switch off everything
+                $(el).addClass("jumbo-1");
+                $(el).removeClass("jumbo-2");
+                // Close the network area
+                $($(el).attr("data-target")).addClass("hidden");
+              });
+              // Show that the button has been clicked
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-2");
+              sStatus = "continue";
+            } else {
+              // We are switching OFF
+              $(elStart).addClass("jumbo-1");
+              $(elStart).removeClass("jumbo-2");
+              // Now CLOSE this visualization
+              divNetwork = $(elStart).attr("data-target");
+              $(divNetwork).addClass("hidden");
+              // And leave
+              sStatus = "leave";
+            }
+          }
+          // REturn the status
+          return sStatus;
+        } catch (ex) {
+          private_methods.errMsg("sticky_switch", ex);
         }
       },
 
@@ -6173,6 +6217,10 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_graph";
 
         try {
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");
@@ -6515,6 +6563,11 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_overlap";
 
         try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");
@@ -6618,6 +6671,11 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_trans";
 
         try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");

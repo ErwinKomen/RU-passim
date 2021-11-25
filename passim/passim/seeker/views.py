@@ -11242,19 +11242,19 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Use the 'graph' function or not?
                 use_network_graph = True
 
-                # Add a custom button to the manuscript listview: to trigger showing a graph
-                html = []
-                if use_network_graph:
-                    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
-                    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
-                    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
-                    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
-                    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
-                    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                #html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                #html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
-                custombutton = "\n".join(html)
-                manuscripts['custombutton'] = custombutton
+                ## Add a custom button to the manuscript listview: to trigger showing a graph
+                #html = []
+                #if use_network_graph:
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
+                #    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
+                #    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
+                #    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
+                ##html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
+                ##html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
+                #custombutton = "\n".join(html)
+                #manuscripts['custombutton'] = custombutton
 
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
