@@ -4761,7 +4761,8 @@ class SermonListView(BasicList):
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
+                # Issue #416: Delete the option to search for a GoldSermon personal dataset
+                # {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
@@ -4803,7 +4804,8 @@ class SermonListView(BasicList):
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'id' }, 
-            {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
+            # Issue #416: Delete the option to search for a GoldSermon personal dataset
+            # {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
             {'filter': 'collsuper',     'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }, 
             {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'id' }
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
@@ -6329,7 +6331,7 @@ class ProjectListView(BasicList):
         html = []
         if custom == "manulink":
             # Link to manuscripts in this project
-            count = instance.project_manuscripts.all().count()
+            count = instance.project_manuscripts.exclude(mtype="tem").count()
             url = reverse('search_manuscript')
             if count > 0:
                 html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
@@ -8021,6 +8023,7 @@ class CollectionListView(BasicList):
 
     def add_to_context(self, context, initial):
         if self.prefix == "priv":
+            context['prefix'] = self.prefix
             context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
         return context
 
@@ -9294,7 +9297,8 @@ class ManuscriptListView(BasicList):
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Sermon Gold",         "id": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
+        # Issue #416: Delete the option to search for a GoldSermon dataset 
+        # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
         # {"name": "Manuscript overlap",      "id": "filter_collection_manuptc",  "enabled": False, "head_id": "filter_collection"},
         {"name": "Project",                 "id": "filter_project",             "enabled": False, "head_id": "filter_other"},
@@ -9324,18 +9328,21 @@ class ManuscriptListView(BasicList):
             {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id' },
             #{'filter': 'collection_manuptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
             # 'title': 'Percentage overlap between the "Comparison manuscript" SSGs and the SSGs referred to in other manuscripts'},
+
             # === Historical Collection ===
             {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
              'title': 'Percentage overlap between the Historical Collection SSGs and the SSGs referred to in the manuscripts'},
+
             # === Personal Dataset ===
             {'filter': 'collection_manu',  'fkfield': 'collections',                            
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               
              'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
-             'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            # Issue #416: Delete the option to search for a GoldSermon dataset 
+            #{'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
+            # 'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
             {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
