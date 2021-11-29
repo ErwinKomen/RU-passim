@@ -2929,6 +2929,7 @@ class Litref(models.Model):
             adapt_markdown(self.short, lowercase=False)
         return sBack
 
+
 class Project2(models.Model):
     """Manuscripts may belong to the one or more projects (Passim or others)"""
     
@@ -2963,6 +2964,7 @@ class Project2(models.Model):
         #    oErr.DoError("Project2/save")
 
         return response
+
 
 class Project(models.Model):
     """manuscripts may belong to the project 'Passim' or to something else"""
@@ -7197,6 +7199,7 @@ class EqualGoldKeyword(models.Model):
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
+
 class EqualGoldProject(models.Model):
     """Relation between an EqualGold and a Project"""
 
@@ -7206,6 +7209,7 @@ class EqualGoldProject(models.Model):
     project = models.ForeignKey(Project2, related_name="equal_proj", on_delete=models.CASCADE)     
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+    
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -7240,8 +7244,7 @@ class SermonGoldKeyword(models.Model):
         if self.gold and self.keyword_id:
             response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
-
-
+    
 
 class Ftextlink(models.Model):
     """Link to the full text of a critical edition of a Gold Sermon"""
@@ -9057,7 +9060,6 @@ class SermonDescr(models.Model):
         return sUrl
           
 
-
 class Range(models.Model):
     """A range in the bible from one place to another"""
 
@@ -10259,6 +10261,7 @@ class CollectionSuper(models.Model):
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
+
 class CollectionProject(models.Model):
     """Relation between a Collection and a Project"""
 
@@ -10268,6 +10271,7 @@ class CollectionProject(models.Model):
     project = models.ForeignKey(Project2, related_name="collection_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
 
 class Template(models.Model):
     """A template to construct a manuscript"""

@@ -6298,10 +6298,10 @@ class ProfileListView(BasicList):
 
 
 class ProjectEdit(BasicDetails):
-    # model = Project
+    """Details and editing of a project (nov 2021 version)"""
+
     model = Project2
     mForm = ProjectForm
-    # prefix = 'prj'
     prefix = 'proj'
     title = "Project"
     # no_delete = True
@@ -6330,16 +6330,14 @@ class ProjectDetails(ProjectEdit):
 class ProjectListView(BasicList):
     """Search and list projects"""
 
-    #model = Project 
     model = Project2 
     listform = ProjectForm
-    #prefix = "prj"
     prefix = "proj"
     has_select2 = True
     paginate_by = 20
+    sg_name = "Project"     # THis is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Projects"
-    # template_name = 'seeker/project_list.html'
-    page_function = "ru.passim.seeker.search_paged_start"
+    # page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
     order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str', 'custom': 'project', 'main': True, 'linkdetails': True},
@@ -6352,24 +6350,30 @@ class ProjectListView(BasicList):
             {'filter': 'project',   'dbfield': 'name',         'keyS': 'project_ta', 'keyList': 'projlist', 'infield': 'name' }]} 
             #{'filter': 'project',   'fkfield': 'projects',    'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'}]},
         ] 
+
     # hier gaat het nog niet goed
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
         html = []
-        if custom == "manulink":
-            # Link to manuscripts in this project
-            count = instance.project2_manuscripts.exclude(mtype="tem").count()
-            url = reverse('search_manuscript')
-            if count > 0:
-             #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
-             #       url, instance.id, count, count)) 
-                html.append("<a href='{}?manu-projlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
-                    url, instance.id, count, count))
-        elif custom == "project":
-            sName = instance.name
-            if sName == "": sName = "<i>(unnamed)</i>"
-            html.append(sName)
+        oErr = ErrHandle()
+        try:
+            if custom == "manulink":
+                # Link to manuscripts in this project
+                count = instance.project2_manuscripts.exclude(mtype="tem").count()
+                url = reverse('search_manuscript')
+                if count > 0:
+                 #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
+                 #       url, instance.id, count, count)) 
+                    html.append("<a href='{}?manu-projlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
+                        url, instance.id, count, count))
+            elif custom == "project":
+                sName = instance.name
+                if sName == "": sName = "<i>(unnamed)</i>"
+                html.append(sName)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectListView/get_field_value")
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle
