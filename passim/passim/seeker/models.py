@@ -7916,7 +7916,8 @@ class SermonDescr(models.Model):
                     for project in qs_project:
                         # Add the projects to the sermon.
                         self.projects.add(project)   
-  
+            # Signal that all went well
+            bBack = True
         except:
             msg = oErr.get_error_message()
             oErr.DoError("adapt_projects")
