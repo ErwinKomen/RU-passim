@@ -2943,27 +2943,24 @@ class Project2(models.Model):
             sName = "(unnamed)"
         return sName
 
-    #def get_default(username):
-    #    """Determine the default project for this user""" # TH: dit niet voor de toekomstige oplossing 
-    #    # maar wel voor alles wat er nu in de database staan               
-
-    #    obj = Project2.objects.filter(name__iexact = "passim").first()
-    #    if obj == None:
-    #        obj = Project2.objects.all().first()
-    #    return obj
-
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # First do the normal saving
         response = super(Project2, self).save(force_insert, force_update, using, update_fields)
-        # Check if this is the first project object
-        qs = Project2.objects.all()
-        if qs.count() == 1:
-            # Set this as default project for all manuscripts
-            prj = qs.first()
-            with transaction.atomic():
-                for obj in Manuscript.objects.all():
-                    obj.project = prj
-                    obj.save()
+
+        #oErr = ErrHandle()
+        #try:
+        #    # Check if this is the first project object
+        #    qs = Project2.objects.all()
+        #    if qs.count() == 1:
+        #        # Set this as default project for all manuscripts
+        #        prj = qs.first()
+        #        with transaction.atomic():
+        #            for obj in Manuscript.objects.all():
+        #                obj.project = prj
+        #                obj.save()
+        #except:
+        #    msg = oErr.get_error_message()
+        #    oErr.DoError("Project2/save")
 
         return response
 
@@ -7898,49 +7895,28 @@ class SermonDescr(models.Model):
         return bOkay, msg
 
     def adapt_projects(self):
-        """Adapt sermon-project connections for new sermon under manuscript"""         
+        """Adapt sermon-project connections for new sermon under manuscript"""  
+               
         oErr = ErrHandle()
         bBack = False
         try:
             sermon = self
-            # First get the manuscript starting from the sermon
-            manu = self.msitem.manu                      
-            # Get all projects connected to this manuscript
-            qs_project = manu.projects.all()                      
-            # Add all these projects to the sermon
-            with transaction.atomic():
-                for project in qs_project:
-                    # Add the projects to the sermon.
-                    self.projects.add(project)   
+            # Check if this sermon is *NOT* yet part of any project
+            count = sermon.projects.count()
 
-            # OLD: KAN WEG            
-            
-            ## First get the manuscript by using the MsItem of the sermon
-            #msitem = self.msitem                      
-            
-            ## Get the id of the manuscript from the MsItem
-            #manuid = msitem.manu_id
-            
-            ## Create empty list to store the project(s) of the manuscript 
-            #project_list = []
+            if count == 0:
+                # Add this sermon to all the projects that the manuscript belongs to
 
-            ## Find the manuscript to which the new sermon belongs 
-            #for manu in Manuscript.objects.filter(id = manuid):
-
-            #    # Find all project names linked to this manuscript
-            #    for mp in ManuscriptProject.objects.filter(manuscript = manu):
-            #        # Add the projects to the list
-            #        project_list.append(mp.project)                    
-                
-            ## Now that we have the projects, we should link them to the new sermon           
-            ## Get the sermon
-            #sermon = self
-            
-            ## Iterate over the project list
-            #for project in project_list:
-            #    # Add the projects to the sermon
-            #     sermon.projects.add(project)   
-   
+                # First get the manuscript starting from the sermon
+                manu = self.msitem.manu                      
+                # Get all projects connected to this manuscript
+                qs_project = manu.projects.all()                      
+                # Add all these projects to the sermon
+                with transaction.atomic():
+                    for project in qs_project:
+                        # Add the projects to the sermon.
+                        self.projects.add(project)   
+  
         except:
             msg = oErr.get_error_message()
             oErr.DoError("adapt_projects")

@@ -676,28 +676,33 @@ def adapt_passim_project_name_sermo():
          
     try:
         # Iterate over all Manuscripts in the database:  
-        for manu in Manuscript.objects.all():            
-            # Create empty list of projects for each manuscript 
-            project_list = []
-            # Find all project names linked to this manuscript
-            for mp in ManuscriptProject.objects.filter(manuscript = manu):
-                # Add the projects to the list
-                project_list.append(mp.project) 
+        idx = 0
+        count = Manuscript.objects.count()
+        with transaction.atomic():
+            for manu in Manuscript.objects.all():    
+                idx += 1
+                print("Manuscript number {} of {}".format(idx, count))  
+                # Create empty list of projects for each manuscript 
+                project_list = []
+                # Find all project names linked to this manuscript
+                for mp in ManuscriptProject.objects.filter(manuscript = manu):
+                    # Add the projects to the list
+                    project_list.append(mp.project) 
        
-            # Now iterate over the sermons that are part of the manuscript                    
-            for sermon in SermonDescr.objects.filter(msitem__manu = manu):              
-                # And iterate over the project list taken from the manuscript
-                for project in project_list:
-                    #print(project.name)
-                    # Get the name of the project
-                    name_project = project.name
-                    # Find out of the project already exists TH: this step is not necessary or is it?
-                    projectfound = Project2.objects.filter(name__iexact = name_project).first()
-                    # Test if the project has already been linked to the sermon 
-                    sermoprojlink = SermonDescrProject.objects.filter(sermon = sermon, project = projectfound).first()
-                    # If this is not the case then a link must be made between the sermon and the project
-                    if sermoprojlink == None: 
-                        SermonDescrProject.objects.create(project = projectfound, sermon = sermon)
+                # Now iterate over the sermons that are part of the manuscript                    
+                for sermon in SermonDescr.objects.filter(msitem__manu = manu):              
+                    # And iterate over the project list taken from the manuscript
+                    for project in project_list:
+                        #print(project.name)
+                        # Get the name of the project
+                        name_project = project.name
+                        # Find out of the project already exists TH: this step is not necessary or is it?
+                        projectfound = Project2.objects.filter(name__iexact = name_project).first()
+                        # Test if the project has already been linked to the sermon 
+                        sermoprojlink = SermonDescrProject.objects.filter(sermon = sermon, project = projectfound).first()
+                        # If this is not the case then a link must be made between the sermon and the project
+                        if sermoprojlink == None: 
+                            SermonDescrProject.objects.create(project = projectfound, sermon = sermon)
                    
        
     except:

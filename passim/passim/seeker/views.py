@@ -6359,7 +6359,7 @@ class ProjectListView(BasicList):
         html = []
         if custom == "manulink":
             # Link to manuscripts in this project
-            count = instance.project_manuscripts.exclude(mtype="tem").count()
+            count = instance.project2_manuscripts.exclude(mtype="tem").count()
             url = reverse('search_manuscript')
             if count > 0:
              #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
@@ -6559,7 +6559,7 @@ class CollAnyEdit(BasicDetails):
         
         # Historical collections have a project assigned to them
         if instance.settype == "hc":
-            context['mainitems'].append( {'type': 'plain', 'label': "Project2:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'})
+            context['mainitems'].append( {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'})
                         
 
         # Any dataset may optionally be elevated to a historical collection
